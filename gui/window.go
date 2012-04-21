@@ -12,16 +12,20 @@ type Window struct {
 	centralView View
 	keyboardFocus View
 	mouseFocus map[int]MouseHandlerView
+	repaintMe bool
 }
 
 func NewWindow(self View, centralView View) *Window {
 	if err := glfw.Init(); err != nil { panic(err) }
 	if err := gl.Init(); err != nil { panic(err) }
-	if err := glfw.OpenWindow(800, 600, 8, 8, 8, 0, 0, 0, glfw.Windowed); err != nil { panic(err) }
+	if err := glfw.OpenWindow(800, 600, 8, 8, 8, 8, 0, 0, glfw.Windowed); err != nil { panic(err) }
+	gl.Enable(gl.BLEND)
+	gl.Enable(gl.LINE_SMOOTH)
+	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 	glfw.Disable(glfw.AutoPollEvents)
 	glfw.SetSwapInterval(1)
 	
-	w := &Window{ViewBase{}, *NewClickKeyboardFocuser(centralView), centralView, centralView, make(map[int]MouseHandlerView)}
+	w := &Window{ViewBase{}, *NewClickKeyboardFocuser(centralView), centralView, centralView, make(map[int]MouseHandlerView), false}
 	if self == nil { self = w }
 	w.ViewBase = *NewView(self)
 	w.AddChild(centralView)
@@ -39,13 +43,28 @@ func (w *Window) HandleEvents() {
 		w.Resize(width, height)
 		w.centralView.Resize(width, height)
 	})
+	
+	keyEvent := KeyEvent{}
 	glfw.SetKeyCallback(func(key, state int) {
-		if state == glfw.KeyPress {
-			w.keyboardFocus.KeyPressed(key)
-		} else if state == glfw.KeyRelease {
-			w.keyboardFocus.KeyReleased(key)
+		keyEvent.Key = key
+		if key > glfw.KeySpecial && key <= glfw.KeyLast {
+			keyEvent.Text = ""
+			if state == glfw.KeyPress {
+				w.keyboardFocus.KeyPressed(keyEvent)
+			} else if state == glfw.KeyRelease {
+				w.keyboardFocus.KeyReleased(keyEvent)
+			}
 		}
 	})
+	glfw.SetCharCallback(func(char, state int) {
+		keyEvent.Text = string(char)
+		if state == glfw.KeyPress {
+			w.keyboardFocus.KeyPressed(keyEvent)
+		} else if state == glfw.KeyRelease {
+			w.keyboardFocus.KeyReleased(keyEvent)
+		}
+	})
+	
 	var mousePos image.Point
 	glfw.SetMousePosCallback(func(x, y int) {
 		mousePos = image.Pt(x, w.Height() - y)
@@ -73,6 +92,7 @@ func (w *Window) HandleEvents() {
 
 	for glfw.WindowParam(glfw.Opened) == 1 {
 		glfw.WaitEvents()
+		w.repaint()
 	}
 }
 
@@ -86,7 +106,10 @@ func (w *Window) SetKeyboardFocus(view View) {
 
 func (w *Window) SetMouseFocus(focus MouseHandlerView, button int) { w.mouseFocus[button] = focus }
 
-func (w Window) Repaint() {
+func (w *Window) Repaint() { w.repaintMe = true }
+func (w Window) repaint() {
+	if !w.repaintMe { return }
+	w.repaintMe = false
 	gl.MatrixMode(gl.PROJECTION)
 	gl.LoadIdentity()
 	width, height := w.Width(), w.Height()

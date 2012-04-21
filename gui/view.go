@@ -5,6 +5,11 @@ import (
 	"image"
 )
 
+type KeyEvent struct {
+	Key int
+	Text string
+}
+
 type View interface {
 	GetViewBase() *ViewBase
 	
@@ -42,8 +47,8 @@ type View interface {
 	TakeKeyboardFocus()
 	TookKeyboardFocus()
 	LostKeyboardFocus()
-	KeyPressed(key int)
-	KeyReleased(key int)
+	KeyPressed(event KeyEvent)
+	KeyReleased(event KeyEvent)
 	
 	SetMouseFocus(focus MouseHandlerView, button int)
 	GetMouseFocus(button int, p image.Point) MouseHandlerView
@@ -162,8 +167,8 @@ func (v *ViewBase) SetKeyboardFocus(view View) { if v.parent != nil { v.parent.S
 func (v *ViewBase) TakeKeyboardFocus() { v.self.SetKeyboardFocus(v.self) }
 func (v *ViewBase) TookKeyboardFocus() {}
 func (v *ViewBase) LostKeyboardFocus() {}
-func (v *ViewBase) KeyPressed(key int) { if v.parent != nil { v.parent.KeyPressed(key) } }
-func (v *ViewBase) KeyReleased(key int) { if v.parent != nil { v.parent.KeyReleased(key) } }
+func (v *ViewBase) KeyPressed(event KeyEvent) { if v.parent != nil { v.parent.KeyPressed(event) } }
+func (v *ViewBase) KeyReleased(event KeyEvent) { if v.parent != nil { v.parent.KeyReleased(event) } }
 
 func (v *ViewBase) SetMouseFocus(focus MouseHandlerView, button int) { if v.parent != nil { v.parent.SetMouseFocus(focus, button) } }
 func (v *ViewBase) GetMouseFocus(button int, p image.Point) MouseHandlerView {
