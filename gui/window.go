@@ -6,6 +6,17 @@ import (
 	"image"
 )
 
+func init() {
+	if err := glfw.Init(); err != nil { panic(err) }
+	if err := gl.Init(); err != nil { panic(err) }
+	if err := glfw.OpenWindow(800, 600, 8, 8, 8, 8, 0, 0, glfw.Windowed); err != nil { panic(err) }
+	gl.Enable(gl.BLEND)
+	gl.Enable(gl.LINE_SMOOTH)
+	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+	glfw.Disable(glfw.AutoPollEvents)
+	glfw.SetSwapInterval(1)
+}
+
 type Window struct {
 	ViewBase
 	ClickHandler
@@ -16,15 +27,6 @@ type Window struct {
 }
 
 func NewWindow(self View, centralView View) *Window {
-	if err := glfw.Init(); err != nil { panic(err) }
-	if err := gl.Init(); err != nil { panic(err) }
-	if err := glfw.OpenWindow(800, 600, 8, 8, 8, 8, 0, 0, glfw.Windowed); err != nil { panic(err) }
-	gl.Enable(gl.BLEND)
-	gl.Enable(gl.LINE_SMOOTH)
-	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-	glfw.Disable(glfw.AutoPollEvents)
-	glfw.SetSwapInterval(1)
-	
 	w := &Window{ViewBase{}, *NewClickKeyboardFocuser(centralView), centralView, centralView, make(map[int]MouseHandlerView), false}
 	if self == nil { self = w }
 	w.ViewBase = *NewView(self)
@@ -47,7 +49,7 @@ func (w *Window) HandleEvents() {
 	keyEvent := KeyEvent{}
 	glfw.SetKeyCallback(func(key, state int) {
 		keyEvent.Key = key
-		if key > glfw.KeySpecial && key <= glfw.KeyLast {
+		if key > glfw.KeySpecial {
 			keyEvent.Text = ""
 			if state == glfw.KeyPress {
 				w.keyboardFocus.KeyPressed(keyEvent)
@@ -57,11 +59,13 @@ func (w *Window) HandleEvents() {
 		}
 	})
 	glfw.SetCharCallback(func(char, state int) {
-		keyEvent.Text = string(char)
-		if state == glfw.KeyPress {
-			w.keyboardFocus.KeyPressed(keyEvent)
-		} else if state == glfw.KeyRelease {
-			w.keyboardFocus.KeyReleased(keyEvent)
+		if char < glfw.KeySpecial {
+			keyEvent.Text = string(char)
+			if state == glfw.KeyPress {
+				w.keyboardFocus.KeyPressed(keyEvent)
+			} else if state == glfw.KeyRelease {
+				w.keyboardFocus.KeyReleased(keyEvent)
+			}
 		}
 	})
 	

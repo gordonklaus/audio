@@ -90,7 +90,7 @@ func (f *Function) KeyPressed(event KeyEvent) {
 	// 	f.FocusNearestView(f, key)
 	case glfw.KeyEnter:
 		creator := NewNodeCreator(f)
-		creator.MoveCenter(f.Center())
+		creator.Move(f.Center())
 	}
 }
 

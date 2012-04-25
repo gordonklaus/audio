@@ -17,7 +17,7 @@ type Node struct {
 	function *Function
 	// inPorts []*InPort
 	// outPorts []*OutPort
-	name *TextBox
+	name *Text
 	focused bool
 }
 
@@ -38,7 +38,7 @@ func NewNode(function *Function) *Node {
 	// n.outPorts = make([]*OutPort, 0)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 
-	n.name = NewTextBox()
+	n.name = NewText("")
 	n.AddChild(n.name)
 	n.name.TextChanged.Connect(func(...interface{}) { n.Resize(n.name.Width() + 2*margin, n.name.Height() + 2*margin) })
 	n.name.SetText("")
