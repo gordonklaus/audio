@@ -20,6 +20,8 @@ type View interface {
 	RemoveChild(v View)
 	ViewAt(point image.Point) View
 	
+	Close()
+	
 	Raise()
 	RaiseChild(child View)
 	Lower()
@@ -103,6 +105,8 @@ func (v ViewBase) ViewAt(point image.Point) View {
 	}
 	return v.self
 }
+
+func (v *ViewBase) Close() { if v.parent != nil { v.parent.RemoveChild(v.self) } }
 
 func (v *ViewBase) Raise() { if v.parent != nil { v.parent.RaiseChild(v.self) } }
 func (v *ViewBase) RaiseChild(child View) {

@@ -119,12 +119,7 @@ func (n *NodeCreator) Paint() {
 	lower := gl.Double(cur.Position().Y)
 	upper := gl.Double(cur.Position().Y + cur.Height())
 	gl.Color4d(.5, .75, 1, .9)
-	gl.Begin(gl.LINE_LOOP)
-	gl.Vertex2d(0, lower)
-	gl.Vertex2d(right, lower)
-	gl.Vertex2d(right, upper)
-	gl.Vertex2d(0, upper)
-	gl.End()
+	gl.Rectd(0, lower, right, upper)
 }
 
 type nodeNameText struct {
@@ -135,8 +130,18 @@ func newNodeNameText(n *NodeCreator) *nodeNameText {
 	t := &nodeNameText{}
 	t.Text = *NewTextBase(t, "")
 	t.n = n
+	t.SetValidator(func(text *string) bool {
+		for _, info := range n.currentPackageInfo.SubPackages {
+			if HasPrefix(ToLower(info.Name), ToLower(*text)) {
+				*text = info.Name[:len(*text)]
+				return true
+			}
+		}
+		return false
+	})
 	return t
 }
+func (t *nodeNameText) LostKeyboardFocus() { t.n.Close() }
 func (t *nodeNameText) KeyPressed(event KeyEvent) {
 	n := t.n
 	switch event.Key {
@@ -146,6 +151,12 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 	case glfw.KeyDown:
 		n.currentActiveIndex--
 		n.indexChanged()
+	case glfw.KeyBackspace:
+		if len(t.GetText()) > 0 {
+			t.Text.KeyPressed(event)
+			break
+		}
+		fallthrough
 	case glfw.KeyLeft:
 		if parent := n.currentPackageInfo.Parent; parent != nil {
 			previous := n.currentPackageInfo
@@ -155,14 +166,22 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 				n.activeIndices = append(n.activeIndices, i)
 				if subPackage == previous { n.currentActiveIndex = i; break }
 			}
-			n.text.SetText("")
+			t.SetText("")
 		}
+	case glfw.KeyEnter:
+		if len(n.currentPackageInfo.SubPackages[n.activeIndices[n.currentActiveIndex]].SubPackages) == 0 {
+			// the good stuff
+			break
+		}
+		fallthrough
 	case glfw.KeyRight:
 		if subPackage := n.currentPackageInfo.SubPackages[n.activeIndices[n.currentActiveIndex]]; len(subPackage.SubPackages) > 0 {
 			n.currentPackageInfo = subPackage
 			n.currentActiveIndex = 0
-			n.text.SetText("")
+			t.SetText("")
 		}
+	case glfw.KeyEsc:
+		n.Close()
 	default:
 		t.Text.KeyPressed(event)
 		return

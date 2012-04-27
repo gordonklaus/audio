@@ -31,6 +31,7 @@ type Text struct {
 	textColor Color
 	backgroundColor Color
 	editable bool
+	validator func(*string)bool
 	
 	TextChanged *Signal
 }
@@ -70,6 +71,10 @@ func (t *Text) SetEditable(editable bool) {
 	t.editable = editable
 }
 
+func (t *Text) SetValidator(validator func(*string)bool) {
+	t.validator = validator
+}
+
 func (t *Text) GetMouseFocus(button int, p image.Point) MouseHandlerView {
 	if t.editable { return t.ViewBase.GetMouseFocus(button, p) }
 	return nil
@@ -77,7 +82,10 @@ func (t *Text) GetMouseFocus(button int, p image.Point) MouseHandlerView {
 
 func (t *Text) KeyPressed(event KeyEvent) {
 	if len(event.Text) > 0 {
-		t.SetText(t.text + event.Text)
+		text := t.text + event.Text
+		if t.validator == nil || t.validator(&text) {
+			t.SetText(text)
+		}
 	}
 	switch event.Key {
 	case KeyBackspace:
