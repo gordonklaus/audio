@@ -15,7 +15,7 @@ type NodeCreator struct {
 	ViewBase
 	function *Function
 	
-	currentPackageInfo *flux.PackageInfo
+	currentInfo flux.Info
 	activeIndices []int
 	currentActiveIndex int
 	
@@ -31,9 +31,9 @@ func NewNodeCreator(function *Function) *NodeCreator {
 	n.function = function
 	function.AddChild(n)
 	
-	n.currentPackageInfo = flux.GetPackageInfo()
+	n.currentInfo = flux.GetPackageInfo()
 	n.activeIndices = []int{}
-	for i := range n.currentPackageInfo.SubPackages { n.activeIndices = append(n.activeIndices, i) }
+	for i := range n.currentInfo.Children() { n.activeIndices = append(n.activeIndices, i) }
 	
 	n.pathText = NewText("")
 	n.pathText.SetBackgroundColor(Color{0, 0, 0, .7})
@@ -52,15 +52,15 @@ func NewNodeCreator(function *Function) *NodeCreator {
 
 func (n *NodeCreator) textChanged() {
 	pathStr := ""
-	for packageInfo := n.currentPackageInfo; packageInfo != nil; packageInfo = packageInfo.Parent { pathStr = path.Join(packageInfo.Name, pathStr) }
-	if len(n.currentPackageInfo.SubPackages) > 0 && len(pathStr) > 0 { pathStr += "/" }
+	for info := n.currentInfo; info != nil; info = info.Parent() { pathStr = path.Join(info.Name(), pathStr) }
+	if len(n.currentInfo.Children()) > 0 && len(pathStr) > 0 { pathStr += "/" }
 	n.pathText.SetText(pathStr)
 	xOffset := n.pathText.Width()
 	
 	currentIndex := n.activeIndices[n.currentActiveIndex]
 	n.activeIndices = []int{}
-	for i, info := range n.currentPackageInfo.SubPackages {
-		if HasPrefix(ToLower(info.Name), ToLower(n.text.GetText())) {
+	for i, child := range n.currentInfo.Children() {
+		if HasPrefix(ToLower(child.Name()), ToLower(n.text.GetText())) {
 			n.activeIndices = append(n.activeIndices, i)
 		}
 	}
@@ -77,11 +77,9 @@ func (n *NodeCreator) textChanged() {
 	}
 	n.nameTexts = []*Text{}
 	width := 0
-	for i, infoIndex := range n.activeIndices {
-		subPackageInfo := n.currentPackageInfo.SubPackages[infoIndex]
-		text := subPackageInfo.Name
-		if len(subPackageInfo.SubPackages) > 0 { text += "->" }
-		l := NewText(text)
+	for i, activeIndex := range n.activeIndices {
+		child := n.currentInfo.Children()[activeIndex]
+		l := NewText(child.Name())
 		l.SetTextColor(Color{.7, .7, .7, 1})
 		l.SetBackgroundColor(Color{0, 0, 0, .7})
 		n.AddChild(l)
@@ -131,9 +129,9 @@ func newNodeNameText(n *NodeCreator) *nodeNameText {
 	t.Text = *NewTextBase(t, "")
 	t.n = n
 	t.SetValidator(func(text *string) bool {
-		for _, info := range n.currentPackageInfo.SubPackages {
-			if HasPrefix(ToLower(info.Name), ToLower(*text)) {
-				*text = info.Name[:len(*text)]
+		for _, child := range n.currentInfo.Children() {
+			if HasPrefix(ToLower(child.Name()), ToLower(*text)) {
+				*text = child.Name()[:len(*text)]
 				return true
 			}
 		}
@@ -158,25 +156,25 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 		fallthrough
 	case glfw.KeyLeft:
-		if parent := n.currentPackageInfo.Parent; parent != nil {
-			previous := n.currentPackageInfo
-			n.currentPackageInfo = parent
+		if parent := n.currentInfo.Parent(); parent != nil {
+			previous := n.currentInfo
+			n.currentInfo = parent
 			n.activeIndices = []int{}
-			for i, subPackage := range parent.SubPackages {
+			for i, child := range parent.Children() {
 				n.activeIndices = append(n.activeIndices, i)
-				if subPackage == previous { n.currentActiveIndex = i; break }
+				if child == previous { n.currentActiveIndex = i; break }
 			}
 			t.SetText("")
 		}
 	case glfw.KeyEnter:
-		if len(n.currentPackageInfo.SubPackages[n.activeIndices[n.currentActiveIndex]].SubPackages) == 0 {
-			// the good stuff
-			break
-		}
 		fallthrough
 	case glfw.KeyRight:
-		if subPackage := n.currentPackageInfo.SubPackages[n.activeIndices[n.currentActiveIndex]]; len(subPackage.SubPackages) > 0 {
-			n.currentPackageInfo = subPackage
+		info := n.currentInfo.Children()[n.activeIndices[n.currentActiveIndex]]
+		if packageInfo, ok := info.(*flux.PackageInfo); ok {
+			packageInfo.Load()
+		}
+		if len(info.Children()) > 0 {
+			n.currentInfo = info
 			n.currentActiveIndex = 0
 			t.SetText("")
 		}
@@ -184,6 +182,5 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		n.Close()
 	default:
 		t.Text.KeyPressed(event)
-		return
 	}
 }
