@@ -147,8 +147,8 @@ func (v *ViewBase) Resize(width, height int) {
 	v.rect.Max = v.rect.Min.Add(image.Pt(width, height))
 	v.self.Repaint()
 }
-func (v *ViewBase) Pan(d image.Point) {
-	v.rect = v.rect.Add(d)
+func (v *ViewBase) Pan(p image.Point) {
+	v.rect = v.rect.Add(p.Sub(v.rect.Min))
 	v.self.Repaint()
 }
 

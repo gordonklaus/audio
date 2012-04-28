@@ -63,6 +63,6 @@ func NewViewPanner(view View) *ViewPanner {
 func (vp *ViewPanner) MousePressed(button int, p image.Point) {
 	vp.p = p
 }
-func pan(v View, p1, p2 image.Point) { v.Pan(p1.Sub(p2)) }
+func pan(v View, p1, p2 image.Point) { v.Pan(v.Rect().Min.Add(p1).Sub(p2)) }
 func (vp *ViewPanner) MouseDragged(button int, p image.Point) { pan(vp.view, vp.p, p) }
 func (vp *ViewPanner) MouseReleased(button int, p image.Point) { pan(vp.view, vp.p, p) }

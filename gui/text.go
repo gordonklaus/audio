@@ -57,6 +57,7 @@ func (t *Text) SetText(text string) {
 	t.TextChanged.Emit(text)
 }
 
+func (t Text) GetTextColor() Color { return t.textColor }
 func (t *Text) SetTextColor(color Color) {
 	t.textColor = color
 	t.Repaint()

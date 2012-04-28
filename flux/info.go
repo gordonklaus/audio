@@ -75,10 +75,10 @@ type PackageInfo struct {
 	buildPackage *build.Package
 	parent *PackageInfo
 	subPackages []*PackageInfo
-	constants []ValueInfo
-	variables []ValueInfo
 	types []*TypeInfo
 	functions []FunctionInfo
+	variables []ValueInfo
+	constants []ValueInfo
 	loaded bool
 }
 
@@ -90,10 +90,10 @@ func (p *PackageInfo) Children() []Info {
 	p.load()
 	var children []Info
 	for _, p := range p.subPackages { children = append(children, p) }
-	for _, c := range p.constants { children = append(children, c) }
-	for _, v := range p.variables { children = append(children, v) }
 	for _, t := range p.types { children = append(children, t) }
 	for _, f := range p.functions { children = append(children, f) }
+	for _, v := range p.variables { children = append(children, v) }
+	for _, c := range p.constants { children = append(children, c) }
 	return children
 }
 
