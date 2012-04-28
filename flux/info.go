@@ -15,7 +15,7 @@ import (
 var packageInfo chan *PackageInfo = make(chan *PackageInfo)
 
 func getPackageInfo(pathStr string) *PackageInfo {
-	packageInfo := &PackageInfo{&build.Package{Name:filepath.Base(pathStr)}, nil, []*PackageInfo{}, []ValueInfo{}, []ValueInfo{}, []*TypeInfo{}, []FunctionInfo{}}
+	packageInfo := newPackageInfo(filepath.Base(pathStr))
 	
 	pkg, err := build.ImportDir(pathStr, build.FindOnly & build.AllowBinary)
 	if err == nil && !pkg.IsCommand() {
@@ -49,7 +49,7 @@ func getPackageInfo(pathStr string) *PackageInfo {
 
 func init() {
 	go func() {
-		rootPackageInfo := &PackageInfo{&build.Package{}, nil, []*PackageInfo{}, []ValueInfo{}, []ValueInfo{}, []*TypeInfo{}, []FunctionInfo{}}
+		rootPackageInfo := newPackageInfo("")
 		for _, srcDir := range build.Default.SrcDirs() {
 			subPackageInfo := getPackageInfo(srcDir)
 			for _, p := range subPackageInfo.subPackages {
@@ -79,12 +79,16 @@ type PackageInfo struct {
 	variables []ValueInfo
 	types []*TypeInfo
 	functions []FunctionInfo
+	loaded bool
 }
+
+func newPackageInfo(name string) *PackageInfo { return &PackageInfo{buildPackage:&build.Package{Name:name}} }
 
 func (p PackageInfo) Name() string { return p.buildPackage.Name }
 func (p PackageInfo) Parent() Info { if p.parent == nil { return nil }; return p.parent }
-func (p PackageInfo) Children() []Info {
-	children := []Info{}
+func (p *PackageInfo) Children() []Info {
+	p.load()
+	var children []Info
 	for _, p := range p.subPackages { children = append(children, p) }
 	for _, c := range p.constants { children = append(children, c) }
 	for _, v := range p.variables { children = append(children, v) }
@@ -93,7 +97,10 @@ func (p PackageInfo) Children() []Info {
 	return children
 }
 
-func (p *PackageInfo) Load() {
+func (p *PackageInfo) load() {
+	if p.loaded { return }
+	p.loaded = true
+	
 	if len(p.buildPackage.Dir) == 0 { return }
 	fset := token.NewFileSet()
 	pkgs, err := parser.ParseDir(fset, p.buildPackage.Dir, func(fileInfo os.FileInfo) bool {
@@ -111,10 +118,9 @@ func (p *PackageInfo) Load() {
 	if !ast.PackageExports(pkg) { return }
 	for _, file := range pkg.Files {
 		for _, decl := range file.Decls {
-			switch d := decl.(type) {
-			case *ast.GenDecl:
-				for _, spec := range d.Specs {
-					switch d.Tok {
+			if genDecl, ok := decl.(*ast.GenDecl); ok {
+				for _, spec := range genDecl.Specs {
+					switch genDecl.Tok {
 					case token.CONST:
 						v := spec.(*ast.ValueSpec)
 						for _, name := range v.Names {
@@ -126,19 +132,64 @@ func (p *PackageInfo) Load() {
 							p.variables = append(p.variables, ValueInfo{name.Name, p, false})
 						}
 					case token.TYPE:
-						p.types = append(p.types, &TypeInfo{spec.(*ast.TypeSpec).Name.Name, p})
+						p.types = append(p.types, &TypeInfo{spec.(*ast.TypeSpec).Name.Name, p, nil, nil})
+						// TODO:  handle interface types differently.  spec.(*ast.TypeSpec).Type.(*ast.InterfaceType)
 					}
 				}
-			case *ast.FuncDecl:
-				p.functions = append(p.functions, FunctionInfo{d.Name.Name, p})
 			}
 		}
 	}
-	
 	Sort(p.constants, "Name")
 	Sort(p.variables, "Name")
 	Sort(p.types, "Name")
+	for _, file := range pkg.Files {
+		for _, decl := range file.Decls {
+			if funcDecl, ok := decl.(*ast.FuncDecl); ok {
+				functionInfo := FunctionInfo{name:funcDecl.Name.Name}
+				if recv := funcDecl.Recv; recv != nil {
+					if typeInfo := p.findTypeInfo(recv); typeInfo != nil {
+						functionInfo.parent = typeInfo
+						typeInfo.methods = append(typeInfo.methods, functionInfo)
+					} else {
+						// exported method on an unexported type
+						// TODO:  expose the type (and its exported methods) but don't allow reference to the type name alone
+					}
+				} else if typeInfo := p.findTypeInfo(funcDecl.Type.Results); typeInfo != nil {
+					functionInfo.parent = typeInfo
+					typeInfo.functions = append(typeInfo.functions, functionInfo)
+				} else {
+					functionInfo.parent = p
+					p.functions = append(p.functions, functionInfo)
+				}
+			}
+		}
+	}
+	for _, typeInfo := range p.types {
+		Sort(typeInfo.functions, "Name")
+		Sort(typeInfo.methods, "Name")
+	}
 	Sort(p.functions, "Name")
+}
+
+func exprTypeID(expr ast.Expr) *ast.Ident {
+	switch e := expr.(type) {
+	case *ast.StarExpr:
+		return exprTypeID(e.X)
+	case *ast.Ident:
+		return e
+	}
+	return nil
+}
+func (p *PackageInfo) findTypeInfo(fields *ast.FieldList) *TypeInfo {
+	if fields.NumFields() == 0 { return nil }
+	if typeID := exprTypeID(fields.List[0].Type); typeID != nil {
+		for _, typeInfo := range p.types {
+			if typeInfo.name == typeID.Name {
+				return typeInfo
+			}
+		}
+	}
+	return nil
 }
 
 type ValueInfo struct {
@@ -148,20 +199,27 @@ type ValueInfo struct {
 }
 func (p ValueInfo) Name() string { return p.name }
 func (p ValueInfo) Parent() Info { return p.parent }
-func (p ValueInfo) Children() []Info { return []Info{} }
+func (p ValueInfo) Children() []Info { return nil }
 
 type TypeInfo struct {
 	name string
 	parent *PackageInfo
+	functions []FunctionInfo
+	methods []FunctionInfo
 }
 func (t TypeInfo) Name() string { return t.name }
 func (t TypeInfo) Parent() Info { return t.parent }
-func (t TypeInfo) Children() []Info { return []Info{} }
+func (t TypeInfo) Children() []Info {
+	var children []Info
+	for _, f := range t.functions { children = append(children, f) }
+	for _, m := range t.methods { children = append(children, m) }
+	return children
+}
 
 type FunctionInfo struct {
 	name string
-	parent *PackageInfo
+	parent Info
 }
 func (f FunctionInfo) Name() string { return f.name }
 func (f FunctionInfo) Parent() Info { return f.parent }
-func (f FunctionInfo) Children() []Info { return []Info{} }
+func (f FunctionInfo) Children() []Info { return nil }

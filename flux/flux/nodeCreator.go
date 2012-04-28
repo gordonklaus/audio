@@ -169,11 +169,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 	case glfw.KeyEnter:
 		fallthrough
 	case glfw.KeyRight:
-		info := n.currentInfo.Children()[n.activeIndices[n.currentActiveIndex]]
-		if packageInfo, ok := info.(*flux.PackageInfo); ok {
-			packageInfo.Load()
-		}
-		if len(info.Children()) > 0 {
+		if info := n.currentInfo.Children()[n.activeIndices[n.currentActiveIndex]]; len(info.Children()) > 0 {
 			n.currentInfo = info
 			n.currentActiveIndex = 0
 			t.SetText("")
