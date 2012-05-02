@@ -3,9 +3,8 @@ package main
 import (
 	gl "github.com/chsc/gogl/gl21"
 	"github.com/jteeuwen/glfw"
-	// ."code.google.com/p/gordon-go/util"
+	."code.google.com/p/gordon-go/util"
 	."code.google.com/p/gordon-go/gui"
-	"code.google.com/p/gordon-go/flux"
 	."image"
 	."strings"
 )
@@ -13,8 +12,9 @@ import (
 type NodeCreator struct {
 	ViewBase
 	function *Function
+	Created *Signal
 	
-	currentInfo flux.Info
+	currentInfo Info
 	activeIndices []int
 	currentActiveIndex int
 	
@@ -28,8 +28,9 @@ func NewNodeCreator(function *Function) *NodeCreator {
 	n.ViewBase = *NewView(n)
 	n.function = function
 	function.AddChild(n)
+	n.Created = NewSignal()
 	
-	n.currentInfo = flux.GetPackageInfo()
+	n.currentInfo = GetPackageInfo()
 	n.activeIndices = []int{}
 	for i := range n.currentInfo.Children() { n.activeIndices = append(n.activeIndices, i) }
 	
@@ -43,15 +44,15 @@ func NewNodeCreator(function *Function) *NodeCreator {
 	return n
 }
 
-func getTextColor(info flux.Info, alpha float32) Color {
+func getTextColor(info Info, alpha float32) Color {
 	switch info.(type) {
-	case *flux.PackageInfo:
+	case *PackageInfo:
 		return Color{1, 1, 1, alpha}
-	case *flux.TypeInfo:
+	case *TypeInfo:
 		return Color{.6, 1, .6, alpha}
-	case flux.FunctionInfo:
+	case FunctionInfo:
 		return Color{1, .6, .6, alpha}
-	case flux.ValueInfo:
+	case ValueInfo:
 		return Color{.6, .6, 1, alpha}
 	}
 	return Color{}
@@ -64,7 +65,7 @@ func (n NodeCreator) lastPathText() (*Text, bool) {
 	return nil, false
 }
 
-func (n NodeCreator) currentActiveInfo() flux.Info { return n.currentInfo.Children()[n.activeIndices[n.currentActiveIndex]] }
+func (n NodeCreator) currentActiveInfo() Info { return n.currentInfo.Children()[n.activeIndices[n.currentActiveIndex]] }
 
 func (n *NodeCreator) update() {
 	n.currentActiveIndex %= len(n.activeIndices)
@@ -85,7 +86,7 @@ func (n *NodeCreator) update() {
 	if n.currentActiveIndex >= len(n.activeIndices) { n.currentActiveIndex = len(n.activeIndices) - 1 }
 	
 	if t, ok := n.lastPathText(); ok {
-		sep := ""; if _, ok := n.currentActiveInfo().(*flux.PackageInfo); ok { sep = "/" } else { sep = "." }
+		sep := ""; if _, ok := n.currentActiveInfo().(*PackageInfo); ok { sep = "/" } else { sep = "." }
 		text := t.GetText()
 		t.SetText(text[:len(text) - 1] + sep)
 	}
@@ -176,6 +177,11 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			t.SetText("")
 		}
 	case glfw.KeyEnter:
+		if creator, ok := n.currentActiveInfo().(interface{NewNode()*Node}); ok {
+			n.Close()
+			n.Created.Emit(creator.NewNode())
+			return
+		}
 		fallthrough
 	case glfw.KeyRight:
 		if info := n.currentActiveInfo(); len(info.Children()) > 0 {

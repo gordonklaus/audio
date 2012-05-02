@@ -1,4 +1,4 @@
-package flux
+package main
 
 import (
 	."code.google.com/p/gordon-go/util"
@@ -146,6 +146,22 @@ func (p *PackageInfo) load() {
 		for _, decl := range file.Decls {
 			if funcDecl, ok := decl.(*ast.FuncDecl); ok {
 				functionInfo := FunctionInfo{name:funcDecl.Name.Name}
+				for _, field := range funcDecl.Type.Params.List {
+					for _, name := range field.Names {
+						functionInfo.parameters = append(functionInfo.parameters, name.Name)
+					}
+				}
+				if results := funcDecl.Type.Results; results != nil {
+					for _, field := range results.List {
+						if field.Names == nil {
+							functionInfo.results = append(functionInfo.results, "")
+						} else {
+							for _, name := range field.Names {
+								functionInfo.results = append(functionInfo.results, name.Name)
+							}
+						}
+					}
+				}
 				if recv := funcDecl.Recv; recv != nil {
 					if typeInfo := p.findTypeInfo(recv); typeInfo != nil {
 						functionInfo.parent = typeInfo
@@ -192,15 +208,6 @@ func (p *PackageInfo) findTypeInfo(fields *ast.FieldList) *TypeInfo {
 	return nil
 }
 
-type ValueInfo struct {
-	name string
-	parent *PackageInfo
-	constant bool
-}
-func (p ValueInfo) Name() string { return p.name }
-func (p ValueInfo) Parent() Info { return p.parent }
-func (p ValueInfo) Children() []Info { return nil }
-
 type TypeInfo struct {
 	name string
 	parent *PackageInfo
@@ -219,7 +226,19 @@ func (t TypeInfo) Children() []Info {
 type FunctionInfo struct {
 	name string
 	parent Info
+	parameters []string
+	results []string
 }
 func (f FunctionInfo) Name() string { return f.name }
 func (f FunctionInfo) Parent() Info { return f.parent }
 func (f FunctionInfo) Children() []Info { return nil }
+func (f FunctionInfo) NewNode() *Node { return NewFunctionNode(f) }
+
+type ValueInfo struct {
+	name string
+	parent *PackageInfo
+	constant bool
+}
+func (p ValueInfo) Name() string { return p.name }
+func (p ValueInfo) Parent() Info { return p.parent }
+func (p ValueInfo) Children() []Info { return nil }
