@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/jteeuwen/glfw"
 	gl "github.com/chsc/gogl/gl21"
 	."code.google.com/p/gordon-go/gui"
 	."math"
@@ -9,7 +10,7 @@ import (
 type Node struct {
 	ViewBase
 	AggregateMouseHandler
-	Function *Function
+	function *Function
 	inputs []*Input
 	outputs []*Output
 	name *Text
@@ -68,20 +69,24 @@ func (n Node) Getputs() []View {
 func (n *Node) TookKeyboardFocus() { n.focused = true; n.Repaint() }
 func (n *Node) LostKeyboardFocus() { n.focused = false; n.Repaint() }
 
-// func (n *Node) KeyPressed(key int) {
-// 	switch key {
-// 	case Key_Left, Key_Right, Key_Up, Key_Down:
-// 		n.function.FocusNearestView(n, key)
-// 	case Key_Escape:
-// 		n.function.TakeKeyboardFocus()
-// 	default:
-// 		n.ViewBase.KeyPressed(key)
-// 	}
-// }
+func (n *Node) KeyPressed(event KeyEvent) {
+	switch event.Key {
+	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
+		n.function.FocusNearestView(n, event.Key)
+	case glfw.KeyEsc:
+		n.function.TakeKeyboardFocus()
+	default:
+		n.ViewBase.KeyPressed(event)
+	}
+}
 
 func (n Node) Paint() {
 	width, height := gl.Double(n.Width()), gl.Double(n.Height())
-	gl.Color4d(0, 0, 0, .5)
+	if n.focused {
+		gl.Color4d(.4, .4, 1, .4)
+	} else {
+		gl.Color4d(0, 0, 0, .5)
+	}
 	gl.Rectd(0, 0, width, height)
 	gl.Color4d(1, 1, 1, 1)
 	gl.Begin(gl.LINE_LOOP)

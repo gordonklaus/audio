@@ -12,6 +12,7 @@ type NodeCreator struct {
 	ViewBase
 	function *Function
 	Created *Signal
+	Canceled *Signal
 	
 	currentInfo Info
 	activeIndices []int
@@ -28,6 +29,7 @@ func NewNodeCreator(function *Function) *NodeCreator {
 	n.function = function
 	function.AddChild(n)
 	n.Created = NewSignal()
+	n.Canceled = NewSignal()
 	
 	n.currentInfo = GetPackageInfo()
 	n.activeIndices = []int{}
@@ -199,6 +201,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 	case glfw.KeyEsc:
 		n.Close()
+		n.Canceled.Emit()
 	default:
 		t.Text.KeyPressed(event)
 	}

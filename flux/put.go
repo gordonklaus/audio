@@ -1,12 +1,14 @@
 package main
 
 import (
+	"github.com/jteeuwen/glfw"
 	gl "github.com/chsc/gogl/gl21"
 	."code.google.com/p/gordon-go/gui"
 )
 
 type put struct {
 	ViewBase
+	AggregateMouseHandler
 	spec putSpecializer
 	node *Node
 	connections []*Connection
@@ -23,6 +25,7 @@ type putSpecializer interface {
 func Newput(spec putSpecializer, n *Node) *put {
 	p := &put{}
 	p.ViewBase = *NewView(spec)
+	p.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(p)}
 	p.spec = spec
 	p.node = n
 	p.Resize(putSize, putSize)
@@ -43,24 +46,28 @@ func (p *put) TookKeyboardFocus() { p.focused = true; p.Repaint() }
 func (p *put) LostKeyboardFocus() { p.focused = false; p.Repaint() }
 
 func (p *put) KeyPressed(event KeyEvent) {
-	// switconn key {
-	// case Key_Enter:
+	switch event.Key {
+	// case glfw.KeyEnter:
 	// 	conn := p.node.function.NewConnection(p.Center())
 	// 	p.spec.ConnectToConnection(conn)
 	// 	conn.BeStraightLine()
 	// 	conn.StartEditing()
-	// case Key_Left, Key_Right, Key_Up, Key_Down:
-	// 	p.node.function.FocusNearestView(p.spec, key)
-	// case Key_Escape:
-	// 	p.node.TakeKeyboardFocus()
-	// default:
-	// 	p.ViewBase.KeyPressed(key)
-	// }
+	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
+		p.node.function.FocusNearestView(p.spec, event.Key)
+	case glfw.KeyEsc:
+		p.node.TakeKeyboardFocus()
+	default:
+		p.ViewBase.KeyPressed(event)
+	}
 }
 
 func (p put) Paint() {
 	width, height := gl.Double(p.Width()), gl.Double(p.Height())
-	gl.Color4d(0, 0, 0, .5)
+	if p.focused {
+		gl.Color4d(.6, .6, 1, .6)
+	} else {
+		gl.Color4d(0, 0, 0, .5)
+	}
 	gl.Rectd(0, 0, width, height)
 	gl.Color4d(1, 1, 1, 1)
 	gl.Begin(gl.LINE_LOOP)
@@ -84,13 +91,13 @@ func NewInput(n *Node) *Input {
 func (p *Input) ConnectToConnection(conn *Connection) { conn.SetDestination(p) }
 
 func (p *Input) KeyPressed(event KeyEvent) {
-	// if key == Key_Left && len(p.connections) > 0 {
-	// 	p.connections[0].dstHandle.TakeKeyboardFocus()
-	// } else if key == Key_Right {
-	// 	p.node.TakeKeyboardFocus()
-	// } else {
-	// 	p.put.KeyPressed(key)
-	// }
+	if event.Key == glfw.KeyLeft && len(p.connections) > 0 {
+		p.connections[0].TakeKeyboardFocus()
+	} else if event.Key == glfw.KeyRight {
+		p.node.TakeKeyboardFocus()
+	} else {
+		p.put.KeyPressed(event)
+	}
 }
 
 
@@ -106,11 +113,11 @@ func NewOutput(n *Node) *Output {
 func (p *Output) ConnectToConnection(conn *Connection) { conn.SetSource(p) }
 
 func (p *Output) KeyPressed(event KeyEvent) {
-	// if key == Key_Left {
-	// 	p.node.TakeKeyboardFocus()
-	// } else if key == Key_Right && len(p.connections) > 0 {
-	// 	p.connections[0].srcHandle.TakeKeyboardFocus()
-	// } else {
-	// 	p.put.KeyPressed(key)
-	// }
+	if event.Key == glfw.KeyLeft {
+		p.node.TakeKeyboardFocus()
+	} else if event.Key == glfw.KeyRight && len(p.connections) > 0 {
+		p.connections[0].TakeKeyboardFocus()
+	} else {
+		p.put.KeyPressed(event)
+	}
 }

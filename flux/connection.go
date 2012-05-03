@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 )
 
@@ -52,8 +53,8 @@ func (c *Connection) DisconnectDestination(point Point) {
 }
 
 func (c *Connection) reform() {
-	// if c.src != nil { c.srcPt = c.function.GetViewCenter(c.src) }
-	// if c.dst != nil { c.dstPt = c.function.GetViewCenter(c.dst) }
+	if c.src != nil { c.srcPt = c.function.GetViewCenter(c.src) }
+	if c.dst != nil { c.dstPt = c.function.GetViewCenter(c.dst) }
 	rect := Rect(c.srcPt.X, c.srcPt.Y, c.dstPt.X, c.dstPt.Y).Canon().Inset(-connectionThickness / 2)
 	c.Move(rect.Min)
 	c.Resize(rect.Dx(), rect.Dy())
@@ -82,14 +83,14 @@ func (c *Connection) TookKeyboardFocus() { c.focused = true; c.Repaint() }
 func (c *Connection) LostKeyboardFocus() { c.focused = false; c.Repaint() }
 
 func (c *Connection) KeyPressed(event KeyEvent) {
-	// switch key {
-	// case Key_Left, Key_Right, Key_Up, Key_Down:
-	// 	c.function.FocusNearestView(c, key)
-	// case Key_Escape:
-	// 	c.function.TakeKeyboardFocus()
-	// default:
-	// 	c.ViewBase.KeyPressed(key)
-	// }
+	switch event.Key {
+	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
+		c.function.FocusNearestView(c, event.Key)
+	case glfw.KeyEsc:
+		c.function.TakeKeyboardFocus()
+	default:
+		c.ViewBase.KeyPressed(event)
+	}
 }
 
 func (c Connection) Paint() {
