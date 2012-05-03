@@ -1,7 +1,6 @@
 package main
 
 import (
-	"image"
 	."code.google.com/p/gordon-go/gui"
 )
 
@@ -12,13 +11,13 @@ type Connection struct {
 	dst *Input
 	
 	focused bool
-	srcPt image.Point
-	dstPt image.Point
+	srcPt Point
+	dstPt Point
 }
 
 const connectionThickness = 7
 
-func NewConnection(function *Function, pt image.Point) *Connection {
+func NewConnection(function *Function, pt Point) *Connection {
 	c := &Connection{}
 	c.ViewBase = *NewView(c)
 	c.function = function
@@ -36,7 +35,7 @@ func (c *Connection) SetSource(src *Output) {
 	if src != nil { src.ConnectConnection(c) }
 	c.reform()
 }
-func (c *Connection) DisconnectSource(point image.Point) {
+func (c *Connection) DisconnectSource(point Point) {
 	c.srcPt = point
 	c.SetSource(nil)
 }
@@ -47,7 +46,7 @@ func (c *Connection) SetDestination(dst *Input) {
 	if dst != nil { dst.ConnectConnection(c) }
 	c.reform()
 }
-func (c *Connection) DisconnectDestination(point image.Point) {
+func (c *Connection) DisconnectDestination(point Point) {
 	c.dstPt = point
 	c.SetDestination(nil)
 }
@@ -55,7 +54,7 @@ func (c *Connection) DisconnectDestination(point image.Point) {
 func (c *Connection) reform() {
 	// if c.src != nil { c.srcPt = c.function.GetViewCenter(c.src) }
 	// if c.dst != nil { c.dstPt = c.function.GetViewCenter(c.dst) }
-	rect := image.Rect(c.srcPt.X, c.srcPt.Y, c.dstPt.X, c.dstPt.Y).Canon().Inset(-connectionThickness / 2)
+	rect := Rect(c.srcPt.X, c.srcPt.Y, c.dstPt.X, c.dstPt.Y).Canon().Inset(-connectionThickness / 2)
 	c.Move(rect.Min)
 	c.Resize(rect.Dx(), rect.Dy())
 	
@@ -64,9 +63,9 @@ func (c *Connection) reform() {
 
 func (c *Connection) BeStraightLine() {
 	if c.src != nil && c.dst == nil {
-		c.dstPt = c.srcPt.Add(image.Pt(64, 0))
+		c.dstPt = c.srcPt.Add(Pt(64, 0))
 	} else if c.src == nil && c.dst != nil {
-		c.srcPt = c.dstPt.Sub(image.Pt(64, 0))
+		c.srcPt = c.dstPt.Sub(Pt(64, 0))
 	}
 	c.reform()
 }
@@ -94,7 +93,7 @@ func (c *Connection) KeyPressed(event KeyEvent) {
 }
 
 func (c Connection) Paint() {
-	// edgeColor := map[bool]image.NRGBAColor{false:{255, 255, 255, 15}, true:{0, 0, 255, 15}}
+	// edgeColor := map[bool]NRGBAColor{false:{255, 255, 255, 15}, true:{0, 0, 255, 15}}
 	// painter.SetStrokeColor(edgeColor[c.focused])
 	// src := c.MapPointFromParent(c.srcPt)
 	// dst := c.MapPointFromParent(c.dstPt)

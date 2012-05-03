@@ -3,7 +3,6 @@ package main
 import (
 	gl "github.com/chsc/gogl/gl21"
 	."code.google.com/p/gordon-go/gui"
-	."image"
 	."math"
 )
 
@@ -30,24 +29,22 @@ func NewFunctionNode(info FunctionInfo) *Node {
 	n.name.SetBackgroundColor(Color{0, 0, 0, 0})
 	n.AddChild(n.name)
 	
-	numInputs := len(info.parameters)
-	numOutputs := len(info.results)
-	maxputs := int(Max(float64(numInputs), float64(numOutputs)))
-	width := 2 * nodeMargin + int(Max(float64(n.name.Width()), float64(maxputs * putSize)))
+	numInputs := float64(len(info.parameters))
+	numOutputs := float64(len(info.results))
+	maxputs := Max(numInputs, numOutputs)
+	width := 2 * nodeMargin + Max(n.name.Width(), maxputs * putSize)
 	height := n.name.Height() + 2*putSize
 	n.Resize(width, height)
-	n.name.Move(Pt(int(width - n.name.Width()) / 2, putSize))
+	n.name.Move(Pt((width - n.name.Width()) / 2, putSize))
 	for i := range info.parameters {
 		p := NewInput(n)
-		spacing := width / numInputs
-		p.Move(Pt(i * spacing + (spacing - putSize) / 2, 0))
+		p.Move(Pt((float64(i) + .5) * width / numInputs - putSize / 2, 0))
 		n.AddChild(p)
 		n.inputs = append(n.inputs, p)
 	}
 	for i := range info.results {
 		p := NewOutput(n)
-		spacing := width / numOutputs
-		p.Move(Pt(i * spacing + (spacing - putSize) / 2, n.Height() - putSize))
+		p.Move(Pt((float64(i) + .5) * width / numOutputs - putSize / 2, n.Height() - putSize))
 		n.AddChild(p)
 		n.outputs = append(n.outputs, p)
 	}

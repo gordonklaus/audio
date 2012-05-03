@@ -3,7 +3,6 @@ package gui
 import (
 	"github.com/jteeuwen/glfw"
 	gl "github.com/chsc/gogl/gl21"
-	"image"
 )
 
 func init() {
@@ -42,8 +41,9 @@ func (w *Window) Close() {
 
 func (w *Window) HandleEvents() {
 	glfw.SetWindowSizeCallback(func(width, height int) {
-		w.Resize(width, height)
-		w.centralView.Resize(width, height)
+		wid, hei := float64(width), float64(height)
+		w.Resize(wid, hei)
+		w.centralView.Resize(wid, hei)
 	})
 	
 	keyEvent := KeyEvent{}
@@ -69,9 +69,9 @@ func (w *Window) HandleEvents() {
 		}
 	})
 	
-	var mousePos image.Point
+	var mousePos Point
 	glfw.SetMousePosCallback(func(x, y int) {
-		mousePos = image.Pt(x, w.Height() - y)
+		mousePos = Pt(float64(x), w.Height() - float64(y))
 		for button, v := range w.mouseFocus {
 			pt := v.MapFrom(mousePos, w.self)
 			v.MouseDragged(button, pt)

@@ -5,7 +5,6 @@ import (
 	gl "github.com/chsc/gogl/gl21"
 	."code.google.com/p/gordon-go/ftgl"
 	."code.google.com/p/gordon-go/util"
-	"image"
 )
 
 type Color struct {
@@ -53,7 +52,7 @@ func NewTextBase(self View, text string) *Text {
 func (t Text) GetText() string { return t.text }
 func (t *Text) SetText(text string) {
 	t.text = text
-	t.Resize(int(font.Advance(text)), int(font.LineHeight()))
+	t.Resize(font.Advance(text), font.LineHeight())
 	t.TextChanged.Emit(text)
 }
 
@@ -76,7 +75,7 @@ func (t *Text) SetValidator(validator func(*string)bool) {
 	t.validator = validator
 }
 
-func (t *Text) GetMouseFocus(button int, p image.Point) MouseHandlerView {
+func (t *Text) GetMouseFocus(button int, p Point) MouseHandlerView {
 	if t.editable { return t.ViewBase.GetMouseFocus(button, p) }
 	return nil
 }

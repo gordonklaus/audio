@@ -5,7 +5,6 @@ import (
 	"github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/util"
 	."code.google.com/p/gordon-go/gui"
-	."image"
 	."strings"
 )
 
@@ -90,11 +89,11 @@ func (n *NodeCreator) update() {
 		text := t.GetText()
 		t.SetText(text[:len(text) - 1] + sep)
 	}
-	xOffset := 0; if t, ok := n.lastPathText(); ok { xOffset = t.Position().X + t.Width() }
+	xOffset := 0.0; if t, ok := n.lastPathText(); ok { xOffset = t.Position().X + t.Width() }
 	
 	for _, l := range n.nameTexts { l.Close() }
 	n.nameTexts = []*Text{}
-	width := 0
+	width := 0.0
 	for i, activeIndex := range n.activeIndices {
 		child := n.currentInfo.Children()[activeIndex]
 		l := NewText(child.Name())
@@ -102,13 +101,13 @@ func (n *NodeCreator) update() {
 		l.SetBackgroundColor(Color{0, 0, 0, .7})
 		n.AddChild(l)
 		n.nameTexts = append(n.nameTexts, l)
-		l.Move(Pt(xOffset, (len(n.activeIndices) - i - 1)*l.Height()))
+		l.Move(Pt(xOffset, float64(len(n.activeIndices) - i - 1)*l.Height()))
 		if l.Width() > width { width = l.Width() }
 	}
 	n.text.Raise()
-	n.Resize(xOffset + width, len(n.nameTexts)*n.nameTexts[0].Height())
+	n.Resize(xOffset + width, float64(len(n.nameTexts))*n.nameTexts[0].Height())
 	
-	yOffset := (len(n.activeIndices) - n.currentActiveIndex - 1)*n.text.Height()
+	yOffset := float64(len(n.activeIndices) - n.currentActiveIndex - 1)*n.text.Height()
 	n.text.Move(Pt(xOffset, yOffset))
 	n.text.SetTextColor(getTextColor(n.currentActiveInfo(), 1))
 	for _, p := range n.pathTexts { p.Move(Pt(p.Position().X, yOffset)) }
@@ -192,7 +191,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			pathText.SetTextColor(getTextColor(info, 1))
 			pathText.SetBackgroundColor(Color{0, 0, 0, .7})
 			n.AddChild(pathText)
-			x := 0; if t, ok := n.lastPathText(); ok { x = t.Position().X + t.Width() }
+			x := 0.0; if t, ok := n.lastPathText(); ok { x = t.Position().X + t.Width() }
 			pathText.Move(Pt(x, 0))
 			n.pathTexts = append(n.pathTexts, pathText)
 			

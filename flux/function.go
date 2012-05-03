@@ -1,7 +1,6 @@
 package main
 
 import (
-	"image"
 	"github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 )
@@ -27,7 +26,7 @@ func (f *Function) NewNode(node *Node) {
 	f.nodes = append(f.nodes, node)
 }
 
-func (f *Function) NewConnection(pt image.Point) *Connection {
+func (f *Function) NewConnection(pt Point) *Connection {
 	conn := NewConnection(f, pt)
 	f.AddChild(conn)
 	conn.Lower()
@@ -46,8 +45,8 @@ func (f *Function) DeleteConnection(connection *Connection) {
 	}
 }
 
-// func (f *Function) GetNearestView(views []View, point image.Point, directionKey int) (nearest View) {
-// 	dir := map[int]image.Point{Key_Left:{-1, 0}, Key_Right:{1, 0}, Key_Up:{0, -1}, Key_Down:{0, 1}}[directionKey]
+// func (f *Function) GetNearestView(views []View, point Point, directionKey int) (nearest View) {
+// 	dir := map[int]Point{Key_Left:{-1, 0}, Key_Right:{1, 0}, Key_Up:{0, -1}, Key_Down:{0, 1}}[directionKey]
 // 	bestScore := 0.0
 // 	for _, view := range views {
 // 		d := f.GetViewCenter(view).Sub(point)
@@ -74,7 +73,7 @@ func (f *Function) DeleteConnection(connection *Connection) {
 // 	if nearest != nil { nearest.TakeKeyboardFocus() }
 // }
 // 
-// func (f *Function) GetViewCenter(v View) image.Point {
+// func (f *Function) GetViewCenter(v View) Point {
 // 	center := v.Center()
 // 	for v != f && v != nil {
 // 		center = v.MapToParent(center);

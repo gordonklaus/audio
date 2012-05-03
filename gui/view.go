@@ -2,7 +2,6 @@ package gui
 
 import (
 	gl "github.com/chsc/gogl/gl21"
-	"image"
 )
 
 type KeyEvent struct {
@@ -18,7 +17,7 @@ type View interface {
 	Children() []View
 	AddChild(v View)
 	RemoveChild(v View)
-	ViewAt(point image.Point) View
+	ViewAt(point Point) View
 	
 	Close()
 	
@@ -27,23 +26,23 @@ type View interface {
 	Lower()
 	LowerChild(child View)
 	
-	Position() image.Point
-	Move(p image.Point)
-	MoveCenter(p image.Point)
-	Moved(p image.Point)
+	Position() Point
+	Move(p Point)
+	MoveCenter(p Point)
+	Moved(p Point)
 	
-	Rect() image.Rectangle
-	Center() image.Point
-	Size() image.Point
-	Width() int
-	Height() int
-	Resize(width, height int)
-	Pan(d image.Point)
+	Rect() Rectangle
+	Center() Point
+	Size() Point
+	Width() float64
+	Height() float64
+	Resize(width, height float64)
+	Pan(d Point)
 	
-	MapFromParent(point image.Point) image.Point
-	MapFrom(point image.Point, parent View) image.Point
-	MapToParent(point image.Point) image.Point
-	MapTo(point image.Point, parent View) image.Point
+	MapFromParent(point Point) Point
+	MapFrom(point Point, parent View) Point
+	MapToParent(point Point) Point
+	MapTo(point Point, parent View) Point
 	
 	SetKeyboardFocus(view View)
 	TakeKeyboardFocus()
@@ -53,7 +52,7 @@ type View interface {
 	KeyReleased(event KeyEvent)
 	
 	SetMouseFocus(focus MouseHandlerView, button int)
-	GetMouseFocus(button int, p image.Point) MouseHandlerView
+	GetMouseFocus(button int, p Point) MouseHandlerView
 	
 	Repaint()
 	Paint()
@@ -68,12 +67,12 @@ type ViewBase struct {
 	self View
 	parent View
 	children []View
-	rect image.Rectangle
-	position image.Point
+	rect Rectangle
+	position Point
 }
 
 func NewView(self View) *ViewBase {
-	return &ViewBase{self, nil, make([]View, 0), image.ZR, image.ZP}
+	return &ViewBase{self, nil, make([]View, 0), ZR, ZP}
 }
 
 func (v *ViewBase) GetViewBase() *ViewBase { return v }
@@ -95,7 +94,7 @@ func (v *ViewBase) RemoveChild(view View) {
 		}
 	}
 }
-func (v ViewBase) ViewAt(point image.Point) View {
+func (v ViewBase) ViewAt(point Point) View {
 	if !point.In(v.self.Rect()) { return nil }
 	children := v.self.Children()
 	for i := len(children) - 1; i >= 0; i-- {
@@ -129,40 +128,40 @@ func (v *ViewBase) LowerChild(child View) {
 	}
 }
 
-func (v ViewBase) Position() image.Point { return v.position }
-func (v *ViewBase) Move(p image.Point) {
+func (v ViewBase) Position() Point { return v.position }
+func (v *ViewBase) Move(p Point) {
 	v.position = p
 	v.self.Moved(p)
 	v.self.Repaint()
 }
-func (v *ViewBase) MoveCenter(p image.Point) { v.Move(p.Sub(v.Size().Div(2))) }
-func (v *ViewBase) Moved(p image.Point) {}
+func (v *ViewBase) MoveCenter(p Point) { v.Move(p.Sub(v.Size().Div(2))) }
+func (v *ViewBase) Moved(p Point) {}
 
-func (v ViewBase) Rect() image.Rectangle { return v.rect }
-func (v ViewBase) Center() image.Point { return v.rect.Min.Add(v.Size().Div(2)) }
-func (v ViewBase) Size() image.Point { return v.rect.Size() }
-func (v ViewBase) Width() int { return v.rect.Dx() }
-func (v ViewBase) Height() int { return v.rect.Dy() }
-func (v *ViewBase) Resize(width, height int) {
-	v.rect.Max = v.rect.Min.Add(image.Pt(width, height))
+func (v ViewBase) Rect() Rectangle { return v.rect }
+func (v ViewBase) Center() Point { return v.rect.Min.Add(v.Size().Div(2)) }
+func (v ViewBase) Size() Point { return v.rect.Size() }
+func (v ViewBase) Width() float64 { return v.rect.Dx() }
+func (v ViewBase) Height() float64 { return v.rect.Dy() }
+func (v *ViewBase) Resize(width, height float64) {
+	v.rect.Max = v.rect.Min.Add(Pt(width, height))
 	v.self.Repaint()
 }
-func (v *ViewBase) Pan(p image.Point) {
+func (v *ViewBase) Pan(p Point) {
 	v.rect = v.rect.Add(p.Sub(v.rect.Min))
 	v.self.Repaint()
 }
 
-func (v ViewBase) MapFromParent(point image.Point) image.Point {
+func (v ViewBase) MapFromParent(point Point) Point {
 	return point.Sub(v.Position()).Add(v.Rect().Min)
 }
-func (v ViewBase) MapFrom(point image.Point, parent View) image.Point {
+func (v ViewBase) MapFrom(point Point, parent View) Point {
 	if v.self == parent { return point }
 	return v.MapFromParent(v.parent.MapFrom(point, parent))
 }
-func (v ViewBase) MapToParent(point image.Point) image.Point {
+func (v ViewBase) MapToParent(point Point) Point {
 	return point.Sub(v.Rect().Min).Add(v.Position())
 }
-func (v ViewBase) MapTo(point image.Point, parent View) image.Point {
+func (v ViewBase) MapTo(point Point, parent View) Point {
 	if v.self == parent { return point }
 	return v.parent.MapTo(v.MapToParent(point), parent)
 }
@@ -175,7 +174,7 @@ func (v *ViewBase) KeyPressed(event KeyEvent) { if v.parent != nil { v.parent.Ke
 func (v *ViewBase) KeyReleased(event KeyEvent) { if v.parent != nil { v.parent.KeyReleased(event) } }
 
 func (v *ViewBase) SetMouseFocus(focus MouseHandlerView, button int) { if v.parent != nil { v.parent.SetMouseFocus(focus, button) } }
-func (v *ViewBase) GetMouseFocus(button int, p image.Point) MouseHandlerView {
+func (v *ViewBase) GetMouseFocus(button int, p Point) MouseHandlerView {
 	if !p.In(v.Rect()) { return nil }
 	children := v.self.Children()
 	for i := len(children) - 1; i >= 0; i-- {
