@@ -186,8 +186,8 @@ func (v *ViewBase) GetMouseFocus(button int, p Point) MouseHandlerView {
 
 func (v ViewBase) Repaint() { if v.parent != nil { v.parent.Repaint() } }
 func (v ViewBase) paintBase() {
-	gl.PushMatrix()
-	defer gl.PopMatrix()
+	gl.PushMatrix(); defer gl.PopMatrix()
+	gl.PushAttrib(gl.ALL_ATTRIB_BITS); defer gl.PopAttrib()
 	delta := v.Position().Sub(v.Rect().Min)
 	gl.Translated(gl.Double(delta.X), gl.Double(delta.Y), 0)
 	v.self.Paint()

@@ -21,3 +21,15 @@ func DrawLine(p1, p2 Point) {
 	Vertex2d(Double(p1.X), Double(p1.Y))
 	Vertex2d(Double(p2.X), Double(p2.Y))
 }
+
+func DrawRect(r Rectangle) {
+	Begin(LINE_LOOP); defer End()
+	Vertex2d(Double(r.Min.X), Double(r.Min.Y))
+	Vertex2d(Double(r.Min.X), Double(r.Max.Y))
+	Vertex2d(Double(r.Max.X), Double(r.Max.Y))
+	Vertex2d(Double(r.Max.X), Double(r.Min.Y))
+}
+
+func FillRect(r Rectangle) {
+	Rectd(Double(r.Min.X), Double(r.Min.Y), Double(r.Max.X), Double(r.Max.Y))
+}

@@ -21,15 +21,19 @@ const (
 	nodeMargin = 3
 )
 
-func NewFunctionNode(info FunctionInfo) *Node {
+func newNode(name string) *Node {
 	n := &Node{}
 	n.ViewBase = *NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 
-	n.name = NewText(info.name)
+	n.name = NewText(name)
 	n.name.SetBackgroundColor(Color{0, 0, 0, 0})
 	n.AddChild(n.name)
-	
+	return n
+}
+
+func NewFunctionNode(info FunctionInfo) *Node {
+	n := newNode(info.name)
 	numInputs := float64(len(info.parameters))
 	numOutputs := float64(len(info.results))
 	maxputs := Max(numInputs, numOutputs)
@@ -50,6 +54,20 @@ func NewFunctionNode(info FunctionInfo) *Node {
 		n.outputs = append(n.outputs, p)
 	}
 	
+	return n
+}
+
+func NewStringLiteralNode(text string) *Node {
+	n := newNode(text)
+	width := 2 * nodeMargin + n.name.Width()
+	height := n.name.Height() + putSize
+	n.Resize(width, height)
+	n.name.Move(Pt((width - n.name.Width()) / 2, 0))
+	n.name.SetTextColor(Color{1, 1, 0, 1})
+	p := NewOutput(n)
+	p.Move(Pt((width - putSize) / 2, n.Height() - putSize))
+	n.AddChild(p)
+	n.outputs = []*Output{p}
 	return n
 }
 

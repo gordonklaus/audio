@@ -87,16 +87,28 @@ func (f *Function) KeyPressed(event KeyEvent) {
 		f.FocusNearestView(f, event.Key)
 	}
 	if len(event.Text) > 0 {
-		creator := NewNodeCreator(f)
-		creator.Move(f.Center())
-		creator.Created.Connect(func(n ...interface{}) {
-			node := n[0].(*Node)
-			f.AddNode(node)
-			node.MoveCenter(f.Center())
-			node.TakeKeyboardFocus()
-		})
-		creator.Canceled.Connect(func(...interface{}) { f.TakeKeyboardFocus() })
-		creator.text.KeyPressed(event)
+		if event.Text == "\"" {
+			creator := NewStringLiteralCreator(f)
+			creator.Move(f.Center())
+			creator.created.Connect(func(n ...interface{}) {
+				node := n[0].(*Node)
+				f.AddNode(node)
+				node.MoveCenter(f.Center())
+				node.TakeKeyboardFocus()
+			})
+			creator.canceled.Connect(func(...interface{}) { f.TakeKeyboardFocus() })
+		} else {
+			creator := NewNodeCreator(f)
+			creator.Move(f.Center())
+			creator.created.Connect(func(n ...interface{}) {
+				node := n[0].(*Node)
+				f.AddNode(node)
+				node.MoveCenter(f.Center())
+				node.TakeKeyboardFocus()
+			})
+			creator.canceled.Connect(func(...interface{}) { f.TakeKeyboardFocus() })
+			creator.text.KeyPressed(event)
+		}
 	}
 }
 

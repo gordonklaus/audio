@@ -103,8 +103,10 @@ func (w *Window) HandleEvents() {
 
 func (w *Window) SetKeyboardFocus(view View) {
 	if w.keyboardFocus != view {
-		w.keyboardFocus.LostKeyboardFocus()
+		// change w.keyboardFocus first to avoid possible infinite recursion
+		oldFocus := w.keyboardFocus
 		w.keyboardFocus = view
+		oldFocus.LostKeyboardFocus()
 		w.keyboardFocus.TookKeyboardFocus()
 	}
 }

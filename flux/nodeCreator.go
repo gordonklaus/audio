@@ -11,8 +11,8 @@ import (
 type NodeCreator struct {
 	ViewBase
 	function *Function
-	Created *Signal
-	Canceled *Signal
+	created *Signal
+	canceled *Signal
 	
 	currentInfo Info
 	activeIndices []int
@@ -28,8 +28,8 @@ func NewNodeCreator(function *Function) *NodeCreator {
 	n.ViewBase = *NewView(n)
 	n.function = function
 	function.AddChild(n)
-	n.Created = NewSignal()
-	n.Canceled = NewSignal()
+	n.created = NewSignal()
+	n.canceled = NewSignal()
 	
 	n.currentInfo = GetPackageInfo()
 	n.activeIndices = []int{}
@@ -43,6 +43,11 @@ func NewNodeCreator(function *Function) *NodeCreator {
 	n.text.TakeKeyboardFocus()
 	
 	return n
+}
+
+func (n *NodeCreator) Cancel() {
+	n.Close()
+	n.canceled.Emit()
 }
 
 func getTextColor(info Info, alpha float32) Color {
@@ -145,7 +150,7 @@ func newNodeNameText(n *NodeCreator) *nodeNameText {
 	})
 	return t
 }
-func (t *nodeNameText) LostKeyboardFocus() { t.n.Close() }
+func (t *nodeNameText) LostKeyboardFocus() { t.n.Cancel() }
 func (t *nodeNameText) KeyPressed(event KeyEvent) {
 	n := t.n
 	switch event.Key {
@@ -180,7 +185,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 	case glfw.KeyEnter:
 		if creator, ok := n.currentActiveInfo().(interface{NewNode()*Node}); ok {
 			n.Close()
-			n.Created.Emit(creator.NewNode())
+			n.created.Emit(creator.NewNode())
 			return
 		}
 		fallthrough
@@ -200,8 +205,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			t.SetText("")
 		}
 	case glfw.KeyEsc:
-		n.Close()
-		n.Canceled.Emit()
+		n.Cancel()
 	default:
 		t.Text.KeyPressed(event)
 	}

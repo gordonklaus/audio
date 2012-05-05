@@ -21,6 +21,8 @@ type Text struct {
 	AggregateMouseHandler
 	text string
 	textColor Color
+	frameSize float64
+	frameColor Color
 	backgroundColor Color
 	editable bool
 	validator func(*string)bool
@@ -45,7 +47,7 @@ func NewTextBase(self View, text string) *Text {
 func (t Text) GetText() string { return t.text }
 func (t *Text) SetText(text string) {
 	t.text = text
-	t.Resize(font.Advance(text), font.LineHeight())
+	t.Resize(2*t.frameSize + font.Advance(text), 2*t.frameSize + font.LineHeight())
 	t.TextChanged.Emit(text)
 }
 
@@ -58,6 +60,16 @@ func (t *Text) SetTextColor(color Color) {
 func (t *Text) SetBackgroundColor(color Color) {
 	t.backgroundColor = color
 	t.Repaint()
+}
+
+func (t *Text) SetFrameColor(color Color) {
+	t.frameColor = color
+	t.Repaint()
+}
+
+func (t *Text) SetFrameSize(size float64) {
+	t.frameSize = size
+	t.Resize(2*t.frameSize + font.Advance(t.text), 2*t.frameSize + font.LineHeight())
 }
 
 func (t *Text) SetEditable(editable bool) {
@@ -89,11 +101,15 @@ func (t *Text) KeyPressed(event KeyEvent) {
 }
 
 func (t Text) Paint() {
-	w, h := gl.Double(t.Width()), gl.Double(t.Height())
 	SetColor(t.backgroundColor)
-	gl.Rectd(0, 0, w, h)
+	FillRect(t.Rect().Inset(t.frameSize))
+	if t.frameSize > 0 {
+		SetColor(t.frameColor)
+		gl.LineWidth(gl.Float(t.frameSize))
+		DrawRect(t.Rect())
+	}
 	
 	SetColor(t.textColor)
-	gl.Translated(0, -gl.Double(font.Descender()), 0)
+	gl.Translated(gl.Double(t.frameSize), gl.Double(t.frameSize - font.Descender()), 0)
 	font.Render(t.text)
 }
