@@ -8,7 +8,6 @@ import (
 
 type put struct {
 	ViewBase
-	AggregateMouseHandler
 	spec putSpecializer
 	node *Node
 	connections []*Connection
@@ -19,21 +18,22 @@ const putSize = 11
 
 type putSpecializer interface {
 	View
-	ConnectToConnection(conn *Connection)
+	ConnectTo(conn *Connection)
+	PassMouseFocusToFreeConnectionHandle(conn *Connection, button int)
 }
 
 func Newput(spec putSpecializer, n *Node) *put {
 	p := &put{}
 	p.ViewBase = *NewView(spec)
-	p.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(p)}
 	p.spec = spec
 	p.node = n
 	p.Resize(putSize, putSize)
 	return p
 }
 
-func (p *put) ConnectConnection(conn *Connection) { p.connections = append(p.connections, conn) }
-func (p *put) DisconnectConnection(conn *Connection) {
+func (p put) CanConnect(interface{}) bool { return true }
+func (p *put) Connect(conn *Connection) { p.connections = append(p.connections, conn) }
+func (p *put) Disconnect(conn *Connection) {
 	for i, connection := range p.connections {
 		if connection == conn {
 			p.connections = append(p.connections[:i], p.connections[i+1:]...)
@@ -47,11 +47,11 @@ func (p *put) LostKeyboardFocus() { p.focused = false; p.Repaint() }
 
 func (p *put) KeyPressed(event KeyEvent) {
 	switch event.Key {
-	// case glfw.KeyEnter:
-	// 	conn := p.node.function.NewConnection(p.Center())
-	// 	p.spec.ConnectToConnection(conn)
-	// 	conn.BeStraightLine()
-	// 	conn.StartEditing()
+	case glfw.KeyEnter:
+		conn := p.node.function.NewConnection(p.Center())
+		p.spec.ConnectTo(conn)
+		conn.BeStraightLine()
+		conn.StartEditing()
 	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
 		p.node.function.FocusNearestView(p.spec, event.Key)
 	case glfw.KeyEsc:
@@ -60,6 +60,16 @@ func (p *put) KeyPressed(event KeyEvent) {
 		p.ViewBase.KeyPressed(event)
 	}
 }
+
+func (p *put) MousePressed(button int, pt Point) {
+	p.TakeKeyboardFocus()
+	conn := p.node.function.NewConnection(p.MapTo(pt, p.node.function))
+	p.spec.ConnectTo(conn)
+	p.spec.PassMouseFocusToFreeConnectionHandle(conn, button)
+	conn.StartEditing()
+}
+func (p put) MouseDragged(button int, pt Point) {}
+func (p put) MouseReleased(button int, pt Point) {}
 
 func (p put) Paint() {
 	width, height := gl.Double(p.Width()), gl.Double(p.Height())
@@ -88,12 +98,13 @@ func NewInput(n *Node) *Input {
 	return p
 }
 
-func (p *Input) ConnectToConnection(conn *Connection) { conn.SetDestination(p) }
+func (p *Input) ConnectTo(conn *Connection) { conn.SetDestination(p) }
+func (p *Input) PassMouseFocusToFreeConnectionHandle(conn *Connection, button int) { conn.srcHandle.SetMouseFocus(conn.srcHandle, button) }
 
 func (p *Input) KeyPressed(event KeyEvent) {
-	if event.Key == glfw.KeyLeft && len(p.connections) > 0 {
+	if event.Key == glfw.KeyDown && len(p.connections) > 0 {
 		p.connections[0].TakeKeyboardFocus()
-	} else if event.Key == glfw.KeyRight {
+	} else if event.Key == glfw.KeyUp {
 		p.node.TakeKeyboardFocus()
 	} else {
 		p.put.KeyPressed(event)
@@ -110,12 +121,13 @@ func NewOutput(n *Node) *Output {
 	return p
 }
 
-func (p *Output) ConnectToConnection(conn *Connection) { conn.SetSource(p) }
+func (p *Output) ConnectTo(conn *Connection) { conn.SetSource(p) }
+func (p *Output) PassMouseFocusToFreeConnectionHandle(conn *Connection, button int) { conn.dstHandle.SetMouseFocus(conn.dstHandle, button) }
 
 func (p *Output) KeyPressed(event KeyEvent) {
-	if event.Key == glfw.KeyLeft {
+	if event.Key == glfw.KeyDown {
 		p.node.TakeKeyboardFocus()
-	} else if event.Key == glfw.KeyRight && len(p.connections) > 0 {
+	} else if event.Key == glfw.KeyUp && len(p.connections) > 0 {
 		p.connections[0].TakeKeyboardFocus()
 	} else {
 		p.put.KeyPressed(event)

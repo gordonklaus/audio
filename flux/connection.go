@@ -7,9 +7,13 @@ import (
 
 type Connection struct {
 	ViewBase
+	AggregateMouseHandler
 	function *Function
 	src *Output
 	dst *Input
+	
+	srcHandle *ConnectionSourceHandle
+	dstHandle *ConnectionDestinationHandle
 	
 	focused bool
 	srcPt Point
@@ -22,8 +26,13 @@ func NewConnection(function *Function, pt Point) *Connection {
 	c := &Connection{}
 	c.ViewBase = *NewView(c)
 	c.function = function
+	c.srcHandle = NewConnectionSourceHandle(c)
+	c.dstHandle = NewConnectionDestinationHandle(c)
 	c.srcPt = pt
 	c.dstPt = pt
+	c.AddChild(c.srcHandle)
+	c.AddChild(c.dstHandle)
+	c.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(c)}
 	return c
 }
 
@@ -31,9 +40,9 @@ func (c Connection) Connected() bool { return c.src != nil && c.dst != nil }
 func (c *Connection) Disconnect() { c.SetSource(nil); c.SetDestination(nil) }
 
 func (c *Connection) SetSource(src *Output) {
-	if c.src != nil { c.src.DisconnectConnection(c) }
+	if c.src != nil { c.src.Disconnect(c) }
 	c.src = src
-	if src != nil { src.ConnectConnection(c) }
+	if src != nil { src.Connect(c) }
 	c.reform()
 }
 func (c *Connection) DisconnectSource(point Point) {
@@ -42,9 +51,9 @@ func (c *Connection) DisconnectSource(point Point) {
 }
 
 func (c *Connection) SetDestination(dst *Input) {
-	if c.dst != nil { c.dst.DisconnectConnection(c) }
+	if c.dst != nil { c.dst.Disconnect(c) }
 	c.dst = dst
-	if dst != nil { dst.ConnectConnection(c) }
+	if dst != nil { dst.Connect(c) }
 	c.reform()
 }
 func (c *Connection) DisconnectDestination(point Point) {
@@ -59,25 +68,36 @@ func (c *Connection) reform() {
 	c.Move(rect.Min)
 	c.Resize(rect.Dx(), rect.Dy())
 	
+	handleOffset := c.dstPt.Sub(c.srcPt).Div(4)
+	if c.srcHandle.editing {
+		c.srcHandle.MoveCenter(c.MapFromParent(c.srcPt))
+	} else {
+		c.srcHandle.MoveCenter(c.MapFromParent(c.srcPt.Add(handleOffset)))
+	}
+	if c.dstHandle.editing {
+		c.dstHandle.MoveCenter(c.MapFromParent(c.dstPt))
+	} else {
+		c.dstHandle.MoveCenter(c.MapFromParent(c.dstPt.Sub(handleOffset)))
+	}
 	c.Repaint()
 }
 
 func (c *Connection) BeStraightLine() {
 	if c.src != nil && c.dst == nil {
-		c.dstPt = c.srcPt.Add(Pt(64, 0))
+		c.dstPt = c.srcPt.Add(Pt(0, 64))
 	} else if c.src == nil && c.dst != nil {
-		c.srcPt = c.dstPt.Sub(Pt(64, 0))
+		c.srcPt = c.dstPt.Sub(Pt(0, 64))
 	}
 	c.reform()
 }
 
-// func (c *Connection) StartEditing() {
-// 	if c.src == nil {
-// 		c.srcHandle.StartEditing()
-// 	} else {
-// 		c.dstHandle.StartEditing()
-// 	}
-// }
+func (c *Connection) StartEditing() {
+	if c.src == nil {
+		c.srcHandle.StartEditing()
+	} else {
+		c.dstHandle.StartEditing()
+	}
+}
 
 func (c *Connection) TookKeyboardFocus() { c.focused = true; c.Repaint() }
 func (c *Connection) LostKeyboardFocus() { c.focused = false; c.Repaint() }
@@ -94,14 +114,6 @@ func (c *Connection) KeyPressed(event KeyEvent) {
 }
 
 func (c Connection) Paint() {
-	// edgeColor := map[bool]NRGBAColor{false:{255, 255, 255, 15}, true:{0, 0, 255, 15}}
-	// painter.SetStrokeColor(edgeColor[c.focused])
-	// src := c.MapPointFromParent(c.srcPt)
-	// dst := c.MapPointFromParent(c.dstPt)
-	// for width := float64(connectionThickness); width > 1; width /= 1.414 {
-	// 	painter.SetLineWidth(width)
-	// 	painter.MoveTo(float64(src.X), float64(src.Y))
-	// 	painter.LineTo(float64(dst.X), float64(dst.Y))
-	// 	painter.Stroke()
-	// }
+	SetColor(map[bool]Color{false:{1, 1, 1, .5}, true:{.4, .4, 1, .7}}[c.focused])
+	DrawLine(c.MapFromParent(c.srcPt), c.MapFromParent(c.dstPt))
 }

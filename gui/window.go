@@ -10,6 +10,7 @@ func init() {
 	if err := gl.Init(); err != nil { panic(err) }
 	if err := glfw.OpenWindow(800, 600, 8, 8, 8, 8, 0, 0, glfw.Windowed); err != nil { panic(err) }
 	gl.Enable(gl.BLEND)
+	gl.Enable(gl.POINT_SMOOTH)
 	gl.Enable(gl.LINE_SMOOTH)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 	glfw.Disable(glfw.AutoPollEvents)

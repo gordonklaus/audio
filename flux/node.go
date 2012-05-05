@@ -60,11 +60,11 @@ func (n Node) Getputs() []View {
 	return puts
 }
 
-// func (n Node) Moved(Point) {
-// 	f := func(p *put) { for _, conn := range p.connections { conn.reform() } }
-// 	for _, p := range n.inputs { f(p.put) }
-// 	for _, p := range n.outputs { f(p.put) }
-// }
+func (n Node) Moved(Point) {
+	f := func(p put) { for _, conn := range p.connections { conn.reform() } }
+	for _, p := range n.inputs { f(p.put) }
+	for _, p := range n.outputs { f(p.put) }
+}
 
 func (n *Node) TookKeyboardFocus() { n.focused = true; n.Repaint() }
 func (n *Node) LostKeyboardFocus() { n.focused = false; n.Repaint() }

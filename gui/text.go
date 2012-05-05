@@ -7,13 +7,6 @@ import (
 	."code.google.com/p/gordon-go/util"
 )
 
-type Color struct {
-	Red float32
-	Green float32
-	Blue float32
-	Alpha float32
-}
-
 var font Font = CreateTextureFont("/usr/X11R6/lib/X11/fonts/TTF/luxirr.ttf")
 func init() {
 	font.SetFaceSize(fontSize, 1)
@@ -95,13 +88,12 @@ func (t *Text) KeyPressed(event KeyEvent) {
 	}
 }
 
-func setColor(color Color) { gl.Color4d(gl.Double(color.Red), gl.Double(color.Green), gl.Double(color.Blue), gl.Double(color.Alpha)) }
 func (t Text) Paint() {
 	w, h := gl.Double(t.Width()), gl.Double(t.Height())
-	setColor(t.backgroundColor)
+	SetColor(t.backgroundColor)
 	gl.Rectd(0, 0, w, h)
 	
-	setColor(t.textColor)
+	SetColor(t.textColor)
 	gl.Translated(0, -gl.Double(font.Descender()), 0)
 	font.Render(t.text)
 }
