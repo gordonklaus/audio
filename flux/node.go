@@ -41,14 +41,14 @@ func NewFunctionNode(info FunctionInfo) *Node {
 	height := n.name.Height() + 2*putSize
 	n.Resize(width, height)
 	n.name.Move(Pt((width - n.name.Width()) / 2, putSize))
-	for i := range info.parameters {
-		p := NewInput(n)
+	for i, parameter := range info.parameters {
+		p := NewInput(n, parameter)
 		p.Move(Pt((float64(i) + .5) * width / numInputs - putSize / 2, 0))
 		n.AddChild(p)
 		n.inputs = append(n.inputs, p)
 	}
-	for i := range info.results {
-		p := NewOutput(n)
+	for i, result := range info.results {
+		p := NewOutput(n, result)
 		p.Move(Pt((float64(i) + .5) * width / numOutputs - putSize / 2, n.Height() - putSize))
 		n.AddChild(p)
 		n.outputs = append(n.outputs, p)
@@ -64,7 +64,7 @@ func NewStringLiteralNode(text string) *Node {
 	n.Resize(width, height)
 	n.name.Move(Pt((width - n.name.Width()) / 2, 0))
 	n.name.SetTextColor(Color{1, 1, 0, 1})
-	p := NewOutput(n)
+	p := NewOutput(n, ValueInfo{"str", "string", nil, false})
 	p.Move(Pt((width - putSize) / 2, n.Height() - putSize))
 	n.AddChild(p)
 	n.outputs = []*Output{p}

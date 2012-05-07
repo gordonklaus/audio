@@ -10,6 +10,7 @@ type put struct {
 	ViewBase
 	spec putSpecializer
 	node *Node
+	info ValueInfo
 	connections []*Connection
 	focused bool
 }
@@ -22,11 +23,12 @@ type putSpecializer interface {
 	PassMouseFocusToFreeConnectionHandle(conn *Connection, button int)
 }
 
-func Newput(spec putSpecializer, n *Node) *put {
+func Newput(spec putSpecializer, n *Node, info ValueInfo) *put {
 	p := &put{}
 	p.ViewBase = *NewView(spec)
 	p.spec = spec
 	p.node = n
+	p.info = info
 	p.Resize(putSize, putSize)
 	return p
 }
@@ -92,9 +94,9 @@ func (p put) Paint() {
 type Input struct {
 	put
 }
-func NewInput(n *Node) *Input {
+func NewInput(n *Node, info ValueInfo) *Input {
 	p := &Input{}
-	p.put = *Newput(p, n)
+	p.put = *Newput(p, n, info)
 	return p
 }
 
@@ -115,9 +117,9 @@ func (p *Input) KeyPressed(event KeyEvent) {
 type Output struct {
 	put
 }
-func NewOutput(n *Node) *Output {
+func NewOutput(n *Node, info ValueInfo) *Output {
 	p := &Output{}
-	p.put = *Newput(p, n)
+	p.put = *Newput(p, n, info)
 	return p
 }
 

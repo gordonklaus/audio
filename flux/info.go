@@ -97,6 +97,41 @@ func (p *PackageInfo) Children() []Info {
 	return children
 }
 
+func typeName(expr ast.Expr) string {
+	switch typ := expr.(type) {
+	case nil:
+		return "<untyped>"
+	case *ast.Ident:
+		return typ.Name
+	case *ast.SelectorExpr:
+		return typeName(typ.X) + typ.Sel.Name
+	case *ast.StarExpr:
+		return "*" + typeName(typ.X)
+	case *ast.ArrayType:
+		return "[]" + typeName(typ.Elt)
+	case *ast.Ellipsis:
+		return "..." + typeName(typ.Elt)
+	case *ast.StructType:
+		return "struct{with some fields}"
+	case *ast.InterfaceType:
+		return "interface{with some methods}"
+	case *ast.MapType:
+		return "map[" + typeName(typ.Key) + "]" + typeName(typ.Value)
+	case *ast.ChanType:
+		s := ""
+		switch typ.Dir {
+		case ast.SEND: s = "chan<- "
+		case ast.RECV: s = "<-chan "
+		case ast.SEND | ast.RECV: s = "chan "
+		}
+		return s + typeName(typ.Value)
+	case *ast.FuncType:
+		return "func(with) args"
+	}
+	Panicf("other type!:  %#v", expr)
+	return ""
+}
+
 func (p *PackageInfo) load() {
 	if p.loaded { return }
 	p.loaded = true
@@ -124,12 +159,12 @@ func (p *PackageInfo) load() {
 					case token.CONST:
 						v := spec.(*ast.ValueSpec)
 						for _, name := range v.Names {
-							p.constants = append(p.constants, ValueInfo{name.Name, p, true})
+							p.constants = append(p.constants, ValueInfo{name.Name, typeName(v.Type), p, true})
 						}
 					case token.VAR:
 						v := spec.(*ast.ValueSpec)
 						for _, name := range v.Names {
-							p.variables = append(p.variables, ValueInfo{name.Name, p, false})
+							p.variables = append(p.variables, ValueInfo{name.Name, typeName(v.Type), p, false})
 						}
 					case token.TYPE:
 						p.types = append(p.types, &TypeInfo{spec.(*ast.TypeSpec).Name.Name, p, nil, nil})
@@ -148,16 +183,16 @@ func (p *PackageInfo) load() {
 				functionInfo := FunctionInfo{name:funcDecl.Name.Name}
 				for _, field := range funcDecl.Type.Params.List {
 					for _, name := range field.Names {
-						functionInfo.parameters = append(functionInfo.parameters, name.Name)
+						functionInfo.parameters = append(functionInfo.parameters, ValueInfo{name.Name, typeName(field.Type), nil, false})
 					}
 				}
 				if results := funcDecl.Type.Results; results != nil {
 					for _, field := range results.List {
 						if field.Names == nil {
-							functionInfo.results = append(functionInfo.results, "")
+							functionInfo.results = append(functionInfo.results, ValueInfo{"", typeName(field.Type), nil, false})
 						} else {
 							for _, name := range field.Names {
-								functionInfo.results = append(functionInfo.results, name.Name)
+								functionInfo.results = append(functionInfo.results, ValueInfo{name.Name, typeName(field.Type), nil, false})
 							}
 						}
 					}
@@ -226,8 +261,8 @@ func (t TypeInfo) Children() []Info {
 type FunctionInfo struct {
 	name string
 	parent Info
-	parameters []string
-	results []string
+	parameters []ValueInfo
+	results []ValueInfo
 }
 func (f FunctionInfo) Name() string { return f.name }
 func (f FunctionInfo) Parent() Info { return f.parent }
@@ -236,6 +271,7 @@ func (f FunctionInfo) NewNode() *Node { return NewFunctionNode(f) }
 
 type ValueInfo struct {
 	name string
+	typeName string
 	parent *PackageInfo
 	constant bool
 }
