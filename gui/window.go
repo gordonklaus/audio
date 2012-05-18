@@ -18,7 +18,7 @@ func init() {
 }
 
 type Window struct {
-	ViewBase
+	*ViewBase
 	ClickHandler
 	centralView View
 	keyboardFocus View
@@ -27,11 +27,11 @@ type Window struct {
 }
 
 func NewWindow(self View, centralView View) *Window {
-	w := &Window{ViewBase{}, *NewClickKeyboardFocuser(centralView), centralView, centralView, make(map[int]MouseHandlerView), false}
+	w := &Window{nil, *NewClickKeyboardFocuser(centralView), centralView, centralView, make(map[int]MouseHandlerView), false}
 	if self == nil { self = w }
-	w.ViewBase = *NewView(self)
+	w.ViewBase = NewView(w)
 	w.AddChild(centralView)
-	
+	w.Self = self
 	return w
 }
 
@@ -74,7 +74,7 @@ func (w *Window) HandleEvents() {
 	glfw.SetMousePosCallback(func(x, y int) {
 		mousePos = Pt(float64(x), w.Height() - float64(y))
 		for button, v := range w.mouseFocus {
-			pt := v.MapFrom(mousePos, w.self)
+			pt := v.MapFrom(mousePos, w.Self)
 			v.MouseDragged(button, pt)
 		}
 	})
@@ -83,12 +83,12 @@ func (w *Window) HandleEvents() {
 			v := w.GetMouseFocus(button, mousePos)
 			if v != nil {
 				w.mouseFocus[button] = v
-				pt := v.MapFrom(mousePos, w.self)
+				pt := v.MapFrom(mousePos, w.Self)
 				v.MousePressed(button, pt)
 			}
 		} else if state == glfw.KeyRelease {
 			if v, ok := w.mouseFocus[button]; ok {
-				pt := v.MapFrom(mousePos, w.self)
+				pt := v.MapFrom(mousePos, w.Self)
 				v.MouseReleased(button, pt)
 				delete(w.mouseFocus, button)
 			}

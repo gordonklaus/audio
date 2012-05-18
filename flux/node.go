@@ -40,7 +40,7 @@ func (t *nodeText) KeyPressed(event KeyEvent) {
 }
 
 type NodeBase struct {
-	ViewBase
+	*ViewBase
 	AggregateMouseHandler
 	function *Function
 	text *nodeText
@@ -55,12 +55,13 @@ const (
 
 func NewNodeBase(self Node, function *Function) *NodeBase {
 	n := &NodeBase{}
-	n.ViewBase = *NewView(self)
+	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(self), NewViewDragger(self)}
 	n.function = function
 	n.text = newNodeText(n)
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	n.AddChild(n.text)
+	n.Self = self
 	return n
 }
 
@@ -85,7 +86,7 @@ func (n NodeBase) Inputs() []*Input { return n.inputs }
 func (n NodeBase) Outputs() []*Output { return n.outputs }
 
 func (n NodeBase) Moved(Point) {
-	f := func(p put) { for _, conn := range p.connections { conn.reform() } }
+	f := func(p *put) { for _, conn := range p.connections { conn.reform() } }
 	for _, p := range n.inputs { f(p.put) }
 	for _, p := range n.outputs { f(p.put) }
 }
@@ -131,10 +132,10 @@ func NewNode(info Info, function *Function) Node {
 	return nil
 }
 
-type FunctionNode struct { NodeBase }
+type FunctionNode struct { *NodeBase }
 func NewFunctionNode(info FunctionInfo, function *Function) *FunctionNode {
 	n := &FunctionNode{}
-	n.NodeBase = *NewNodeBase(n, function)
+	n.NodeBase = NewNodeBase(n, function)
 	n.text.SetText(info.name)
 	for _, parameter := range info.parameters {
 		p := NewInput(n, parameter)
@@ -154,10 +155,10 @@ func (n FunctionNode) GoCode(inputs string) string {
 	return Sprintf("%v(%v)", n.text.GetText(), inputs)
 }
 
-type ConstantNode struct { NodeBase }
+type ConstantNode struct { *NodeBase }
 func NewStringConstantNode(function *Function) *ConstantNode {
 	n := &ConstantNode{}
-	n.NodeBase = *NewNodeBase(n, function)
+	n.NodeBase = NewNodeBase(n, function)
 	n.text.SetEditable(true)
 	p := NewOutput(n, ValueInfo{})
 	n.AddChild(p)

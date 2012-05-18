@@ -9,7 +9,7 @@ import (
 )
 
 type NodeCreator struct {
-	ViewBase
+	*ViewBase
 	function *Function
 	created *Signal
 	canceled *Signal
@@ -25,7 +25,7 @@ type NodeCreator struct {
 
 func NewNodeCreator(function *Function) *NodeCreator {
 	n := &NodeCreator{}
-	n.ViewBase = *NewView(n)
+	n.ViewBase = NewView(n)
 	n.function = function
 	function.AddChild(n)
 	n.created = NewSignal()

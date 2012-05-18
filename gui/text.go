@@ -17,7 +17,7 @@ const (
 )
 
 type Text struct {
-	ViewBase
+	*ViewBase
 	AggregateMouseHandler
 	text string
 	textColor Color
@@ -34,13 +34,13 @@ func NewText(text string) *Text { return NewTextBase(nil, text) }
 func NewTextBase(self View, text string) *Text {
 	t := &Text{}
 	if self == nil { self = t }
-	t.ViewBase = *NewView(self)
+	t.ViewBase = NewView(t)
 	t.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(t)}
 	t.textColor = Color{1, 1, 1, 1}
 	t.backgroundColor = Color{0, 0, 0, 1}
 	t.TextChanged = NewSignal()
-	
 	t.SetText(text)
+	t.Self = self
 	return t
 }
 

@@ -7,7 +7,7 @@ import (
 )
 
 type ConnectionHandle struct {
-	ViewBase
+	*ViewBase
 	spec ConnectionHandleSpecializer
 	connection *Connection
 	
@@ -27,10 +27,11 @@ type ConnectionHandleSpecializer interface {
 
 func NewConnectionHandle(spec ConnectionHandleSpecializer, conn *Connection) *ConnectionHandle {
 	h := &ConnectionHandle{}
-	h.ViewBase = *NewView(spec)
+	h.ViewBase = NewView(h)
 	h.spec = spec
 	h.connection = conn
 	h.Resize(connectionHandleSize, connectionHandleSize)
+	h.Self = spec
 	return h
 }
 
@@ -112,13 +113,13 @@ func (h ConnectionHandle) Paint() {
 
 
 type ConnectionSourceHandle struct {
-	ConnectionHandle
+	*ConnectionHandle
 	savedConnection *Output
 }
 
 func NewConnectionSourceHandle(conn *Connection) *ConnectionSourceHandle {
 	h := &ConnectionSourceHandle{}
-	h.ConnectionHandle = *NewConnectionHandle(h, conn)
+	h.ConnectionHandle = NewConnectionHandle(h, conn)
 	return h
 }
 
@@ -166,13 +167,13 @@ func (h *ConnectionSourceHandle) KeyPressed(event KeyEvent) {
 
 
 type ConnectionDestinationHandle struct {
-	ConnectionHandle
+	*ConnectionHandle
 	savedConnection *Input
 }
 
 func NewConnectionDestinationHandle(conn *Connection) *ConnectionDestinationHandle {
 	h := &ConnectionDestinationHandle{}
-	h.ConnectionHandle = *NewConnectionHandle(h, conn)
+	h.ConnectionHandle = NewConnectionHandle(h, conn)
 	return h
 }
 

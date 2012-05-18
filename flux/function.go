@@ -11,7 +11,7 @@ import (
 )
 
 type Function struct {
-	ViewBase
+	*ViewBase
 	AggregateMouseHandler
 	nodes []Node
 	connections []*Connection
@@ -19,7 +19,7 @@ type Function struct {
 
 func NewFunction() *Function {
 	f := &Function{}
-	f.ViewBase = *NewView(f)
+	f.ViewBase = NewView(f)
 	f.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(f), NewViewPanner(f)}
 	return f
 }

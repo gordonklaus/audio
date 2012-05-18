@@ -6,7 +6,7 @@ import (
 )
 
 type Connection struct {
-	ViewBase
+	*ViewBase
 	AggregateMouseHandler
 	function *Function
 	src *Output
@@ -24,7 +24,7 @@ const connectionThickness = 7
 
 func NewConnection(function *Function, pt Point) *Connection {
 	c := &Connection{}
-	c.ViewBase = *NewView(c)
+	c.ViewBase = NewView(c)
 	c.function = function
 	c.srcHandle = NewConnectionSourceHandle(c)
 	c.dstHandle = NewConnectionDestinationHandle(c)
