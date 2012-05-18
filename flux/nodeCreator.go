@@ -54,7 +54,7 @@ func getTextColor(info Info, alpha float32) Color {
 	switch info.(type) {
 	case *PackageInfo:
 		return Color{1, 1, 1, alpha}
-	case *TypeInfo:
+	case TypeInfo:
 		return Color{.6, 1, .6, alpha}
 	case FunctionInfo:
 		return Color{1, .6, .6, alpha}
@@ -183,9 +183,9 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			t.SetText("")
 		}
 	case glfw.KeyEnter:
-		if creator, ok := n.currentActiveInfo().(interface{NewNode()*Node}); ok {
+		if node := NewNode(n.currentActiveInfo(), n.function); node != nil {
 			n.Close()
-			n.created.Emit(creator.NewNode())
+			n.created.Emit(node)
 			return
 		}
 		fallthrough

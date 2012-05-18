@@ -9,7 +9,7 @@ import (
 type put struct {
 	ViewBase
 	spec putSpecializer
-	node *Node
+	node Node
 	info ValueInfo
 	connections []*Connection
 	focused bool
@@ -23,7 +23,7 @@ type putSpecializer interface {
 	PassMouseFocusToFreeConnectionHandle(conn *Connection, button int)
 }
 
-func Newput(spec putSpecializer, n *Node, info ValueInfo) *put {
+func Newput(spec putSpecializer, n Node, info ValueInfo) *put {
 	p := &put{}
 	p.ViewBase = *NewView(spec)
 	p.spec = spec
@@ -50,12 +50,12 @@ func (p *put) LostKeyboardFocus() { p.focused = false; p.Repaint() }
 func (p *put) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case glfw.KeyEnter:
-		conn := p.node.function.NewConnection(p.Center())
+		conn := p.node.Function().NewConnection(p.Center())
 		p.spec.ConnectTo(conn)
 		conn.BeStraightLine()
 		conn.StartEditing()
 	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
-		p.node.function.FocusNearestView(p.spec, event.Key)
+		p.node.Function().FocusNearestView(p.spec, event.Key)
 	case glfw.KeyEsc:
 		p.node.TakeKeyboardFocus()
 	default:
@@ -65,7 +65,7 @@ func (p *put) KeyPressed(event KeyEvent) {
 
 func (p *put) MousePressed(button int, pt Point) {
 	p.TakeKeyboardFocus()
-	conn := p.node.function.NewConnection(p.MapTo(pt, p.node.function))
+	conn := p.node.Function().NewConnection(p.MapTo(pt, p.node.Function()))
 	p.spec.ConnectTo(conn)
 	p.spec.PassMouseFocusToFreeConnectionHandle(conn, button)
 	conn.StartEditing()
@@ -94,7 +94,7 @@ func (p put) Paint() {
 type Input struct {
 	put
 }
-func NewInput(n *Node, info ValueInfo) *Input {
+func NewInput(n Node, info ValueInfo) *Input {
 	p := &Input{}
 	p.put = *Newput(p, n, info)
 	return p
@@ -117,7 +117,7 @@ func (p *Input) KeyPressed(event KeyEvent) {
 type Output struct {
 	put
 }
-func NewOutput(n *Node, info ValueInfo) *Output {
+func NewOutput(n Node, info ValueInfo) *Output {
 	p := &Output{}
 	p.put = *Newput(p, n, info)
 	return p

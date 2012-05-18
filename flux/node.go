@@ -5,15 +5,47 @@ import (
 	gl "github.com/chsc/gogl/gl21"
 	."code.google.com/p/gordon-go/gui"
 	."math"
+	."fmt"
 )
 
-type Node struct {
+type Node interface {
+	View
+	MouseHandler
+	Function() *Function
+	Inputs() []*Input
+	Outputs() []*Output
+	GoCode(inputs string) string
+}
+
+type nodeText struct {
+	Text
+	node *NodeBase
+}
+func newNodeText(node *NodeBase) *nodeText {
+	t := &nodeText{}
+	t.Text = *NewTextBase(t, "")
+	t.node = node
+	return t
+}
+func (t *nodeText) LostKeyboardFocus() { t.SetEditable(false) }
+func (t *nodeText) KeyPressed(event KeyEvent) {
+	switch event.Key {
+	case glfw.KeyEnter:
+		t.SetEditable(false)
+		t.node.TakeKeyboardFocus()
+	default:
+		t.Text.KeyPressed(event)
+	}
+	t.node.reform()
+}
+
+type NodeBase struct {
 	ViewBase
 	AggregateMouseHandler
 	function *Function
+	text *nodeText
 	inputs []*Input
 	outputs []*Output
-	name *Text
 	focused bool
 }
 
@@ -21,73 +53,47 @@ const (
 	nodeMargin = 3
 )
 
-func newNode(name string) *Node {
-	n := &Node{}
-	n.ViewBase = *NewView(n)
-	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
-
-	n.name = NewText(name)
-	n.name.SetBackgroundColor(Color{0, 0, 0, 0})
-	n.AddChild(n.name)
+func NewNodeBase(self Node, function *Function) *NodeBase {
+	n := &NodeBase{}
+	n.ViewBase = *NewView(self)
+	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(self), NewViewDragger(self)}
+	n.function = function
+	n.text = newNodeText(n)
+	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
+	n.AddChild(n.text)
 	return n
 }
 
-func NewFunctionNode(info FunctionInfo) *Node {
-	n := newNode(info.name)
-	numInputs := float64(len(info.parameters))
-	numOutputs := float64(len(info.results))
+func (n *NodeBase) reform() {
+	numInputs := float64(len(n.inputs))
+	numOutputs := float64(len(n.outputs))
 	maxputs := Max(numInputs, numOutputs)
-	width := 2 * nodeMargin + Max(n.name.Width(), maxputs * putSize)
-	height := n.name.Height() + 2*putSize
+	width := 2 * nodeMargin + Max(n.text.Width(), maxputs * putSize)
+	height := n.text.Height() + 2*putSize
 	n.Resize(width, height)
-	n.name.Move(Pt((width - n.name.Width()) / 2, putSize))
-	for i, parameter := range info.parameters {
-		p := NewInput(n, parameter)
-		p.Move(Pt((float64(i) + .5) * width / numInputs - putSize / 2, 0))
-		n.AddChild(p)
-		n.inputs = append(n.inputs, p)
+	n.text.Move(Pt((width - n.text.Width()) / 2, putSize))
+	for i, input := range n.inputs {
+		input.Move(Pt((float64(i) + .5) * width / numInputs - putSize / 2, 0))
 	}
-	for i, result := range info.results {
-		p := NewOutput(n, result)
-		p.Move(Pt((float64(i) + .5) * width / numOutputs - putSize / 2, n.Height() - putSize))
-		n.AddChild(p)
-		n.outputs = append(n.outputs, p)
+	for i, output := range n.outputs {
+		output.Move(Pt((float64(i) + .5) * width / numOutputs - putSize / 2, n.Height() - putSize))
 	}
-	
-	return n
 }
 
-func NewStringLiteralNode(text string) *Node {
-	n := newNode(text)
-	width := 2 * nodeMargin + n.name.Width()
-	height := n.name.Height() + putSize
-	n.Resize(width, height)
-	n.name.Move(Pt((width - n.name.Width()) / 2, 0))
-	n.name.SetTextColor(Color{1, 1, 0, 1})
-	p := NewOutput(n, ValueInfo{"str", "string", nil, false})
-	p.Move(Pt((width - putSize) / 2, n.Height() - putSize))
-	n.AddChild(p)
-	n.outputs = []*Output{p}
-	return n
-}
+func (n NodeBase) Function() *Function { return n.function }
+func (n NodeBase) Inputs() []*Input { return n.inputs }
+func (n NodeBase) Outputs() []*Output { return n.outputs }
 
-func (n Node) Getputs() []View {
-	puts := make([]View, 0, len(n.inputs) + len(n.outputs))
-	for _, p := range n.inputs { puts = append(puts, p) }
-	for _, p := range n.outputs { puts = append(puts, p) }
-	return puts
-}
-
-func (n Node) Moved(Point) {
+func (n NodeBase) Moved(Point) {
 	f := func(p put) { for _, conn := range p.connections { conn.reform() } }
 	for _, p := range n.inputs { f(p.put) }
 	for _, p := range n.outputs { f(p.put) }
 }
 
-func (n *Node) TookKeyboardFocus() { n.focused = true; n.Repaint() }
-func (n *Node) LostKeyboardFocus() { n.focused = false; n.Repaint() }
+func (n *NodeBase) TookKeyboardFocus() { n.focused = true; n.Repaint() }
+func (n *NodeBase) LostKeyboardFocus() { n.focused = false; n.Repaint() }
 
-func (n *Node) KeyPressed(event KeyEvent) {
+func (n *NodeBase) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
 		n.function.FocusNearestView(n, event.Key)
@@ -98,7 +104,7 @@ func (n *Node) KeyPressed(event KeyEvent) {
 	}
 }
 
-func (n Node) Paint() {
+func (n NodeBase) Paint() {
 	width, height := gl.Double(n.Width()), gl.Double(n.Height())
 	if n.focused {
 		gl.Color4d(.4, .4, 1, .4)
@@ -113,4 +119,53 @@ func (n Node) Paint() {
 	gl.Vertex2d(width, height)
 	gl.Vertex2d(0, height)
 	gl.End()
+}
+
+func NewNode(info Info, function *Function) Node {
+	switch info := info.(type) {
+	// case StringTypeInfo:
+	// 	return NewBasicLiteralNode(info)
+	case FunctionInfo:
+		return NewFunctionNode(info, function)
+	}
+	return nil
+}
+
+type FunctionNode struct { NodeBase }
+func NewFunctionNode(info FunctionInfo, function *Function) *FunctionNode {
+	n := &FunctionNode{}
+	n.NodeBase = *NewNodeBase(n, function)
+	n.text.SetText(info.name)
+	for _, parameter := range info.parameters {
+		p := NewInput(n, parameter)
+		n.AddChild(p)
+		n.inputs = append(n.inputs, p)
+	}
+	for _, result := range info.results {
+		p := NewOutput(n, result)
+		n.AddChild(p)
+		n.outputs = append(n.outputs, p)
+	}
+	n.reform()
+	
+	return n
+}
+func (n FunctionNode) GoCode(inputs string) string {
+	return Sprintf("%v(%v)", n.text.GetText(), inputs)
+}
+
+type ConstantNode struct { NodeBase }
+func NewStringConstantNode(function *Function) *ConstantNode {
+	n := &ConstantNode{}
+	n.NodeBase = *NewNodeBase(n, function)
+	n.text.SetEditable(true)
+	p := NewOutput(n, ValueInfo{})
+	n.AddChild(p)
+	n.outputs = []*Output{p}
+	n.reform()
+	return n
+}
+
+func (n ConstantNode) GoCode(string) string {
+	return Sprintf(`"%v"`, n.text.GetText())
 }

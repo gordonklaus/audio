@@ -138,7 +138,7 @@ func (h ConnectionSourceHandle) UpdateConnection(p Point) {
 func (h *ConnectionSourceHandle) MoveToNearestConnectableput(key int) {
 	connectableputs := []View{}
 	for _, node := range h.connection.function.nodes {
-		for _, output := range node.outputs {
+		for _, output := range node.Outputs() {
 			if h.connection.dst.CanConnect(output) { connectableputs = append(connectableputs, output) }
 		}
 	}
@@ -192,7 +192,7 @@ func (h ConnectionDestinationHandle) UpdateConnection(p Point) {
 func (h *ConnectionDestinationHandle) MoveToNearestConnectableput(key int) {
 	connectableputs := []View{}
 	for _, node := range h.connection.function.nodes {
-		for _, input := range node.inputs {
+		for _, input := range node.Inputs() {
 			if input.CanConnect(h.connection.src) { connectableputs = append(connectableputs, input) }
 		}
 	}

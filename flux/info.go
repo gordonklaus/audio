@@ -10,6 +10,7 @@ import (
 	."log"
 	"path"
 	"path/filepath"
+	"unsafe"
 )
 
 var packageInfo chan *PackageInfo = make(chan *PackageInfo)
@@ -19,7 +20,7 @@ func getPackageInfo(pathStr string) *PackageInfo {
 	
 	pkg, err := build.ImportDir(pathStr, build.FindOnly & build.AllowBinary)
 	if err == nil && !pkg.IsCommand() {
-		packageInfo.buildPackage = pkg
+		packageInfo.buildPackage = *pkg
 	} else if err != nil {
 		if _, ok := err.(*build.NoGoError); !ok { Println(err) }
 	}
@@ -40,7 +41,7 @@ func getPackageInfo(pathStr string) *PackageInfo {
 	
 	if len(packageInfo.buildPackage.ImportPath) == 0 && len(packageInfo.subPackages) == 1 && len(packageInfo.subPackages[0].buildPackage.ImportPath) == 0 {
 		subPackageInfo := packageInfo.subPackages[0]
-		subPackageInfo.buildPackage.Name = path.Join(packageInfo.Name(), subPackageInfo.Name())
+		subPackageInfo.name = path.Join(packageInfo.name, subPackageInfo.name)
 		packageInfo = subPackageInfo
 	}
 	
@@ -50,6 +51,26 @@ func getPackageInfo(pathStr string) *PackageInfo {
 func init() {
 	go func() {
 		rootPackageInfo := newPackageInfo("")
+		rootPackageInfo.types = append(rootPackageInfo.types, BoolTypeInfo{newTypeInfoBase("bool", rootPackageInfo)},
+															IntTypeInfo{newTypeInfoBase("int", rootPackageInfo), true, 8*int(unsafe.Sizeof(int(0)))},
+															IntTypeInfo{newTypeInfoBase("int8", rootPackageInfo), true, 8},
+															IntTypeInfo{newTypeInfoBase("int16", rootPackageInfo), true, 16},
+															IntTypeInfo{newTypeInfoBase("int32", rootPackageInfo), true, 32},
+															IntTypeInfo{newTypeInfoBase("int64", rootPackageInfo), true, 64},
+															IntTypeInfo{newTypeInfoBase("uint", rootPackageInfo), false, 8*int(unsafe.Sizeof(uint(0)))},
+															IntTypeInfo{newTypeInfoBase("uint8", rootPackageInfo), false, 8},
+															IntTypeInfo{newTypeInfoBase("uint16", rootPackageInfo), false, 16},
+															IntTypeInfo{newTypeInfoBase("uint32", rootPackageInfo), false, 32},
+															IntTypeInfo{newTypeInfoBase("uint64", rootPackageInfo), false, 64},
+															IntTypeInfo{newTypeInfoBase("uintptr", rootPackageInfo), false, 8*int(unsafe.Sizeof(uintptr(0)))},
+															FloatTypeInfo{newTypeInfoBase("float32", rootPackageInfo), 32},
+															FloatTypeInfo{newTypeInfoBase("float64", rootPackageInfo), 64},
+															ComplexTypeInfo{newTypeInfoBase("complex64", rootPackageInfo), 64},
+															ComplexTypeInfo{newTypeInfoBase("complex128", rootPackageInfo), 128},
+															IntTypeInfo{newTypeInfoBase("byte", rootPackageInfo), false, 8},
+															IntTypeInfo{newTypeInfoBase("rune", rootPackageInfo), true, 32},
+															StringTypeInfo{newTypeInfoBase("string", rootPackageInfo)},
+										)
 		for _, srcDir := range build.Default.SrcDirs() {
 			subPackageInfo := getPackageInfo(srcDir)
 			for _, p := range subPackageInfo.subPackages {
@@ -71,29 +92,35 @@ type Info interface {
 	Children() []Info
 }
 
+type InfoBase struct {
+	name string
+	parent Info
+}
+func (i InfoBase) Name() string { return i.name }
+func (i InfoBase) Parent() Info { return i.parent }
+func (i InfoBase) Children() []Info { return nil }
+
 type PackageInfo struct {
-	buildPackage *build.Package
-	parent *PackageInfo
-	subPackages []*PackageInfo
-	types []*TypeInfo
+	InfoBase
+	buildPackage build.Package
+	types []TypeInfo
 	functions []FunctionInfo
 	variables []ValueInfo
 	constants []ValueInfo
+	subPackages []*PackageInfo
 	loaded bool
 }
 
-func newPackageInfo(name string) *PackageInfo { return &PackageInfo{buildPackage:&build.Package{Name:name}} }
+func newPackageInfo(name string) *PackageInfo { return &PackageInfo{InfoBase:InfoBase{name:name}} }
 
-func (p PackageInfo) Name() string { return p.buildPackage.Name }
-func (p PackageInfo) Parent() Info { if p.parent == nil { return nil }; return p.parent }
 func (p *PackageInfo) Children() []Info {
 	p.load()
 	var children []Info
-	for _, p := range p.subPackages { children = append(children, p) }
 	for _, t := range p.types { children = append(children, t) }
 	for _, f := range p.functions { children = append(children, f) }
 	for _, v := range p.variables { children = append(children, v) }
 	for _, c := range p.constants { children = append(children, c) }
+	for _, p := range p.subPackages { children = append(children, p) }
 	return children
 }
 
@@ -156,58 +183,58 @@ func (p *PackageInfo) load() {
 			if genDecl, ok := decl.(*ast.GenDecl); ok {
 				for _, spec := range genDecl.Specs {
 					switch genDecl.Tok {
-					case token.CONST:
-						v := spec.(*ast.ValueSpec)
-						for _, name := range v.Names {
-							p.constants = append(p.constants, ValueInfo{name.Name, typeName(v.Type), p, true})
-						}
-					case token.VAR:
-						v := spec.(*ast.ValueSpec)
-						for _, name := range v.Names {
-							p.variables = append(p.variables, ValueInfo{name.Name, typeName(v.Type), p, false})
-						}
 					case token.TYPE:
-						p.types = append(p.types, &TypeInfo{spec.(*ast.TypeSpec).Name.Name, p, nil, nil})
-						// TODO:  handle interface types differently.  spec.(*ast.TypeSpec).Type.(*ast.InterfaceType)
+						p.types = append(p.types, NewTypeInfo(spec.(*ast.TypeSpec), p))
 					}
 				}
 			}
 		}
 	}
-	Sort(p.constants, "Name")
-	Sort(p.variables, "Name")
 	Sort(p.types, "Name")
 	for _, file := range pkg.Files {
 		for _, decl := range file.Decls {
-			if funcDecl, ok := decl.(*ast.FuncDecl); ok {
-				functionInfo := FunctionInfo{name:funcDecl.Name.Name}
-				for _, field := range funcDecl.Type.Params.List {
-					for _, name := range field.Names {
-						functionInfo.parameters = append(functionInfo.parameters, ValueInfo{name.Name, typeName(field.Type), nil, false})
+			switch decl := decl.(type) {
+			case *ast.GenDecl:
+				for _, spec := range decl.Specs {
+					switch decl.Tok {
+					case token.CONST:
+						v := spec.(*ast.ValueSpec)
+						for _, name := range v.Names {
+							p.constants = append(p.constants, ValueInfo{InfoBase{name.Name, p}, typeName(v.Type), true})
+						}
+					case token.VAR:
+						v := spec.(*ast.ValueSpec)
+						for _, name := range v.Names {
+							p.variables = append(p.variables, ValueInfo{InfoBase{name.Name, p}, typeName(v.Type), false})
+						}
 					}
 				}
-				if results := funcDecl.Type.Results; results != nil {
+			case *ast.FuncDecl:
+				functionInfo := FunctionInfo{InfoBase:InfoBase{decl.Name.Name, nil}}
+				for _, field := range decl.Type.Params.List {
+					for _, name := range field.Names {
+						functionInfo.parameters = append(functionInfo.parameters, ValueInfo{InfoBase{name.Name, nil}, typeName(field.Type), false})
+					}
+				}
+				if results := decl.Type.Results; results != nil {
 					for _, field := range results.List {
 						if field.Names == nil {
-							functionInfo.results = append(functionInfo.results, ValueInfo{"", typeName(field.Type), nil, false})
+							functionInfo.results = append(functionInfo.results, ValueInfo{InfoBase{"", nil}, typeName(field.Type), false})
 						} else {
 							for _, name := range field.Names {
-								functionInfo.results = append(functionInfo.results, ValueInfo{name.Name, typeName(field.Type), nil, false})
+								functionInfo.results = append(functionInfo.results, ValueInfo{InfoBase{name.Name, nil}, typeName(field.Type), false})
 							}
 						}
 					}
 				}
-				if recv := funcDecl.Recv; recv != nil {
+				if recv := decl.Recv; recv != nil {
 					if typeInfo := p.findTypeInfo(recv); typeInfo != nil {
 						functionInfo.parent = typeInfo
-						typeInfo.methods = append(typeInfo.methods, functionInfo)
+						*typeInfo.Methods() = append(*typeInfo.Methods(), functionInfo)
 					} else {
 						// exported method on an unexported type
 						// TODO:  expose the type (and its exported methods) but don't allow reference to the type name alone
 					}
-				} else if typeInfo := p.findTypeInfo(funcDecl.Type.Results); typeInfo != nil {
-					functionInfo.parent = typeInfo
-					typeInfo.functions = append(typeInfo.functions, functionInfo)
 				} else {
 					functionInfo.parent = p
 					p.functions = append(p.functions, functionInfo)
@@ -215,9 +242,10 @@ func (p *PackageInfo) load() {
 			}
 		}
 	}
+	Sort(p.constants, "Name")
+	Sort(p.variables, "Name")
 	for _, typeInfo := range p.types {
-		Sort(typeInfo.functions, "Name")
-		Sort(typeInfo.methods, "Name")
+		Sort(*typeInfo.Methods(), "Name")
 	}
 	Sort(p.functions, "Name")
 }
@@ -231,11 +259,11 @@ func exprTypeID(expr ast.Expr) *ast.Ident {
 	}
 	return nil
 }
-func (p *PackageInfo) findTypeInfo(fields *ast.FieldList) *TypeInfo {
+func (p *PackageInfo) findTypeInfo(fields *ast.FieldList) TypeInfo {
 	if fields.NumFields() == 0 { return nil }
 	if typeID := exprTypeID(fields.List[0].Type); typeID != nil {
 		for _, typeInfo := range p.types {
-			if typeInfo.name == typeID.Name {
+			if typeInfo.Name() == typeID.Name {
 				return typeInfo
 			}
 		}
@@ -243,38 +271,117 @@ func (p *PackageInfo) findTypeInfo(fields *ast.FieldList) *TypeInfo {
 	return nil
 }
 
-type TypeInfo struct {
-	name string
-	parent *PackageInfo
-	functions []FunctionInfo
+type TypeInfo interface {
+	Info
+	Methods() *[]FunctionInfo
+}
+type TypeInfoBase struct {
+	InfoBase
 	methods []FunctionInfo
 }
-func (t TypeInfo) Name() string { return t.name }
-func (t TypeInfo) Parent() Info { return t.parent }
-func (t TypeInfo) Children() []Info {
+func newTypeInfoBase(name string, parent Info) *TypeInfoBase { return &TypeInfoBase{InfoBase{name, parent}, nil} }
+func NewTypeInfo(spec *ast.TypeSpec, parent Info) TypeInfo {
+	switch typ := spec.Type.(type) {
+	// case *ast.Ident:
+	// 	return typ.Name
+	// case *ast.SelectorExpr:
+	// 	return typeName(typ.X) + typ.Sel.Name
+	// case *ast.StarExpr:
+	// 	return "*" + typeName(typ.X)
+	// case *ast.ArrayType:
+	// 	return "[]" + typeName(typ.Elt)
+	// case *ast.Ellipsis:
+	// 	return "..." + typeName(typ.Elt)
+	// case *ast.StructType:
+	// 	return "struct{with some fields}"
+	// case *ast.InterfaceType:
+	// 	return "interface{with some methods}"
+	// case *ast.MapType:
+	// 	return "map[" + typeName(typ.Key) + "]" + typeName(typ.Value)
+	// case *ast.ChanType:
+	// 	s := ""
+	// 	switch typ.Dir {
+	// 	case ast.SEND: s = "chan<- "
+	// 	case ast.RECV: s = "<-chan "
+	// 	case ast.SEND | ast.RECV: s = "chan "
+	// 	}
+	// 	return s + typeName(typ.Value)
+	// case *ast.FuncType:
+	// 	return "func(with) args"
+	}
+	return newTypeInfoBase(spec.Name.Name, parent)
+	Panicf("other type!:  %#v", spec)
+	return nil
+}
+func (t TypeInfoBase) Children() []Info {
 	var children []Info
-	for _, f := range t.functions { children = append(children, f) }
 	for _, m := range t.methods { children = append(children, m) }
 	return children
 }
+func (t *TypeInfoBase) Methods() *[]FunctionInfo { return &t.methods }
+
+type BoolTypeInfo struct { *TypeInfoBase }
+type IntTypeInfo struct {
+	*TypeInfoBase
+	signed bool
+	bits int
+}
+type FloatTypeInfo struct {
+	*TypeInfoBase
+	bits int
+}
+type ComplexTypeInfo struct {
+	*TypeInfoBase
+	bits int
+}
+type StringTypeInfo struct { *TypeInfoBase }
+type ArrayTypeInfo struct {
+	*TypeInfoBase
+	size int
+	element TypeInfo
+}
+type ChanTypeInfo struct {
+	*TypeInfoBase
+	send bool
+	recv bool
+	element TypeInfo
+}
+type FunctionTypeInfo struct {
+	*TypeInfoBase
+	receiver TypeInfo
+	inputs []TypeInfo
+	outputs []TypeInfo
+}
+type InterfaceTypeInfo struct {
+	*TypeInfoBase
+	methods []FunctionTypeInfo
+}
+type MapTypeInfo struct {
+	*TypeInfoBase
+	key TypeInfo
+	value TypeInfo
+}
+type PointerTypeInfo struct {
+	*TypeInfoBase
+	element TypeInfo
+}
+type SliceTypeInfo struct {
+	*TypeInfoBase
+	element TypeInfo
+}
+type StructTypeInfo struct {
+	*TypeInfoBase
+	fields []ValueInfo
+}
 
 type FunctionInfo struct {
-	name string
-	parent Info
+	InfoBase
 	parameters []ValueInfo
 	results []ValueInfo
 }
-func (f FunctionInfo) Name() string { return f.name }
-func (f FunctionInfo) Parent() Info { return f.parent }
-func (f FunctionInfo) Children() []Info { return nil }
-func (f FunctionInfo) NewNode() *Node { return NewFunctionNode(f) }
 
 type ValueInfo struct {
-	name string
+	InfoBase
 	typeName string
-	parent *PackageInfo
 	constant bool
 }
-func (p ValueInfo) Name() string { return p.name }
-func (p ValueInfo) Parent() Info { return p.parent }
-func (p ValueInfo) Children() []Info { return nil }

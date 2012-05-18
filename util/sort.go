@@ -28,8 +28,13 @@ func Sort(slice interface{}, key interface{}) {
 	var less func(i, j int) bool
 	switch k.Kind() {
 	case String:
-		if method, ok := elemType.MethodByName(key.(string)); ok && method.Type.NumIn() == 1 && method.Type.NumOut() >= 1 {
-			call := func(i int) Value { return method.Func.Call([]Value{s.Index(i)})[0] }
+		if method, ok := elemType.MethodByName(key.(string)); ok && method.Type.NumOut() > 0 {
+			var call func(i int) Value
+			if elemType.Kind() != Interface && method.Type.NumIn() == 1 {
+				call = func(i int) Value { return method.Func.Call([]Value{s.Index(i)})[0] }
+			} else if elemType.Kind() == Interface && method.Type.NumIn() == 0 {
+				call = func(i int) Value { return s.Index(i).MethodByName(key.(string)).Call(nil)[0] }
+			}
 			switch method.Type.Out(0).Kind() {
 			case Bool:
 				less = func(i, j int) bool { return !call(i).Bool() && call(j).Bool() }
@@ -43,9 +48,8 @@ func Sort(slice interface{}, key interface{}) {
 				less = func(i, j int) bool { return call(i).String() < call(j).String() }
 			}
 		}
-	default:
-		panic(Sprintf("Can't sort using key '%#v'.", key))
 	}
+	if less == nil { panic(Sprintf("Can't sort using key '%#v'.", key)) }
 	
 	tmp := New(elemType).Elem()
 	SortBy(s.Len(), less, func(i, j int) {
