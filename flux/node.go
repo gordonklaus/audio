@@ -11,7 +11,7 @@ import (
 type Node interface {
 	View
 	MouseHandler
-	Function() *Function
+	Block() *Block
 	Inputs() []*Input
 	Outputs() []*Output
 	GoCode(inputs string) string
@@ -42,7 +42,7 @@ func (t *nodeText) KeyPressed(event KeyEvent) {
 type NodeBase struct {
 	*ViewBase
 	AggregateMouseHandler
-	function *Function
+	block *Block
 	text *nodeText
 	inputs []*Input
 	outputs []*Output
@@ -53,11 +53,11 @@ const (
 	nodeMargin = 3
 )
 
-func NewNodeBase(self Node, function *Function) *NodeBase {
+func NewNodeBase(self Node, block *Block) *NodeBase {
 	n := &NodeBase{}
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(self), NewViewDragger(self)}
-	n.function = function
+	n.block = block
 	n.text = newNodeText(n)
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	n.AddChild(n.text)
@@ -81,7 +81,7 @@ func (n *NodeBase) reform() {
 	}
 }
 
-func (n NodeBase) Function() *Function { return n.function }
+func (n NodeBase) Block() *Block { return n.block }
 func (n NodeBase) Inputs() []*Input { return n.inputs }
 func (n NodeBase) Outputs() []*Output { return n.outputs }
 
@@ -97,9 +97,9 @@ func (n *NodeBase) LostKeyboardFocus() { n.focused = false; n.Repaint() }
 func (n *NodeBase) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
-		n.function.FocusNearestView(n, event.Key)
+		n.block.Outermost().FocusNearestView(n, event.Key)
 	case glfw.KeyEsc:
-		n.function.TakeKeyboardFocus()
+		n.block.TakeKeyboardFocus()
 	default:
 		n.ViewBase.KeyPressed(event)
 	}
@@ -122,20 +122,20 @@ func (n NodeBase) Paint() {
 	gl.End()
 }
 
-func NewNode(info Info, function *Function) Node {
+func NewNode(info Info, block *Block) Node {
 	switch info := info.(type) {
 	// case StringTypeInfo:
 	// 	return NewBasicLiteralNode(info)
 	case FunctionInfo:
-		return NewFunctionNode(info, function)
+		return NewFunctionNode(info, block)
 	}
 	return nil
 }
 
 type FunctionNode struct { *NodeBase }
-func NewFunctionNode(info FunctionInfo, function *Function) *FunctionNode {
+func NewFunctionNode(info FunctionInfo, block *Block) *FunctionNode {
 	n := &FunctionNode{}
-	n.NodeBase = NewNodeBase(n, function)
+	n.NodeBase = NewNodeBase(n, block)
 	n.text.SetText(info.name)
 	for _, parameter := range info.parameters {
 		p := NewInput(n, parameter)
@@ -156,9 +156,9 @@ func (n FunctionNode) GoCode(inputs string) string {
 }
 
 type ConstantNode struct { *NodeBase }
-func NewStringConstantNode(function *Function) *ConstantNode {
+func NewStringConstantNode(block *Block) *ConstantNode {
 	n := &ConstantNode{}
-	n.NodeBase = NewNodeBase(n, function)
+	n.NodeBase = NewNodeBase(n, block)
 	n.text.SetEditable(true)
 	p := NewOutput(n, ValueInfo{})
 	n.AddChild(p)

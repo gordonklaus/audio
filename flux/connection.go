@@ -8,7 +8,7 @@ import (
 type Connection struct {
 	*ViewBase
 	AggregateMouseHandler
-	function *Function
+	block *Block
 	src *Output
 	dst *Input
 	
@@ -22,10 +22,10 @@ type Connection struct {
 
 const connectionThickness = 7
 
-func NewConnection(function *Function, pt Point) *Connection {
+func NewConnection(block *Block, pt Point) *Connection {
 	c := &Connection{}
 	c.ViewBase = NewView(c)
-	c.function = function
+	c.block = block
 	c.srcHandle = NewConnectionSourceHandle(c)
 	c.dstHandle = NewConnectionDestinationHandle(c)
 	c.srcPt = pt
@@ -62,8 +62,8 @@ func (c *Connection) DisconnectDestination(point Point) {
 }
 
 func (c *Connection) reform() {
-	if c.src != nil { c.srcPt = c.function.GetViewCenter(c.src) }
-	if c.dst != nil { c.dstPt = c.function.GetViewCenter(c.dst) }
+	if c.src != nil { c.srcPt = c.src.MapTo(c.src.Center(), c.block) }
+	if c.dst != nil { c.dstPt = c.dst.MapTo(c.dst.Center(), c.block)}
 	rect := Rect(c.srcPt.X, c.srcPt.Y, c.dstPt.X, c.dstPt.Y).Canon().Inset(-connectionThickness / 2)
 	c.Move(rect.Min)
 	c.Resize(rect.Dx(), rect.Dy())
@@ -105,9 +105,9 @@ func (c *Connection) LostKeyboardFocus() { c.focused = false; c.Repaint() }
 func (c *Connection) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
-		c.function.FocusNearestView(c, event.Key)
+		c.block.Outermost().FocusNearestView(c, event.Key)
 	case glfw.KeyEsc:
-		c.function.TakeKeyboardFocus()
+		c.block.TakeKeyboardFocus()
 	default:
 		c.ViewBase.KeyPressed(event)
 	}

@@ -53,8 +53,8 @@ func (h *ConnectionHandle) StopEditing() {
 		if h.connection.Connected() {
 			h.connection.reform()
 		} else {
-			h.connection.function.DeleteConnection(h.connection)
-			h.connection.function.TakeKeyboardFocus()
+			h.connection.block.DeleteConnection(h.connection)
+			h.connection.block.TakeKeyboardFocus()
 		}
 	}
 }
@@ -68,7 +68,7 @@ func (h *ConnectionHandle) KeyPressed(event KeyEvent) {
 		if h.editing {
 			h.spec.MoveToNearestConnectableput(event.Key)
 		} else {
-			h.connection.function.FocusNearestView(h.spec, event.Key)
+			h.connection.block.Outermost().FocusNearestView(h.spec, event.Key)
 		}
 	case glfw.KeyEnter:
 		if h.editing {
@@ -80,7 +80,7 @@ func (h *ConnectionHandle) KeyPressed(event KeyEvent) {
 		if h.editing {
 			h.CancelEditing()
 		} else {
-			h.connection.function.TakeKeyboardFocus()
+			h.connection.block.TakeKeyboardFocus()
 		}
 	default:
 		h.ViewBase.KeyPressed(event)
@@ -127,8 +127,9 @@ func (h *ConnectionSourceHandle) SaveConnection() { h.savedConnection = h.connec
 func (h *ConnectionSourceHandle) RestoreSavedConnection() { h.connection.SetSource(h.savedConnection) }
 
 func (h ConnectionSourceHandle) UpdateConnection(p Point) {
-	p = h.MapTo(p, h.connection.function)
-	v := h.connection.function.ViewAt(p)
+	b := h.connection.block.Outermost()
+	p = h.MapTo(p, b)
+	v := b.ViewAt(p)
 	if output, ok := v.(*Output); ok && h.connection.dst.CanConnect(output) {
 		h.connection.SetSource(output)
 	} else {
@@ -137,14 +138,15 @@ func (h ConnectionSourceHandle) UpdateConnection(p Point) {
 }
 
 func (h *ConnectionSourceHandle) MoveToNearestConnectableput(key int) {
+	b := h.connection.block.Outermost()
 	connectableputs := []View{}
-	for _, node := range h.connection.function.nodes {
+	for _, node := range b.AllNodes() {
 		for _, output := range node.Outputs() {
 			if h.connection.dst.CanConnect(output) { connectableputs = append(connectableputs, output) }
 		}
 	}
 	
-	view := h.connection.function.GetNearestView(connectableputs, h.connection.srcPt, key)
+	view := b.GetNearestView(connectableputs, h.connection.srcPt, key)
 	if put, ok := view.(*Output); ok {
 		h.connection.SetSource(put)
 	}
@@ -181,8 +183,9 @@ func (h *ConnectionDestinationHandle) SaveConnection() { h.savedConnection = h.c
 func (h *ConnectionDestinationHandle) RestoreSavedConnection() { h.connection.SetDestination(h.savedConnection) }
 
 func (h ConnectionDestinationHandle) UpdateConnection(p Point) {
-	p = h.MapTo(p, h.connection.function)
-	v := h.connection.function.ViewAt(p)
+	b := h.connection.block.Outermost()
+	p = h.MapTo(p, b)
+	v := b.ViewAt(p)
 	if input, ok := v.(*Input); ok && input.CanConnect(h.connection.src) {
 		h.connection.SetDestination(input)
 	} else {
@@ -191,14 +194,15 @@ func (h ConnectionDestinationHandle) UpdateConnection(p Point) {
 }
 
 func (h *ConnectionDestinationHandle) MoveToNearestConnectableput(key int) {
+	b := h.connection.block.Outermost()
 	connectableputs := []View{}
-	for _, node := range h.connection.function.nodes {
+	for _, node := range b.AllNodes() {
 		for _, input := range node.Inputs() {
 			if input.CanConnect(h.connection.src) { connectableputs = append(connectableputs, input) }
 		}
 	}
 	
-	view := h.connection.function.GetNearestView(connectableputs, h.connection.dstPt, key)
+	view := b.GetNearestView(connectableputs, h.connection.dstPt, key)
 	if put, ok := view.(*Input); ok {
 		h.connection.SetDestination(put)
 	}

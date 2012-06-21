@@ -51,12 +51,12 @@ func (p *put) LostKeyboardFocus() { p.focused = false; p.Repaint() }
 func (p *put) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case glfw.KeyEnter:
-		conn := p.node.Function().NewConnection(p.Center())
+		conn := p.node.Block().NewConnection(p.Center())
 		p.spec.ConnectTo(conn)
 		conn.BeStraightLine()
 		conn.StartEditing()
 	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
-		p.node.Function().FocusNearestView(p.spec, event.Key)
+		p.node.Block().FocusNearestView(p.spec, event.Key)
 	case glfw.KeyEsc:
 		p.node.TakeKeyboardFocus()
 	default:
@@ -66,7 +66,7 @@ func (p *put) KeyPressed(event KeyEvent) {
 
 func (p *put) MousePressed(button int, pt Point) {
 	p.TakeKeyboardFocus()
-	conn := p.node.Function().NewConnection(p.MapTo(pt, p.node.Function()))
+	conn := p.node.Block().NewConnection(p.MapTo(pt, p.node.Block()))
 	p.spec.ConnectTo(conn)
 	p.spec.PassMouseFocusToFreeConnectionHandle(conn, button)
 	conn.StartEditing()

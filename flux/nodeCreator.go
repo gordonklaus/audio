@@ -10,7 +10,7 @@ import (
 
 type NodeCreator struct {
 	*ViewBase
-	function *Function
+	block *Block
 	created *Signal
 	canceled *Signal
 	
@@ -23,11 +23,11 @@ type NodeCreator struct {
 	text *nodeNameText
 }
 
-func NewNodeCreator(function *Function) *NodeCreator {
+func NewNodeCreator(block *Block) *NodeCreator {
 	n := &NodeCreator{}
 	n.ViewBase = NewView(n)
-	n.function = function
-	function.AddChild(n)
+	n.block = block
+	block.AddChild(n)
 	n.created = NewSignal()
 	n.canceled = NewSignal()
 	
@@ -183,7 +183,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			t.SetText("")
 		}
 	case glfw.KeyEnter:
-		if node := NewNode(n.currentActiveInfo(), n.function); node != nil {
+		if node := NewNode(n.currentActiveInfo(), n.block); node != nil {
 			n.Close()
 			n.created.Emit(node)
 			return

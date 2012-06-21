@@ -2,7 +2,7 @@ package main
 
 import (
 	."io/ioutil"
-	"github.com/jteeuwen/glfw"
+	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
 	."fmt"
@@ -12,43 +12,18 @@ import (
 
 type Function struct {
 	*ViewBase
-	AggregateMouseHandler
-	nodes []Node
-	connections []*Connection
+	block *Block
 }
 
 func NewFunction() *Function {
 	f := &Function{}
 	f.ViewBase = NewView(f)
-	f.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(f), NewViewPanner(f)}
+	f.block = NewBlock(nil)
+	f.AddChild(f.block)
 	return f
 }
 
-func (f *Function) AddNode(node Node) {
-	f.AddChild(node)
-	f.nodes = append(f.nodes, node)
-}
-
-func (f *Function) NewConnection(pt Point) *Connection {
-	conn := NewConnection(f, pt)
-	f.AddChild(conn)
-	conn.Lower()
-	f.connections = append(f.connections, conn)
-	return conn
-}
-
-func (f *Function) DeleteConnection(connection *Connection) {
-	for i, conn := range f.connections {
-		if conn == connection {
-			f.connections = append(f.connections[:i], f.connections[i+1:]...)
-			f.RemoveChild(connection)
-			connection.Disconnect()
-			return
-		}
-	}
-}
-
-func (f Function) nodeOrder() (order []Node, ok bool) {
+func nodeOrder(nodes map[Node]bool) (order []Node, ok bool) {
 	visited := Set{}
 	var insertInOrder func(node Node, visitedThisCall Set) bool
 	insertInOrder = func(node Node, visitedThisCall Set) bool {
@@ -57,10 +32,25 @@ func (f Function) nodeOrder() (order []Node, ok bool) {
 		
 		if !visited[node] {
 			visited[node] = true
-			for _, input := range node.Inputs() {
-				for _, conn := range input.connections {
-					if !insertInOrder(conn.src.node, visitedThisCall.Copy()) { return false }
+			switch node := node.(type) {
+			default:
+				for _, input := range node.Inputs() {
+					for _, conn := range input.connections {
+						// if block.connections[conn] {
+							srcNode := conn.src.node
+						// 	for !block.nodes[srcNode] { srcNode = srcNode.block.node }
+							if !insertInOrder(srcNode, visitedThisCall.Copy()) { return false }
+						// } else {
+						// 	blockInputs[conn] = true
+						// }
+					}
 				}
+			case *IfNode:
+				// order, falseInputs := node.falseBlock.nodeOrder()
+				// order, trueInputs := node.trueBlock.nodeOrder()
+				// for _, input := range append(falseInputs, node.input, trueInputs...) {
+				// 	// same as above
+				// }
 			}
 			order = append(order, node)
 		}
@@ -68,13 +58,18 @@ func (f Function) nodeOrder() (order []Node, ok bool) {
 	}
 	
 	endNodes := []Node{}
-	for _, node := range f.nodes {
-		for _, output := range node.Outputs() {
-			if len(output.connections) > 0 { continue }
+	for node := range nodes {
+		switch node := node.(type) {
+		default:
+			for _, output := range node.Outputs() {
+				if len(output.connections) > 0 { continue }
+			}
+		case *IfNode:
+			if node.falseBlock.HasOutputConnections() || node.trueBlock.HasOutputConnections() { continue }
 		}
 		endNodes = append(endNodes, node)
 	}
-	if len(endNodes) == 0 && len(f.nodes) > 0 { return }
+	if len(endNodes) == 0 && len(nodes) > 0 { return }
 	
 	for _, node := range endNodes {
 		if !insertInOrder(node, Set{}) { return }
@@ -84,7 +79,7 @@ func (f Function) nodeOrder() (order []Node, ok bool) {
 }
 
 func (f Function) Save() {
-	order, ok := f.nodeOrder()
+	order, ok := nodeOrder(f.block.nodes)
 	if !ok {
 		Println("cyclic!")
 		return
@@ -131,68 +126,19 @@ func (f Function) Save() {
 	WriteFile("../main.go", []byte(s), 0644)
 }
 
-func (f *Function) GetNearestView(views []View, point Point, directionKey int) (nearest View) {
-	dir := map[int]Point{glfw.KeyLeft:{-1, 0}, glfw.KeyRight:{1, 0}, glfw.KeyUp:{0, 1}, glfw.KeyDown:{0, -1}}[directionKey]
-	bestScore := 0.0
-	for _, view := range views {
-		d := f.GetViewCenter(view).Sub(point)
-		score := (dir.X * d.X + dir.Y * d.Y) / (d.X * d.X + d.Y * d.Y);
-		if (score > bestScore) {
-			bestScore = score
-			nearest = view
-		}
-	}
-	return
+func (f *Function) Resize(w, h float64) {
+	f.ViewBase.Resize(w, h)
+	f.block.Resize(w, h)
 }
 
-func (f *Function) FocusNearestView(v View, directionKey int) {
-	views := []View{}
-	for _, node := range f.nodes {
-		views = append(views, node)
-		for _, p := range node.Inputs() { views = append(views, p) }
-		for _, p := range node.Outputs() { views = append(views, p) }
-	}
-	for _, connection := range f.connections {
-		views = append(views, connection)
-	}
-	nearest := f.GetNearestView(views, f.GetViewCenter(v), directionKey)
-	if nearest != nil { nearest.TakeKeyboardFocus() }
-}
-
-func (f *Function) GetViewCenter(v View) Point {
-	center := v.Center()
-	for v != f && v != nil {
-		center = v.MapToParent(center);
-		v = v.Parent()
-	}
-	return center
-}
+func (f *Function) TookKeyboardFocus() { f.block.TakeKeyboardFocus() }
 
 func (f *Function) KeyPressed(event KeyEvent) {
 	switch event.Key {
-	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
-		f.FocusNearestView(f, event.Key)
-	case glfw.KeyF1:
+	case KeyF1:
 		f.Save()
-	}
-	if len(event.Text) > 0 {
-		if event.Text == "\"" {
-			node := NewStringConstantNode(f)
-			f.AddNode(node)
-			node.MoveCenter(f.Center())
-			node.text.TakeKeyboardFocus()
-		} else {
-			creator := NewNodeCreator(f)
-			creator.Move(f.Center())
-			creator.created.Connect(func(n ...interface{}) {
-				node := n[0].(Node)
-				f.AddNode(node)
-				node.MoveCenter(f.Center())
-				node.TakeKeyboardFocus()
-			})
-			creator.canceled.Connect(func(...interface{}) { f.TakeKeyboardFocus() })
-			creator.text.KeyPressed(event)
-		}
+	default:
+		f.ViewBase.KeyPressed(event)
 	}
 }
 
