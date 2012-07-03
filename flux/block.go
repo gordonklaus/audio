@@ -28,22 +28,24 @@ func NewBlock(node Node) *Block {
 }
 
 func (b *Block) Outer() *Block {
-	if b.node != nil { return b.node.Block() }
-	return b
+	if b.node == nil { return nil }
+	return b.node.Block()
 }
 func (b *Block) Outermost() *Block {
-	if outer := b.Outer(); outer != b { return outer.Outer() }
+	if outer := b.Outer(); outer != nil { return outer.Outermost() }
 	return b
 }
 
 func (b *Block) AddNode(node Node) {
 	b.AddChild(node)
 	b.nodes[node] = true
+	b.reform()
 }
 
 func (b *Block) RemoveNode(node Node) {
 	b.RemoveChild(node)
 	delete(b.nodes, node)
+	b.reform()
 }
 
 func (b *Block) NewConnection(pt Point) *Connection {
@@ -55,9 +57,10 @@ func (b *Block) NewConnection(pt Point) *Connection {
 }
 
 func (b *Block) DeleteConnection(connection *Connection) {
+	connection.Disconnect()
 	delete(b.connections, connection)
 	b.RemoveChild(connection)
-	connection.Disconnect()
+	b.reform()
 }
 
 func (b Block) AllNodes() (nodes []Node) {
@@ -110,15 +113,18 @@ func (b *Block) StopEditing() {
 }
 
 func (b *Block) reform() {
-	// outer := b.Outer()
-	// p := b.MapTo(b.Center(), outer)
-	// b.points = []Point{p}
-	// rect := ZR.Add(p)
-	// for n := range b.nodes {
-	// 	p := n.MapTo(n.Center(), outer)
-	// 	b.points = append(b.points, p)
-	// 	rect = rect.Union(ZR.Add(p))
-	// }
+	// b.points = []Point{}
+	rect := ZR
+	for n := range b.nodes {
+		r := n.MapRectToParent(n.Rect())
+		// b.points = append(b.points, p)
+		if rect == ZR {
+			rect = r
+		} else {
+			rect = rect.Union(r)
+		}
+	}
+	if rect == ZR { rect = Rect(0, 0, 16, 16) }
 	// if b.editingNode != nil && !b.nodes[b.editingNode] {
 	// 	p := b.editingNode.MapTo(b.editingNode.Center(), outer)
 	// 	b.points = append(b.points, p)
@@ -127,10 +133,17 @@ func (b *Block) reform() {
 	// if b.editing && b.editingNode == nil && len(b.nodes) == 0 {
 	// 	b.points = append(b.points, p.Add(Pt(-4, 32)), p.Add(Pt(4, 32)))
 	// }
-	// b.Move(rect.Min)
-	// b.Pan(rect.Min)
-	// b.Resize(rect.Dx(), rect.Dy())
-	b.Repaint()
+	
+	if b.node == nil { b.Move(b.MapToParent(rect.Min)) }
+	b.Pan(rect.Min)
+	b.Resize(rect.Dx(), rect.Dy())
+	if n, ok := b.node.(interface{positionBlocks()}); ok { n.positionBlocks() }
+	
+	if b.node == nil {
+		b.Repaint()	
+	} else {
+		b.Outer().reform()
+	}
 }
 
 func (b *Block) GetNearestView(views []View, point Point, directionKey int) (nearest View) {
@@ -257,5 +270,6 @@ func (b Block) Paint() {
 	} else {
 		SetColor(Color{1, 1, 1, .5})
 	}
-	DrawPolygon(b.points...)
+	// DrawPolygon(b.points...)
+	DrawRect(b.Rect())
 }

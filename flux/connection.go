@@ -43,6 +43,7 @@ func (c *Connection) SetSource(src *Output) {
 	if c.src != nil { c.src.Disconnect(c) }
 	c.src = src
 	if src != nil { src.Connect(c) }
+	c.reblock()
 	c.reform()
 }
 func (c *Connection) DisconnectSource(point Point) {
@@ -54,6 +55,7 @@ func (c *Connection) SetDestination(dst *Input) {
 	if c.dst != nil { c.dst.Disconnect(c) }
 	c.dst = dst
 	if dst != nil { dst.Connect(c) }
+	c.reblock()
 	c.reform()
 }
 func (c *Connection) DisconnectDestination(point Point) {
@@ -61,23 +63,44 @@ func (c *Connection) DisconnectDestination(point Point) {
 	c.SetDestination(nil)
 }
 
+func (c *Connection) reblock() {
+	if c.src == nil && c.dst == nil {
+		return
+	} else if c.src == nil {
+		c.block = c.dst.node.Block()
+	} else if c.dst == nil {
+		c.block = c.src.node.Block()
+	} else {
+loop:	for srcBlock := c.src.node.Block(); srcBlock != nil; srcBlock = srcBlock.Outer() {
+			for dstBlock := c.dst.node.Block(); dstBlock != nil; dstBlock = dstBlock.Outer() {
+				if srcBlock == dstBlock {
+					c.block = srcBlock
+					break loop
+				}
+			}
+		}
+	}
+	c.block.AddChild(c)
+	c.Lower()
+}
+
 func (c *Connection) reform() {
 	if c.src != nil { c.srcPt = c.src.MapTo(c.src.Center(), c.block) }
-	if c.dst != nil { c.dstPt = c.dst.MapTo(c.dst.Center(), c.block)}
-	rect := Rect(c.srcPt.X, c.srcPt.Y, c.dstPt.X, c.dstPt.Y).Canon().Inset(-connectionThickness / 2)
+	if c.dst != nil { c.dstPt = c.dst.MapTo(c.dst.Center(), c.block) }
+	rect := Rectangle{c.srcPt, c.dstPt}.Canon().Inset(-connectionThickness / 2)
 	c.Move(rect.Min)
 	c.Resize(rect.Dx(), rect.Dy())
 	
 	handleOffset := c.dstPt.Sub(c.srcPt).Div(4)
 	if c.srcHandle.editing {
-		c.srcHandle.MoveCenter(c.MapFromParent(c.srcPt))
+		c.srcHandle.MoveCenter(c.MapFrom(c.srcPt, c.block))
 	} else {
-		c.srcHandle.MoveCenter(c.MapFromParent(c.srcPt.Add(handleOffset)))
+		c.srcHandle.MoveCenter(c.MapFrom(c.srcPt.Add(handleOffset), c.block))
 	}
 	if c.dstHandle.editing {
-		c.dstHandle.MoveCenter(c.MapFromParent(c.dstPt))
+		c.dstHandle.MoveCenter(c.MapFrom(c.dstPt, c.block))
 	} else {
-		c.dstHandle.MoveCenter(c.MapFromParent(c.dstPt.Sub(handleOffset)))
+		c.dstHandle.MoveCenter(c.MapFrom(c.dstPt.Sub(handleOffset), c.block))
 	}
 	c.Repaint()
 }
@@ -115,5 +138,5 @@ func (c *Connection) KeyPressed(event KeyEvent) {
 
 func (c Connection) Paint() {
 	SetColor(map[bool]Color{false:{1, 1, 1, .5}, true:{.4, .4, 1, .7}}[c.focused])
-	DrawLine(c.MapFromParent(c.srcPt), c.MapFromParent(c.dstPt))
+	DrawLine(c.MapFrom(c.srcPt, c.block), c.MapFrom(c.dstPt, c.block))
 }

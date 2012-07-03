@@ -85,10 +85,17 @@ func (n NodeBase) Block() *Block { return n.block }
 func (n NodeBase) Inputs() []*Input { return n.inputs }
 func (n NodeBase) Outputs() []*Output { return n.outputs }
 
-func (n NodeBase) Moved(Point) {
+func (n *NodeBase) Move(p Point) {
+	n.ViewBase.Move(p)
 	f := func(p *put) { for _, conn := range p.connections { conn.reform() } }
 	for _, p := range n.inputs { f(p.put) }
 	for _, p := range n.outputs { f(p.put) }
+	n.block.reform()
+}
+
+func (n *NodeBase) Resize(width, height float64) {
+	n.ViewBase.Resize(width, height)
+	n.block.reform()
 }
 
 func (n *NodeBase) TookKeyboardFocus() { n.focused = true; n.Repaint() }

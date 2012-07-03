@@ -33,3 +33,17 @@ func DrawRect(r Rectangle) {
 func FillRect(r Rectangle) {
 	Rectd(Double(r.Min.X), Double(r.Min.Y), Double(r.Max.X), Double(r.Max.Y))
 }
+
+func DrawPolygon(points ...Point) {
+	Begin(LINE_LOOP); defer End()
+	for _, p := range points {
+		Vertex2d(Double(p.X), Double(p.Y))
+	}
+}
+
+func FillPolygon(points ...Point) {
+	Begin(POLYGON); defer End()
+	for _, p := range points {
+		Vertex2d(Double(p.X), Double(p.Y))
+	}
+}

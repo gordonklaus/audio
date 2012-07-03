@@ -4,6 +4,7 @@ import (
 	."github.com/jteeuwen/glfw"
 	gl "github.com/chsc/gogl/gl21"
 	."code.google.com/p/gordon-go/gui"
+	."math"
 )
 
 type IfNode struct {
@@ -22,15 +23,14 @@ func NewIfNode(block *Block) *IfNode {
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.block = block
 	n.input = NewInput(n, ValueInfo{})
-	n.falseBlock = NewBlock(n)
-	n.trueBlock = NewBlock(n)
+	n.falseBlock = NewBlock(nil)
+	n.trueBlock = NewBlock(nil)
+	n.falseBlock.node = n
+	n.trueBlock.node = n
 	n.AddChild(n.input)
 	n.AddChild(n.falseBlock)
 	n.AddChild(n.trueBlock)
-	n.Resize(n.falseBlock.Width() + n.trueBlock.Width(), n.input.Height() + n.falseBlock.Height())
-	n.input.Move(Pt((n.Width() - n.input.Width()) / 2, 0))
-	n.falseBlock.Move(Pt(0, n.input.Height()))
-	n.trueBlock.Move(Pt(n.falseBlock.Width(), n.input.Height()))
+	n.positionBlocks()
 	return n
 }
 
@@ -40,8 +40,24 @@ func (n IfNode) Outputs() []*Output { return nil }
 
 func (n IfNode) GoCode(string) string { return "" }
 
-func (n IfNode) Moved(Point) {
+func (n *IfNode) positionBlocks() {
+	w := n.falseBlock.Width() + 2*n.input.Width() + n.trueBlock.Width()
+	h := 2*n.input.Height() + Max(n.falseBlock.Height(), n.trueBlock.Height())
+	n.Resize(w, h)
+	n.input.Move(Pt(n.falseBlock.Width() + n.input.Width()/2, 0))
+	n.falseBlock.Move(Pt(0, 2*n.input.Height()))
+	n.trueBlock.Move(Pt(n.falseBlock.Width() + 2*n.input.Width(), 2*n.input.Height()))
+}
+
+func (n *IfNode) Move(p Point) {
+	n.ViewBase.Move(p)
 	for _, conn := range n.input.connections { conn.reform() }
+	n.block.reform()
+}
+
+func (n *IfNode) Resize(width, height float64) {
+	n.ViewBase.Resize(width, height)
+	n.block.reform()
 }
 
 func (n *IfNode) TookKeyboardFocus() { n.focused = true; n.Repaint() }

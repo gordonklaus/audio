@@ -2,11 +2,13 @@ package gui
 
 import (
 	gl "github.com/chsc/gogl/gl21"
+	."code.google.com/p/gordon-go/util"
 )
 
 type KeyEvent struct {
 	Key int
 	Text string
+	Shift, Ctrl, Alt, Super bool
 }
 
 type View interface {
@@ -29,7 +31,6 @@ type View interface {
 	Position() Point
 	Move(p Point)
 	MoveCenter(p Point)
-	Moved(p Point)
 	
 	Rect() Rectangle
 	Center() Point
@@ -43,6 +44,11 @@ type View interface {
 	MapFrom(point Point, parent View) Point
 	MapToParent(point Point) Point
 	MapTo(point Point, parent View) Point
+	
+	MapRectFromParent(rect Rectangle) Rectangle
+	MapRectFrom(rect Rectangle, parent View) Rectangle
+	MapRectToParent(rect Rectangle) Rectangle
+	MapRectTo(rect Rectangle, parent View) Rectangle
 	
 	SetKeyboardFocus(view View)
 	TakeKeyboardFocus()
@@ -80,19 +86,17 @@ func (v ViewBase) Parent() View { return v.parent }
 func (v *ViewBase) SetParent(parent View) { v.parent = parent }
 func (v ViewBase) Children() []View { return v.children }
 func (v *ViewBase) AddChild(childView View) {
+	if childView.Parent() != nil {
+		childView.Parent().RemoveChild(childView)
+	}
 	v.children = append(v.children, childView)
 	childView.SetParent(v.Self)
 	childView.Repaint()
 }
 func (v *ViewBase) RemoveChild(view View) {
-	for i, child := range v.children {
-		if child == view {
-			v.children = append(v.children[:i], v.children[i+1:]...)
-			view.SetParent(nil)
-			v.Self.Repaint()
-			return
-		}
-	}
+	SliceRemove(&v.children, view)
+	view.SetParent(nil)
+	v.Self.Repaint()
 }
 func (v ViewBase) ViewAt(point Point) View {
 	if !point.In(v.Self.Rect()) { return nil }
@@ -131,11 +135,9 @@ func (v *ViewBase) LowerChild(child View) {
 func (v ViewBase) Position() Point { return v.position }
 func (v *ViewBase) Move(p Point) {
 	v.position = p
-	v.Self.Moved(p)
 	v.Self.Repaint()
 }
-func (v *ViewBase) MoveCenter(p Point) { v.Move(p.Sub(v.Size().Div(2))) }
-func (v *ViewBase) Moved(p Point) {}
+func (v *ViewBase) MoveCenter(p Point) { v.Self.Move(p.Sub(v.Size().Div(2))) }
 
 func (v ViewBase) Rect() Rectangle { return v.rect }
 func (v ViewBase) Center() Point { return v.rect.Min.Add(v.Size().Div(2)) }
@@ -165,6 +167,11 @@ func (v ViewBase) MapTo(point Point, parent View) Point {
 	if v.Self == parent { return point }
 	return v.parent.MapTo(v.MapToParent(point), parent)
 }
+
+func (v ViewBase) MapRectFromParent(rect Rectangle) Rectangle { return Rectangle{v.MapFromParent(rect.Min), v.MapFromParent(rect.Max)} }
+func (v ViewBase) MapRectFrom(rect Rectangle, parent View) Rectangle { return Rectangle{v.MapFrom(rect.Min, parent), v.MapFrom(rect.Max, parent)} }
+func (v ViewBase) MapRectToParent(rect Rectangle) Rectangle { return Rectangle{v.MapToParent(rect.Min), v.MapToParent(rect.Max)} }
+func (v ViewBase) MapRectTo(rect Rectangle, parent View) Rectangle { return Rectangle{v.MapTo(rect.Min, parent), v.MapTo(rect.Max, parent)} }
 
 func (v *ViewBase) SetKeyboardFocus(view View) { if v.parent != nil { v.parent.SetKeyboardFocus(view) } }
 func (v *ViewBase) TakeKeyboardFocus() { v.Self.SetKeyboardFocus(v.Self) }
