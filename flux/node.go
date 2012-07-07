@@ -14,7 +14,9 @@ type Node interface {
 	Block() *Block
 	Inputs() []*Input
 	Outputs() []*Output
-	GoCode(inputs string) string
+	InputConnections() []*Connection
+	OutputConnections() []*Connection
+	Code(indent int, vars map[*Input]string, inputs string) string
 }
 
 type nodeText struct {
@@ -84,6 +86,24 @@ func (n *NodeBase) reform() {
 func (n NodeBase) Block() *Block { return n.block }
 func (n NodeBase) Inputs() []*Input { return n.inputs }
 func (n NodeBase) Outputs() []*Output { return n.outputs }
+
+func (n NodeBase) InputConnections() (connections []*Connection) {
+	for _, input := range n.Inputs() {
+		for _, conn := range input.connections {
+			connections = append(connections, conn)
+		}
+	}
+	return
+}
+
+func (n NodeBase) OutputConnections() (connections []*Connection) {
+	for _, output := range n.Outputs() {
+		for _, conn := range output.connections {
+			connections = append(connections, conn)
+		}
+	}
+	return
+}
 
 func (n *NodeBase) Move(p Point) {
 	n.ViewBase.Move(p)
@@ -158,7 +178,7 @@ func NewFunctionNode(info FunctionInfo, block *Block) *FunctionNode {
 	
 	return n
 }
-func (n FunctionNode) GoCode(inputs string) string {
+func (n FunctionNode) Code(_ int, _ map[*Input]string, inputs string) string {
 	return Sprintf("%v(%v)", n.text.GetText(), inputs)
 }
 
@@ -174,6 +194,6 @@ func NewStringConstantNode(block *Block) *ConstantNode {
 	return n
 }
 
-func (n ConstantNode) GoCode(string) string {
+func (n ConstantNode) Code(int, map[*Input]string, string) string {
 	return Sprintf(`"%v"`, n.text.GetText())
 }

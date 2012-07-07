@@ -64,24 +64,24 @@ func (c *Connection) DisconnectDestination(point Point) {
 }
 
 func (c *Connection) reblock() {
+	var newBlock *Block
 	if c.src == nil && c.dst == nil {
 		return
 	} else if c.src == nil {
-		c.block = c.dst.node.Block()
+		newBlock = c.dst.node.Block()
 	} else if c.dst == nil {
-		c.block = c.src.node.Block()
+		newBlock = c.src.node.Block()
 	} else {
 loop:	for srcBlock := c.src.node.Block(); srcBlock != nil; srcBlock = srcBlock.Outer() {
 			for dstBlock := c.dst.node.Block(); dstBlock != nil; dstBlock = dstBlock.Outer() {
 				if srcBlock == dstBlock {
-					c.block = srcBlock
+					newBlock = srcBlock
 					break loop
 				}
 			}
 		}
 	}
-	c.block.AddChild(c)
-	c.Lower()
+	newBlock.AddConnection(c)
 }
 
 func (c *Connection) reform() {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	."fmt"
 	."github.com/jteeuwen/glfw"
 	gl "github.com/chsc/gogl/gl21"
 	."code.google.com/p/gordon-go/gui"
@@ -38,7 +39,27 @@ func (n IfNode) Block() *Block { return n.block }
 func (n IfNode) Inputs() []*Input { return []*Input{n.input} }
 func (n IfNode) Outputs() []*Output { return nil }
 
-func (n IfNode) GoCode(string) string { return "" }
+func (n IfNode) InputConnections() []*Connection {
+	return append(append(n.input.connections, n.falseBlock.InputConnections()...), n.trueBlock.InputConnections()...)
+}
+
+func (n IfNode) OutputConnections() []*Connection {
+	return append(n.falseBlock.OutputConnections(), n.trueBlock.OutputConnections()...)
+}
+
+func (n IfNode) Code(indent int, vars map[*Input]string, _ string) (s string) {
+	name := "false"
+	if len(n.input.connections) > 0 {
+		name = vars[n.input]
+	}
+	s += Sprintf("%vif %v {\n", tabs(indent), name)
+	s += n.trueBlock.Code(indent + 1, vars)
+	if s2 := n.falseBlock.Code(indent + 1, vars); len(s2) > 0 {
+		s += Sprintf("%v} else {\n%v", tabs(indent), s2)
+	}
+	s += tabs(indent) + "}\n"
+	return
+}
 
 func (n *IfNode) positionBlocks() {
 	w := n.falseBlock.Width() + 2*n.input.Width() + n.trueBlock.Width()

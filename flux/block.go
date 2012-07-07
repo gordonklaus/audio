@@ -1,8 +1,11 @@
 package main
 
 import (
+	."fmt"
+	."strings"
 	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
+	."code.google.com/p/gordon-go/util"
 )
 
 type Block struct {
@@ -50,10 +53,18 @@ func (b *Block) RemoveNode(node Node) {
 
 func (b *Block) NewConnection(pt Point) *Connection {
 	conn := NewConnection(b, pt)
+	b.AddConnection(conn)
+	return conn
+}
+
+func (b *Block) AddConnection(conn *Connection) {
+	if conn.block != nil {
+		delete(conn.block.connections, conn)
+	}
+	conn.block = b
 	b.AddChild(conn)
 	conn.Lower()
 	b.connections[conn] = true
-	return conn
 }
 
 func (b *Block) DeleteConnection(connection *Connection) {
@@ -87,17 +98,137 @@ func (b Block) AllConnections() (conns []*Connection) {
 	return conns
 }
 
-func (b Block) HasOutputConnections() bool {
-	for n := range b.nodes {
-		for _, output := range n.Outputs() {
-			for _, conn := range output.connections {
-				if !b.nodes[conn.dst.node] {
-					return true
-				}
+func (b Block) InputConnections() (connections []*Connection) {
+	for node := range b.nodes {
+		for _, conn := range node.InputConnections() {
+			if !b.connections[conn] {
+				connections = append(connections, conn)
 			}
 		}
 	}
-	return false
+	return
+}
+
+func (b Block) OutputConnections() (connections []*Connection) {
+	for node := range b.nodes {
+		for _, conn := range node.OutputConnections() {
+			if !b.connections[conn] {
+				connections = append(connections, conn)
+			}
+		}
+	}
+	return
+}
+
+func (b *Block) nodeOrder() (order []Node, ok bool) {
+	visited := Set{}
+	var insertInOrder func(node Node, visitedThisCall Set) bool
+	insertInOrder = func(node Node, visitedThisCall Set) bool {
+		if visitedThisCall[node] { return false }
+		visitedThisCall[node] = true
+		
+		if !visited[node] {
+			visited[node] = true
+conns:		for _, conn := range node.InputConnections() {
+				if b.connections[conn] {
+					srcNode := conn.src.node
+					for !b.nodes[srcNode] {
+						srcNode = srcNode.Block().node
+						if srcNode == nil { continue conns }
+					}
+					if !insertInOrder(srcNode, visitedThisCall.Copy()) { return false }
+				}
+			}
+			order = append(order, node)
+		}
+		return true
+	}
+	
+	endNodes := []Node{}
+nx:	for node := range b.nodes {
+		for _, conn := range node.OutputConnections() {
+			if conn.block == b { continue nx }
+		}
+		endNodes = append(endNodes, node)
+	}
+	if len(endNodes) == 0 && len(b.nodes) > 0 { return }
+	
+	for _, node := range endNodes {
+		if !insertInOrder(node, Set{}) { return }
+	}
+	ok = true
+	return
+}
+
+func (b *Block) Code(indent int, vars map[*Input]string) (s string) {
+	vars, varsCopy := map[*Input]string{}, vars
+	for k, v := range varsCopy { vars[k] = v }
+	
+	order, ok := b.nodeOrder()
+	if !ok {
+		Println("cyclic!")
+		return
+	}
+cx:	for conn := range b.connections {
+		if _, ok := vars[conn.dst]; ok { continue }
+		for block := conn.src.node.Block().Outer(); block != b; block = block.Outer() {
+			if block == nil { continue cx }
+		}
+		name := newVarName()
+		s += Sprintf("%vvar %v %v\n", tabs(indent), name, conn.dst.info.typeName)
+		vars[conn.dst] = name
+	}
+	for _, node := range order {
+		switch node := node.(type) {
+		default:
+			inputs := []string{}
+			for _, input := range node.Inputs() {
+				name := ""
+				if len(input.connections) > 0 {
+					name = vars[input.connections[0].dst]
+				} else {
+					// INSTEAD:  name = "*new(typeName)"  or zero literal
+					name = newVarName()
+					s += Sprintf("%vvar %v %v\n", tabs(indent), name, input.info.typeName)
+				}
+				inputs = append(inputs, name)
+			}
+			outputs := []string{}
+			anyOutputConnections := false
+			assignExisting := map[string]string{}
+			for _, output := range node.Outputs() {
+				name := "_"
+				if len(output.connections) > 0 {
+					anyOutputConnections = true
+					name = newVarName()
+					for _, conn := range output.connections {
+						if existingName, ok := vars[conn.dst]; ok {
+							assignExisting[existingName] = name
+						} else {
+							vars[conn.dst] = name
+						}
+					}
+				}
+				outputs = append(outputs, name)
+			}
+			assignment := ""
+			if anyOutputConnections {
+				assignment = Join(outputs, ", ") + " := "
+			}
+			s += Sprintf("%v%v%v\n", tabs(indent), assignment, node.Code(indent, vars, Join(inputs, ", ")))
+			if len(assignExisting) > 0 {
+				var existingNames, sourceNames []string
+				for v1, v2 := range assignExisting {
+					existingNames = append(existingNames, v1)
+					sourceNames = append(sourceNames, v2)
+				}
+				s += Sprintf("%v%v = %v\n", tabs(indent), Join(existingNames, ", "), Join(sourceNames, ", "))
+			}
+		case *IfNode:
+			s += node.Code(indent, vars, "")
+		}
+	}
+	return
 }
 
 func (b *Block) StartEditing() {
@@ -220,8 +351,8 @@ func (b *Block) KeyPressed(event KeyEvent) {
 			} else {
 				b.StopEditing()
 			}
-		} else {
-			b.node.Block().TakeKeyboardFocus()
+		} else if outer := b.Outer(); outer != nil {
+			outer.TakeKeyboardFocus()
 		}
 	default:
 		switch event.Text {
