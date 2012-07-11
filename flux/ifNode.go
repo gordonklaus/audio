@@ -3,9 +3,7 @@ package main
 import (
 	."fmt"
 	."github.com/jteeuwen/glfw"
-	gl "github.com/chsc/gogl/gl21"
 	."code.google.com/p/gordon-go/gui"
-	."math"
 )
 
 type IfNode struct {
@@ -31,6 +29,9 @@ func NewIfNode(block *Block) *IfNode {
 	n.AddChild(n.input)
 	n.AddChild(n.falseBlock)
 	n.AddChild(n.trueBlock)
+
+	n.input.MoveCenter(Pt(-2*putSize, 0))
+	n.trueBlock.Move(ZP)
 	n.positionBlocks()
 	return n
 }
@@ -62,23 +63,19 @@ func (n IfNode) Code(indent int, vars map[*Input]string, _ string) (s string) {
 }
 
 func (n *IfNode) positionBlocks() {
-	w := n.falseBlock.Width() + 2*n.input.Width() + n.trueBlock.Width()
-	h := 2*n.input.Height() + Max(n.falseBlock.Height(), n.trueBlock.Height())
-	n.Resize(w, h)
-	n.input.Move(Pt(n.falseBlock.Width() + n.input.Width()/2, 0))
-	n.falseBlock.Move(Pt(0, 2*n.input.Height()))
-	n.trueBlock.Move(Pt(n.falseBlock.Width() + 2*n.input.Width(), 2*n.input.Height()))
+	n.falseBlock.Move(Pt(0, -n.falseBlock.Height()))
+	rect := n.input.MapRectToParent(n.input.Rect()).Union(n.falseBlock.MapRectToParent(n.falseBlock.Rect())).Union(n.trueBlock.MapRectToParent(n.trueBlock.Rect()))
+	n.Pan(rect.Min)
+	n.Resize(rect.Dx(), rect.Dy())
 }
 
 func (n *IfNode) Move(p Point) {
 	n.ViewBase.Move(p)
 	for _, conn := range n.input.connections { conn.reform() }
-	n.block.reform()
 }
 
 func (n *IfNode) Resize(width, height float64) {
 	n.ViewBase.Resize(width, height)
-	n.block.reform()
 }
 
 func (n *IfNode) TookKeyboardFocus() { n.focused = true; n.Repaint() }
@@ -96,18 +93,6 @@ func (n *IfNode) KeyPressed(event KeyEvent) {
 }
 
 func (n IfNode) Paint() {
-	width, height := gl.Double(n.Width()), gl.Double(n.Height())
-	if n.focused {
-		gl.Color4d(.4, .4, 1, .4)
-	} else {
-		gl.Color4d(0, 0, 0, .5)
-	}
-	gl.Rectd(0, 0, width, height)
-	gl.Color4d(1, 1, 1, 1)
-	gl.Begin(gl.LINE_LOOP)
-	gl.Vertex2d(0, 0)
-	gl.Vertex2d(width, 0)
-	gl.Vertex2d(width, height)
-	gl.Vertex2d(0, height)
-	gl.End()
+	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
+	DrawLine(ZP, n.input.MapToParent(n.input.Center()))
 }

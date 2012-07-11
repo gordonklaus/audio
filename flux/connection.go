@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/jteeuwen/glfw"
+	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 )
 
@@ -107,9 +107,9 @@ func (c *Connection) reform() {
 
 func (c *Connection) BeStraightLine() {
 	if c.src != nil && c.dst == nil {
-		c.dstPt = c.srcPt.Add(Pt(0, 64))
+		c.dstPt = c.srcPt.Add(Pt(48, 0))
 	} else if c.src == nil && c.dst != nil {
-		c.srcPt = c.dstPt.Sub(Pt(0, 64))
+		c.srcPt = c.dstPt.Sub(Pt(48, 0))
 	}
 	c.reform()
 }
@@ -127,9 +127,9 @@ func (c *Connection) LostKeyboardFocus() { c.focused = false; c.Repaint() }
 
 func (c *Connection) KeyPressed(event KeyEvent) {
 	switch event.Key {
-	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
+	case KeyLeft, KeyRight, KeyUp, KeyDown:
 		c.block.Outermost().FocusNearestView(c, event.Key)
-	case glfw.KeyEsc:
+	case KeyEsc:
 		c.block.TakeKeyboardFocus()
 	default:
 		c.ViewBase.KeyPressed(event)
@@ -137,6 +137,9 @@ func (c *Connection) KeyPressed(event KeyEvent) {
 }
 
 func (c Connection) Paint() {
-	SetColor(map[bool]Color{false:{1, 1, 1, .5}, true:{.4, .4, 1, .7}}[c.focused])
-	DrawLine(c.MapFrom(c.srcPt, c.block), c.MapFrom(c.dstPt, c.block))
+	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[c.focused])
+	start, end := c.MapFrom(c.srcPt, c.block), c.MapFrom(c.dstPt, c.block)
+	d := end.Sub(start)
+	dx := d.X / 3
+	DrawCubic([4]Point{start, start.Add(Pt(dx, 0)), end.Sub(Pt(dx, 0)), end}, int(d.Len() / 8))
 }

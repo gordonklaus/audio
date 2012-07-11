@@ -35,6 +35,14 @@ func (p Point) Div(k float64) Point {
 	return Point{p.X / k, p.Y / k}
 }
 
+func (p Point) Cross(q Point) float64 {
+	return p.X * q.Y - p.Y * q.X
+}
+
+func (p Point) Len() float64 {
+	return Sqrt(p.X * p.X + p.Y * p.Y)
+}
+
 // In returns whether p is in r.
 func (p Point) In(r Rectangle) bool {
 	return r.Min.X <= p.X && p.X < r.Max.X &&
@@ -99,6 +107,10 @@ func (r Rectangle) Size() Point {
 		r.Max.X - r.Min.X,
 		r.Max.Y - r.Min.Y,
 	}
+}
+
+func (r Rectangle) Center() Point {
+	return r.Min.Add(r.Size().Div(2))
 }
 
 // Add returns the rectangle r translated by p.

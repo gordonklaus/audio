@@ -51,5 +51,3 @@ func (f *Function) KeyPressed(event KeyEvent) {
 		f.ViewBase.KeyPressed(event)
 	}
 }
-
-func (Function) Paint() {}

@@ -48,6 +48,8 @@ func Sort(slice interface{}, key interface{}) {
 				less = func(i, j int) bool { return call(i).String() < call(j).String() }
 			}
 		}
+	case Func:
+		less = func(i, j int) bool { return k.Call([]Value{s.Index(i), s.Index(j)})[0].Bool() }
 	}
 	if less == nil { panic(Sprintf("Can't sort using key '%#v'.", key)) }
 	

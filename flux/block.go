@@ -3,6 +3,8 @@ package main
 import (
 	."fmt"
 	."strings"
+	."math"
+	"time"
 	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
@@ -26,7 +28,8 @@ func NewBlock(node Node) *Block {
 	b.node = node
 	b.nodes = map[Node]bool{}
 	b.connections = map[*Connection]bool{}
-	b.reform()
+	b.Pan(Pt(-400, -300))
+	go b.reform()
 	return b
 }
 
@@ -42,13 +45,11 @@ func (b *Block) Outermost() *Block {
 func (b *Block) AddNode(node Node) {
 	b.AddChild(node)
 	b.nodes[node] = true
-	b.reform()
 }
 
 func (b *Block) RemoveNode(node Node) {
 	b.RemoveChild(node)
 	delete(b.nodes, node)
-	b.reform()
 }
 
 func (b *Block) NewConnection(pt Point) *Connection {
@@ -71,7 +72,6 @@ func (b *Block) DeleteConnection(connection *Connection) {
 	connection.Disconnect()
 	delete(b.connections, connection)
 	b.RemoveChild(connection)
-	b.reform()
 }
 
 func (b Block) AllNodes() (nodes []Node) {
@@ -234,46 +234,105 @@ cx:	for conn := range b.connections {
 func (b *Block) StartEditing() {
 	b.TakeKeyboardFocus()
 	b.editing = true
-	b.reform()
 }
 
 func (b *Block) StopEditing() {
 	b.editing = false
 	b.editingNode = nil
-	b.reform()
 }
 
 func (b *Block) reform() {
-	// b.points = []Point{}
-	rect := ZR
-	for n := range b.nodes {
-		r := n.MapRectToParent(n.Rect())
-		// b.points = append(b.points, p)
-		if rect == ZR {
-			rect = r
-		} else {
-			rect = rect.Union(r)
+	for {
+		v := map[Node]Point{}
+		center := ZP
+		for n := range b.nodes {
+			v[n] = ZP
+			center = center.Add(n.Position())
 		}
-	}
-	if rect == ZR { rect = Rect(0, 0, 16, 16) }
-	// if b.editingNode != nil && !b.nodes[b.editingNode] {
-	// 	p := b.editingNode.MapTo(b.editingNode.Center(), outer)
-	// 	b.points = append(b.points, p)
-	// 	rect = rect.Union(ZR.Add(p))
-	// }
-	// if b.editing && b.editingNode == nil && len(b.nodes) == 0 {
-	// 	b.points = append(b.points, p.Add(Pt(-4, 32)), p.Add(Pt(4, 32)))
-	// }
+		center = center.Div(float64(len(b.nodes)))
+		for n1 := range b.nodes {
+			for n2 := range b.nodes {
+				if n2 == n1 { continue }
+				dir := n1.MapToParent(n1.Center()).Sub(n2.MapToParent(n2.Center()))
+				d := Sqrt(dir.X * dir.X + dir.Y * dir.Y)
+				if d > 128 { continue }
+				v[n1] = v[n1].Add(dir.Mul(2 * (128 - d) / (1 + d)))
+			}
+		}
+		for conn := range b.connections {
+			src, dst := conn.src, conn.dst
+			if src == nil || dst == nil { continue }
+			d := dst.MapTo(dst.Position(), b).Sub(src.MapTo(src.Position(), b).Add(Pt(64, 0)))
+			d.X *= 2
+			d.Y /= 2
+			
+			srcNode := src.node; for !b.nodes[srcNode] { srcNode = srcNode.Block().node }
+			dstNode := dst.node; for !b.nodes[dstNode] { dstNode = dstNode.Block().node }
+			v[srcNode] = v[srcNode].Add(d)
+			v[dstNode] = v[dstNode].Sub(d)
+		}
+		for n, v := range v {
+			v = v.Add(center.Sub(n.Position()).Div(4))
+			n.Move(n.Position().Add(v.Mul(2 * .033)))
+		}
+		
+		pts := []Point{}
+		for n := range b.nodes {
+			r := n.MapRectToParent(n.Rect())
+			pts = append(pts, r.Min, r.Max, Pt(r.Min.X, r.Max.Y), Pt(r.Max.X, r.Min.Y))
+		}
+		if len(pts) == 0 { pts = append(pts, ZP, Pt(0, 16), Pt(8, 8)) }
+		iLowerLeft, lowerLeft := 0, pts[0]
+		for i, p := range pts {
+			if p.Y < lowerLeft.Y || p.Y == lowerLeft.Y && p.X < lowerLeft.X {
+				iLowerLeft, lowerLeft = i, p
+			}
+		}
+		pts[0], pts[iLowerLeft] = pts[iLowerLeft], pts[0]
+		Sort(pts[1:], func(p1, p2 Point) bool {
+			x := p1.Sub(lowerLeft).Cross(p2.Sub(lowerLeft))
+			if x > 0 { return true }
+			if x == 0 { return p1.X < p2.X }
+			return false
+		})
+		N := len(pts)
+		pts = append([]Point{pts[N-1]}, pts...)
+		m := 1
+		for i := 2; i <= N; i++ {
+			for pts[m].Sub(pts[m - 1]).Cross(pts[i].Sub(pts[m - 1])) <= 0 {
+				if m > 1 { m-- } else if i == N { break } else { i++ }
+			}
+			m++
+			pts[m], pts[i] = pts[i], pts[m]
+		}
+		pts = pts[:m]
+		center = ZP
+		for _, p := range pts { center = center.Add(p) }
+		center = center.Div(float64(len(pts)))
+		for i, p := range pts {
+			dir := p.Sub(center)
+			d := dir.Len()
+			pts[i] = p.Add(dir.Mul(32 / d))
+		}
+		b.points = pts
+		
+		rect := ZR.Add(pts[0])
+		for _, p := range pts { rect = rect.Union(ZR.Add(p)) }
+		// if b.editingNode != nil && !b.nodes[b.editingNode] {
+		// 	p := b.editingNode.MapTo(b.editingNode.Center(), outer)
+		// 	pts = append(pts, p)
+		// 	rect = rect.Union(ZR.Add(p))
+		// }
+		// if b.editing && b.editingNode == nil && len(b.nodes) == 0 {
+		// 	pts = append(pts, p.Add(Pt(-4, 32)), p.Add(Pt(4, 32)))
+		// }
 	
-	if b.node == nil { b.Move(b.MapToParent(rect.Min)) }
-	b.Pan(rect.Min)
-	b.Resize(rect.Dx(), rect.Dy())
-	if n, ok := b.node.(interface{positionBlocks()}); ok { n.positionBlocks() }
-	
-	if b.node == nil {
-		b.Repaint()	
-	} else {
-		b.Outer().reform()
+		if b.node == nil { b.Move(b.MapToParent(rect.Min)) }
+		b.Pan(rect.Min)
+		b.Resize(rect.Dx(), rect.Dy())
+		if n, ok := b.node.(interface{positionBlocks()}); ok { n.positionBlocks() }
+		
+		time.Sleep(33 * time.Millisecond)
 	}
 }
 
@@ -317,7 +376,6 @@ func (b *Block) KeyPressed(event KeyEvent) {
 			if v == nil { v = b }
 			views := []View{}; for _, n := range outermost.AllNodes() { views = append(views, n) }
 			if n := outermost.GetNearestView(views, v.MapTo(v.Center(), outermost), event.Key); n != nil { b.editingNode = n.(Node) }
-			b.reform()
 		} else {
 			outermost.FocusNearestView(b, event.Key)
 		}
@@ -332,7 +390,6 @@ func (b *Block) KeyPressed(event KeyEvent) {
 				b.nodes[b.editingNode] = true
 				b.AddChild(b.editingNode)
 			}
-			b.reform()
 		}
 	case KeyEnter:
 		if b.editing {
@@ -347,7 +404,6 @@ func (b *Block) KeyPressed(event KeyEvent) {
 		if b.editing {
 			if b.editingNode != nil {
 				b.editingNode = nil
-				b.reform()
 			} else {
 				b.StopEditing()
 			}
@@ -395,12 +451,16 @@ func (b *Block) KeyPressed(event KeyEvent) {
 // 
 func (b Block) Paint() {
 	if b.editing {
-		SetColor(Color{1, .5, 0, .7})
+		SetColor(Color{.7, .4, 0, 1})
 	} else if b.focused {
-		SetColor(Color{.4, .4, 1, .7})
+		SetColor(Color{.3, .3, .7, 1})
 	} else {
-		SetColor(Color{1, 1, 1, .5})
+		SetColor(Color{.5, .5, .5, 1})
 	}
-	// DrawPolygon(b.points...)
-	DrawRect(b.Rect())
+	n := len(b.points)
+	for i := range b.points {
+		p1, p2, p3 := b.points[i], b.points[(i + 1) % n], b.points[(i + 2) % n]
+		p1, p3 = p1.Add(p2).Div(2), p2.Add(p3).Div(2)
+		DrawQuadratic([3]Point{p1, p2, p3}, int(p3.Sub(p2).Len() + p2.Sub(p1).Len()) / 8)
+	}
 }

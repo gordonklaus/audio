@@ -103,7 +103,7 @@ func (w *Window) HandleEvents() {
 	})
 
 	for WindowParam(Opened) == 1 {
-		WaitEvents()
+		PollEvents()
 		w.repaint()
 	}
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/jteeuwen/glfw"
-	."github.com/chsc/gogl/gl21"
 	."code.google.com/p/gordon-go/gui"
 )
 
@@ -15,7 +14,7 @@ type ConnectionHandle struct {
 	editing bool
 }
 
-const connectionHandleSize = 13
+const connectionHandleSize = putSize - 2
 
 type ConnectionHandleSpecializer interface {
 	View
@@ -56,7 +55,6 @@ func (h *ConnectionHandle) StopEditing() {
 			h.connection.block.DeleteConnection(h.connection)
 			h.connection.block.TakeKeyboardFocus()
 		}
-		h.connection.block.reform()
 	}
 }
 
@@ -101,14 +99,8 @@ func (h *ConnectionHandle) MouseReleased(button int, p Point) {
 }
 
 func (h ConnectionHandle) Paint() {
-	if h.editing {
-		SetColor(Color{1, .5, 0, .7})
-	} else if h.focused {
-		SetColor(Color{.4, .4, 1, .7})
-	} else {
-		SetColor(Color{1, 1, 1, .5})
-	}
-	PointSize(Float(connectionHandleSize / 2))
+	SetColor(map[bool]Color{true:{1, .5, 0, .5}, false:map[bool]Color{true:{.4, .4, 1, .4}, false:{0, 0, 0, .5}}[h.focused]}[h.editing])
+	SetPointSize(connectionHandleSize)
 	DrawPoint(h.Center())
 }
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/jteeuwen/glfw"
-	gl "github.com/chsc/gogl/gl21"
 	."code.google.com/p/gordon-go/gui"
 	."math"
 	."fmt"
@@ -71,16 +70,24 @@ func (n *NodeBase) reform() {
 	numInputs := float64(len(n.inputs))
 	numOutputs := float64(len(n.outputs))
 	maxputs := Max(numInputs, numOutputs)
-	width := 2 * nodeMargin + Max(n.text.Width(), maxputs * putSize)
-	height := n.text.Height() + 2*putSize
-	n.Resize(width, height)
-	n.text.Move(Pt((width - n.text.Width()) / 2, putSize))
+	rx, ry := 2.0 * putSize, (maxputs + 1) * putSize / 2
+	
+	rect := ZR
 	for i, input := range n.inputs {
-		input.Move(Pt((float64(i) + .5) * width / numInputs - putSize / 2, 0))
+		y := putSize * (float64(i) - (numInputs - 1) / 2)
+		input.MoveCenter(Pt(-rx * Sqrt(ry * ry - y * y) / ry, y))
+		rect = rect.Union(input.MapRectToParent(input.Rect()))
 	}
 	for i, output := range n.outputs {
-		output.Move(Pt((float64(i) + .5) * width / numOutputs - putSize / 2, n.Height() - putSize))
+		y := putSize * (float64(i) - (numOutputs - 1) / 2)
+		output.MoveCenter(Pt(rx * Sqrt(ry * ry - y * y) / ry, y))
+		rect = rect.Union(output.MapRectToParent(output.Rect()))
 	}
+
+	n.text.MoveCenter(Pt(0, rect.Max.Y + n.text.Height() / 2))
+	rect = rect.Union(n.text.MapRectToParent(n.text.Rect()))
+	n.Pan(rect.Min)
+	n.Resize(rect.Dx(), rect.Dy())
 }
 
 func (n NodeBase) Block() *Block { return n.block }
@@ -110,12 +117,6 @@ func (n *NodeBase) Move(p Point) {
 	f := func(p *put) { for _, conn := range p.connections { conn.reform() } }
 	for _, p := range n.inputs { f(p.put) }
 	for _, p := range n.outputs { f(p.put) }
-	n.block.reform()
-}
-
-func (n *NodeBase) Resize(width, height float64) {
-	n.ViewBase.Resize(width, height)
-	n.block.reform()
 }
 
 func (n *NodeBase) TookKeyboardFocus() { n.focused = true; n.Repaint() }
@@ -133,20 +134,9 @@ func (n *NodeBase) KeyPressed(event KeyEvent) {
 }
 
 func (n NodeBase) Paint() {
-	width, height := gl.Double(n.Width()), gl.Double(n.Height())
-	if n.focused {
-		gl.Color4d(.4, .4, 1, .4)
-	} else {
-		gl.Color4d(0, 0, 0, .5)
-	}
-	gl.Rectd(0, 0, width, height)
-	gl.Color4d(1, 1, 1, 1)
-	gl.Begin(gl.LINE_LOOP)
-	gl.Vertex2d(0, 0)
-	gl.Vertex2d(width, 0)
-	gl.Vertex2d(width, height)
-	gl.Vertex2d(0, height)
-	gl.End()
+	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
+	for _, p := range n.inputs { DrawLine(ZP, p.MapToParent(p.Center())) }
+	for _, p := range n.outputs { DrawLine(ZP, p.MapToParent(p.Center())) }
 }
 
 func NewNode(info Info, block *Block) Node {

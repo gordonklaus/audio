@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/jteeuwen/glfw"
-	gl "github.com/chsc/gogl/gl21"
 	."code.google.com/p/gordon-go/gui"
 )
 
@@ -30,6 +29,7 @@ func Newput(spec putSpecializer, n Node, info ValueInfo) *put {
 	p.node = n
 	p.info = info
 	p.Resize(putSize, putSize)
+	p.Pan(Pt(putSize, putSize).Div(-2))
 	p.Self = spec
 	return p
 }
@@ -75,20 +75,12 @@ func (p put) MouseDragged(button int, pt Point) {}
 func (p put) MouseReleased(button int, pt Point) {}
 
 func (p put) Paint() {
-	width, height := gl.Double(p.Width()), gl.Double(p.Height())
-	if p.focused {
-		gl.Color4d(.6, .6, 1, .6)
-	} else {
-		gl.Color4d(0, 0, 0, .5)
+	color := map[bool]Color{true:{.5, .5, 1, .5}, false:{1, 1, 1, .25}}[p.focused]
+	for f := 1.0; f > .1; f /= 2 {
+		SetColor(color)
+		SetPointSize(f * putSize)
+		DrawPoint(ZP)
 	}
-	gl.Rectd(0, 0, width, height)
-	gl.Color4d(1, 1, 1, 1)
-	gl.Begin(gl.LINE_LOOP)
-	gl.Vertex2d(0, 0)
-	gl.Vertex2d(width, 0)
-	gl.Vertex2d(width, height)
-	gl.Vertex2d(0, height)
-	gl.End()
 }
 
 

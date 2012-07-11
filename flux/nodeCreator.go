@@ -50,7 +50,7 @@ func (n *NodeCreator) Cancel() {
 	n.canceled.Emit()
 }
 
-func getTextColor(info Info, alpha float32) Color {
+func getTextColor(info Info, alpha float64) Color {
 	switch info.(type) {
 	case *PackageInfo:
 		return Color{1, 1, 1, alpha}
