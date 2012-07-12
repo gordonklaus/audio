@@ -19,6 +19,7 @@ type Block struct {
 	focused, editing bool
 	editingNode Node
 	points []Point
+	intermediatePoints []Point
 }
 
 func NewBlock(node Node) *Block {
@@ -281,7 +282,7 @@ func (b *Block) reform() {
 			r := n.MapRectToParent(n.Rect())
 			pts = append(pts, r.Min, r.Max, Pt(r.Min.X, r.Max.Y), Pt(r.Max.X, r.Min.Y))
 		}
-		if len(pts) == 0 { pts = append(pts, ZP, Pt(0, 16), Pt(8, 8)) }
+		if len(pts) == 0 { pts = append(pts, ZP, Pt(0, 37), Pt(32, 18)) }
 		iLowerLeft, lowerLeft := 0, pts[0]
 		for i, p := range pts {
 			if p.Y < lowerLeft.Y || p.Y == lowerLeft.Y && p.X < lowerLeft.X {
@@ -312,9 +313,14 @@ func (b *Block) reform() {
 		for i, p := range pts {
 			dir := p.Sub(center)
 			d := dir.Len()
-			pts[i] = p.Add(dir.Mul(32 / d))
+			if len(pts) > 3 { pts[i] = p.Add(dir.Mul(32 / d)) }
 		}
-		b.points = pts
+		b.intermediatePoints = pts
+		b.points = []Point{}
+		for i := range pts {
+			p1, p2 := pts[i], pts[(i + 1) % len(pts)]
+			b.points = append(b.points, p1.Add(p2).Div(2))
+		}
 		
 		rect := ZR.Add(pts[0])
 		for _, p := range pts { rect = rect.Union(ZR.Add(p)) }
@@ -459,8 +465,7 @@ func (b Block) Paint() {
 	}
 	n := len(b.points)
 	for i := range b.points {
-		p1, p2, p3 := b.points[i], b.points[(i + 1) % n], b.points[(i + 2) % n]
-		p1, p3 = p1.Add(p2).Div(2), p2.Add(p3).Div(2)
+		p1, p2, p3 := b.points[i], b.intermediatePoints[(i + 1) % n], b.points[(i + 1) % n]
 		DrawQuadratic([3]Point{p1, p2, p3}, int(p3.Sub(p2).Len() + p2.Sub(p1).Len()) / 8)
 	}
 }

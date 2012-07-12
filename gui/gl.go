@@ -64,3 +64,14 @@ func DrawCubic(ctrlPoints [4]Point, steps int) {
 	MapGrid1d(Int(steps), 0, 1)
 	EvalMesh1(LINE, 0, Int(steps))
 }
+
+func DrawBezier(ctrlPoints []Point, steps int) {
+	pts := []Double{}
+	for _, p := range ctrlPoints {
+		pts = append(pts, Double(p.X), Double(p.Y), 0)
+	}
+	Map1d(MAP1_VERTEX_3, 0, 1, 3, Int(len(ctrlPoints)), &pts[0])
+	Enable(MAP1_VERTEX_3); defer Disable(MAP1_VERTEX_3)
+	MapGrid1d(Int(steps), 0, 1)
+	EvalMesh1(LINE, 0, Int(steps))
+}

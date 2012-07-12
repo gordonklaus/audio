@@ -14,6 +14,7 @@ type IfNode struct {
 	falseBlock *Block
 	trueBlock *Block
 	focused bool
+	blockEnds [2]Point
 }
 
 func NewIfNode(block *Block) *IfNode {
@@ -29,9 +30,10 @@ func NewIfNode(block *Block) *IfNode {
 	n.AddChild(n.input)
 	n.AddChild(n.falseBlock)
 	n.AddChild(n.trueBlock)
+	n.blockEnds = [2]Point{}
 
 	n.input.MoveCenter(Pt(-2*putSize, 0))
-	n.trueBlock.Move(ZP)
+	n.trueBlock.Move(Pt(putSize, 4))
 	n.positionBlocks()
 	return n
 }
@@ -63,7 +65,14 @@ func (n IfNode) Code(indent int, vars map[*Input]string, _ string) (s string) {
 }
 
 func (n *IfNode) positionBlocks() {
-	n.falseBlock.Move(Pt(0, -n.falseBlock.Height()))
+	n.falseBlock.Move(Pt(putSize, -4 - n.falseBlock.Height()))
+	for i, b := range []*Block{n.falseBlock, n.trueBlock} {
+		if len(b.points) == 0 { continue }
+		leftmost := b.points[0]
+		for _, p := range b.points { if p.X < leftmost.X { leftmost = p } }
+		n.blockEnds[i] = b.MapToParent(leftmost)
+	}
+	
 	rect := n.input.MapRectToParent(n.input.Rect()).Union(n.falseBlock.MapRectToParent(n.falseBlock.Rect())).Union(n.trueBlock.MapRectToParent(n.trueBlock.Rect()))
 	n.Pan(rect.Min)
 	n.Resize(rect.Dx(), rect.Dy())
@@ -95,4 +104,8 @@ func (n *IfNode) KeyPressed(event KeyEvent) {
 func (n IfNode) Paint() {
 	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
 	DrawLine(ZP, n.input.MapToParent(n.input.Center()))
+	top, bottom := n.blockEnds[0], n.blockEnds[1]; top.X, bottom.X = 0, 0
+	DrawLine(top, bottom)
+	DrawLine(top, n.blockEnds[0])
+	DrawLine(bottom, n.blockEnds[1])
 }
