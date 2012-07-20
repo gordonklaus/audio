@@ -10,6 +10,8 @@ type Point struct {
 	X, Y float64
 }
 
+func (p Point) XY() (float64, float64) { return p.X, p.Y }
+
 // String returns a string representation of p like "(3,4)".
 func (p Point) String() string {
 	return "(" + strconv.FormatFloat(p.X, 'f', -1, 64) + "," + strconv.FormatFloat(p.Y, 'f', -1, 64) + ")"

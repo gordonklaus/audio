@@ -417,29 +417,35 @@ func (b *Block) KeyPressed(event KeyEvent) {
 			outer.TakeKeyboardFocus()
 		}
 	default:
-		switch event.Text {
-		default:
-			creator := NewNodeCreator(b)
-			creator.Move(b.Center())
-			creator.created.Connect(func(n ...interface{}) {
-				node := n[0].(Node)
+		if !(event.Ctrl || event.Alt || event.Super) {
+			switch event.Text {
+			default:
+				creator := NewNodeCreator()
+				b.AddChild(creator)
+				creator.Move(b.Center())
+				creator.created.Connect(func(n ...interface{}) {
+					node := NewNode(n[0].(Info), b)
+					b.AddNode(node)
+					node.MoveCenter(b.Center())
+					node.TakeKeyboardFocus()
+				})
+				creator.canceled.Connect(func(...interface{}) { b.TakeKeyboardFocus() })
+				creator.text.KeyPressed(event)
+				creator.text.TakeKeyboardFocus()
+			case "\"":
+				node := NewStringConstantNode(b)
+				b.AddNode(node)
+				node.MoveCenter(b.Center())
+				node.text.TakeKeyboardFocus()
+			case ",":
+				node := NewIfNode(b)
 				b.AddNode(node)
 				node.MoveCenter(b.Center())
 				node.TakeKeyboardFocus()
-			})
-			creator.canceled.Connect(func(...interface{}) { b.TakeKeyboardFocus() })
-			creator.text.KeyPressed(event)
-		case "\"":
-			node := NewStringConstantNode(b)
-			b.AddNode(node)
-			node.MoveCenter(b.Center())
-			node.text.TakeKeyboardFocus()
-		case ",":
-			node := NewIfNode(b)
-			b.AddNode(node)
-			node.MoveCenter(b.Center())
-			node.TakeKeyboardFocus()
-		case "":
+			case "":
+				b.ViewBase.KeyPressed(event)
+			}
+		} else {
 			b.ViewBase.KeyPressed(event)
 		}
 	}

@@ -19,21 +19,28 @@ func init() {
 
 type Window struct {
 	*ViewBase
-	ClickHandler
 	centralView View
 	keyboardFocus View
 	mouseFocus map[int]MouseHandlerView
 	repaintMe bool
 }
 
-func NewWindow(self View, centralView View) *Window {
-	w := &Window{nil, *NewClickKeyboardFocuser(centralView), centralView, nil, make(map[int]MouseHandlerView), false}
+func NewWindow(self View) *Window {
+	w := &Window{nil, nil, nil, make(map[int]MouseHandlerView), false}
 	if self == nil { self = w }
 	w.ViewBase = NewView(w)
-	w.AddChild(centralView)
 	w.Self = self
-	w.SetKeyboardFocus(centralView)
 	return w
+}
+
+func (w *Window) SetCentralView(v View) {
+	if w.centralView != nil { w.RemoveChild(w.centralView) }
+	w.centralView = v
+	if v != nil {
+		if v.Parent() != w { w.AddChild(v) }
+		v.Resize(w.Size().XY())
+		w.SetKeyboardFocus(v)
+	}
 }
 
 func (w *Window) Close() {
@@ -45,7 +52,7 @@ func (w *Window) HandleEvents() {
 	SetWindowSizeCallback(func(width, height int) {
 		wid, hei := float64(width), float64(height)
 		w.Self.Resize(wid, hei)
-		w.centralView.Resize(wid, hei)
+		if w.centralView != nil { w.centralView.Resize(wid, hei) }
 	})
 	
 	keyEvent := KeyEvent{}

@@ -104,7 +104,7 @@ type PackageInfo struct {
 	InfoBase
 	buildPackage build.Package
 	types []TypeInfo
-	functions []FunctionInfo
+	functions []*FunctionInfo
 	variables []ValueInfo
 	constants []ValueInfo
 	subPackages []*PackageInfo
@@ -210,7 +210,7 @@ func (p *PackageInfo) load() {
 					}
 				}
 			case *ast.FuncDecl:
-				functionInfo := FunctionInfo{InfoBase:InfoBase{decl.Name.Name, nil}}
+				functionInfo := &FunctionInfo{InfoBase:InfoBase{decl.Name.Name, nil}}
 				for _, field := range decl.Type.Params.List {
 					for _, name := range field.Names {
 						functionInfo.parameters = append(functionInfo.parameters, ValueInfo{InfoBase{name.Name, nil}, typeName(field.Type), false})
@@ -273,11 +273,11 @@ func (p *PackageInfo) findTypeInfo(fields *ast.FieldList) TypeInfo {
 
 type TypeInfo interface {
 	Info
-	Methods() *[]FunctionInfo
+	Methods() *[]*FunctionInfo
 }
 type TypeInfoBase struct {
 	InfoBase
-	methods []FunctionInfo
+	methods []*FunctionInfo
 }
 func newTypeInfoBase(name string, parent Info) *TypeInfoBase { return &TypeInfoBase{InfoBase{name, parent}, nil} }
 func NewTypeInfo(spec *ast.TypeSpec, parent Info) TypeInfo {
@@ -318,7 +318,7 @@ func (t TypeInfoBase) Children() []Info {
 	for _, m := range t.methods { children = append(children, m) }
 	return children
 }
-func (t *TypeInfoBase) Methods() *[]FunctionInfo { return &t.methods }
+func (t *TypeInfoBase) Methods() *[]*FunctionInfo { return &t.methods }
 
 type BoolTypeInfo struct { *TypeInfoBase }
 type IntTypeInfo struct {
@@ -376,6 +376,7 @@ type StructTypeInfo struct {
 
 type FunctionInfo struct {
 	InfoBase
+	tmp string
 	parameters []ValueInfo
 	results []ValueInfo
 }

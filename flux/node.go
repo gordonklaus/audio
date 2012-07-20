@@ -143,14 +143,14 @@ func NewNode(info Info, block *Block) Node {
 	switch info := info.(type) {
 	// case StringTypeInfo:
 	// 	return NewBasicLiteralNode(info)
-	case FunctionInfo:
+	case *FunctionInfo:
 		return NewFunctionNode(info, block)
 	}
 	return nil
 }
 
 type FunctionNode struct { *NodeBase }
-func NewFunctionNode(info FunctionInfo, block *Block) *FunctionNode {
+func NewFunctionNode(info *FunctionInfo, block *Block) *FunctionNode {
 	n := &FunctionNode{}
 	n.NodeBase = NewNodeBase(n, block)
 	n.text.SetText(info.name)
