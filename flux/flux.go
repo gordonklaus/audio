@@ -12,11 +12,15 @@ type FluxWindow struct {
 func NewFluxWindow() *FluxWindow {
 	w := &FluxWindow{}
 	w.Window = NewWindow(w)
-	w.nodeCreator = NewNodeCreator()
+	w.nodeCreator = NewNodeCreator(true)
 	w.SetCentralView(w.nodeCreator)
 	w.nodeCreator.created.Connect(func(n ...interface{}) {
-		if _, ok := n[0].(*FunctionInfo); ok {
+		switch n[0].(type) {
+		case *FunctionInfo:
 			w.SetCentralView(NewFunction())
+		default:
+			w.SetCentralView(w.nodeCreator)
+			w.nodeCreator.text.TakeKeyboardFocus()
 		}
 	})
 	w.nodeCreator.canceled.Connect(func(...interface{}) {

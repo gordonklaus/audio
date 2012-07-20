@@ -2,6 +2,7 @@ package main
 
 import (
 	."code.google.com/p/gordon-go/util"
+	"fmt"
 	"go/build"
 	"go/token"
 	"go/parser"
@@ -21,8 +22,11 @@ func getPackageInfo(pathStr string) *PackageInfo {
 	pkg, err := build.ImportDir(pathStr, build.FindOnly & build.AllowBinary)
 	if err == nil && !pkg.IsCommand() {
 		packageInfo.buildPackage = *pkg
-	} else if err != nil {
-		if _, ok := err.(*build.NoGoError); !ok { Println(err) }
+	} else {
+		if err != nil {
+			if _, ok := err.(*build.NoGoError); !ok { Println(err) }
+		}
+		packageInfo.buildPackage.Dir = pathStr
 	}
 	
 	if file, err := os.Open(pathStr); err == nil {
@@ -88,8 +92,10 @@ func GetPackageInfo() *PackageInfo {
 
 type Info interface {
 	Name() string
+	SetName(name string)
 	Parent() Info
 	Children() []Info
+	FluxSourcePath() string
 }
 
 type InfoBase struct {
@@ -97,8 +103,10 @@ type InfoBase struct {
 	parent Info
 }
 func (i InfoBase) Name() string { return i.name }
+func (i *InfoBase) SetName(name string) { i.name = name }
 func (i InfoBase) Parent() Info { return i.parent }
 func (i InfoBase) Children() []Info { return nil }
+func (i InfoBase) FluxSourcePath() string { return fmt.Sprintf("%v/%v.flux", i.parent.FluxSourcePath(), i.name) }
 
 type PackageInfo struct {
 	InfoBase
@@ -123,6 +131,7 @@ func (p *PackageInfo) Children() []Info {
 	for _, p := range p.subPackages { children = append(children, p) }
 	return children
 }
+func (p PackageInfo) FluxSourcePath() string { return p.buildPackage.Dir }
 
 func typeName(expr ast.Expr) string {
 	switch typ := expr.(type) {
@@ -163,7 +172,6 @@ func (p *PackageInfo) load() {
 	if p.loaded { return }
 	p.loaded = true
 	
-	if len(p.buildPackage.Dir) == 0 { return }
 	fset := token.NewFileSet()
 	pkgs, err := parser.ParseDir(fset, p.buildPackage.Dir, func(fileInfo os.FileInfo) bool {
 		for _, file := range append(p.buildPackage.GoFiles, p.buildPackage.CgoFiles...) {
@@ -173,8 +181,7 @@ func (p *PackageInfo) load() {
 		}
 		return false
 	}, parser.ParseComments)
-	if err != nil { panic(err) }
-	if len(pkgs) != 1 { Panicf("%v packages found in %v; expected 1.", len(pkgs), p.buildPackage.Dir) }
+	if err != nil || len(pkgs) == 0 { return }
 	
 	pkg := pkgs[p.buildPackage.Name]
 	if !ast.PackageExports(pkg) { return }
@@ -200,12 +207,12 @@ func (p *PackageInfo) load() {
 					case token.CONST:
 						v := spec.(*ast.ValueSpec)
 						for _, name := range v.Names {
-							p.constants = append(p.constants, ValueInfo{InfoBase{name.Name, p}, typeName(v.Type), true})
+							p.constants = append(p.constants, ValueInfo{&InfoBase{name.Name, p}, typeName(v.Type), true})
 						}
 					case token.VAR:
 						v := spec.(*ast.ValueSpec)
 						for _, name := range v.Names {
-							p.variables = append(p.variables, ValueInfo{InfoBase{name.Name, p}, typeName(v.Type), false})
+							p.variables = append(p.variables, ValueInfo{&InfoBase{name.Name, p}, typeName(v.Type), false})
 						}
 					}
 				}
@@ -213,16 +220,16 @@ func (p *PackageInfo) load() {
 				functionInfo := &FunctionInfo{InfoBase:InfoBase{decl.Name.Name, nil}}
 				for _, field := range decl.Type.Params.List {
 					for _, name := range field.Names {
-						functionInfo.parameters = append(functionInfo.parameters, ValueInfo{InfoBase{name.Name, nil}, typeName(field.Type), false})
+						functionInfo.parameters = append(functionInfo.parameters, ValueInfo{&InfoBase{name.Name, nil}, typeName(field.Type), false})
 					}
 				}
 				if results := decl.Type.Results; results != nil {
 					for _, field := range results.List {
 						if field.Names == nil {
-							functionInfo.results = append(functionInfo.results, ValueInfo{InfoBase{"", nil}, typeName(field.Type), false})
+							functionInfo.results = append(functionInfo.results, ValueInfo{&InfoBase{"", nil}, typeName(field.Type), false})
 						} else {
 							for _, name := range field.Names {
-								functionInfo.results = append(functionInfo.results, ValueInfo{InfoBase{name.Name, nil}, typeName(field.Type), false})
+								functionInfo.results = append(functionInfo.results, ValueInfo{&InfoBase{name.Name, nil}, typeName(field.Type), false})
 							}
 						}
 					}
@@ -376,13 +383,18 @@ type StructTypeInfo struct {
 
 type FunctionInfo struct {
 	InfoBase
-	tmp string
 	parameters []ValueInfo
 	results []ValueInfo
 }
+func (f FunctionInfo) FluxSourcePath() string {
+	if _, ok := f.parent.(TypeInfo); ok {
+		return fmt.Sprintf("%vmethods/%v.flux", f.parent.FluxSourcePath(), f.name)
+	}
+	return f.InfoBase.FluxSourcePath()
+}
 
 type ValueInfo struct {
-	InfoBase
+	*InfoBase
 	typeName string
 	constant bool
 }

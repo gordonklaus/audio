@@ -420,11 +420,11 @@ func (b *Block) KeyPressed(event KeyEvent) {
 		if !(event.Ctrl || event.Alt || event.Super) {
 			switch event.Text {
 			default:
-				creator := NewNodeCreator()
+				creator := NewNodeCreator(false)
 				b.AddChild(creator)
 				creator.Move(b.Center())
-				creator.created.Connect(func(n ...interface{}) {
-					node := NewNode(n[0].(Info), b)
+				creator.created.Connect(func(info ...interface{}) {
+					node := NewNode(info[0].(Info), b)
 					b.AddNode(node)
 					node.MoveCenter(b.Center())
 					node.TakeKeyboardFocus()

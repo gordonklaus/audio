@@ -5,11 +5,12 @@ import (
 	."code.google.com/p/gordon-go/util"
 	."code.google.com/p/gordon-go/gui"
 	."strings"
+	"os"
 )
 
 type NodeCreator struct {
 	*ViewBase
-	mode creatorMode
+	fluxSourceOnly bool
 	finished bool
 	created *Signal
 	canceled *Signal
@@ -17,6 +18,7 @@ type NodeCreator struct {
 	currentInfo Info
 	activeIndices []int
 	currentActiveIndex int
+	newInfo Info
 	
 	pathTexts []*Text
 	nameTexts []*Text
@@ -29,13 +31,13 @@ const (
 	newFunction
 )
 
-func NewNodeCreator() *NodeCreator {
-	n := &NodeCreator{mode:browse, finished:false, created:NewSignal(), canceled:NewSignal()}
+func NewNodeCreator(fluxSourceOnly bool) *NodeCreator {
+	n := &NodeCreator{created:NewSignal(), canceled:NewSignal()}
 	n.ViewBase = NewView(n)
 	
+	n.fluxSourceOnly = fluxSourceOnly
 	n.currentInfo = GetPackageInfo()
 	n.activeIndices = []int{}
-	for i := range n.currentInfo.Children() { n.activeIndices = append(n.activeIndices, i) }
 	
 	n.text = newNodeNameText(n)
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
@@ -75,7 +77,19 @@ func (n NodeCreator) lastPathText() (*Text, bool) {
 	return nil, false
 }
 
-func (n NodeCreator) currentActiveInfo() Info { return n.currentInfo.Children()[n.activeIndices[n.currentActiveIndex]] }
+func (n NodeCreator) filteredInfos() (infos []Info) {
+	if !n.fluxSourceOnly { return n.currentInfo.Children() }
+	for _, child := range n.currentInfo.Children() {
+		if _, err := os.Stat(child.FluxSourcePath()); err != nil { continue }
+		infos = append(infos, child)
+	}
+	return
+}
+
+func (n NodeCreator) currentActiveInfo() Info {
+	if len(n.activeIndices) == 0 { return nil }
+	return n.filteredInfos()[n.activeIndices[n.currentActiveIndex]]
+}
 
 func (n *NodeCreator) update() {
 	currentIndex := 0
@@ -85,24 +99,21 @@ func (n *NodeCreator) update() {
 		currentIndex = n.activeIndices[n.currentActiveIndex]
 	}
 	
-	infos := n.currentInfo.Children()
-	if n.mode != browse {
-		var newInfo Info
-		switch n.mode {
-		case newFunction: newInfo = &FunctionInfo{InfoBase:InfoBase{name:n.text.GetText()}}
-		}
+	infos := n.filteredInfos()
+	if n.newInfo != nil {
+		n.newInfo.SetName(n.text.GetText())
 		newIndex := 0
 		for i, child := range infos {
-			if child.Name() >= n.text.GetText() {
+			if child.Name() >= n.newInfo.Name() {
 				switch child.(type) {
-				case *FunctionInfo: if n.mode != newFunction { continue }
+				case *FunctionInfo: if _, ok := n.newInfo.(*FunctionInfo); !ok { continue }
 				default: continue
 				}
 				newIndex = i
 				break
 			}
 		}
-		infos = append(infos[:newIndex], append([]Info{newInfo}, infos[newIndex:]...)...)
+		infos = append(infos[:newIndex], append([]Info{n.newInfo}, infos[newIndex:]...)...)
 		currentIndex = newIndex
 	}
 	
@@ -120,7 +131,7 @@ func (n *NodeCreator) update() {
 	}
 	if n.currentActiveIndex >= len(n.activeIndices) { n.currentActiveIndex = len(n.activeIndices) - 1 }
 	
-	if t, ok := n.lastPathText(); ok {
+	if t, ok := n.lastPathText(); ok && len(n.activeIndices) > 0 {
 		sep := ""; if _, ok := infos[n.activeIndices[n.currentActiveIndex]].(*PackageInfo); ok { sep = "/" } else { sep = "." }
 		text := t.GetText()
 		t.SetText(text[:len(text) - 1] + sep)
@@ -145,7 +156,9 @@ func (n *NodeCreator) update() {
 	
 	yOffset := float64(len(n.activeIndices) - n.currentActiveIndex - 1)*n.text.Height()
 	n.text.Move(Pt(xOffset, yOffset))
-	n.text.SetTextColor(getTextColor(infos[n.activeIndices[n.currentActiveIndex]], 1))
+	if len(n.activeIndices) > 0 {
+		n.text.SetTextColor(getTextColor(infos[n.activeIndices[n.currentActiveIndex]], 1))
+	}
 	for _, p := range n.pathTexts { p.Move(Pt(p.Position().X, yOffset)) }
 	
 	n.Pan(Pt(0, yOffset))
@@ -153,7 +166,7 @@ func (n *NodeCreator) update() {
 
 func (n *NodeCreator) Paint() {
 	rect := ZR
-	if n.mode == browse {
+	if n.newInfo == nil && len(n.nameTexts) > 0 {
 		cur := n.nameTexts[n.currentActiveIndex]
 		rect = Rect(0, cur.Position().Y, cur.Position().X + cur.Width(), cur.Position().Y + cur.Height())
 	} else {
@@ -173,10 +186,10 @@ func newNodeNameText(n *NodeCreator) *nodeNameText {
 	t.Text = *NewTextBase(t, "")
 	t.n = n
 	t.SetValidator(func(text *string) bool {
-		if n.mode != browse { return true }
-		for _, child := range n.currentInfo.Children() {
-			if HasPrefix(ToLower(child.Name()), ToLower(*text)) {
-				*text = child.Name()[:len(*text)]
+		if n.newInfo != nil { return true }
+		for _, info := range n.filteredInfos() {
+			if HasPrefix(ToLower(info.Name()), ToLower(*text)) {
+				*text = info.Name()[:len(*text)]
 				return true
 			}
 		}
@@ -189,12 +202,12 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 	n := t.n
 	switch event.Key {
 	case KeyUp:
-		if n.mode == browse {
+		if n.newInfo == nil {
 			n.currentActiveIndex--
 			n.update()
 		}
 	case KeyDown:
-		if n.mode == browse {
+		if n.newInfo == nil {
 			n.currentActiveIndex++
 			n.update()
 		}
@@ -205,12 +218,12 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 		fallthrough
 	case KeyLeft:
-		if parent := n.currentInfo.Parent(); n.mode == browse && parent != nil {
+		if parent := n.currentInfo.Parent(); n.newInfo == nil && parent != nil {
 			previous := n.currentInfo
 			n.currentInfo = parent
 			n.currentActiveIndex = 0
-			for i, child := range parent.Children() {
-				if child == previous { n.activeIndices = []int{i}; break }
+			for i, info := range n.filteredInfos() {
+				if info == previous { n.activeIndices = []int{i}; break }
 			}
 			
 			length := len(n.pathTexts)
@@ -220,7 +233,11 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			t.SetText("")
 		}
 	case KeyEnter:
-		if info, ok := n.currentActiveInfo().(*FunctionInfo); ok {
+		info := n.newInfo
+		if info == nil { info = n.currentActiveInfo() }
+		switch info.(type) {
+		case *PackageInfo: break
+		default:
 			n.Close()
 			n.finished = true
 			n.created.Emit(info)
@@ -228,7 +245,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 		fallthrough
 	case KeyRight:
-		if info := n.currentActiveInfo(); n.mode == browse && len(info.Children()) > 0 {
+		if info := n.currentActiveInfo(); n.newInfo == nil && info != nil && len(info.Children()) > 0 {
 			n.currentInfo = info
 			n.activeIndices[0], n.currentActiveIndex = 0, 0
 			
@@ -243,15 +260,15 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			t.SetText("")
 		}
 	case KeyEsc:
-		if n.mode == browse {
+		if n.newInfo == nil {
 			n.Cancel()
 		} else {
-			n.mode = browse
+			n.newInfo = nil
 			t.SetText("")
 		}
 	default:
-		if n.mode == browse && event.Text == "\\" {
-			n.mode = newFunction
+		if n.newInfo == nil && event.Text == "\\" {
+			n.newInfo = &FunctionInfo{}
 			t.SetText("")
 		} else {
 			t.Text.KeyPressed(event)
