@@ -4,6 +4,9 @@ import (
 	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/util"
 	."code.google.com/p/gordon-go/gui"
+	."fmt"
+	"go/build"
+	."io/ioutil"
 	."strings"
 	"os"
 )
@@ -64,7 +67,7 @@ func getTextColor(info Info, alpha float64) Color {
 		return Color{.6, 1, .6, alpha}
 	case *FunctionInfo:
 		return Color{1, .6, .6, alpha}
-	case ValueInfo:
+	case *ValueInfo:
 		return Color{.6, .6, 1, alpha}
 	}
 	return Color{}
@@ -87,7 +90,7 @@ func (n NodeCreator) filteredInfos() (infos []Info) {
 }
 
 func (n NodeCreator) currentActiveInfo() Info {
-	if len(n.activeIndices) == 0 { return nil }
+	if len(n.activeIndices) == 0 || len(n.filteredInfos()) == 0 { return nil }
 	return n.filteredInfos()[n.activeIndices[n.currentActiveIndex]]
 }
 
@@ -106,6 +109,7 @@ func (n *NodeCreator) update() {
 		for i, child := range infos {
 			if child.Name() >= n.newInfo.Name() {
 				switch child.(type) {
+				case *PackageInfo: if _, ok := n.newInfo.(*PackageInfo); !ok { continue }
 				case *FunctionInfo: if _, ok := n.newInfo.(*FunctionInfo); !ok { continue }
 				default: continue
 				}
@@ -234,10 +238,33 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 	case KeyEnter:
 		info := n.newInfo
-		if info == nil { info = n.currentActiveInfo() }
-		switch info.(type) {
-		case *PackageInfo: break
-		default:
+		existing := false
+		if info == nil {
+			info = n.currentActiveInfo()
+		} else if n.currentActiveInfo() != nil && info.Name() == n.currentActiveInfo().Name() {
+			info = n.currentActiveInfo()
+			existing = true
+		}
+		if n.newInfo != nil && !existing {
+			n.currentInfo.AddChild(info)
+			switch info := info.(type) {
+			case *PackageInfo:
+				srcDirs := build.Default.SrcDirs()
+				info.buildPackage.Dir = Sprintf("%v/%v", srcDirs[len(srcDirs) - 1], info.name)
+				if err := os.Mkdir(info.FluxSourcePath(), 0755); err != nil { Println(err) }
+			case TypeInfo:
+				if err := WriteFile(info.FluxSourcePath(), []byte("type"), 0644); err != nil { Println(err) }
+			case *FunctionInfo:
+				if err := WriteFile(info.FluxSourcePath(), []byte("func"), 0644); err != nil { Println(err) }
+			}
+			
+			n.currentActiveIndex = 0
+			for i, child := range n.filteredInfos() {
+				if child == info { n.activeIndices = []int{i}; break }
+			}
+		}
+		n.newInfo = nil
+		if _, ok := info.(*PackageInfo); !ok {
 			n.Close()
 			n.finished = true
 			n.created.Emit(info)
@@ -245,19 +272,22 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 		fallthrough
 	case KeyRight:
-		if info := n.currentActiveInfo(); n.newInfo == nil && info != nil && len(info.Children()) > 0 {
-			n.currentInfo = info
-			n.activeIndices[0], n.currentActiveIndex = 0, 0
+		if n.newInfo == nil {
+			switch info := n.currentActiveInfo().(type) {
+			case *PackageInfo, TypeInfo:
+				n.currentInfo = info
+				n.activeIndices[0], n.currentActiveIndex = 0, 0
 			
-			pathText := NewText(info.Name() + "/")
-			pathText.SetTextColor(getTextColor(info, 1))
-			pathText.SetBackgroundColor(Color{0, 0, 0, .7})
-			n.AddChild(pathText)
-			x := 0.0; if t, ok := n.lastPathText(); ok { x = t.Position().X + t.Width() }
-			pathText.Move(Pt(x, 0))
-			n.pathTexts = append(n.pathTexts, pathText)
+				pathText := NewText(info.Name() + "/")
+				pathText.SetTextColor(getTextColor(info, 1))
+				pathText.SetBackgroundColor(Color{0, 0, 0, .7})
+				n.AddChild(pathText)
+				x := 0.0; if t, ok := n.lastPathText(); ok { x = t.Position().X + t.Width() }
+				pathText.Move(Pt(x, 0))
+				n.pathTexts = append(n.pathTexts, pathText)
 			
-			t.SetText("")
+				t.SetText("")
+			}
 		}
 	case KeyEsc:
 		if n.newInfo == nil {
@@ -267,8 +297,21 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			t.SetText("")
 		}
 	default:
-		if n.newInfo == nil && event.Text == "\\" {
-			n.newInfo = &FunctionInfo{}
+		if n.newInfo == nil && event.Ctrl {
+			if _, ok := n.currentInfo.(*PackageInfo); !ok {
+				if _, ok := n.currentInfo.(TypeInfo); !(ok && event.Text == "3") {
+					t.Text.KeyPressed(event)
+					return
+				}
+			}
+			switch event.Text {
+			case "1": n.newInfo = &PackageInfo{}
+			case "2": n.newInfo = &TypeInfoBase{}
+			case "3": n.newInfo = &FunctionInfo{}
+			case "4": n.newInfo = &ValueInfo{}
+			case "5": n.newInfo = &ValueInfo{constant:true}
+			default: t.Text.KeyPressed(event); return
+			}
 			t.SetText("")
 		} else {
 			t.Text.KeyPressed(event)

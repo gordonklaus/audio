@@ -9,8 +9,9 @@ import (
 	"go/ast"
 	"os"
 	."log"
-	"path"
 	"path/filepath"
+	."strings"
+	"unicode"
 	"unsafe"
 )
 
@@ -20,33 +21,23 @@ func getPackageInfo(pathStr string) *PackageInfo {
 	packageInfo := newPackageInfo(filepath.Base(pathStr))
 	
 	pkg, err := build.ImportDir(pathStr, build.FindOnly & build.AllowBinary)
-	if err == nil && !pkg.IsCommand() {
+	packageInfo.buildPackage.Dir = pathStr
+	if err != nil {
+		if _, ok := err.(*build.NoGoError); !ok { Println(err) }
+	} else if !pkg.IsCommand() {
 		packageInfo.buildPackage = *pkg
-	} else {
-		if err != nil {
-			if _, ok := err.(*build.NoGoError); !ok { Println(err) }
-		}
-		packageInfo.buildPackage.Dir = pathStr
 	}
 	
 	if file, err := os.Open(pathStr); err == nil {
 		if fileInfos, err := file.Readdir(-1); err == nil {
 			for _, fileInfo := range fileInfos {
-				if fileInfo.IsDir() {
+				if fileInfo.IsDir() && unicode.IsLetter(([]rune(fileInfo.Name()))[0]) && !HasSuffix(fileInfo.Name(), ".fluxmethods") {
 					subPackageInfo := getPackageInfo(filepath.Join(pathStr, fileInfo.Name()))
-					if len(subPackageInfo.subPackages) > 0 || len(subPackageInfo.buildPackage.ImportPath) > 0 {
-						subPackageInfo.parent = packageInfo
-						packageInfo.subPackages = append(packageInfo.subPackages, subPackageInfo)
-					}
+					subPackageInfo.parent = packageInfo
+					packageInfo.subPackages = append(packageInfo.subPackages, subPackageInfo)
 				}
 			}
 		}
-	}
-	
-	if len(packageInfo.buildPackage.ImportPath) == 0 && len(packageInfo.subPackages) == 1 && len(packageInfo.subPackages[0].buildPackage.ImportPath) == 0 {
-		subPackageInfo := packageInfo.subPackages[0]
-		subPackageInfo.name = path.Join(packageInfo.name, subPackageInfo.name)
-		packageInfo = subPackageInfo
 	}
 	
 	return packageInfo
@@ -94,7 +85,9 @@ type Info interface {
 	Name() string
 	SetName(name string)
 	Parent() Info
+	SetParent(info Info)
 	Children() []Info
+	AddChild(info Info)
 	FluxSourcePath() string
 }
 
@@ -105,7 +98,9 @@ type InfoBase struct {
 func (i InfoBase) Name() string { return i.name }
 func (i *InfoBase) SetName(name string) { i.name = name }
 func (i InfoBase) Parent() Info { return i.parent }
+func (i *InfoBase) SetParent(info Info) { i.parent = info }
 func (i InfoBase) Children() []Info { return nil }
+func (i InfoBase) AddChild(info Info) {}
 func (i InfoBase) FluxSourcePath() string { return fmt.Sprintf("%v/%v.flux", i.parent.FluxSourcePath(), i.name) }
 
 type PackageInfo struct {
@@ -113,8 +108,8 @@ type PackageInfo struct {
 	buildPackage build.Package
 	types []TypeInfo
 	functions []*FunctionInfo
-	variables []ValueInfo
-	constants []ValueInfo
+	variables []*ValueInfo
+	constants []*ValueInfo
 	subPackages []*PackageInfo
 	loaded bool
 }
@@ -130,6 +125,20 @@ func (p *PackageInfo) Children() []Info {
 	for _, c := range p.constants { children = append(children, c) }
 	for _, p := range p.subPackages { children = append(children, p) }
 	return children
+}
+func (p *PackageInfo) AddChild(info Info) {
+	info.SetParent(p)
+	index := 0
+	switch info := info.(type) {
+	case *PackageInfo:
+		for i, pkg := range p.subPackages { if pkg.name > info.name { index = i; break } }
+		p.subPackages = append(p.subPackages[:index], append([]*PackageInfo{info}, p.subPackages[index:]...)...)
+	case *FunctionInfo:
+		for i, f := range p.functions { if f.name > info.name { index = i; break } }
+		p.functions = append(p.functions[:index], append([]*FunctionInfo{info}, p.functions[index:]...)...)
+	default:
+		panic("not yet implemented")
+	}
 }
 func (p PackageInfo) FluxSourcePath() string { return p.buildPackage.Dir }
 
@@ -207,12 +216,12 @@ func (p *PackageInfo) load() {
 					case token.CONST:
 						v := spec.(*ast.ValueSpec)
 						for _, name := range v.Names {
-							p.constants = append(p.constants, ValueInfo{&InfoBase{name.Name, p}, typeName(v.Type), true})
+							p.constants = append(p.constants, &ValueInfo{InfoBase{name.Name, p}, typeName(v.Type), true})
 						}
 					case token.VAR:
 						v := spec.(*ast.ValueSpec)
 						for _, name := range v.Names {
-							p.variables = append(p.variables, ValueInfo{&InfoBase{name.Name, p}, typeName(v.Type), false})
+							p.variables = append(p.variables, &ValueInfo{InfoBase{name.Name, p}, typeName(v.Type), false})
 						}
 					}
 				}
@@ -220,16 +229,16 @@ func (p *PackageInfo) load() {
 				functionInfo := &FunctionInfo{InfoBase:InfoBase{decl.Name.Name, nil}}
 				for _, field := range decl.Type.Params.List {
 					for _, name := range field.Names {
-						functionInfo.parameters = append(functionInfo.parameters, ValueInfo{&InfoBase{name.Name, nil}, typeName(field.Type), false})
+						functionInfo.parameters = append(functionInfo.parameters, ValueInfo{InfoBase{name.Name, nil}, typeName(field.Type), false})
 					}
 				}
 				if results := decl.Type.Results; results != nil {
 					for _, field := range results.List {
 						if field.Names == nil {
-							functionInfo.results = append(functionInfo.results, ValueInfo{&InfoBase{"", nil}, typeName(field.Type), false})
+							functionInfo.results = append(functionInfo.results, ValueInfo{InfoBase{"", nil}, typeName(field.Type), false})
 						} else {
 							for _, name := range field.Names {
-								functionInfo.results = append(functionInfo.results, ValueInfo{&InfoBase{name.Name, nil}, typeName(field.Type), false})
+								functionInfo.results = append(functionInfo.results, ValueInfo{InfoBase{name.Name, nil}, typeName(field.Type), false})
 							}
 						}
 					}
@@ -325,6 +334,16 @@ func (t TypeInfoBase) Children() []Info {
 	for _, m := range t.methods { children = append(children, m) }
 	return children
 }
+func (t *TypeInfoBase) AddChild(info Info) {
+	info.SetParent(t)
+	if info, ok := info.(*FunctionInfo); ok {
+		index := 0
+		for i, f := range t.methods { if f.name > info.name { index = i; break } }
+		t.methods = append(t.methods[:index], append([]*FunctionInfo{info}, t.methods[index:]...)...)
+	} else {
+		panic("types can only contain functions")
+	}
+}
 func (t *TypeInfoBase) Methods() *[]*FunctionInfo { return &t.methods }
 
 type BoolTypeInfo struct { *TypeInfoBase }
@@ -386,6 +405,7 @@ type FunctionInfo struct {
 	parameters []ValueInfo
 	results []ValueInfo
 }
+func (FunctionInfo) AddChild(info Info) { panic("functions can't have children") }
 func (f FunctionInfo) FluxSourcePath() string {
 	if _, ok := f.parent.(TypeInfo); ok {
 		return fmt.Sprintf("%vmethods/%v.flux", f.parent.FluxSourcePath(), f.name)
@@ -394,7 +414,7 @@ func (f FunctionInfo) FluxSourcePath() string {
 }
 
 type ValueInfo struct {
-	*InfoBase
+	InfoBase
 	typeName string
 	constant bool
 }
