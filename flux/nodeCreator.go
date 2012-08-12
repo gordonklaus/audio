@@ -255,7 +255,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			case TypeInfo:
 				if err := WriteFile(info.FluxSourcePath(), []byte("type"), 0644); err != nil { Println(err) }
 			case *FunctionInfo:
-				if err := WriteFile(info.FluxSourcePath(), []byte("func"), 0644); err != nil { Println(err) }
+				NewFunction(info)
 			}
 			
 			n.currentActiveIndex = 0

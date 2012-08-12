@@ -3,8 +3,11 @@ package main
 import (
 	"github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
+	."code.google.com/p/gordon-go/util"
 	."math"
 	."fmt"
+	."strconv"
+	."strings"
 )
 
 type Node interface {
@@ -15,6 +18,7 @@ type Node interface {
 	Outputs() []*Output
 	InputConnections() []*Connection
 	OutputConnections() []*Connection
+	Save(indent int, nodeIDs map[Node]int) string
 	Code(indent int, vars map[*Input]string, inputs string) string
 }
 
@@ -149,9 +153,39 @@ func NewNode(info Info, block *Block) Node {
 	return nil
 }
 
-type FunctionNode struct { *NodeBase }
+func LoadNode(b *Block, s string, indent int, nodes map[int]Node, pkgNames map[string]*PackageInfo) (node Node, rest string) {
+	line, rest := Split2(s, "\n")
+	fields := Fields(line)
+	if fields[1][0] == '"' {
+		strNode := NewStringConstantNode(b)
+		text := fields[1]
+		strNode.text.SetText(text[1:len(text) - 1])
+		node = strNode
+	} else if fields[1] == "if" {
+		node, rest = LoadIfNode(s, indent, b, nodes, pkgNames)
+	} else {
+		pkgName, name := Split2(fields[1], ".")
+		for _, info := range pkgNames[pkgName].Children() {
+			if info.Name() != name { continue }
+			switch info := info.(type) {
+			case *FunctionInfo:
+				node = NewFunctionNode(info, b)
+			default:
+				panic("not yet implemented")
+			}
+		}
+	}
+	nodeID, _ := Atoi(fields[0])
+	nodes[nodeID] = node
+	return node, rest
+}
+
+type FunctionNode struct {
+	*NodeBase
+	info *FunctionInfo
+}
 func NewFunctionNode(info *FunctionInfo, block *Block) *FunctionNode {
-	n := &FunctionNode{}
+	n := &FunctionNode{info:info}
 	n.NodeBase = NewNodeBase(n, block)
 	n.text.SetText(info.name)
 	for _, parameter := range info.parameters {
@@ -168,15 +202,20 @@ func NewFunctionNode(info *FunctionInfo, block *Block) *FunctionNode {
 	
 	return n
 }
+func (n FunctionNode) Package() *PackageInfo { return n.info.Parent().(*PackageInfo) }
+func (n FunctionNode) Save(int, map[Node]int) string {
+	pkgName := n.Package().Name() // TODO:  handle name collisions
+	return Sprintf("%v.%v", pkgName, n.info.Name())
+}
 func (n FunctionNode) Code(_ int, _ map[*Input]string, inputs string) string {
-	return Sprintf("%v(%v)", n.text.GetText(), inputs)
+	pkgName := n.Package().Name() // TODO:  handle name collisions
+	return Sprintf("%v.%v(%v)", pkgName, n.info.Name(), inputs)
 }
 
 type ConstantNode struct { *NodeBase }
 func NewStringConstantNode(block *Block) *ConstantNode {
 	n := &ConstantNode{}
 	n.NodeBase = NewNodeBase(n, block)
-	n.text.SetEditable(true)
 	p := NewOutput(n, ValueInfo{})
 	n.AddChild(p)
 	n.outputs = []*Output{p}
@@ -184,6 +223,10 @@ func NewStringConstantNode(block *Block) *ConstantNode {
 	return n
 }
 
+func (n ConstantNode) Save(int, map[Node]int) string {
+	return Sprintf(`"%v"`, n.text.GetText())
+}
 func (n ConstantNode) Code(int, map[*Input]string, string) string {
 	return Sprintf(`"%v"`, n.text.GetText())
 }
+

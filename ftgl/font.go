@@ -13,7 +13,9 @@ type Font struct {
 func CreateTextureFont(filePath string) Font {
 	s := C.CString(filePath)
 	defer C.free(unsafe.Pointer(s))
-	return Font{C.ftglCreateTextureFont(s)}
+	font := C.ftglCreateTextureFont(s)
+	if font == nil { panic("couldn't create font") }
+	return Font{font}
 }
 
 func (font Font) SetFaceSize(size, res uint) bool {

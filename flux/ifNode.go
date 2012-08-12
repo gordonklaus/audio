@@ -4,6 +4,7 @@ import (
 	."fmt"
 	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
+	."code.google.com/p/gordon-go/util"
 )
 
 type IfNode struct {
@@ -38,6 +39,14 @@ func NewIfNode(block *Block) *IfNode {
 	return n
 }
 
+func LoadIfNode(s string, indent int, b *Block, nodes map[int]Node, pkgs map[string]*PackageInfo) (*IfNode, string) {
+	n := NewIfNode(b)
+	_, s = Split2(s, "\n")
+	s = n.trueBlock.Load(s, indent, nodes, pkgs)
+	s = n.falseBlock.Load(s, indent, nodes, pkgs)
+	return n, s
+}
+
 func (n IfNode) Block() *Block { return n.block }
 func (n IfNode) Inputs() []*Input { return []*Input{n.input} }
 func (n IfNode) Outputs() []*Output { return nil }
@@ -50,18 +59,21 @@ func (n IfNode) OutputConnections() []*Connection {
 	return append(n.falseBlock.OutputConnections(), n.trueBlock.OutputConnections()...)
 }
 
-func (n IfNode) Code(indent int, vars map[*Input]string, _ string) (s string) {
+func (n IfNode) Save(indent int, nodeIDs map[Node]int) string {
+	return Sprintf("if\n%v\n%v", n.trueBlock.Save(indent, nodeIDs), n.falseBlock.Save(indent, nodeIDs))
+}
+func (n IfNode) Code(indent int, vars map[*Input]string, _ string) string {
 	name := "false"
 	if len(n.input.connections) > 0 {
 		name = vars[n.input]
 	}
-	s += Sprintf("%vif %v {\n", tabs(indent), name)
+	s := Sprintf("%vif %v {\n", tabs(indent), name)
 	s += n.trueBlock.Code(indent + 1, vars)
 	if s2 := n.falseBlock.Code(indent + 1, vars); len(s2) > 0 {
 		s += Sprintf("%v} else {\n%v", tabs(indent), s2)
 	}
 	s += tabs(indent) + "}\n"
-	return
+	return s
 }
 
 func (n *IfNode) positionBlocks() {

@@ -4,6 +4,7 @@ import (
 	."fmt"
 	."strings"
 	."math"
+	."strconv"
 	"time"
 	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
@@ -14,6 +15,7 @@ type Block struct {
 	*ViewBase
 	AggregateMouseHandler
 	node Node
+	function *Function
 	nodes map[Node]bool
 	connections map[*Connection]bool
 	focused, editing bool
@@ -46,11 +48,20 @@ func (b *Block) Outermost() *Block {
 func (b *Block) AddNode(node Node) {
 	b.AddChild(node)
 	b.nodes[node] = true
+	if node, ok := node.(interface{Package()*PackageInfo}); ok {
+		b.Outermost().function.pkgRefs[node.Package()]++
+	}
 }
 
 func (b *Block) RemoveNode(node Node) {
 	b.RemoveChild(node)
 	delete(b.nodes, node)
+	if node, ok := node.(interface{Package()*PackageInfo}); ok {
+		pkg := node.Package()
+		pkgRefs := b.Outermost().function.pkgRefs
+		pkgRefs[pkg]--
+		if pkgRefs[pkg] == 0 { delete(pkgRefs, pkg) }
+	}
 }
 
 func (b *Block) NewConnection(pt Point) *Connection {
@@ -161,6 +172,27 @@ nx:	for node := range b.nodes {
 	return
 }
 
+func (b *Block) Save(indent int, nodeIDs map[Node]int) string {
+	order, ok := b.nodeOrder()
+	if !ok {
+		Println("cyclic!")
+		return ""
+	}
+	s := tabs(indent) + "\\"
+	indent++
+	for _, node := range order {
+		nodeID++
+		nodeIDs[node] = nodeID
+		s += Sprintf("\n%v%v %v", tabs(indent), nodeIDs[node], node.Save(indent, nodeIDs))
+	}
+	for conn := range b.connections {
+		iSrc := -1; for i, src := range conn.src.node.Outputs() { if src == conn.src { iSrc = i; break } }
+		iDst := -1; for i, dst := range conn.dst.node.Inputs() { if dst == conn.dst { iDst = i; break } }
+		s += Sprintf("\n%v- %v %v %v %v", tabs(indent), nodeIDs[conn.src.node], iSrc, nodeIDs[conn.dst.node], iDst)
+	}
+	return s
+}
+
 func (b *Block) Code(indent int, vars map[*Input]string) (s string) {
 	vars, varsCopy := map[*Input]string{}, vars
 	for k, v := range varsCopy { vars[k] = v }
@@ -230,6 +262,33 @@ cx:	for conn := range b.connections {
 		}
 	}
 	return
+}
+
+func (b *Block) Load(s string, indent int, nodes map[int]Node, pkgNames map[string]*PackageInfo) string {
+	_, s = Split2(s, "\n")
+	indent++
+	for len(s) > 0 {
+		i := 0
+		for s[i] == '\t' { i++ }
+		if i < indent { return s }
+		if s[i] == '-' {
+			var line string
+			line, s = Split2(s, "\n")
+			x := Fields(line)
+			srcNodeID, _ := Atoi(x[1])
+			iSrcPut, _ := Atoi(x[2])
+			dstNodeID, _ := Atoi(x[3])
+			iDstPut, _ := Atoi(x[4])
+			conn := b.NewConnection(ZP)
+			nodes[srcNodeID].Outputs()[iSrcPut].ConnectTo(conn)
+			nodes[dstNodeID].Inputs()[iDstPut].ConnectTo(conn)
+		} else {
+			var node Node
+			node, s = LoadNode(b, s, indent, nodes, pkgNames)
+			b.AddNode(node)
+		}
+	}
+	return s
 }
 
 func (b *Block) StartEditing() {
@@ -434,6 +493,7 @@ func (b *Block) KeyPressed(event KeyEvent) {
 				creator.text.TakeKeyboardFocus()
 			case "\"":
 				node := NewStringConstantNode(b)
+				node.text.SetEditable(true)
 				b.AddNode(node)
 				node.MoveCenter(b.Center())
 				node.text.TakeKeyboardFocus()

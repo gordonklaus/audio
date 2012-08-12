@@ -14,10 +14,10 @@ func NewFluxWindow() *FluxWindow {
 	w.Window = NewWindow(w)
 	w.nodeCreator = NewNodeCreator(true)
 	w.SetCentralView(w.nodeCreator)
-	w.nodeCreator.created.Connect(func(n ...interface{}) {
-		switch n[0].(type) {
+	w.nodeCreator.created.Connect(func(info ...interface{}) {
+		switch info := info[0].(type) {
 		case *FunctionInfo:
-			w.SetCentralView(NewFunction())
+			w.SetCentralView(NewFunction(info))
 		default:
 			w.SetCentralView(w.nodeCreator)
 			w.nodeCreator.text.TakeKeyboardFocus()

@@ -73,12 +73,17 @@ func init() {
 			}
 			rootPackageInfo.subPackages = append(rootPackageInfo.subPackages, subPackageInfo.subPackages...)
 		}
+		Sort(rootPackageInfo.subPackages, "Name")
 		for { packageInfo <- rootPackageInfo }
 	}()
 }
 
 func GetPackageInfo() *PackageInfo {
 	return <-packageInfo
+}
+
+func FindPackageInfo(path string) *PackageInfo {
+	return GetPackageInfo().FindPackageInfo(path)
 }
 
 type Info interface {
@@ -282,6 +287,15 @@ func (p *PackageInfo) findTypeInfo(fields *ast.FieldList) TypeInfo {
 			if typeInfo.Name() == typeID.Name {
 				return typeInfo
 			}
+		}
+	}
+	return nil
+}
+func (p *PackageInfo) FindPackageInfo(path string) *PackageInfo {
+	if path == p.buildPackage.ImportPath { return p }
+	for _, pkg := range p.subPackages {
+		if info := pkg.FindPackageInfo(path); info != nil {
+			return info
 		}
 	}
 	return nil
