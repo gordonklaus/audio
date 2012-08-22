@@ -161,6 +161,12 @@ func LoadNode(b *Block, s string, indent int, nodes map[int]Node, pkgNames map[s
 		text := fields[1]
 		strNode.text.SetText(text[1:len(text) - 1])
 		node = strNode
+	} else if fields[1] == "\\in" {
+		for n := range b.nodes {
+			if _, ok := n.(*InputNode); ok {
+				node = n
+			}
+		}
 	} else if fields[1] == "if" {
 		node, rest = LoadIfNode(s, indent, b, nodes, pkgNames)
 	} else {
@@ -229,4 +235,3 @@ func (n ConstantNode) Save(int, map[Node]int) string {
 func (n ConstantNode) Code(int, map[*Input]string, string) string {
 	return Sprintf(`"%v"`, n.text.GetText())
 }
-

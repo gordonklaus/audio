@@ -231,23 +231,7 @@ func (p *PackageInfo) load() {
 					}
 				}
 			case *ast.FuncDecl:
-				functionInfo := &FunctionInfo{InfoBase:InfoBase{decl.Name.Name, nil}}
-				for _, field := range decl.Type.Params.List {
-					for _, name := range field.Names {
-						functionInfo.parameters = append(functionInfo.parameters, ValueInfo{InfoBase{name.Name, nil}, typeName(field.Type), false})
-					}
-				}
-				if results := decl.Type.Results; results != nil {
-					for _, field := range results.List {
-						if field.Names == nil {
-							functionInfo.results = append(functionInfo.results, ValueInfo{InfoBase{"", nil}, typeName(field.Type), false})
-						} else {
-							for _, name := range field.Names {
-								functionInfo.results = append(functionInfo.results, ValueInfo{InfoBase{name.Name, nil}, typeName(field.Type), false})
-							}
-						}
-					}
-				}
+				functionInfo := NewFunctionInfo(decl.Name.Name, decl.Type)
 				if recv := decl.Recv; recv != nil {
 					if typeInfo := p.findTypeInfo(recv); typeInfo != nil {
 						functionInfo.parent = typeInfo
@@ -418,6 +402,26 @@ type FunctionInfo struct {
 	InfoBase
 	parameters []ValueInfo
 	results []ValueInfo
+}
+func getFields(f []*ast.Field) (v []ValueInfo) {
+	for _, field := range f {
+		if len(field.Names) > 0 {
+			for _, name := range field.Names {
+				v = append(v, ValueInfo{InfoBase{name.Name, nil}, typeName(field.Type), false})
+			}
+		} else {
+			v = append(v, ValueInfo{InfoBase{"", nil}, typeName(field.Type), false})
+		}
+	}
+	return
+}
+func NewFunctionInfo(name string, tp *ast.FuncType) *FunctionInfo {
+	f := &FunctionInfo{InfoBase:InfoBase{name, nil}}
+	f.parameters = getFields(tp.Params.List)
+	if tp.Results != nil {
+		f.results = getFields(tp.Results.List)
+	}
+	return f
 }
 func (FunctionInfo) AddChild(info Info) { panic("functions can't have children") }
 func (f FunctionInfo) FluxSourcePath() string {
