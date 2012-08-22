@@ -1,6 +1,7 @@
 #include <PxPhysicsAPI.h>
 #include "scene.h"
 #include "physics.hpp"
+#include "geometry.hpp"
 
 using namespace physx;
 
@@ -24,8 +25,8 @@ void* newScene() {
 	return scene;
 }
 
-void* Scene_newDynamicActor(void* s, float* pos) {
-	PxRigidDynamic* a = physics->createRigidDynamic(PxTransform(*((PxVec3*)pos)));
+void* Scene_newDynamicActor(void* s, Transform pose) {
+	PxRigidDynamic* a = physics->createRigidDynamic(t2P(pose));
 	((PxScene*)s)->addActor(*a);
 	return a;
 }
