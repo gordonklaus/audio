@@ -50,6 +50,7 @@ func (b *Block) AddNode(node Node) {
 		b.AddChild(node)
 		b.nodes[node] = true
 		if node, ok := node.(interface{Package()*PackageInfo}); ok {
+			// TODO:  not for methods
 			b.Outermost().function.AddPackageRef(node.Package())
 		}
 	}
@@ -201,13 +202,14 @@ func (b *Block) Code(indent int, vars map[*Input]string) (s string) {
 		Println("cyclic!")
 		return
 	}
+	pkg := b.Outermost().function.pkg()
 cx:	for conn := range b.connections {
 		if _, ok := vars[conn.dst]; ok { continue }
 		for block := conn.src.node.Block().Outer(); block != b; block = block.Outer() {
 			if block == nil { continue cx }
 		}
 		name := newVarName()
-		s += Sprintf("%vvar %v %v\n", tabs(indent), name, conn.dst.info.typeName)
+		s += Sprintf("%vvar %v %v\n", tabs(indent), name, qualifiedName(conn.dst.info.typ, pkg))
 		vars[conn.dst] = name
 	}
 	for _, node := range order {
@@ -221,7 +223,7 @@ cx:	for conn := range b.connections {
 				} else {
 					// INSTEAD:  name = "*new(typeName)"  or zero literal
 					name = newVarName()
-					s += Sprintf("%vvar %v %v\n", tabs(indent), name, input.info.typeName)
+					s += Sprintf("%vvar %v %v\n", tabs(indent), name, qualifiedName(input.info.typ, pkg))
 				}
 				inputs = append(inputs, name)
 			}

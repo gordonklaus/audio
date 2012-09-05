@@ -16,7 +16,7 @@ func NewFluxWindow() *FluxWindow {
 	w.SetCentralView(w.browser)
 	w.browser.created.Connect(func(info ...interface{}) {
 		switch info := info[0].(type) {
-		case *FunctionInfo:
+		case *FuncInfo:
 			w.SetCentralView(NewFunction(info))
 		default:
 			w.SetCentralView(w.browser)

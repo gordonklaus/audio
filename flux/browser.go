@@ -64,9 +64,9 @@ func getTextColor(info Info, alpha float64) Color {
 	switch info.(type) {
 	case *PackageInfo:
 		return Color{1, 1, 1, alpha}
-	case TypeInfo:
+	case *NamedType:
 		return Color{.6, 1, .6, alpha}
-	case *FunctionInfo:
+	case *FuncInfo:
 		return Color{1, .6, .6, alpha}
 	case *ValueInfo:
 		return Color{.6, .6, 1, alpha}
@@ -91,7 +91,7 @@ func (b Browser) filteredInfos() (infos []Info) {
 		}
 	case typesOnly:
 		for _, child := range b.currentInfo.Children() {
-			switch child.(type) { case *PackageInfo, TypeInfo: infos = append(infos, child) }
+			switch child.(type) { case *PackageInfo, *NamedType: infos = append(infos, child) }
 		}
 	}
 	return
@@ -118,7 +118,7 @@ func (b *Browser) update() {
 			if child.Name() >= b.newInfo.Name() {
 				switch child.(type) {
 				case *PackageInfo: if _, ok := b.newInfo.(*PackageInfo); !ok { continue }
-				case *FunctionInfo: if _, ok := b.newInfo.(*FunctionInfo); !ok { continue }
+				case *FuncInfo: if _, ok := b.newInfo.(*FuncInfo); !ok { continue }
 				default: continue
 				}
 				newIndex = i
@@ -260,9 +260,9 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 				srcDirs := build.Default.SrcDirs()
 				info.buildPackage.Dir = Sprintf("%v/%v", srcDirs[len(srcDirs) - 1], info.name)
 				if err := os.Mkdir(info.FluxSourcePath(), 0755); err != nil { Println(err) }
-			case TypeInfo:
+			case *NamedType:
 				if err := WriteFile(info.FluxSourcePath(), []byte("type"), 0644); err != nil { Println(err) }
-			case *FunctionInfo:
+			case *FuncInfo:
 				NewFunction(info)
 			}
 			
@@ -282,7 +282,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 	case KeyRight:
 		if b.newInfo == nil {
 			switch info := b.currentActiveInfo().(type) {
-			case *PackageInfo, TypeInfo:
+			case *PackageInfo, *NamedType:
 				b.currentInfo = info
 				b.activeIndices[0], b.currentActiveIndex = 0, 0
 			
@@ -306,12 +306,12 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 	default:
 		_, inPkg := b.currentInfo.(*PackageInfo)
-		_, inType := b.currentInfo.(TypeInfo)
+		_, inType := b.currentInfo.(*NamedType)
 		if event.Ctrl && b.mode != typesOnly && b.newInfo == nil && (inPkg || inType && event.Text == "3") {
 			switch event.Text {
 			case "1": b.newInfo = &PackageInfo{}
-			case "2": b.newInfo = &TypeInfoBase{}
-			case "3": b.newInfo = &FunctionInfo{}
+			case "2": b.newInfo = &NamedType{}
+			case "3": b.newInfo = &FuncInfo{}
 			case "4": b.newInfo = &ValueInfo{}
 			case "5": b.newInfo = &ValueInfo{constant:true}
 			default: t.Text.KeyPressed(event); return

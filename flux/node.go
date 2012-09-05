@@ -145,9 +145,9 @@ func (n NodeBase) Paint() {
 
 func NewNode(info Info, block *Block) Node {
 	switch info := info.(type) {
-	// case StringTypeInfo:
+	// case StringType:
 	// 	return NewBasicLiteralNode(info)
-	case *FunctionInfo:
+	case *FuncInfo:
 		return NewFunctionNode(info, block)
 	}
 	return nil
@@ -174,7 +174,7 @@ func LoadNode(b *Block, s string, indent int, nodes map[int]Node, pkgNames map[s
 		for _, info := range pkgNames[pkgName].Children() {
 			if info.Name() != name { continue }
 			switch info := info.(type) {
-			case *FunctionInfo:
+			case *FuncInfo:
 				node = NewFunctionNode(info, b)
 			default:
 				panic("not yet implemented")
@@ -188,18 +188,18 @@ func LoadNode(b *Block, s string, indent int, nodes map[int]Node, pkgNames map[s
 
 type FunctionNode struct {
 	*NodeBase
-	info *FunctionInfo
+	info *FuncInfo
 }
-func NewFunctionNode(info *FunctionInfo, block *Block) *FunctionNode {
+func NewFunctionNode(info *FuncInfo, block *Block) *FunctionNode {
 	n := &FunctionNode{info:info}
 	n.NodeBase = NewNodeBase(n, block)
 	n.text.SetText(info.name)
-	for _, parameter := range info.parameters {
+	for _, parameter := range info.typ.parameters {
 		p := NewInput(n, parameter)
 		n.AddChild(p)
 		n.inputs = append(n.inputs, p)
 	}
-	for _, result := range info.results {
+	for _, result := range info.typ.results {
 		p := NewOutput(n, result)
 		n.AddChild(p)
 		n.outputs = append(n.outputs, p)

@@ -2,25 +2,32 @@ package main
 
 import (
 	."code.google.com/p/gordon-go/util"
-	"fmt"
+	"go/ast"
 	"go/build"
 	"go/token"
-	"go/parser"
-	"go/ast"
 	"os"
+	"fmt"
 	."log"
 	"path/filepath"
 	."strings"
+	."strconv"
 	"unicode"
-	"unsafe"
 )
+
+func GetPackageInfo() *PackageInfo {
+	return <-packageInfo
+}
+
+func FindPackageInfo(path string) *PackageInfo {
+	return GetPackageInfo().FindPackageInfo(path)
+}
 
 var packageInfo chan *PackageInfo = make(chan *PackageInfo)
 
 func getPackageInfo(pathStr string) *PackageInfo {
 	packageInfo := newPackageInfo(filepath.Base(pathStr))
 	
-	pkg, err := build.ImportDir(pathStr, build.FindOnly & build.AllowBinary)
+	pkg, err := build.ImportDir(pathStr, 0)
 	packageInfo.buildPackage.Dir = pathStr
 	if err != nil {
 		if _, ok := err.(*build.NoGoError); !ok { Println(err) }
@@ -31,7 +38,7 @@ func getPackageInfo(pathStr string) *PackageInfo {
 	if file, err := os.Open(pathStr); err == nil {
 		if fileInfos, err := file.Readdir(-1); err == nil {
 			for _, fileInfo := range fileInfos {
-				if fileInfo.IsDir() && unicode.IsLetter(([]rune(fileInfo.Name()))[0]) && !HasSuffix(fileInfo.Name(), ".fluxmethods") {
+				if fileInfo.IsDir() && unicode.IsLetter(([]rune(fileInfo.Name()))[0]) && !HasSuffix(fileInfo.Name(), methodDirSuffix) {
 					subPackageInfo := getPackageInfo(filepath.Join(pathStr, fileInfo.Name()))
 					subPackageInfo.parent = packageInfo
 					packageInfo.subPackages = append(packageInfo.subPackages, subPackageInfo)
@@ -46,26 +53,6 @@ func getPackageInfo(pathStr string) *PackageInfo {
 func init() {
 	go func() {
 		rootPackageInfo := newPackageInfo("")
-		rootPackageInfo.types = append(rootPackageInfo.types, BoolTypeInfo{newTypeInfoBase("bool", rootPackageInfo)},
-															IntTypeInfo{newTypeInfoBase("int", rootPackageInfo), true, 8*int(unsafe.Sizeof(int(0)))},
-															IntTypeInfo{newTypeInfoBase("int8", rootPackageInfo), true, 8},
-															IntTypeInfo{newTypeInfoBase("int16", rootPackageInfo), true, 16},
-															IntTypeInfo{newTypeInfoBase("int32", rootPackageInfo), true, 32},
-															IntTypeInfo{newTypeInfoBase("int64", rootPackageInfo), true, 64},
-															IntTypeInfo{newTypeInfoBase("uint", rootPackageInfo), false, 8*int(unsafe.Sizeof(uint(0)))},
-															IntTypeInfo{newTypeInfoBase("uint8", rootPackageInfo), false, 8},
-															IntTypeInfo{newTypeInfoBase("uint16", rootPackageInfo), false, 16},
-															IntTypeInfo{newTypeInfoBase("uint32", rootPackageInfo), false, 32},
-															IntTypeInfo{newTypeInfoBase("uint64", rootPackageInfo), false, 64},
-															IntTypeInfo{newTypeInfoBase("uintptr", rootPackageInfo), false, 8*int(unsafe.Sizeof(uintptr(0)))},
-															FloatTypeInfo{newTypeInfoBase("float32", rootPackageInfo), 32},
-															FloatTypeInfo{newTypeInfoBase("float64", rootPackageInfo), 64},
-															ComplexTypeInfo{newTypeInfoBase("complex64", rootPackageInfo), 64},
-															ComplexTypeInfo{newTypeInfoBase("complex128", rootPackageInfo), 128},
-															IntTypeInfo{newTypeInfoBase("byte", rootPackageInfo), false, 8},
-															IntTypeInfo{newTypeInfoBase("rune", rootPackageInfo), true, 32},
-															StringTypeInfo{newTypeInfoBase("string", rootPackageInfo)},
-										)
 		for _, srcDir := range build.Default.SrcDirs() {
 			subPackageInfo := getPackageInfo(srcDir)
 			for _, p := range subPackageInfo.subPackages {
@@ -76,14 +63,6 @@ func init() {
 		Sort(rootPackageInfo.subPackages, "Name")
 		for { packageInfo <- rootPackageInfo }
 	}()
-}
-
-func GetPackageInfo() *PackageInfo {
-	return <-packageInfo
-}
-
-func FindPackageInfo(path string) *PackageInfo {
-	return GetPackageInfo().FindPackageInfo(path)
 }
 
 type Info interface {
@@ -111,8 +90,8 @@ func (i InfoBase) FluxSourcePath() string { return fmt.Sprintf("%v/%v.flux", i.p
 type PackageInfo struct {
 	InfoBase
 	buildPackage build.Package
-	types []TypeInfo
-	functions []*FunctionInfo
+	types []*NamedType
+	functions []*FuncInfo
 	variables []*ValueInfo
 	constants []*ValueInfo
 	subPackages []*PackageInfo
@@ -138,143 +117,217 @@ func (p *PackageInfo) AddChild(info Info) {
 	case *PackageInfo:
 		for i, pkg := range p.subPackages { if pkg.name > info.name { index = i; break } }
 		p.subPackages = append(p.subPackages[:index], append([]*PackageInfo{info}, p.subPackages[index:]...)...)
-	case *FunctionInfo:
+	case *FuncInfo:
 		for i, f := range p.functions { if f.name > info.name { index = i; break } }
-		p.functions = append(p.functions[:index], append([]*FunctionInfo{info}, p.functions[index:]...)...)
+		p.functions = append(p.functions[:index], append([]*FuncInfo{info}, p.functions[index:]...)...)
 	default:
 		panic("not yet implemented")
 	}
 }
 func (p PackageInfo) FluxSourcePath() string { return p.buildPackage.Dir }
 
-func typeName(expr ast.Expr) string {
-	switch typ := expr.(type) {
-	case nil:
-		return "<untyped>"
-	case *ast.Ident:
-		return typ.Name
-	case *ast.SelectorExpr:
-		return typeName(typ.X) + typ.Sel.Name
-	case *ast.StarExpr:
-		return "*" + typeName(typ.X)
-	case *ast.ArrayType:
-		return "[]" + typeName(typ.Elt)
-	case *ast.Ellipsis:
-		return "..." + typeName(typ.Elt)
-	case *ast.StructType:
-		return "struct{with some fields}"
-	case *ast.InterfaceType:
-		return "interface{with some methods}"
-	case *ast.MapType:
-		return "map[" + typeName(typ.Key) + "]" + typeName(typ.Value)
-	case *ast.ChanType:
-		s := ""
-		switch typ.Dir {
-		case ast.SEND: s = "chan<- "
-		case ast.RECV: s = "<-chan "
-		case ast.SEND | ast.RECV: s = "chan "
-		}
-		return s + typeName(typ.Value)
-	case *ast.FuncType:
-		return "func(with) args"
-	}
-	Panicf("other type!:  %#v", expr)
-	return ""
-}
-
 func (p *PackageInfo) load() {
 	if p.loaded { return }
 	p.loaded = true
 	
-	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, p.buildPackage.Dir, func(fileInfo os.FileInfo) bool {
-		for _, file := range append(p.buildPackage.GoFiles, p.buildPackage.CgoFiles...) {
-			if fileInfo.Name() == file {
-				return true
-			}
-		}
-		return false
-	}, parser.ParseComments)
-	if err != nil || len(pkgs) == 0 { return }
+	// "builtin" contains invalid Go code.  (move this line earlier, so builtin doesn't even show up in the list)
+	if p.buildPackage.ImportPath == "builtin" { return }
 	
-	pkg := pkgs[p.buildPackage.Name]
-	if !ast.PackageExports(pkg) { return }
-	for _, file := range pkg.Files {
-		for _, decl := range file.Decls {
-			if genDecl, ok := decl.(*ast.GenDecl); ok {
-				for _, spec := range genDecl.Specs {
-					switch genDecl.Tok {
-					case token.TYPE:
-						p.types = append(p.types, NewTypeInfo(spec.(*ast.TypeSpec), p))
-					}
-				}
-			}
+	pkg, err := getPackage(p.buildPackage.ImportPath)
+	if err != nil { Println(err); return }
+	
+	for id := range pkg.Imports {
+		FindPackageInfo(id).load()
+	}
+	
+	for name, obj := range pkg.Scope.Objects {
+		if _, ok := obj.Decl.(*ast.TypeSpec); ok {
+			obj.Type = newNamedType(name, p)
+		}
+	}
+	for _, obj := range pkg.Scope.Objects {
+		if t, ok := obj.Decl.(*ast.TypeSpec); ok {
+			n := obj.Type.(*NamedType)
+			n.underlying = specUnderlyingType(t.Type)
+			p.types = append(p.types, n)
 		}
 	}
 	Sort(p.types, "Name")
 	for _, file := range pkg.Files {
 		for _, decl := range file.Decls {
-			switch decl := decl.(type) {
-			case *ast.GenDecl:
-				for _, spec := range decl.Specs {
-					switch decl.Tok {
-					case token.CONST:
-						v := spec.(*ast.ValueSpec)
-						for _, name := range v.Names {
-							p.constants = append(p.constants, &ValueInfo{InfoBase{name.Name, p}, typeName(v.Type), true})
-						}
-					case token.VAR:
-						v := spec.(*ast.ValueSpec)
-						for _, name := range v.Names {
-							p.variables = append(p.variables, &ValueInfo{InfoBase{name.Name, p}, typeName(v.Type), false})
-						}
+			if decl, ok := decl.(*ast.GenDecl); ok && decl.Tok == token.CONST {
+				for iota, s := range decl.Specs {
+					spec := s.(*ast.ValueSpec)
+					var typ Type
+					if spec.Type != nil {
+						typ = specType(spec.Type)
 					}
-				}
-			case *ast.FuncDecl:
-				functionInfo := NewFunctionInfo(decl.Name.Name, decl.Type)
-				if recv := decl.Recv; recv != nil {
-					if typeInfo := p.findTypeInfo(recv); typeInfo != nil {
-						functionInfo.parent = typeInfo
-						*typeInfo.Methods() = append(*typeInfo.Methods(), functionInfo)
-					} else {
-						// exported method on an unexported type
-						// TODO:  expose the type (and its exported methods) but don't allow reference to the type name alone
+					for _, name := range spec.Names {
+						if typ == nil {
+							// TODO:  compute value (may be needed for the length of an ArrayType var) and type
+							_ = iota
+							typ = Universe.Lookup("int").Type.(Type)
+						}
+						p.constants = append(p.constants, &ValueInfo{InfoBase{name.Name, p}, typ, true})
 					}
-				} else {
-					functionInfo.parent = p
-					p.functions = append(p.functions, functionInfo)
 				}
 			}
 		}
 	}
 	Sort(p.constants, "Name")
+	for _, file := range pkg.Files {
+		for _, decl := range file.Decls {
+			switch decl := decl.(type) {
+			case *ast.GenDecl:
+				if decl.Tok == token.VAR {
+					for _, s := range decl.Specs {
+						spec := s.(*ast.ValueSpec)
+						var typ Type
+						if spec.Type != nil {
+							typ = specType(spec.Type)
+						}
+						for _, name := range spec.Names {
+							if typ == nil {
+								// TODO:  compute type
+								// typ = exprType(spec.Values[i])
+								typ = Universe.Lookup("int").Type.(Type)
+							}
+							p.variables = append(p.variables, &ValueInfo{InfoBase{name.Name, p}, typ, false})
+						}
+					}
+				}
+			case *ast.FuncDecl:
+				var recv Type
+				if r := decl.Recv; r != nil {
+					recv = specType(r.List[0].Type)
+				}
+				tp := decl.Type
+				f := &FuncInfo{InfoBase{decl.Name.Name, nil}, FuncType{implementsType{}, recv, getFields(tp.Params), getFields(tp.Results)}}
+				if recv != nil {
+					if r, ok := recv.(PointerType); ok {
+						recv = r.element
+					}
+					r := recv.(*NamedType)
+					f.parent = r
+					r.methods = append(r.methods, f)
+				} else {
+					f.parent = p
+					p.functions = append(p.functions, f)
+				}
+			}
+		}
+	}
 	Sort(p.variables, "Name")
-	for _, typeInfo := range p.types {
-		Sort(*typeInfo.Methods(), "Name")
+	for _, t := range p.types {
+		Sort(t.methods, "Name")
 	}
 	Sort(p.functions, "Name")
 }
 
-func exprTypeID(expr ast.Expr) *ast.Ident {
-	switch e := expr.(type) {
-	case *ast.StarExpr:
-		return exprTypeID(e.X)
+func specUnderlyingType(x ast.Expr) Type {
+	switch x := x.(type) {
+	case *ast.ParenExpr:
+		return specUnderlyingType(x.X)
 	case *ast.Ident:
-		return e
-	}
-	return nil
-}
-func (p *PackageInfo) findTypeInfo(fields *ast.FieldList) TypeInfo {
-	if fields.NumFields() == 0 { return nil }
-	if typeID := exprTypeID(fields.List[0].Type); typeID != nil {
-		for _, typeInfo := range p.types {
-			if typeInfo.Name() == typeID.Name {
-				return typeInfo
-			}
+		if spec, ok := x.Obj.Decl.(*ast.TypeSpec); ok {
+			return specUnderlyingType(spec.Type)
+		}
+	case *ast.SelectorExpr:
+		pkgScope := x.X.(*ast.Ident).Obj.Data.(*ast.Scope)
+		objName := x.Sel.Name
+		if spec, ok := pkgScope.Objects[objName].Decl.(*ast.TypeSpec); ok {
+			return specUnderlyingType(spec.Type)
 		}
 	}
+	return specType(x)
+}
+
+func specType(x ast.Expr) Type {
+	switch x := x.(type) {
+	case *ast.ParenExpr:
+		return specType(x.X)
+	case *ast.Ident:
+		return x.Obj.Type.(Type)
+	case *ast.SelectorExpr:
+		pkgScope := x.X.(*ast.Ident).Obj.Data.(*ast.Scope)
+		objName := x.Sel.Name
+		return pkgScope.Objects[objName].Type.(Type)
+	case *ast.StarExpr:
+		return PointerType{element:specType(x.X)}
+	case *ast.ArrayType:
+		if x.Len != nil {
+			return ArrayType{size:intConstValue(x.Len), element:specType(x.Elt)}
+		}
+		return SliceType{element:specType(x.Elt)}
+	case *ast.Ellipsis:
+		return SliceType{element:specType(x.Elt)}
+	case *ast.MapType:
+		return MapType{key:specType(x.Key), value:specType(x.Value)}
+	case *ast.ChanType:
+		return ChanType{send:x.Dir&ast.SEND != 0, recv:x.Dir&ast.RECV != 0, element:specType(x.Value)}
+	case *ast.FuncType:
+		return FuncType{parameters:getFields(x.Params), results:getFields(x.Results)}
+	case *ast.InterfaceType:
+		t := InterfaceType{}
+		for _, m := range x.Methods.List {
+			switch field := m.Type.(type) {
+			case *ast.FuncType:
+				t.methods = append(t.methods, FuncInfo{InfoBase{m.Names[0].Name, nil}, FuncType{implementsType{}, nil, getFields(field.Params), getFields(field.Results)}})
+			case *ast.Ident:
+				emb, ok := field.Obj.Type.(*NamedType).underlying.(InterfaceType)
+				if !ok {
+					emb = specType(field.Obj.Decl.(*ast.TypeSpec).Type).(InterfaceType)
+				}
+				t.methods = append(t.methods, emb.methods...)
+			case *ast.SelectorExpr:
+				pkgScope := field.X.(*ast.Ident).Obj.Data.(*ast.Scope)
+				objName := field.Sel.Name
+				t.methods = append(t.methods, specType(pkgScope.Objects[objName].Decl.(*ast.TypeSpec).Type).(InterfaceType).methods...)
+			default:
+				Panicf("unknown interface field:  %#v\n", field)
+			}
+		}
+		return t
+	case *ast.StructType:
+		// TODO
+		return StructType{}
+	}
+	Panicf("unknown type:  %#v\n", x)
 	return nil
 }
+
+func intConstValue(x ast.Expr) int {
+	switch x := x.(type) {
+	case *ast.ParenExpr:
+		return intConstValue(x.X)
+	case *ast.BasicLit:
+		l, _ := Atoi(x.Value)
+		return l
+	case *ast.Ident:
+		// x.Obj.Data?
+	case *ast.BinaryExpr:
+	case *ast.UnaryExpr:
+	case *ast.CallExpr:
+		// len(...) or Type(...)
+	}
+	Printf("unknown const value:  %#v\n", x)
+	return -1
+}
+
+func getFields(f *ast.FieldList) (v []ValueInfo) {
+	if f == nil { return }
+	for _, field := range f.List {
+		if len(field.Names) > 0 {
+			for _, name := range field.Names {
+				v = append(v, ValueInfo{InfoBase{name.Name, nil}, specType(field.Type), false})
+			}
+		} else {
+			v = append(v, ValueInfo{InfoBase{"", nil}, specType(field.Type), false})
+		}
+	}
+	return
+}
+
 func (p *PackageInfo) FindPackageInfo(path string) *PackageInfo {
 	if path == p.buildPackage.ImportPath { return p }
 	for _, pkg := range p.subPackages {
@@ -285,154 +338,182 @@ func (p *PackageInfo) FindPackageInfo(path string) *PackageInfo {
 	return nil
 }
 
-type TypeInfo interface {
-	Info
-	Methods() *[]*FunctionInfo
+type Type interface { isType() }
+type implementsType struct {}
+func (implementsType) isType() {}
+
+type BasicType struct {
+	implementsType
 }
-type TypeInfoBase struct {
+type PointerType struct {
+	implementsType
+	element Type
+}
+type ArrayType struct {
+	implementsType
+	size int
+	element Type
+}
+type SliceType struct {
+	implementsType
+	element Type
+}
+type MapType struct {
+	implementsType
+	key Type
+	value Type
+}
+type ChanType struct {
+	implementsType
+	send bool
+	recv bool
+	element Type
+}
+type FuncType struct {
+	implementsType
+	receiver Type
+	parameters []ValueInfo
+	results []ValueInfo
+}
+type InterfaceType struct {
+	implementsType
+	methods []FuncInfo
+}
+type StructType struct {
+	implementsType
+	fields []ValueInfo
+}
+type NamedType struct {
+	implementsType
 	InfoBase
-	methods []*FunctionInfo
+	underlying Type
+	methods []*FuncInfo
 }
-func newTypeInfoBase(name string, parent Info) *TypeInfoBase { return &TypeInfoBase{InfoBase{name, parent}, nil} }
-func NewTypeInfo(spec *ast.TypeSpec, parent Info) TypeInfo {
-	switch typ := spec.Type.(type) {
-	// case *ast.Ident:
-	// 	return typ.Name
-	// case *ast.SelectorExpr:
-	// 	return typeName(typ.X) + typ.Sel.Name
-	// case *ast.StarExpr:
-	// 	return "*" + typeName(typ.X)
-	// case *ast.ArrayType:
-	// 	return "[]" + typeName(typ.Elt)
-	// case *ast.Ellipsis:
-	// 	return "..." + typeName(typ.Elt)
-	// case *ast.StructType:
-	// 	return "struct{with some fields}"
-	// case *ast.InterfaceType:
-	// 	return "interface{with some methods}"
-	// case *ast.MapType:
-	// 	return "map[" + typeName(typ.Key) + "]" + typeName(typ.Value)
-	// case *ast.ChanType:
-	// 	s := ""
-	// 	switch typ.Dir {
-	// 	case ast.SEND: s = "chan<- "
-	// 	case ast.RECV: s = "<-chan "
-	// 	case ast.SEND | ast.RECV: s = "chan "
-	// 	}
-	// 	return s + typeName(typ.Value)
-	// case *ast.FuncType:
-	// 	return "func(with) args"
-	}
-	return newTypeInfoBase(spec.Name.Name, parent)
-	Panicf("other type!:  %#v", spec)
-	return nil
-}
-func (t TypeInfoBase) Children() []Info {
+
+func newNamedType(name string, parent Info) *NamedType { return &NamedType{InfoBase:InfoBase{name, parent}} }
+func (t NamedType) Children() []Info {
 	var children []Info
 	for _, m := range t.methods { children = append(children, m) }
 	return children
 }
-func (t *TypeInfoBase) AddChild(info Info) {
+func (t *NamedType) AddChild(info Info) {
 	info.SetParent(t)
-	if info, ok := info.(*FunctionInfo); ok {
+	if info, ok := info.(*FuncInfo); ok {
 		index := 0
 		for i, f := range t.methods { if f.name > info.name { index = i; break } }
-		t.methods = append(t.methods[:index], append([]*FunctionInfo{info}, t.methods[index:]...)...)
+		t.methods = append(t.methods[:index], append([]*FuncInfo{info}, t.methods[index:]...)...)
 	} else {
 		panic("types can only contain functions")
 	}
 }
-func (t *TypeInfoBase) Methods() *[]*FunctionInfo { return &t.methods }
 
-type BoolTypeInfo struct { *TypeInfoBase }
-type IntTypeInfo struct {
-	*TypeInfoBase
-	signed bool
-	bits int
-}
-type FloatTypeInfo struct {
-	*TypeInfoBase
-	bits int
-}
-type ComplexTypeInfo struct {
-	*TypeInfoBase
-	bits int
-}
-type StringTypeInfo struct { *TypeInfoBase }
-type ArrayTypeInfo struct {
-	*TypeInfoBase
-	size int
-	element TypeInfo
-}
-type ChanTypeInfo struct {
-	*TypeInfoBase
-	send bool
-	recv bool
-	element TypeInfo
-}
-type FunctionTypeInfo struct {
-	*TypeInfoBase
-	receiver TypeInfo
-	inputs []TypeInfo
-	outputs []TypeInfo
-}
-type InterfaceTypeInfo struct {
-	*TypeInfoBase
-	methods []FunctionTypeInfo
-}
-type MapTypeInfo struct {
-	*TypeInfoBase
-	key TypeInfo
-	value TypeInfo
-}
-type PointerTypeInfo struct {
-	*TypeInfoBase
-	element TypeInfo
-}
-type SliceTypeInfo struct {
-	*TypeInfoBase
-	element TypeInfo
-}
-type StructTypeInfo struct {
-	*TypeInfoBase
-	fields []ValueInfo
-}
-
-type FunctionInfo struct {
-	InfoBase
-	parameters []ValueInfo
-	results []ValueInfo
-}
-func getFields(f []*ast.Field) (v []ValueInfo) {
-	for _, field := range f {
-		if len(field.Names) > 0 {
-			for _, name := range field.Names {
-				v = append(v, ValueInfo{InfoBase{name.Name, nil}, typeName(field.Type), false})
-			}
-		} else {
-			v = append(v, ValueInfo{InfoBase{"", nil}, typeName(field.Type), false})
+func typeString(t Type) string {
+	switch t := t.(type) {
+	case PointerType:
+		return "*" + typeString(t.element)
+	case ArrayType:
+		return fmt.Sprintf("[%d]%s", t.size, typeString(t.element))
+	case SliceType:
+		return "[]" + typeString(t.element)
+	case MapType:
+		return fmt.Sprintf("[%s]%s", typeString(t.key), typeString(t.value))
+	case ChanType:
+		s := ""
+		switch {
+		case t.send && t.recv:
+			s = "chan "
+		case t.send:
+			s = "chan<- "
+		case t.recv:
+			s = "<-chan "
 		}
+		return s + typeString(t.element)
+	case FuncType:
+		return "func" + signature(t)
+	case InterfaceType:
+		s := "interface{"
+		for i, m := range t.methods {
+			if i > 0 {
+				s += "; "
+			}
+			s += m.name + signature(m.typ)
+		}
+		return s + "}"
+	case StructType:
+		s := "struct{"
+		for i, f := range t.fields {
+			if i > 0 {
+				s += "; "
+			}
+			if f.name != "" {
+				s += f.name + " "
+			}
+			s += typeString(f.typ)
+		}
+		return s + "}"
+	case *NamedType:
+		return t.name
 	}
-	return
+	panic(fmt.Sprintf("no string for type %#v\n", t))
+	return ""
 }
-func NewFunctionInfo(name string, tp *ast.FuncType) *FunctionInfo {
-	f := &FunctionInfo{InfoBase:InfoBase{name, nil}}
-	f.parameters = getFields(tp.Params.List)
-	if tp.Results != nil {
-		f.results = getFields(tp.Results.List)
+
+func signature(f FuncType) string {
+	s := paramsString(f.parameters) + " "
+	if len(f.results) == 1 && f.results[0].name == "" {
+		return s + typeString(f.results[0].typ)
 	}
-	return f
+	return s + paramsString(f.results)
 }
-func (FunctionInfo) AddChild(info Info) { panic("functions can't have children") }
-func (f FunctionInfo) FluxSourcePath() string {
-	if _, ok := f.parent.(TypeInfo); ok {
-		return fmt.Sprintf("%vmethods/%v.flux", f.parent.FluxSourcePath(), f.name)
+
+func paramsString(params []ValueInfo) string {
+	s := "("
+	for i, p := range params {
+		if i > 0 {
+			s += ", "
+		}
+		if p.name != "" {
+			s += p.name + " "
+		}
+		s += typeString(p.typ)
+	}
+	return s + ")"
+}
+
+type FuncInfo struct {
+	InfoBase
+	typ FuncType
+}
+func (FuncInfo) AddChild(info Info) { panic("functions can't have children") }
+const methodDirSuffix = ".fluxmethods"
+func (f FuncInfo) FluxSourcePath() string {
+	if _, ok := f.parent.(*NamedType); ok {
+		return fmt.Sprintf("%s%s/%s.flux", f.parent.FluxSourcePath(), methodDirSuffix, f.name)
 	}
 	return f.InfoBase.FluxSourcePath()
 }
 
 type ValueInfo struct {
 	InfoBase
-	typeName string
+	typ Type
 	constant bool
+}
+
+func qualifiedName(x interface{}, pkg *PackageInfo) string {
+	if x, ok := x.(Info); ok {
+		if p := x.Parent(); p != nil {
+			s := ""
+			println(p, pkg)
+			if p != pkg {
+				s = p.Name() + "."
+			}
+			return s + x.Name()
+		}
+	}
+	if x, ok := x.(Type); ok {
+		// TODO:  pass pkg to typeString -- nested names may need to be qualified
+		return typeString(x)
+	}
+	panic(fmt.Sprintf("can't qualify %#v\n", x))
+	return ""
 }
