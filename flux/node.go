@@ -5,7 +5,6 @@ import (
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
 	."math"
-	."fmt"
 	."strconv"
 	."strings"
 )
@@ -18,8 +17,6 @@ type Node interface {
 	Outputs() []*Output
 	InputConnections() []*Connection
 	OutputConnections() []*Connection
-	Save(indent int, nodeIDs map[Node]int) string
-	Code(indent int, vars map[*Input]string, inputs string) string
 }
 
 type nodeText struct {
@@ -158,8 +155,8 @@ func LoadNode(b *Block, s string, indent int, nodes map[int]Node, pkgNames map[s
 	fields := Fields(line)
 	if fields[1][0] == '"' {
 		strNode := NewStringConstantNode(b)
-		text := fields[1]
-		strNode.text.SetText(text[1:len(text) - 1])
+		text, _ := Unquote(fields[1])
+		strNode.text.SetText(text)
 		node = strNode
 	} else if fields[1] == "\\in" {
 		for n := range b.nodes {
@@ -209,14 +206,6 @@ func NewFunctionNode(info *FuncInfo, block *Block) *FunctionNode {
 	return n
 }
 func (n FunctionNode) Package() *PackageInfo { return n.info.Parent().(*PackageInfo) }
-func (n FunctionNode) Save(int, map[Node]int) string {
-	pkgName := n.Package().Name() // TODO:  handle name collisions
-	return Sprintf("%v.%v", pkgName, n.info.Name())
-}
-func (n FunctionNode) Code(_ int, _ map[*Input]string, inputs string) string {
-	pkgName := n.Package().Name() // TODO:  handle name collisions
-	return Sprintf("%v.%v(%v)", pkgName, n.info.Name(), inputs)
-}
 
 type ConstantNode struct { *NodeBase }
 func NewStringConstantNode(block *Block) *ConstantNode {
@@ -227,11 +216,4 @@ func NewStringConstantNode(block *Block) *ConstantNode {
 	n.outputs = []*Output{p}
 	n.reform()
 	return n
-}
-
-func (n ConstantNode) Save(int, map[Node]int) string {
-	return Sprintf(`"%v"`, n.text.GetText())
-}
-func (n ConstantNode) Code(int, map[*Input]string, string) string {
-	return Sprintf(`"%v"`, n.text.GetText())
 }

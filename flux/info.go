@@ -197,19 +197,17 @@ func (p *PackageInfo) load() {
 					}
 				}
 			case *ast.FuncDecl:
-				var recv Type
+				f := &FuncInfo{InfoBase{decl.Name.Name, nil}, nil, specType(decl.Type).(FuncType)}
 				if r := decl.Recv; r != nil {
-					recv = specType(r.List[0].Type)
-				}
-				tp := decl.Type
-				f := &FuncInfo{InfoBase{decl.Name.Name, nil}, FuncType{implementsType{}, recv, getFields(tp.Params), getFields(tp.Results)}}
-				if recv != nil {
+					// TODO:  FuncType of a method should include the receiver as first argument
+					recv := specType(r.List[0].Type)
+					f.receiver = recv
 					if r, ok := recv.(PointerType); ok {
 						recv = r.element
 					}
-					r := recv.(*NamedType)
-					f.parent = r
-					r.methods = append(r.methods, f)
+					nr := recv.(*NamedType)
+					f.parent = nr
+					nr.methods = append(nr.methods, f)
 				} else {
 					f.parent = p
 					p.functions = append(p.functions, f)
@@ -272,7 +270,7 @@ func specType(x ast.Expr) Type {
 		for _, m := range x.Methods.List {
 			switch field := m.Type.(type) {
 			case *ast.FuncType:
-				t.methods = append(t.methods, FuncInfo{InfoBase{m.Names[0].Name, nil}, FuncType{implementsType{}, nil, getFields(field.Params), getFields(field.Results)}})
+				t.methods = append(t.methods, FuncInfo{InfoBase{m.Names[0].Name, nil}, nil, specType(field).(FuncType)})
 			case *ast.Ident:
 				emb, ok := field.Obj.Type.(*NamedType).underlying.(InterfaceType)
 				if !ok {
@@ -371,7 +369,6 @@ type ChanType struct {
 }
 type FuncType struct {
 	implementsType
-	receiver Type
 	parameters []ValueInfo
 	results []ValueInfo
 }
@@ -407,81 +404,9 @@ func (t *NamedType) AddChild(info Info) {
 	}
 }
 
-func typeString(t Type) string {
-	switch t := t.(type) {
-	case PointerType:
-		return "*" + typeString(t.element)
-	case ArrayType:
-		return fmt.Sprintf("[%d]%s", t.size, typeString(t.element))
-	case SliceType:
-		return "[]" + typeString(t.element)
-	case MapType:
-		return fmt.Sprintf("[%s]%s", typeString(t.key), typeString(t.value))
-	case ChanType:
-		s := ""
-		switch {
-		case t.send && t.recv:
-			s = "chan "
-		case t.send:
-			s = "chan<- "
-		case t.recv:
-			s = "<-chan "
-		}
-		return s + typeString(t.element)
-	case FuncType:
-		return "func" + signature(t)
-	case InterfaceType:
-		s := "interface{"
-		for i, m := range t.methods {
-			if i > 0 {
-				s += "; "
-			}
-			s += m.name + signature(m.typ)
-		}
-		return s + "}"
-	case StructType:
-		s := "struct{"
-		for i, f := range t.fields {
-			if i > 0 {
-				s += "; "
-			}
-			if f.name != "" {
-				s += f.name + " "
-			}
-			s += typeString(f.typ)
-		}
-		return s + "}"
-	case *NamedType:
-		return t.name
-	}
-	panic(fmt.Sprintf("no string for type %#v\n", t))
-	return ""
-}
-
-func signature(f FuncType) string {
-	s := paramsString(f.parameters) + " "
-	if len(f.results) == 1 && f.results[0].name == "" {
-		return s + typeString(f.results[0].typ)
-	}
-	return s + paramsString(f.results)
-}
-
-func paramsString(params []ValueInfo) string {
-	s := "("
-	for i, p := range params {
-		if i > 0 {
-			s += ", "
-		}
-		if p.name != "" {
-			s += p.name + " "
-		}
-		s += typeString(p.typ)
-	}
-	return s + ")"
-}
-
 type FuncInfo struct {
 	InfoBase
+	receiver Type
 	typ FuncType
 }
 func (FuncInfo) AddChild(info Info) { panic("functions can't have children") }
@@ -497,23 +422,4 @@ type ValueInfo struct {
 	InfoBase
 	typ Type
 	constant bool
-}
-
-func qualifiedName(x interface{}, pkg *PackageInfo) string {
-	if x, ok := x.(Info); ok {
-		if p := x.Parent(); p != nil {
-			s := ""
-			println(p, pkg)
-			if p != pkg {
-				s = p.Name() + "."
-			}
-			return s + x.Name()
-		}
-	}
-	if x, ok := x.(Type); ok {
-		// TODO:  pass pkg to typeString -- nested names may need to be qualified
-		return typeString(x)
-	}
-	panic(fmt.Sprintf("can't qualify %#v\n", x))
-	return ""
 }

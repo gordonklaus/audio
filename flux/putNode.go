@@ -15,9 +15,6 @@ func NewInputNode(block *Block) *InputNode {
 	return n
 }
 
-func (n InputNode) Save(int, map[Node]int) string { return "\\in" }
-func (n InputNode) Code(int, map[*Input]string, string) string { return "" }
-
 func (n *InputNode) KeyPressed(event KeyEvent) {
 	if event.Text == "," {
 		browser := NewBrowser(typesOnly)

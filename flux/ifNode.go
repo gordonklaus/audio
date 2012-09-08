@@ -1,7 +1,6 @@
 package main
 
 import (
-	."fmt"
 	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
@@ -57,23 +56,6 @@ func (n IfNode) InputConnections() []*Connection {
 
 func (n IfNode) OutputConnections() []*Connection {
 	return append(n.falseBlock.OutputConnections(), n.trueBlock.OutputConnections()...)
-}
-
-func (n IfNode) Save(indent int, nodeIDs map[Node]int) string {
-	return Sprintf("if\n%v\n%v", n.trueBlock.Save(indent, nodeIDs), n.falseBlock.Save(indent, nodeIDs))
-}
-func (n IfNode) Code(indent int, vars map[*Input]string, _ string) string {
-	name := "false"
-	if len(n.input.connections) > 0 {
-		name = vars[n.input]
-	}
-	s := Sprintf("%vif %v {\n", tabs(indent), name)
-	s += n.trueBlock.Code(indent + 1, vars)
-	if s2 := n.falseBlock.Code(indent + 1, vars); len(s2) > 0 {
-		s += Sprintf("%v} else {\n%v", tabs(indent), s2)
-	}
-	s += tabs(indent) + "}\n"
-	return s
 }
 
 func (n *IfNode) positionBlocks() {

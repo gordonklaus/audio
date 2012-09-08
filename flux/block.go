@@ -1,7 +1,6 @@
 package main
 
 import (
-	."fmt"
 	."strings"
 	."math"
 	."strconv"
@@ -169,100 +168,6 @@ nx:	for node := range b.nodes {
 		if !insertInOrder(node, Set{}) { return }
 	}
 	ok = true
-	return
-}
-
-func (b *Block) Save(indent int, nodeIDs map[Node]int) string {
-	order, ok := b.nodeOrder()
-	if !ok {
-		Println("cyclic!")
-		return ""
-	}
-	s := tabs(indent) + "\\"
-	indent++
-	for _, node := range order {
-		nodeID++
-		nodeIDs[node] = nodeID
-		s += Sprintf("\n%v%v %v", tabs(indent), nodeIDs[node], node.Save(indent, nodeIDs))
-	}
-	for conn := range b.connections {
-		iSrc := -1; for i, src := range conn.src.node.Outputs() { if src == conn.src { iSrc = i; break } }
-		iDst := -1; for i, dst := range conn.dst.node.Inputs() { if dst == conn.dst { iDst = i; break } }
-		s += Sprintf("\n%v- %v %v %v %v", tabs(indent), nodeIDs[conn.src.node], iSrc, nodeIDs[conn.dst.node], iDst)
-	}
-	return s
-}
-
-func (b *Block) Code(indent int, vars map[*Input]string) (s string) {
-	vars, varsCopy := map[*Input]string{}, vars
-	for k, v := range varsCopy { vars[k] = v }
-	
-	order, ok := b.nodeOrder()
-	if !ok {
-		Println("cyclic!")
-		return
-	}
-	pkg := b.Outermost().function.pkg()
-cx:	for conn := range b.connections {
-		if _, ok := vars[conn.dst]; ok { continue }
-		for block := conn.src.node.Block().Outer(); block != b; block = block.Outer() {
-			if block == nil { continue cx }
-		}
-		name := newVarName()
-		s += Sprintf("%vvar %v %v\n", tabs(indent), name, qualifiedName(conn.dst.info.typ, pkg))
-		vars[conn.dst] = name
-	}
-	for _, node := range order {
-		switch node := node.(type) {
-		default:
-			inputs := []string{}
-			for _, input := range node.Inputs() {
-				name := ""
-				if len(input.connections) > 0 {
-					name = vars[input.connections[0].dst]
-				} else {
-					// INSTEAD:  name = "*new(typeName)"  or zero literal
-					name = newVarName()
-					s += Sprintf("%vvar %v %v\n", tabs(indent), name, qualifiedName(input.info.typ, pkg))
-				}
-				inputs = append(inputs, name)
-			}
-			outputs := []string{}
-			anyOutputConnections := false
-			assignExisting := map[string]string{}
-			for _, output := range node.Outputs() {
-				name := "_"
-				if len(output.connections) > 0 {
-					anyOutputConnections = true
-					name = newVarName()
-					for _, conn := range output.connections {
-						if existingName, ok := vars[conn.dst]; ok {
-							assignExisting[existingName] = name
-						} else {
-							vars[conn.dst] = name
-						}
-					}
-				}
-				outputs = append(outputs, name)
-			}
-			assignment := ""
-			if anyOutputConnections {
-				assignment = Join(outputs, ", ") + " := "
-			}
-			s += Sprintf("%v%v%v\n", tabs(indent), assignment, node.Code(indent, vars, Join(inputs, ", ")))
-			if len(assignExisting) > 0 {
-				var existingNames, sourceNames []string
-				for v1, v2 := range assignExisting {
-					existingNames = append(existingNames, v1)
-					sourceNames = append(sourceNames, v2)
-				}
-				s += Sprintf("%v%v = %v\n", tabs(indent), Join(existingNames, ", "), Join(sourceNames, ", "))
-			}
-		case *InputNode:
-		case *IfNode:
-			s += node.Code(indent, vars, "")
-		}
-	}
 	return
 }
 
