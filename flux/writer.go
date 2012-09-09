@@ -43,20 +43,20 @@ func saveFunction(f Function) {
 		params = append(params, s)
 	}
 	Fprintf(w.flux, "func(%s)\n", Join(params, ", "))
-	for p := range f.pkgRefs {
-		if p != w.pkg {
-			w.flux.WriteString(p.buildPackage.ImportPath + "\n")
-		}
+	for p, n := range w.pkgNames {
+		Fprintf(w.flux, "%s %s\n", n, p.buildPackage.ImportPath)
 	}
 	w.writeBlockFlux(f.block, 0)
 	
 	/////
 	
 	Fprintf(w.go_, "package %s\n\nimport (\n", w.pkg.Name())
-	for p := range f.pkgRefs {
-		if p != w.pkg {
-			Fprintf(w.go_, "\t\"%s\"\n", p.buildPackage.ImportPath)
+	for p, n := range w.pkgNames {
+		w.go_.WriteString("\t")
+		if n != p.Name() {
+			Fprintf(w.go_, "%s ", n)
 		}
+		Fprintf(w.go_, "\"%s\"\n", p.buildPackage.ImportPath)
 	}
 	vars := map[*Input]string{}
 	params = nil

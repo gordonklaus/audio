@@ -27,9 +27,10 @@ func loadFunction(f *Function) bool {
 	line, r.s = Split2(r.s, "\n")
 	for r.s[0] != '\\' {
 		line, r.s = Split2(r.s, "\n")
-		pkg := FindPackageInfo(line)
+		name, importPath := Split2(line, " ")
+		pkg := FindPackageInfo(importPath)
 		// TODO:  handle name collisions
-		r.pkgNames[pkg.name] = pkg
+		r.pkgNames[name] = pkg
 	}
 	for _, parameter := range f.info.typ.parameters {
 		// TODO:  increment pkgRef for this parameter's type
