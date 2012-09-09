@@ -3,10 +3,7 @@ package main
 import (
 	"github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
-	."code.google.com/p/gordon-go/util"
 	."math"
-	."strconv"
-	."strings"
 )
 
 type Node interface {
@@ -148,39 +145,6 @@ func NewNode(info Info, block *Block) Node {
 		return NewFunctionNode(info, block)
 	}
 	return nil
-}
-
-func LoadNode(b *Block, s string, indent int, nodes map[int]Node, pkgNames map[string]*PackageInfo) (node Node, rest string) {
-	line, rest := Split2(s, "\n")
-	fields := Fields(line)
-	if fields[1][0] == '"' {
-		strNode := NewStringConstantNode(b)
-		text, _ := Unquote(fields[1])
-		strNode.text.SetText(text)
-		node = strNode
-	} else if fields[1] == "\\in" {
-		for n := range b.nodes {
-			if _, ok := n.(*InputNode); ok {
-				node = n
-			}
-		}
-	} else if fields[1] == "if" {
-		node, rest = LoadIfNode(s, indent, b, nodes, pkgNames)
-	} else {
-		pkgName, name := Split2(fields[1], ".")
-		for _, info := range pkgNames[pkgName].Children() {
-			if info.Name() != name { continue }
-			switch info := info.(type) {
-			case *FuncInfo:
-				node = NewFunctionNode(info, b)
-			default:
-				panic("not yet implemented")
-			}
-		}
-	}
-	nodeID, _ := Atoi(fields[0])
-	nodes[nodeID] = node
-	return node, rest
 }
 
 type FunctionNode struct {

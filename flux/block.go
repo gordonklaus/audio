@@ -1,9 +1,7 @@
 package main
 
 import (
-	."strings"
 	."math"
-	."strconv"
 	"time"
 	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
@@ -169,33 +167,6 @@ nx:	for node := range b.nodes {
 	}
 	ok = true
 	return
-}
-
-func (b *Block) Load(s string, indent int, nodes map[int]Node, pkgNames map[string]*PackageInfo) string {
-	_, s = Split2(s, "\n")
-	indent++
-	for len(s) > 0 {
-		i := 0
-		for s[i] == '\t' { i++ }
-		if i < indent { return s }
-		if s[i] == '-' {
-			var line string
-			line, s = Split2(s, "\n")
-			x := Fields(line)
-			srcNodeID, _ := Atoi(x[1])
-			iSrcPut, _ := Atoi(x[2])
-			dstNodeID, _ := Atoi(x[3])
-			iDstPut, _ := Atoi(x[4])
-			conn := b.NewConnection(ZP)
-			nodes[srcNodeID].Outputs()[iSrcPut].ConnectTo(conn)
-			nodes[dstNodeID].Inputs()[iDstPut].ConnectTo(conn)
-		} else {
-			var node Node
-			node, s = LoadNode(b, s, indent, nodes, pkgNames)
-			b.AddNode(node)
-		}
-	}
-	return s
 }
 
 func (b *Block) StartEditing() {

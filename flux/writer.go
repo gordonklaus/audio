@@ -17,7 +17,7 @@ type writer struct {
 }
 
 func saveFunction(f Function) {
-	w := &writer{pkg:f.pkg(), pkgNames:map[*PackageInfo]string{}, names:map[string]int{}, nodeIDs:map[Node]int{}}
+	w := &writer{nil, nil, f.pkg(), map[*PackageInfo]string{}, map[string]int{}, 0, map[Node]int{}}
 	var err error
 	w.flux, err = os.Create(f.info.FluxSourcePath())
 	if err != nil { Println(err); return }
@@ -202,7 +202,7 @@ cx:	for conn := range b.connections {
 }
 
 func (w writer) newName(s string) string {
-	if s == "" { s = "x" }
+	if s == "" || s == "_" { s = "x" }
 	if i, ok := w.names[s]; ok {
 		w.names[s]++
 		return w.newName(s + Itoa(i))

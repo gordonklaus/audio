@@ -3,7 +3,6 @@ package main
 import (
 	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
-	."code.google.com/p/gordon-go/util"
 )
 
 type IfNode struct {
@@ -36,14 +35,6 @@ func NewIfNode(block *Block) *IfNode {
 	n.trueBlock.Move(Pt(putSize, 4))
 	n.positionBlocks()
 	return n
-}
-
-func LoadIfNode(s string, indent int, b *Block, nodes map[int]Node, pkgs map[string]*PackageInfo) (*IfNode, string) {
-	n := NewIfNode(b)
-	_, s = Split2(s, "\n")
-	s = n.trueBlock.Load(s, indent, nodes, pkgs)
-	s = n.falseBlock.Load(s, indent, nodes, pkgs)
-	return n, s
 }
 
 func (n IfNode) Block() *Block { return n.block }
