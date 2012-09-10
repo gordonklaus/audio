@@ -11,5 +11,5 @@ PxMat33 m2P(Matrix m) { return *(PxMat33*)&m; }
 PxTransform t2P(Transform t) { return PxTransform(v2P(t.p), q2P(t.o).getNormalized()); }
 Transform P2t(PxTransform t) { Transform r; r.p = P2v(t.p); r.o = P2q(t.q); return r; }
 
-Transform TransformFromSegment(Vector p1, Vector p2) { return P2t(PxTransformFromSegment(v2P(p1), v2P(p2))); }
+Quaternion Matrix_toQuat(Matrix m) { return P2q(PxQuat(m2P(m))); }
 

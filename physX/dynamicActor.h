@@ -9,7 +9,6 @@ extern "C" {
 #endif
 
 Transform DynamicActor_globalPose(void* actor);
-Vector DynamicActor_xAxis(void* actor);
 
 void DynamicActor_addSphere(void* actor, Vector pos, float radius, void* material);
 void DynamicActor_addCapsule(void* actor, Vector start, Vector end, float radius, void* material);

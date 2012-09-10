@@ -27,6 +27,7 @@ void* newScene() {
 
 void* Scene_newDynamicActor(void* s, Transform pose) {
 	PxRigidDynamic* a = physics->createRigidDynamic(t2P(pose));
+	a->setSolverIterationCounts(16, 4);
 	((PxScene*)s)->addActor(*a);
 	return a;
 }

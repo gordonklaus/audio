@@ -11,7 +11,7 @@ typedef struct { Vector c1, c2, c3; } Matrix;
 typedef struct { float x, y, z, w; } Quaternion;
 typedef struct { Vector p; Quaternion o; } Transform;
 
-Transform TransformFromSegment(Vector p1, Vector p2);
+Quaternion Matrix_toQuat(Matrix m);
 
 #ifdef __cplusplus
 }
