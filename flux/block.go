@@ -46,10 +46,13 @@ func (b *Block) Outermost() *Block {
 }
 
 func (b *Block) AddNode(node Node) {
-	b.AddChild(node)
-	b.nodes[node] = true
-	if node, ok := node.(interface{Package()*PackageInfo}); ok {
-		b.Outermost().function.pkgRefs[node.Package()]++
+	if !b.nodes[node] {
+		b.AddChild(node)
+		b.nodes[node] = true
+		if node, ok := node.(interface{Package()*PackageInfo}); ok {
+			// TODO:  not for methods
+			b.Outermost().function.AddPackageRef(node.Package())
+		}
 	}
 }
 
@@ -57,10 +60,7 @@ func (b *Block) RemoveNode(node Node) {
 	b.RemoveChild(node)
 	delete(b.nodes, node)
 	if node, ok := node.(interface{Package()*PackageInfo}); ok {
-		pkg := node.Package()
-		pkgRefs := b.Outermost().function.pkgRefs
-		pkgRefs[pkg]--
-		if pkgRefs[pkg] == 0 { delete(pkgRefs, pkg) }
+		b.Outermost().function.SubPackageRef(node.Package())
 	}
 }
 
@@ -202,13 +202,14 @@ func (b *Block) Code(indent int, vars map[*Input]string) (s string) {
 		Println("cyclic!")
 		return
 	}
+	pkg := b.Outermost().function.pkg()
 cx:	for conn := range b.connections {
 		if _, ok := vars[conn.dst]; ok { continue }
 		for block := conn.src.node.Block().Outer(); block != b; block = block.Outer() {
 			if block == nil { continue cx }
 		}
 		name := newVarName()
-		s += Sprintf("%vvar %v %v\n", tabs(indent), name, conn.dst.info.typeName)
+		s += Sprintf("%vvar %v %v\n", tabs(indent), name, qualifiedName(conn.dst.info.typ, pkg))
 		vars[conn.dst] = name
 	}
 	for _, node := range order {
@@ -222,7 +223,7 @@ cx:	for conn := range b.connections {
 				} else {
 					// INSTEAD:  name = "*new(typeName)"  or zero literal
 					name = newVarName()
-					s += Sprintf("%vvar %v %v\n", tabs(indent), name, input.info.typeName)
+					s += Sprintf("%vvar %v %v\n", tabs(indent), name, qualifiedName(input.info.typ, pkg))
 				}
 				inputs = append(inputs, name)
 			}
@@ -257,6 +258,7 @@ cx:	for conn := range b.connections {
 				}
 				s += Sprintf("%v%v = %v\n", tabs(indent), Join(existingNames, ", "), Join(sourceNames, ", "))
 			}
+		case *InputNode:
 		case *IfNode:
 			s += node.Code(indent, vars, "")
 		}
@@ -383,15 +385,6 @@ func (b *Block) reform() {
 		
 		rect := ZR.Add(pts[0])
 		for _, p := range pts { rect = rect.Union(ZR.Add(p)) }
-		// if b.editingNode != nil && !b.nodes[b.editingNode] {
-		// 	p := b.editingNode.MapTo(b.editingNode.Center(), outer)
-		// 	pts = append(pts, p)
-		// 	rect = rect.Union(ZR.Add(p))
-		// }
-		// if b.editing && b.editingNode == nil && len(b.nodes) == 0 {
-		// 	pts = append(pts, p.Add(Pt(-4, 32)), p.Add(Pt(4, 32)))
-		// }
-	
 		if b.node == nil { b.Move(b.MapToParent(rect.Min)) }
 		b.Pan(rect.Min)
 		b.Resize(rect.Dx(), rect.Dy())
@@ -479,18 +472,18 @@ func (b *Block) KeyPressed(event KeyEvent) {
 		if !(event.Ctrl || event.Alt || event.Super) {
 			switch event.Text {
 			default:
-				creator := NewNodeCreator(false)
-				b.AddChild(creator)
-				creator.Move(b.Center())
-				creator.created.Connect(func(info ...interface{}) {
+				browser := NewBrowser(browse)
+				b.AddChild(browser)
+				browser.Move(b.Center())
+				browser.created.Connect(func(info ...interface{}) {
 					node := NewNode(info[0].(Info), b)
 					b.AddNode(node)
 					node.MoveCenter(b.Center())
 					node.TakeKeyboardFocus()
 				})
-				creator.canceled.Connect(func(...interface{}) { b.TakeKeyboardFocus() })
-				creator.text.KeyPressed(event)
-				creator.text.TakeKeyboardFocus()
+				browser.canceled.Connect(func(...interface{}) { b.TakeKeyboardFocus() })
+				browser.text.KeyPressed(event)
+				browser.text.TakeKeyboardFocus()
 			case "\"":
 				node := NewStringConstantNode(b)
 				node.text.SetEditable(true)

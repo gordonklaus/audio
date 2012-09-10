@@ -7,7 +7,7 @@ import (
 	."code.google.com/p/gordon-go/util"
 )
 
-var font Font = CreateTextureFont("/usr/X11R6/lib/X11/fonts/TTF/luxirr.ttf")
+var font Font = CreateTextureFont("/usr/share/fonts/truetype/freefont/FreeSans.ttf")
 func init() {
 	font.SetFaceSize(fontSize, 1)
 }
