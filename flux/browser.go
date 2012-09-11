@@ -5,7 +5,6 @@ import (
 	."code.google.com/p/gordon-go/util"
 	."code.google.com/p/gordon-go/gui"
 	."fmt"
-	"go/build"
 	."io/ioutil"
 	."strings"
 	"os"
@@ -40,7 +39,7 @@ func NewBrowser(mode browserMode) *Browser {
 	b.ViewBase = NewView(b)
 	
 	b.mode = mode
-	b.currentInfo = GetPackageInfo()
+	b.currentInfo = rootPackageInfo
 	b.activeIndices = []int{}
 	
 	b.text = newNodeNameText(b)
@@ -257,8 +256,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			b.currentInfo.AddChild(info)
 			switch info := info.(type) {
 			case *PackageInfo:
-				srcDirs := build.Default.SrcDirs()
-				info.buildPackage.Dir = Sprintf("%v/%v", srcDirs[len(srcDirs) - 1], info.name)
+				*info = *newPackageInfo(info.parent.(*PackageInfo), info.name)
 				if err := os.Mkdir(info.FluxSourcePath(), 0755); err != nil { Println(err) }
 			case *NamedType:
 				if err := WriteFile(info.FluxSourcePath(), []byte("type"), 0644); err != nil { Println(err) }

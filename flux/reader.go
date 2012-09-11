@@ -28,7 +28,7 @@ func loadFunction(f *Function) bool {
 	for r.s[0] != '\\' {
 		line, r.s = Split2(r.s, "\n")
 		name, importPath := Split2(line, " ")
-		pkg := FindPackageInfo(importPath)
+		pkg := findPackageInfo(importPath)
 		// TODO:  handle name collisions
 		r.pkgNames[name] = pkg
 	}

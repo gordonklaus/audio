@@ -3,6 +3,7 @@ package main
 import (
 	."fmt"
 	"os"
+	"reflect"
 	."strconv"
 	."strings"
 )
@@ -34,17 +35,9 @@ func saveFunction(f Function) {
 		}
 	}
 	
-	// TODO:  instead, w.typeString(f.info) ?
-	var params []string
-	for _, output := range f.inputNode.Outputs() {
-		s := ""
-		if name := output.info.Name(); name != "" { s = name + " " }
-		s += w.typeString(output.info.typ)
-		params = append(params, s)
-	}
-	Fprintf(w.flux, "func(%s)\n", Join(params, ", "))
+	Fprintf(w.flux, "%s\n", w.typeString(f.info.typ))
 	for p, n := range w.pkgNames {
-		Fprintf(w.flux, "%s %s\n", n, p.buildPackage.ImportPath)
+		Fprintf(w.flux, "%s %s\n", n, p.importPath)
 	}
 	w.writeBlockFlux(f.block, 0)
 	
@@ -56,12 +49,11 @@ func saveFunction(f Function) {
 		if n != p.Name() {
 			Fprintf(w.go_, "%s ", n)
 		}
-		Fprintf(w.go_, "\"%s\"\n", p.buildPackage.ImportPath)
+		Fprintf(w.go_, "\"%s\"\n", p.importPath)
 	}
 	vars := map[*Input]string{}
-	params = nil
+	params := []string{}
 	for _, output := range f.inputNode.Outputs() {
-		// TODO: use output.info.Name(), handle name collisions?
 		name := ""
 		if len(output.connections) > 0 {
 			name = w.newName(output.info.name)
@@ -139,9 +131,7 @@ cx:	for conn := range b.connections {
 				if len(input.connections) > 0 {
 					name = vars[input.connections[0].dst]
 				} else {
-					// INSTEAD:  name = "*new(typeName)"  or zero literal
-					name = w.newName(input.info.name)
-					Fprintf(w.go_, "%svar %s %s\n", tabs(indent), name, w.typeString(input.info.typ))
+					name = w.zeroLiteral(input.info.typ)
 				}
 				inputs = append(inputs, name)
 			}
@@ -294,6 +284,33 @@ func (w writer) paramsString(params []ValueInfo) string {
 		s += w.typeString(p.typ)
 	}
 	return s + ")"
+}
+
+func (w writer) zeroLiteral(t Type) string {
+	switch t := t.(type) {
+	case *BasicType:
+		switch t.reflectType.Kind() {
+		case reflect.Bool:
+			return "false"
+		case reflect.String:
+			return `""`
+		case reflect.UnsafePointer:
+			return "nil"
+		}
+		return "0"
+	case PointerType, SliceType, MapType, ChanType, FuncType, InterfaceType:
+		return "nil"
+	case ArrayType, StructType:
+		return w.typeString(t) + "{}"
+	case *NamedType:
+		switch t.underlying.(type) {
+		case ArrayType, StructType:
+			return w.typeString(t) + "{}"
+		}
+		return w.zeroLiteral(t.underlying)
+	}
+	panic(Sprintf("no zero literal for type %#v\n", t))
+	return ""
 }
 
 func tabs(n int) string { return Repeat("\t", n) }

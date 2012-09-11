@@ -9,60 +9,48 @@ import (
 	"fmt"
 	."log"
 	"path/filepath"
+	"reflect"
 	."strings"
 	."strconv"
 	"unicode"
 )
 
-func GetPackageInfo() *PackageInfo {
-	return <-packageInfo
-}
+var rootPackageInfo *PackageInfo
 
-func FindPackageInfo(path string) *PackageInfo {
-	return GetPackageInfo().FindPackageInfo(path)
-}
-
-var packageInfo chan *PackageInfo = make(chan *PackageInfo)
-
-func getPackageInfo(pathStr string) *PackageInfo {
-	packageInfo := newPackageInfo(filepath.Base(pathStr))
+func newPackageInfo(parent *PackageInfo, name string) *PackageInfo {
+	p := &PackageInfo{InfoBase:InfoBase{name, parent}, importPath:filepath.Join(parent.importPath, name), fullPath:filepath.Join(parent.fullPath, name)}
 	
-	pkg, err := build.ImportDir(pathStr, 0)
-	packageInfo.buildPackage.Dir = pathStr
-	if err != nil {
-		if _, ok := err.(*build.NoGoError); !ok { Println(err) }
-	} else if !pkg.IsCommand() {
-		packageInfo.buildPackage = *pkg
-	}
-	
-	if file, err := os.Open(pathStr); err == nil {
+	if file, err := os.Open(p.fullPath); err == nil {
 		if fileInfos, err := file.Readdir(-1); err == nil {
 			for _, fileInfo := range fileInfos {
-				if fileInfo.IsDir() && unicode.IsLetter(([]rune(fileInfo.Name()))[0]) && !HasSuffix(fileInfo.Name(), methodDirSuffix) {
-					subPackageInfo := getPackageInfo(filepath.Join(pathStr, fileInfo.Name()))
-					subPackageInfo.parent = packageInfo
-					packageInfo.subPackages = append(packageInfo.subPackages, subPackageInfo)
+				name := fileInfo.Name()
+				if fileInfo.IsDir() && unicode.IsLetter(([]rune(name))[0]) && name != "testdata" && !HasSuffix(name, methodDirSuffix) {
+					p2 := newPackageInfo(p, name)
+					p.subPackages = append(p.subPackages, p2)
 				}
 			}
 		}
 	}
 	
-	return packageInfo
+	return p
 }
 
 func init() {
-	go func() {
-		rootPackageInfo := newPackageInfo("")
-		for _, srcDir := range build.Default.SrcDirs() {
-			subPackageInfo := getPackageInfo(srcDir)
-			for _, p := range subPackageInfo.subPackages {
-				p.parent = rootPackageInfo
-			}
-			rootPackageInfo.subPackages = append(rootPackageInfo.subPackages, subPackageInfo.subPackages...)
+	rootPackageInfo = &PackageInfo{}
+	rootPackageInfo.loaded = true
+	for _, srcDir := range build.Default.SrcDirs() {
+		rootPackageInfo.fullPath = srcDir
+		srcPackageInfo := newPackageInfo(rootPackageInfo, "")
+		for _, p := range srcPackageInfo.subPackages {
+			p.parent = rootPackageInfo
 		}
-		Sort(rootPackageInfo.subPackages, "Name")
-		for { packageInfo <- rootPackageInfo }
-	}()
+		rootPackageInfo.subPackages = append(rootPackageInfo.subPackages, srcPackageInfo.subPackages...)
+	}
+	Sort(rootPackageInfo.subPackages, "Name")
+}
+
+func findPackageInfo(path string) *PackageInfo {
+	return rootPackageInfo.findPackageInfo(path)
 }
 
 type Info interface {
@@ -89,7 +77,8 @@ func (i InfoBase) FluxSourcePath() string { return fmt.Sprintf("%v/%v.flux", i.p
 
 type PackageInfo struct {
 	InfoBase
-	buildPackage build.Package
+	importPath string
+	fullPath string
 	types []*NamedType
 	functions []*FuncInfo
 	variables []*ValueInfo
@@ -97,8 +86,6 @@ type PackageInfo struct {
 	subPackages []*PackageInfo
 	loaded bool
 }
-
-func newPackageInfo(name string) *PackageInfo { return &PackageInfo{InfoBase:InfoBase{name:name}} }
 
 func (p *PackageInfo) Children() []Info {
 	p.load()
@@ -124,20 +111,22 @@ func (p *PackageInfo) AddChild(info Info) {
 		panic("not yet implemented")
 	}
 }
-func (p PackageInfo) FluxSourcePath() string { return p.buildPackage.Dir }
+func (p PackageInfo) FluxSourcePath() string { return p.fullPath }
 
 func (p *PackageInfo) load() {
 	if p.loaded { return }
 	p.loaded = true
 	
-	// "builtin" contains invalid Go code.  (move this line earlier, so builtin doesn't even show up in the list)
-	if p.buildPackage.ImportPath == "builtin" { return }
-	
-	pkg, err := getPackage(p.buildPackage.ImportPath)
-	if err != nil { Println(err); return }
+	pkg, err := getPackage(p.importPath)
+	if err != nil {
+		if _, ok := err.(*build.NoGoError); !ok {
+			Println(err)
+		}
+		return
+	}
 	
 	for id := range pkg.Imports {
-		FindPackageInfo(id).load()
+		findPackageInfo(id).load()
 	}
 	
 	for name, obj := range pkg.Scope.Objects {
@@ -148,7 +137,7 @@ func (p *PackageInfo) load() {
 	for _, obj := range pkg.Scope.Objects {
 		if t, ok := obj.Decl.(*ast.TypeSpec); ok {
 			n := obj.Type.(*NamedType)
-			n.underlying = specUnderlyingType(t.Type)
+			n.underlying = specUnderlyingType(t.Type, map[string]bool{})
 			p.types = append(p.types, n)
 		}
 	}
@@ -222,19 +211,25 @@ func (p *PackageInfo) load() {
 	Sort(p.functions, "Name")
 }
 
-func specUnderlyingType(x ast.Expr) Type {
+func specUnderlyingType(x ast.Expr, visitedNames map[string]bool) Type {
 	switch x := x.(type) {
 	case *ast.ParenExpr:
-		return specUnderlyingType(x.X)
+		return specUnderlyingType(x.X, visitedNames)
 	case *ast.Ident:
+		if visitedNames[x.Name] {
+			Printf("invalid recursive type %s\n", x.Name)
+			return nil
+		}
+		visitedNames[x.Name] = true
+		
 		if spec, ok := x.Obj.Decl.(*ast.TypeSpec); ok {
-			return specUnderlyingType(spec.Type)
+			return specUnderlyingType(spec.Type, visitedNames)
 		}
 	case *ast.SelectorExpr:
 		pkgScope := x.X.(*ast.Ident).Obj.Data.(*ast.Scope)
 		objName := x.Sel.Name
 		if spec, ok := pkgScope.Objects[objName].Decl.(*ast.TypeSpec); ok {
-			return specUnderlyingType(spec.Type)
+			return specUnderlyingType(spec.Type, visitedNames)
 		}
 	}
 	return specType(x)
@@ -326,10 +321,10 @@ func getFields(f *ast.FieldList) (v []ValueInfo) {
 	return
 }
 
-func (p *PackageInfo) FindPackageInfo(path string) *PackageInfo {
-	if path == p.buildPackage.ImportPath { return p }
+func (p *PackageInfo) findPackageInfo(path string) *PackageInfo {
+	if path == p.importPath { return p }
 	for _, pkg := range p.subPackages {
-		if info := pkg.FindPackageInfo(path); info != nil {
+		if info := pkg.findPackageInfo(path); info != nil {
 			return info
 		}
 	}
@@ -342,6 +337,7 @@ func (implementsType) isType() {}
 
 type BasicType struct {
 	implementsType
+	reflectType reflect.Type
 }
 type PointerType struct {
 	implementsType
