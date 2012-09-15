@@ -27,16 +27,18 @@ func loadFunction(f *Function) bool {
 	line, r.s = Split2(r.s, "\n")
 	for r.s[0] != '\\' {
 		line, r.s = Split2(r.s, "\n")
-		name, importPath := Split2(line, " ")
+		importPath, name := Split2(line, " ")
 		pkg := findPackageInfo(importPath)
-		// TODO:  handle name collisions
+		if name == "" {
+			name = pkg.name
+		}
 		r.pkgNames[name] = pkg
 	}
 	for _, parameter := range f.info.typ.parameters {
-		// TODO:  increment pkgRef for this parameter's type
 		p := NewOutput(f.inputNode, parameter)
 		f.inputNode.AddChild(p)
 		f.inputNode.outputs = append(f.inputNode.outputs, p)
+		f.AddPackageRef(parameter.typ)
 	}
 	f.inputNode.reform()
 	r.readBlock(f.block, 0)

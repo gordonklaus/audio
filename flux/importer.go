@@ -6,10 +6,11 @@ import (
 	"go/parser"
 	"go/token"
 	"path/filepath"
+	"reflect"
+	"unsafe"
 )
 
 func srcImport(imports map[string]*ast.Object, path string) (*ast.Object, error) {
-	if path == "unsafe" { return Unsafe, nil }
 	if obj, ok := imports[path]; ok { return obj, nil }
 	pkg, err := getPackage(path)
 	if err != nil { return nil, err }
@@ -24,7 +25,7 @@ func srcImport(imports map[string]*ast.Object, path string) (*ast.Object, error)
 	return obj, nil
 }
 
-var pkgs = map[string]*ast.Package{}
+var pkgs = map[string]*ast.Package{"":&builtinAstPkg, "unsafe":&unsafePkg}
 func getPackage(path string) (*ast.Package, error) {
 	if pkg, ok := pkgs[path]; ok { return pkg, nil }
 	buildPkg, err := build.Import(path, "", 0)
@@ -37,8 +38,66 @@ func getPackage(path string) (*ast.Package, error) {
 		files[fileName] = file
 	}
 	// TODO:  incorporate flux source into files (if missing)
-	pkg, err := ast.NewPackage(fset, files, srcImport, Universe)
+	pkg, err := ast.NewPackage(fset, files, srcImport, builtinAstPkg.Scope)
 	if err != nil { return nil, err }
 	pkgs[path] = pkg
 	return pkg, nil
+}
+
+var (
+	builtinAstPkg = ast.Package{Scope:ast.NewScope(nil)}
+	unsafePkg = ast.Package{"unsafe", ast.NewScope(nil), nil, nil}
+)
+
+func init() {
+	b := scopeBuilder{builtinAstPkg.Scope}
+	b.defTypes(new(bool), new(int8), new(int16), new(int32), new(int64), new(int), new(uint16), new(uint32), new(uint64), new(uint), new(uintptr), new(byte), new(float32), new(float64), new(complex64), new(complex128), new(string), new(error))
+	b.defType("uint8", new(uint8))
+	b.defType("rune", new(rune))
+	builtinAstPkg.Scope.Lookup("error").Type.(*NamedType).underlying = InterfaceType{methods:[]FuncInfo{{InfoBase:InfoBase{name:"Error"}, typ:FuncType{results:[]ValueInfo{{typ:builtinAstPkg.Scope.Lookup("string").Type.(Type)}}}}}}
+	b.defConsts("false", "true", "nil", "iota")
+	b.defFuncs("append", "cap", "close", "complex", "copy", "delete", "imag", "len", "make", "new", "panic", "print", "println", "real", "recover")
+	
+	builtinPkg = &PackageInfo{}
+	builtinPkg.load()
+	
+	unsafePkg = ast.Package{"unsafe", ast.NewScope(nil), nil, nil}
+	b = scopeBuilder{unsafePkg.Scope}
+	b.defTypes(new(unsafe.Pointer))
+	b.defFuncs("Alignof", "Offsetof", "Sizeof")
+}
+
+type scopeBuilder struct {
+	scope *ast.Scope
+}
+
+func (b scopeBuilder) defTypes(values ...interface{}) {
+	for _, value := range values {
+		b.defType(reflect.TypeOf(value).Elem().Name(), value)
+	}
+}
+
+func (b scopeBuilder) defType(name string, value interface{}) {
+	obj := b.define(ast.Typ, name)
+	typ := newNamedType(name, nil)
+	typ.underlying = &BasicType{reflectType:reflect.TypeOf(value).Elem()}
+	obj.Type = typ
+}
+
+func (b scopeBuilder) defConsts(names ...string) {
+	for _, name := range names {
+		b.define(ast.Con, name).Data = &ValueInfo{InfoBase{name, nil}, nil, true}
+	}
+}
+
+func (b scopeBuilder) defFuncs(names ...string) {
+	for _, name := range names {
+		b.define(ast.Fun, name).Data = &FuncInfo{InfoBase{name, nil}, nil, FuncType{}}
+	}
+}
+
+func (b scopeBuilder) define(kind ast.ObjKind, name string) *ast.Object {
+	obj := ast.NewObj(kind, name)
+	b.scope.Insert(obj)
+	return obj
 }

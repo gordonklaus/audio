@@ -40,6 +40,9 @@ func NewBrowser(mode browserMode) *Browser {
 	
 	b.mode = mode
 	b.currentInfo = rootPackageInfo
+	rootPackageInfo.types = builtinPkg.types
+	rootPackageInfo.functions = builtinPkg.functions
+	rootPackageInfo.constants = builtinPkg.constants
 	b.activeIndices = []int{}
 	
 	b.text = newNodeNameText(b)

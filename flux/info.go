@@ -15,7 +15,7 @@ import (
 	"unicode"
 )
 
-var rootPackageInfo *PackageInfo
+var builtinPkg, rootPackageInfo *PackageInfo
 
 func newPackageInfo(parent *PackageInfo, name string) *PackageInfo {
 	p := &PackageInfo{InfoBase:InfoBase{name, parent}, importPath:filepath.Join(parent.importPath, name), fullPath:filepath.Join(parent.fullPath, name)}
@@ -36,8 +36,7 @@ func newPackageInfo(parent *PackageInfo, name string) *PackageInfo {
 }
 
 func init() {
-	rootPackageInfo = &PackageInfo{}
-	rootPackageInfo.loaded = true
+	rootPackageInfo = &PackageInfo{loaded:true}
 	for _, srcDir := range build.Default.SrcDirs() {
 		rootPackageInfo.fullPath = srcDir
 		srcPackageInfo := newPackageInfo(rootPackageInfo, "")
@@ -129,16 +128,30 @@ func (p *PackageInfo) load() {
 		findPackageInfo(id).load()
 	}
 	
+	// create NamedTypes first (to support recursive types); also, parent and add existing types, funcs, consts (special support for builtinPkg and unsafePkg)
 	for name, obj := range pkg.Scope.Objects {
-		if _, ok := obj.Decl.(*ast.TypeSpec); ok {
-			obj.Type = newNamedType(name, p)
+		if obj.Kind == ast.Typ {
+			n, ok := obj.Type.(*NamedType)
+			if !ok {
+				n = newNamedType(name, p)
+				obj.Type = n
+			}
+			n.parent = p
+			p.types = append(p.types, n)
+		}
+		if f, ok := obj.Data.(*FuncInfo); ok {
+			f.parent = p
+			p.functions = append(p.functions, f)
+		}
+		if v, ok := obj.Data.(*ValueInfo); ok {
+			v.parent = p
+			p.constants = append(p.constants, v)
 		}
 	}
+	
 	for _, obj := range pkg.Scope.Objects {
 		if t, ok := obj.Decl.(*ast.TypeSpec); ok {
-			n := obj.Type.(*NamedType)
-			n.underlying = specUnderlyingType(t.Type, map[string]bool{})
-			p.types = append(p.types, n)
+			obj.Type.(*NamedType).underlying = specUnderlyingType(t.Type, map[string]bool{})
 		}
 	}
 	Sort(p.types, "Name")
@@ -155,7 +168,7 @@ func (p *PackageInfo) load() {
 						if typ == nil {
 							// TODO:  compute value (may be needed for the length of an ArrayType var) and type
 							_ = iota
-							typ = Universe.Lookup("int").Type.(Type)
+							typ = builtinAstPkg.Scope.Lookup("int").Type.(Type)
 						}
 						p.constants = append(p.constants, &ValueInfo{InfoBase{name.Name, p}, typ, true})
 					}
@@ -179,7 +192,7 @@ func (p *PackageInfo) load() {
 							if typ == nil {
 								// TODO:  compute type
 								// typ = exprType(spec.Values[i])
-								typ = Universe.Lookup("int").Type.(Type)
+								typ = builtinAstPkg.Scope.Lookup("int").Type.(Type)
 							}
 							p.variables = append(p.variables, &ValueInfo{InfoBase{name.Name, p}, typ, false})
 						}
@@ -312,7 +325,9 @@ func getFields(f *ast.FieldList) (v []ValueInfo) {
 	for _, field := range f.List {
 		if len(field.Names) > 0 {
 			for _, name := range field.Names {
-				v = append(v, ValueInfo{InfoBase{name.Name, nil}, specType(field.Type), false})
+				n := name.Name
+				if n == "_" { n = "" }
+				v = append(v, ValueInfo{InfoBase{n, nil}, specType(field.Type), false})
 			}
 		} else {
 			v = append(v, ValueInfo{InfoBase{"", nil}, specType(field.Type), false})

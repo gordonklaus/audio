@@ -10,7 +10,6 @@ import (
 
 type writer struct {
 	flux, go_ *os.File
-	pkg *PackageInfo
 	pkgNames map[*PackageInfo]string
 	names map[string]int
 	nodeID int
@@ -18,7 +17,7 @@ type writer struct {
 }
 
 func saveFunction(f Function) {
-	w := &writer{nil, nil, f.pkg(), map[*PackageInfo]string{}, map[string]int{}, 0, map[Node]int{}}
+	w := &writer{nil, nil, map[*PackageInfo]string{}, map[string]int{}, 0, map[Node]int{}}
 	var err error
 	w.flux, err = os.Create(f.info.FluxSourcePath())
 	if err != nil { Println(err); return }
@@ -27,26 +26,31 @@ func saveFunction(f Function) {
 	if err != nil { Println(err); return }
 	defer w.go_.Close()
 	
-	// TODO:  w.newName() for all universe and w.pkg names
-	
-	for p := range f.pkgRefs {
-		if p != w.pkg {
-			w.pkgNames[p] = w.newName(p.Name())
+	for _, i := range append(builtinPkg.Children(), f.pkg().Children()...) {
+		if _, ok := i.(*PackageInfo); !ok {
+			w.newName(i.Name())
 		}
 	}
 	
-	Fprintf(w.flux, "%s\n", w.typeString(f.info.typ))
+	for p := range f.pkgRefs {
+		w.pkgNames[p] = w.newName(p.Name())
+	}
+	
+	w.flux.WriteString(w.typeString(f.info.typ))
 	for p, n := range w.pkgNames {
-		Fprintf(w.flux, "%s %s\n", n, p.importPath)
+		Fprintf(w.flux, "\n%s", p.importPath)
+		if n != p.name {
+			Fprintf(w.flux, " %s", n)
+		}
 	}
 	w.writeBlockFlux(f.block, 0)
 	
 	/////
 	
-	Fprintf(w.go_, "package %s\n\nimport (\n", w.pkg.Name())
+	Fprintf(w.go_, "package %s\n\nimport (\n", f.pkg().Name())
 	for p, n := range w.pkgNames {
 		w.go_.WriteString("\t")
-		if n != p.Name() {
+		if n != p.name {
 			Fprintf(w.go_, "%s ", n)
 		}
 		Fprintf(w.go_, "\"%s\"\n", p.importPath)
@@ -75,7 +79,7 @@ func (w *writer) writeBlockFlux(b *Block, indent int) {
 		return
 	}
 	
-	w.flux.WriteString(tabs(indent) + "\\")
+	Fprintf(w.flux, "\n%s\\", tabs(indent))
 	indent++
 	for _, node := range order {
 		w.nodeID++
@@ -87,9 +91,8 @@ func (w *writer) writeBlockFlux(b *Block, indent int) {
 		case *ConstantNode:
 			w.flux.WriteString(Quote(n.text.GetText()))
 		case *IfNode:
-			w.flux.WriteString("if\n")
+			w.flux.WriteString("if")
 			w.writeBlockFlux(n.trueBlock, indent)
-			w.flux.WriteString("\n")
 			w.writeBlockFlux(n.falseBlock, indent)
 		case *InputNode:
 			w.flux.WriteString("\\in")
@@ -278,9 +281,9 @@ func (w writer) paramsString(params []ValueInfo) string {
 		if i > 0 {
 			s += ", "
 		}
-		if p.name != "" {
-			s += p.name + " "
-		}
+		name := p.name
+		if name == "" { name = "_" }
+		s += name + " "
 		s += w.typeString(p.typ)
 	}
 	return s + ")"

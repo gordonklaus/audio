@@ -3,6 +3,7 @@ package main
 import (
 	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
+	."fmt"
 )
 
 type Function struct {
@@ -36,8 +37,58 @@ func (f Function) pkg() *PackageInfo {
 	return parent.(*PackageInfo)
 }
 
-func (f *Function) AddPackageRef(p *PackageInfo) { f.pkgRefs[p]++ }
-func (f *Function) SubPackageRef(p *PackageInfo) { f.pkgRefs[p]--; if f.pkgRefs[p] == 0 { delete(f.pkgRefs, p) } }
+func (f *Function) AddPackageRef(x interface{}) {
+	switch x := x.(type) {
+	case Info:
+		if p, ok := x.Parent().(*PackageInfo); ok && p != f.pkg() && p != builtinPkg {
+			f.pkgRefs[p]++
+		}
+	case Type:
+		f.walkType(x, (*Function).AddPackageRef)
+	default:
+		panic(Sprintf("can't AddPackageRef for %#v\n", x))
+	}
+}
+func (f *Function) SubPackageRef(x interface{}) {
+	switch x := x.(type) {
+	case Info:
+		if p, ok := x.Parent().(*PackageInfo); ok {
+			f.pkgRefs[p]--
+			if f.pkgRefs[p] <= 0 {
+				delete(f.pkgRefs, p)
+			}
+		}
+	case Type:
+		f.walkType(x, (*Function).SubPackageRef)
+	default:
+		panic(Sprintf("can't SubPackageRef for %#v\n", x))
+	}
+}
+func (f *Function) walkType(t Type, op func(*Function, interface{})) {
+	switch t := t.(type) {
+	case PointerType:
+		f.walkType(t.element, op)
+	case ArrayType:
+		f.walkType(t.element, op)
+	case SliceType:
+		f.walkType(t.element, op)
+	case MapType:
+		f.walkType(t.key, op)
+		f.walkType(t.value, op)
+	case ChanType:
+		f.walkType(t.element, op)
+	case FuncType:
+		for _, v := range append(t.parameters, t.results...) { f.walkType(v.typ, op) }
+	case InterfaceType:
+		for _, m := range t.methods { f.walkType(m.typ, op) }
+	case StructType:
+		for _, v := range t.fields { f.walkType(v.typ, op) }
+	case *NamedType:
+		op(f, t)
+	default:
+		panic(Sprintf("unexpected type %#v\n", t))
+	}
+}
 
 func (f *Function) TookKeyboardFocus() { f.block.TakeKeyboardFocus() }
 

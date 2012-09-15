@@ -42,22 +42,23 @@ func (b *Block) Outermost() *Block {
 	return b
 }
 
-func (b *Block) AddNode(node Node) {
-	if !b.nodes[node] {
-		b.AddChild(node)
-		b.nodes[node] = true
-		if node, ok := node.(interface{Package()*PackageInfo}); ok {
-			// TODO:  not for methods
-			b.Outermost().function.AddPackageRef(node.Package())
+func (b *Block) AddNode(n Node) {
+	if !b.nodes[n] {
+		b.AddChild(n)
+		b.nodes[n] = true
+		switch n := n.(type) {
+		case *FunctionNode:
+			b.Outermost().function.AddPackageRef(n.info)
 		}
 	}
 }
 
-func (b *Block) RemoveNode(node Node) {
-	b.RemoveChild(node)
-	delete(b.nodes, node)
-	if node, ok := node.(interface{Package()*PackageInfo}); ok {
-		b.Outermost().function.SubPackageRef(node.Package())
+func (b *Block) RemoveNode(n Node) {
+	b.RemoveChild(n)
+	delete(b.nodes, n)
+	switch n := n.(type) {
+	case *FunctionNode:
+		b.Outermost().function.SubPackageRef(n.info)
 	}
 }
 

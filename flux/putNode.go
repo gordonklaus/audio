@@ -22,12 +22,13 @@ func (n *InputNode) KeyPressed(event KeyEvent) {
 		browser.Move(n.Center())
 		browser.created.Connect(func(info ...interface{}) {
 			typ := info[0].(Type)
-			output := NewOutput(n, ValueInfo{typ:typ})
+			param := ValueInfo{typ:typ}
+			f := n.block.Outermost().function
+			f.info.typ.parameters = append(f.info.typ.parameters, param)
+			f.AddPackageRef(typ)
+			output := NewOutput(n, param)
 			n.AddChild(output)
 			n.outputs = append(n.outputs, output)
-			if t, ok := typ.(*NamedType); ok {
-				n.block.Outermost().function.AddPackageRef(t.Parent().(*PackageInfo))
-			}
 			n.reform()
 			output.TakeKeyboardFocus()
 		})
