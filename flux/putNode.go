@@ -20,7 +20,7 @@ func (n *InputNode) KeyPressed(event KeyEvent) {
 		browser := NewBrowser(typesOnly)
 		n.AddChild(browser)
 		browser.Move(n.Center())
-		browser.created.Connect(func(info ...interface{}) {
+		browser.accepted.Connect(func(info ...interface{}) {
 			typ := info[0].(Type)
 			param := ValueInfo{typ:typ}
 			f := n.block.Outermost().function

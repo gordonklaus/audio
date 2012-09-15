@@ -14,16 +14,14 @@ type Browser struct {
 	*ViewBase
 	mode browserMode
 	finished bool
-	created *Signal
-	canceled *Signal
+	accepted, canceled *Signal
 	
-	currentInfo Info
-	activeIndices []int
-	currentActiveIndex int
+	path []Info
+	indices []int
+	i int
 	newInfo Info
 	
-	pathTexts []*Text
-	nameTexts []*Text
+	pathTexts, nameTexts []*Text
 	text *nodeNameText
 }
 
@@ -35,15 +33,14 @@ const (
 )
 
 func NewBrowser(mode browserMode) *Browser {
-	b := &Browser{created:NewSignal(), canceled:NewSignal()}
+	b := &Browser{accepted:NewSignal(), canceled:NewSignal()}
 	b.ViewBase = NewView(b)
 	
 	b.mode = mode
-	b.currentInfo = rootPackageInfo
+	b.path = []Info{rootPackageInfo}
 	rootPackageInfo.types = builtinPkg.types
 	rootPackageInfo.functions = builtinPkg.functions
 	rootPackageInfo.constants = builtinPkg.constants
-	b.activeIndices = []int{}
 	
 	b.text = newNodeNameText(b)
 	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
@@ -54,7 +51,7 @@ func NewBrowser(mode browserMode) *Browser {
 	return b
 }
 
-func (b *Browser) Cancel() {
+func (b *Browser) cancel() {
 	if !b.finished {
 		b.finished = true
 		b.Close()
@@ -62,54 +59,13 @@ func (b *Browser) Cancel() {
 	}
 }
 
-func getTextColor(info Info, alpha float64) Color {
-	switch info.(type) {
-	case *PackageInfo:
-		return Color{1, 1, 1, alpha}
-	case *NamedType:
-		return Color{.6, 1, .6, alpha}
-	case *FuncInfo:
-		return Color{1, .6, .6, alpha}
-	case *ValueInfo:
-		return Color{.6, .6, 1, alpha}
-	}
-	return Color{}
-}
-
-func (b Browser) lastPathText() (*Text, bool) {
-	if np := len(b.pathTexts); np > 0 {
-		return b.pathTexts[np - 1], true
-	}
-	return nil, false
-}
-
-func (b Browser) filteredInfos() (infos []Info) {
-	switch b.mode {
-	case browse:
-		infos = b.currentInfo.Children()
-	case fluxSourceOnly:
-		for _, child := range b.currentInfo.Children() {
-			if _, err := os.Stat(child.FluxSourcePath()); err == nil { infos = append(infos, child) }
-		}
-	case typesOnly:
-		for _, child := range b.currentInfo.Children() {
-			switch child.(type) { case *PackageInfo, *NamedType: infos = append(infos, child) }
-		}
-	}
-	return
-}
-
-func (b Browser) currentActiveInfo() Info {
-	if len(b.activeIndices) == 0 || len(b.filteredInfos()) == 0 { return nil }
-	return b.filteredInfos()[b.activeIndices[b.currentActiveIndex]]
-}
-
 func (b *Browser) update() {
 	currentIndex := 0
-	if len(b.activeIndices) > 0 {
-		b.currentActiveIndex %= len(b.activeIndices)
-		if b.currentActiveIndex < 0 { b.currentActiveIndex += len(b.activeIndices) }
-		currentIndex = b.activeIndices[b.currentActiveIndex]
+	n := len(b.indices)
+	if n > 0 {
+		b.i %= n
+		if b.i < 0 { b.i += n }
+		currentIndex = b.indices[b.i]
 	}
 	
 	infos := b.filteredInfos()
@@ -131,22 +87,23 @@ func (b *Browser) update() {
 		currentIndex = newIndex
 	}
 	
-	b.activeIndices = []int{}
+	b.indices = nil
 	for i, child := range infos {
 		if HasPrefix(ToLower(child.Name()), ToLower(b.text.GetText())) {
-			b.activeIndices = append(b.activeIndices, i)
+			b.indices = append(b.indices, i)
 		}
 	}
-	for i, index := range b.activeIndices {
+	n = len(b.indices)
+	for i, index := range b.indices {
 		if index >= currentIndex {
-			b.currentActiveIndex = i
+			b.i = i
 			break
 		}
 	}
-	if b.currentActiveIndex >= len(b.activeIndices) { b.currentActiveIndex = len(b.activeIndices) - 1 }
+	if b.i >= n { b.i = n - 1 }
 	
-	if t, ok := b.lastPathText(); ok && len(b.activeIndices) > 0 {
-		sep := ""; if _, ok := infos[b.activeIndices[b.currentActiveIndex]].(*PackageInfo); ok { sep = "/" } else { sep = "." }
+	if t, ok := b.lastPathText(); ok && n > 0 {
+		sep := ""; if _, ok := infos[b.indices[b.i]].(*PackageInfo); ok { sep = "/" } else { sep = "." }
 		text := t.GetText()
 		t.SetText(text[:len(text) - 1] + sep)
 	}
@@ -155,33 +112,62 @@ func (b *Browser) update() {
 	for _, l := range b.nameTexts { l.Close() }
 	b.nameTexts = []*Text{}
 	width := 0.0
-	for i, activeIndex := range b.activeIndices {
+	for i, activeIndex := range b.indices {
 		child := infos[activeIndex]
 		l := NewText(child.Name())
 		l.SetTextColor(getTextColor(child, .7))
 		l.SetBackgroundColor(Color{0, 0, 0, .7})
 		b.AddChild(l)
 		b.nameTexts = append(b.nameTexts, l)
-		l.Move(Pt(xOffset, float64(len(b.activeIndices) - i - 1)*l.Height()))
+		l.Move(Pt(xOffset, float64(n - i - 1)*l.Height()))
 		if l.Width() > width { width = l.Width() }
 	}
 	b.text.Raise()
 	b.Resize(xOffset + width, float64(len(b.nameTexts))*b.text.Height())
 	
-	yOffset := float64(len(b.activeIndices) - b.currentActiveIndex - 1)*b.text.Height()
+	yOffset := float64(n - b.i - 1)*b.text.Height()
 	b.text.Move(Pt(xOffset, yOffset))
-	if len(b.activeIndices) > 0 {
-		b.text.SetTextColor(getTextColor(infos[b.activeIndices[b.currentActiveIndex]], 1))
+	if n > 0 {
+		b.text.SetTextColor(getTextColor(infos[b.indices[b.i]], 1))
 	}
 	for _, p := range b.pathTexts { p.Move(Pt(p.Position().X, yOffset)) }
 	
 	b.Pan(Pt(0, yOffset))
 }
 
+func (b Browser) filteredInfos() (infos []Info) {
+	switch b.mode {
+	case browse:
+		infos = b.path[0].Children()
+	case fluxSourceOnly:
+		for _, child := range b.path[0].Children() {
+			if _, err := os.Stat(child.FluxSourcePath()); err == nil { infos = append(infos, child) }
+		}
+	case typesOnly:
+		for _, child := range b.path[0].Children() {
+			switch child.(type) { case *PackageInfo, *NamedType: infos = append(infos, child) }
+		}
+	}
+	return
+}
+
+func (b Browser) currentInfo() Info {
+	infos := b.filteredInfos()
+	if len(b.indices) == 0 || len(infos) == 0 { return nil }
+	return infos[b.indices[b.i]]
+}
+
+func (b Browser) lastPathText() (*Text, bool) {
+	if np := len(b.pathTexts); np > 0 {
+		return b.pathTexts[np - 1], true
+	}
+	return nil, false
+}
+
 func (b *Browser) Paint() {
 	rect := ZR
 	if b.newInfo == nil && len(b.nameTexts) > 0 {
-		cur := b.nameTexts[b.currentActiveIndex]
+		cur := b.nameTexts[b.i]
 		rect = Rect(0, cur.Position().Y, cur.Position().X + cur.Width(), cur.Position().Y + cur.Height())
 	} else {
 		rect = b.text.MapRectToParent(b.text.Rect())
@@ -211,18 +197,18 @@ func newNodeNameText(b *Browser) *nodeNameText {
 	})
 	return t
 }
-func (t *nodeNameText) LostKeyboardFocus() { t.b.Cancel() }
+func (t *nodeNameText) LostKeyboardFocus() { t.b.cancel() }
 func (t *nodeNameText) KeyPressed(event KeyEvent) {
 	b := t.b
 	switch event.Key {
 	case KeyUp:
 		if b.newInfo == nil {
-			b.currentActiveIndex--
+			b.i--
 			b.update()
 		}
 	case KeyDown:
 		if b.newInfo == nil {
-			b.currentActiveIndex++
+			b.i++
 			b.update()
 		}
 	case KeyBackspace:
@@ -232,12 +218,12 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 		fallthrough
 	case KeyLeft:
-		if parent := b.currentInfo.Parent(); b.newInfo == nil && parent != nil {
-			previous := b.currentInfo
-			b.currentInfo = parent
-			b.currentActiveIndex = 0
+		if len(b.path) > 1 && b.newInfo == nil {
+			previous := b.path[0]
+			b.path = b.path[1:]
+			b.i = 0
 			for i, info := range b.filteredInfos() {
-				if info == previous { b.activeIndices = []int{i}; break }
+				if info == previous { b.indices = []int{i}; break }
 			}
 			
 			length := len(b.pathTexts)
@@ -249,14 +235,14 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 	case KeyEnter:
 		info := b.newInfo
 		existing := false
-		if info == nil {
-			info = b.currentActiveInfo()
-		} else if b.currentActiveInfo() != nil && info.Name() == b.currentActiveInfo().Name() {
-			info = b.currentActiveInfo()
+		if cur := b.currentInfo(); info == nil {
+			info = cur
+		} else if cur != nil && info.Name() == cur.Name() {
+			info = cur
 			existing = true
 		}
 		if b.newInfo != nil && !existing {
-			b.currentInfo.AddChild(info)
+			b.path[0].AddChild(info)
 			switch info := info.(type) {
 			case *PackageInfo:
 				*info = *newPackageInfo(info.parent.(*PackageInfo), info.name)
@@ -267,47 +253,48 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 				NewFunction(info)
 			}
 			
-			b.currentActiveIndex = 0
+			b.i = 0
 			for i, child := range b.filteredInfos() {
-				if child == info { b.activeIndices = []int{i}; break }
+				if child == info { b.indices = []int{i}; break }
 			}
 		}
 		b.newInfo = nil
 		if _, ok := info.(*PackageInfo); !ok {
 			b.Close()
 			b.finished = true
-			b.created.Emit(info)
+			b.accepted.Emit(info)
 			return
 		}
 		fallthrough
 	case KeyRight:
 		if b.newInfo == nil {
-			switch info := b.currentActiveInfo().(type) {
+			switch info := b.currentInfo().(type) {
 			case *PackageInfo, *NamedType:
-				b.currentInfo = info
-				b.activeIndices[0], b.currentActiveIndex = 0, 0
-			
-				pathText := NewText(info.Name() + "/")
+				b.path = append([]Info{info}, b.path...)
+				b.indices = nil
+				
+				sep := ""; if _, ok := info.(*PackageInfo); ok { sep = "/" } else { sep = "." }
+				pathText := NewText(info.Name() + sep)
 				pathText.SetTextColor(getTextColor(info, 1))
 				pathText.SetBackgroundColor(Color{0, 0, 0, .7})
 				b.AddChild(pathText)
 				x := 0.0; if t, ok := b.lastPathText(); ok { x = t.Position().X + t.Width() }
 				pathText.Move(Pt(x, 0))
 				b.pathTexts = append(b.pathTexts, pathText)
-			
+				
 				t.SetText("")
 			}
 		}
 	case KeyEsc:
 		if b.newInfo == nil {
-			b.Cancel()
+			b.cancel()
 		} else {
 			b.newInfo = nil
 			t.SetText("")
 		}
 	default:
-		_, inPkg := b.currentInfo.(*PackageInfo)
-		_, inType := b.currentInfo.(*NamedType)
+		_, inPkg := b.path[0].(*PackageInfo)
+		_, inType := b.path[0].(*NamedType)
 		if event.Ctrl && b.mode != typesOnly && b.newInfo == nil && (inPkg || inType && event.Text == "3") {
 			switch event.Text {
 			case "1": b.newInfo = &PackageInfo{}
@@ -322,4 +309,18 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			t.Text.KeyPressed(event)
 		}
 	}
+}
+
+func getTextColor(info Info, alpha float64) Color {
+	switch info.(type) {
+	case *PackageInfo:
+		return Color{1, 1, 1, alpha}
+	case *NamedType:
+		return Color{.6, 1, .6, alpha}
+	case *FuncInfo:
+		return Color{1, .6, .6, alpha}
+	case *ValueInfo:
+		return Color{.6, .6, 1, alpha}
+	}
+	return Color{}
 }

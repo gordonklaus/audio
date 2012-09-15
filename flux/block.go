@@ -352,7 +352,7 @@ func (b *Block) KeyPressed(event KeyEvent) {
 				browser := NewBrowser(browse)
 				b.AddChild(browser)
 				browser.Move(b.Center())
-				browser.created.Connect(func(info ...interface{}) {
+				browser.accepted.Connect(func(info ...interface{}) {
 					node := NewNode(info[0].(Info), b)
 					b.AddNode(node)
 					node.MoveCenter(b.Center())

@@ -14,7 +14,7 @@ func NewFluxWindow() *FluxWindow {
 	w.Window = NewWindow(w)
 	w.browser = NewBrowser(fluxSourceOnly)
 	w.SetCentralView(w.browser)
-	w.browser.created.Connect(func(info ...interface{}) {
+	w.browser.accepted.Connect(func(info ...interface{}) {
 		switch info := info[0].(type) {
 		case *FuncInfo:
 			w.SetCentralView(NewFunction(info))
