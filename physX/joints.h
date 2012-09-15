@@ -8,7 +8,12 @@
 extern "C" {
 #endif
 
-void newIsoUniversalJoint(void* actor1, Transform transform1, void* actor2, Transform transform2);
+void* newJoint(void* actor1, Transform transform1, void* actor2, Transform transform2);
+void Joint_enableCollision(void* j);
+void Joint_setMotion(void* j, int axis, int type);
+void Joint_setDrive(void* j, int index, float spring, float damping, float forceLimit);
+void Joint_setDrivePose(void* j, Transform pose);
+void Joint_setDriveVelocity(void* j, Vector linear, Vector angular);
 
 #ifdef __cplusplus
 }

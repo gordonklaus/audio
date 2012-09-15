@@ -2,6 +2,7 @@ package simulation
 
 import (
 	."code.google.com/p/gordon-go/physX"
+	."math"
 )
 
 type Body struct {
@@ -12,10 +13,10 @@ type Body struct {
 func newBody(scene Scene, position Vector) Body {
 	b := Body{scene.NewDynamicActor(Transform{position, IQ}), [4][3]Vector{}}
 	const sideLength = 2
-	ne := Vector{sideLength / 2, sideLength / 2}
-	nw := Vector{-sideLength / 2, sideLength / 2}
-	sw := Vector{-sideLength / 2, -sideLength / 2}
-	se := Vector{sideLength / 2, -sideLength / 2}
+	ne := Vector{sideLength / 2, sideLength / 2, 0}
+	nw := Vector{-sideLength / 2, sideLength / 2, 0}
+	sw := Vector{-sideLength / 2, -sideLength / 2, 0}
+	se := Vector{sideLength / 2, -sideLength / 2, 0}
 	bottom := Vector{0, 0, -1}
 
 	b.limbAttachmentPoints = [4][3]Vector{{bottom, ne, se}, {bottom, nw, ne}, {bottom, sw, nw}, {bottom, se, sw}}
@@ -40,11 +41,11 @@ type TripartiteLimb struct {
 	thigh1, thigh2, thigh3 Thigh
 	calf1, calf2, calf3 Calf
 	foot Foot
-//	actuator1, actuator2, actuator3 CylindricalJoint
-//	controller1, controller2, controller3 JointController
+	actuator1, actuator2, actuator3 CylindricalJoint
+	controller1, controller2, controller3 JointController
 }
 
-func newTripartiteLimb(scene Scene, body Body, iLimb int, params [3]JointControllerParams) TripartiteLimb {
+func newTripartiteLimb(scene Scene, body Body, iLimb int, params [3]JointControllerParam) TripartiteLimb {
 	l := TripartiteLimb{}
 	p := body.getLimbAttachmentPoints(iLimb)
 
@@ -61,42 +62,35 @@ func newTripartiteLimb(scene Scene, body Body, iLimb int, params [3]JointControl
 	l.calf3 = newCalf(scene, p[2], footPosition, center)
 	l.foot = newFoot(scene, footPosition, center)
 
-	NewIsoUniversalJointGlobal(body.a, l.thigh1.a, Transform{p[0], l.thigh1.a.GlobalPose().Orientation})
-	NewIsoUniversalJointGlobal(body.a, l.thigh2.a, Transform{p[1], l.thigh2.a.GlobalPose().Orientation})
-	NewIsoUniversalJointGlobal(body.a, l.thigh3.a, Transform{p[2], l.thigh3.a.GlobalPose().Orientation})
+	NewIsoUniversalJointGlobal(body.a, l.thigh1.a, l.thigh1.a.GlobalPose())
+	NewIsoUniversalJointGlobal(body.a, l.thigh2.a, l.thigh2.a.GlobalPose())
+	NewIsoUniversalJointGlobal(body.a, l.thigh3.a, l.thigh3.a.GlobalPose())
 
-/*	actuator1 = new CylindricalJoint(scene, *thigh1, *calf1, thigh1->getEnd(), thigh1->getXAxis())
-	actuator2 = new CylindricalJoint(scene, *thigh2, *calf2, thigh2->getEnd(), thigh2->getXAxis())
-	actuator3 = new CylindricalJoint(scene, *thigh3, *calf3, thigh3->getEnd(), thigh3->getXAxis())
+	l.actuator1 = NewCylindricalJointGlobal(l.thigh1.a, l.calf1.a, Transform{l.thigh1.End(), l.thigh1.a.Orientation()})
+	l.actuator2 = NewCylindricalJointGlobal(l.thigh2.a, l.calf2.a, Transform{l.thigh2.End(), l.thigh2.a.Orientation()})
+	l.actuator3 = NewCylindricalJointGlobal(l.thigh3.a, l.calf3.a, Transform{l.thigh3.End(), l.thigh3.a.Orientation()})
+	
+	const x = MaxFloat32
+	l.actuator1.SetDrive(x, x, x)
+	l.actuator2.SetDrive(x, x, x)
+	l.actuator3.SetDrive(x, x, x)
 
-	addRevoluteJoint(scene, *calf1, *foot, footPosition, calf1->getZAxis())
-	addRevoluteJoint(scene, *calf2, *foot, footPosition, calf2->getZAxis())
-	addRevoluteJoint(scene, *calf3, *foot, footPosition, calf3->getZAxis())
+	NewRevoluteJointGlobal(l.calf1.a, l.foot.a, Transform{footPosition, AxisOrientation(l.calf1.a.ZAxis())})
+	NewRevoluteJointGlobal(l.calf2.a, l.foot.a, Transform{footPosition, AxisOrientation(l.calf2.a.ZAxis())})
+	NewRevoluteJointGlobal(l.calf3.a, l.foot.a, Transform{footPosition, AxisOrientation(l.calf3.a.ZAxis())})
 
-	controller1.attackPhase = params[0]["attackPhase"]
-	controller1.releasePhase = params[0]["releasePhase"]
-	controller2.attackPhase = params[1]["attackPhase"]
-	controller2.releasePhase = params[1]["releasePhase"]
-	controller3.attackPhase = params[2]["attackPhase"]
-	controller3.releasePhase = params[2]["releasePhase"]*/
+	l.controller1.p = params[0]
+	l.controller2.p = params[1]
+	l.controller3.p = params[2]
 	
 	return l
 }
 
-/*CylindricalJoint& getActuator1() { return *actuator1 }
-CylindricalJoint& getActuator2() { return *actuator2 }
-CylindricalJoint& getActuator3() { return *actuator3 }
-
-void update(double simulationTime) {
-	actuator1->setTargetDistance(controller1.getPosition(simulationTime))
-	actuator2->setTargetDistance(controller2.getPosition(simulationTime))
-	actuator3->setTargetDistance(controller3.getPosition(simulationTime))
-
-	actuator1->update(simulationTime)
-	actuator2->update(simulationTime)
-	actuator3->update(simulationTime)
+func (l TripartiteLimb) update(simulationTime float64) {
+	l.actuator1.SetDriveLength(l.controller1.position(simulationTime))
+	l.actuator2.SetDriveLength(l.controller2.position(simulationTime))
+	l.actuator3.SetDriveLength(l.controller3.position(simulationTime))
 }
-*/
 
 type Thigh struct {
 	a DynamicActor
@@ -105,61 +99,57 @@ type Thigh struct {
 
 func newThigh(scene Scene, bodyAttachmentPoint, footPosition, limbCenter Vector) Thigh {
 	t := Thigh{}
-	t.a = scene.NewDynamicActor(TransformFromSegment(bodyAttachmentPoint, footPosition))
-//formerly	t.a = scene.NewDynamicActor(bodyAttachmentPoint, AxisNormalOrientation(footPosition.Sub(bodyAttachmentPoint), limbCenter.Sub(bodyAttachmentPoint)))
+	t.a = scene.NewDynamicActor(Transform{bodyAttachmentPoint, AxisNormalOrientation(footPosition.Sub(bodyAttachmentPoint), limbCenter.Sub(bodyAttachmentPoint))})
 	d := footPosition.Sub(bodyAttachmentPoint).Len()
-	t.start = Vector{.3}
-	t.end = Vector{d / 2}
+	t.start = Vector{.3, 0, 0}
+	t.end = Vector{d / 2, 0, 0}
 	material := NewMaterial(1, .7, .5)
 	t.a.AddCapsule(t.start, t.end, .1, material)
 	return t
 }
 
-//	NxVec3 getStart() { return transformToGlobal(start) }
-//	NxVec3 getEnd() { return transformToGlobal(end) }
+func (t Thigh) Start() Vector { return t.a.VectorToGlobal(t.start) }
+func (t Thigh) End() Vector { return t.a.VectorToGlobal(t.end) }
 
 
-type Calf struct { DynamicActor }
+type Calf struct { a DynamicActor }
 func newCalf(scene Scene, bodyAttachmentPoint, footPosition, limbCenter Vector) Calf {
-	c := Calf{scene.NewDynamicActor(TransformFromSegment(bodyAttachmentPoint, footPosition))}
+	c := Calf{scene.NewDynamicActor(Transform{bodyAttachmentPoint, AxisOrientation(footPosition.Sub(bodyAttachmentPoint))})}
 	d := footPosition.Sub(bodyAttachmentPoint).Len()
 	material := NewMaterial(1, .7, .5)
-	c.AddCapsule(Vector{d / 2 + .3}, Vector{d - .3}, .05, material)
+	c.a.AddCapsule(Vector{d / 2 + .3, 0, 0}, Vector{d - .3, 0, 0}, .05, material)
 	return c
 }
 
-type Foot struct { DynamicActor }
+type Foot struct { a DynamicActor }
 func newFoot(scene Scene, position, limbCenter Vector) Foot {
-	f := Foot{scene.NewDynamicActor(TransformFromSegment(position, limbCenter))}
+	f := Foot{scene.NewDynamicActor(Transform{position, AxisOrientation(limbCenter.Sub(position))})}
 	material := NewMaterial(1, .7, .5)
-	f.AddCapsule(Vector{}, Vector{.01}, .3, material)
+	f.a.AddCapsule(Vector{}, Vector{.01, 0, 0}, .3, material)
 	return f
 }
 
-/*struct JointController {
-	JointController() : frequency(.3), attackPhase(0), releasePhase(0) {}
-
-	double getPosition(double simulationTime) {
-		double pulseWidth = releasePhase - attackPhase
-		pulseWidth -= floor(pulseWidth)
-		double phase = simulationTime * frequency - attackPhase
-		phase -= floor(phase)
-		return phase < pulseWidth
+type JointController struct { p JointControllerParam }
+const frequency = .3
+func (c JointController) position(simulationTime float64) float64 {
+	pulseWidth := c.p.ReleasePhase - c.p.AttackPhase
+	pulseWidth -= Floor(pulseWidth)
+	phase := simulationTime * frequency - c.p.AttackPhase
+	phase -= Floor(phase)
+	if phase < pulseWidth {
+		return 1
 	}
-
-	double frequency
-	double attackPhase
-	double releasePhase
+	return 0
 }
-*/
+
 type ClimbingFish struct {
 	body Body
 	limbs [4]TripartiteLimb
 }
 
-type JointControllerParams struct { attackPhase, releasePhase float64 }
+type JointControllerParam struct { AttackPhase, ReleasePhase float64 }
 
-func NewClimbingFish(scene Scene, params [4][3]JointControllerParams) ClimbingFish {
+func NewClimbingFish(scene Scene, params [4][3]JointControllerParam) ClimbingFish {
 	c := ClimbingFish{}
 	c.body = newBody(scene, Vector{0, 0, 2})
 	for i := 0; i < 4; i++ {
@@ -169,12 +159,14 @@ func NewClimbingFish(scene Scene, params [4][3]JointControllerParams) ClimbingFi
 }
 
 /*
-NxVec3 ClimbingFish::getPosition() { return body->getGlobalPose().t }
-NxVec3 ClimbingFish::getFootPosition(int i) { return limbs[i]->foot->getGlobalPose().t }
-NxVec3 ClimbingFish::getZAxis() { return body->getZAxis() }
-
-void ClimbingFish::update(double simulationTime) {
-	for(int i = 0 i < limbs.size() ++i)
-		limbs[i]->update(simulationTime)
-}
+NxVec3 ClimbingFish::getPosition() { return body.getGlobalPose().t }
+NxVec3 ClimbingFish::getFootPosition(int i) { return limbs[i].foot.getGlobalPose().t }
+NxVec3 ClimbingFish::getZAxis() { return body.getZAxis() }
 */
+
+func (f ClimbingFish) Update(simulationTime float64) {
+	for _, limb := range f.limbs {
+		limb.update(simulationTime)
+	}
+}
+

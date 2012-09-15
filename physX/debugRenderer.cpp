@@ -42,7 +42,7 @@ void DebugRenderer_resize(DebugRenderer* r, int w, int h) {
 	glViewport(0, 0, w, h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluPerspective(65, double(w) / h, 1, 10000);
+	gluPerspective(65, double(w) / h, 0, 10000);
 }
 
 void DebugRenderer_zoom(DebugRenderer* r, double factor) {
