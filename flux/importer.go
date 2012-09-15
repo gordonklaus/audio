@@ -51,12 +51,12 @@ var (
 
 func init() {
 	b := scopeBuilder{builtinAstPkg.Scope}
-	b.defTypes(new(bool), new(int8), new(int16), new(int32), new(int64), new(int), new(uint16), new(uint32), new(uint64), new(uint), new(uintptr), new(byte), new(float32), new(float64), new(complex64), new(complex128), new(string), new(error))
-	b.defType("uint8", new(uint8))
+	b.defTypes(new(bool), new(int8), new(int16), new(int32), new(int64), new(int), new(uint8), new(uint16), new(uint32), new(uint64), new(uint), new(uintptr), new(float32), new(float64), new(complex64), new(complex128), new(string))
+	b.defType("byte", new(byte))
 	b.defType("rune", new(rune))
-	builtinAstPkg.Scope.Lookup("error").Type.(*NamedType).underlying = InterfaceType{methods:[]FuncInfo{{InfoBase:InfoBase{name:"Error"}, typ:FuncType{results:[]ValueInfo{{typ:builtinAstPkg.Scope.Lookup("string").Type.(Type)}}}}}}
-	b.defConsts("false", "true", "nil", "iota")
+	b.define(ast.Typ, "error").Type = &NamedType{InfoBase:InfoBase{"error", nil}, underlying:InterfaceType{methods:[]FuncInfo{{InfoBase:InfoBase{name:"Error"}, typ:FuncType{results:[]ValueInfo{{typ:builtinAstPkg.Scope.Lookup("string").Type.(Type)}}}}}}}
 	b.defFuncs("append", "cap", "close", "complex", "copy", "delete", "imag", "len", "make", "new", "panic", "print", "println", "real", "recover")
+	b.defConsts("false", "true", "nil", "iota")
 	
 	builtinPkg = &PackageInfo{}
 	builtinPkg.load()
@@ -78,10 +78,7 @@ func (b scopeBuilder) defTypes(values ...interface{}) {
 }
 
 func (b scopeBuilder) defType(name string, value interface{}) {
-	obj := b.define(ast.Typ, name)
-	typ := newNamedType(name, nil)
-	typ.underlying = &BasicType{reflectType:reflect.TypeOf(value).Elem()}
-	obj.Type = typ
+	b.define(ast.Typ, name).Type = &NamedType{InfoBase:InfoBase{name, nil}, underlying:&BasicType{reflectType:reflect.TypeOf(value).Elem()}}
 }
 
 func (b scopeBuilder) defConsts(names ...string) {

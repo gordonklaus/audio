@@ -133,7 +133,7 @@ func (p *PackageInfo) load() {
 		if obj.Kind == ast.Typ {
 			n, ok := obj.Type.(*NamedType)
 			if !ok {
-				n = newNamedType(name, p)
+				n = &NamedType{InfoBase:InfoBase{name, p}}
 				obj.Type = n
 			}
 			n.parent = p
@@ -398,7 +398,6 @@ type NamedType struct {
 	methods []*FuncInfo
 }
 
-func newNamedType(name string, parent Info) *NamedType { return &NamedType{InfoBase:InfoBase{name, parent}} }
 func (t NamedType) Children() []Info {
 	var children []Info
 	for _, m := range t.methods { children = append(children, m) }

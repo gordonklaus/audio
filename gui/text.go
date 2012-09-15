@@ -7,7 +7,7 @@ import (
 	."code.google.com/p/gordon-go/util"
 )
 
-var font Font = CreateTextureFont("/usr/share/fonts/truetype/freefont/FreeSans.ttf")
+var font Font = CreateTextureFont(fontpath)
 func init() {
 	font.SetFaceSize(fontSize, 1)
 }
