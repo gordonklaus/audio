@@ -349,7 +349,8 @@ func (b *Block) KeyPressed(event KeyEvent) {
 		if !(event.Ctrl || event.Alt || event.Super) {
 			switch event.Text {
 			default:
-				browser := NewBrowser(browse)
+				f := b.Outermost().function
+				browser := NewBrowser(browse, f.pkg(), f.imports())
 				b.AddChild(browser)
 				browser.Move(b.Center())
 				browser.accepted.Connect(func(info ...interface{}) {

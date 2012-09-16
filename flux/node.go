@@ -17,13 +17,12 @@ type Node interface {
 }
 
 type nodeText struct {
-	Text
+	*TextBase
 	node *NodeBase
 }
 func newNodeText(node *NodeBase) *nodeText {
-	t := &nodeText{}
-	t.Text = *NewTextBase(t, "")
-	t.node = node
+	t := &nodeText{node:node}
+	t.TextBase = NewTextBase(t, "")
 	return t
 }
 func (t *nodeText) LostKeyboardFocus() { t.SetEditable(false) }
@@ -33,7 +32,7 @@ func (t *nodeText) KeyPressed(event KeyEvent) {
 		t.SetEditable(false)
 		t.node.TakeKeyboardFocus()
 	default:
-		t.Text.KeyPressed(event)
+		t.TextBase.KeyPressed(event)
 	}
 	t.node.reform()
 }

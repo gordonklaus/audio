@@ -37,6 +37,13 @@ func (f Function) pkg() *PackageInfo {
 	return parent.(*PackageInfo)
 }
 
+func (f Function) imports() (x []*PackageInfo) {
+	for p := range f.pkgRefs {
+		x = append(x, p)
+	}
+	return
+}
+
 func (f *Function) AddPackageRef(x interface{}) {
 	switch x := x.(type) {
 	case Info:

@@ -17,13 +17,13 @@ func NewInputNode(block *Block) *InputNode {
 
 func (n *InputNode) KeyPressed(event KeyEvent) {
 	if event.Text == "," {
-		browser := NewBrowser(typesOnly)
+		f := n.block.Outermost().function
+		browser := NewBrowser(typesOnly, f.pkg(), f.imports())
 		n.AddChild(browser)
 		browser.Move(n.Center())
 		browser.accepted.Connect(func(info ...interface{}) {
 			typ := info[0].(Type)
 			param := ValueInfo{typ:typ}
-			f := n.block.Outermost().function
 			f.info.typ.parameters = append(f.info.typ.parameters, param)
 			f.AddPackageRef(typ)
 			output := NewOutput(n, param)

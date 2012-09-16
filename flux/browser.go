@@ -1,18 +1,20 @@
 package main
 
 import (
-	."github.com/jteeuwen/glfw"
-	."code.google.com/p/gordon-go/util"
 	."code.google.com/p/gordon-go/gui"
+	."code.google.com/p/gordon-go/util"
 	."fmt"
+	."github.com/jteeuwen/glfw"
+	"go/ast"
 	."io/ioutil"
-	."strings"
 	"os"
+	."strings"
 )
 
 type Browser struct {
 	*ViewBase
 	mode browserMode
+	currentPkg *PackageInfo
 	finished bool
 	accepted, canceled *Signal
 	
@@ -21,7 +23,7 @@ type Browser struct {
 	i int
 	newInfo Info
 	
-	pathTexts, nameTexts []*Text
+	pathTexts, nameTexts []Text
 	text *nodeNameText
 }
 
@@ -32,20 +34,31 @@ const (
 	typesOnly
 )
 
-func NewBrowser(mode browserMode) *Browser {
-	b := &Browser{accepted:NewSignal(), canceled:NewSignal()}
+func NewBrowser(mode browserMode, currentPkg *PackageInfo, imports []*PackageInfo) *Browser {
+	b := &Browser{currentPkg:currentPkg, accepted:NewSignal(), canceled:NewSignal()}
 	b.ViewBase = NewView(b)
 	
 	b.mode = mode
 	b.path = []Info{rootPackageInfo}
 	rootPackageInfo.types = builtinPkg.types
 	rootPackageInfo.functions = builtinPkg.functions
+	rootPackageInfo.variables = []*ValueInfo{}
 	rootPackageInfo.constants = builtinPkg.constants
+	if currentPkg != nil { imports = append(imports, currentPkg) }
+	for _, p := range imports {
+		rootPackageInfo.types = append(rootPackageInfo.types, p.types...)
+		rootPackageInfo.functions = append(rootPackageInfo.functions, p.functions...)
+		rootPackageInfo.variables = append(rootPackageInfo.variables, p.variables...)
+		rootPackageInfo.constants = append(rootPackageInfo.constants, p.constants...)
+	}
+	Sort(rootPackageInfo.types, "Name")
+	Sort(rootPackageInfo.functions, "Name")
+	Sort(rootPackageInfo.variables, "Name")
+	Sort(rootPackageInfo.constants, "Name")
 	
 	b.text = newNodeNameText(b)
 	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	b.AddChild(b.text)
-	b.text.TextChanged.Connect(func(...interface{}) { b.update() })
 	b.text.SetText("")
 	
 	return b
@@ -59,94 +72,25 @@ func (b *Browser) cancel() {
 	}
 }
 
-func (b *Browser) update() {
-	currentIndex := 0
-	n := len(b.indices)
-	if n > 0 {
-		b.i %= n
-		if b.i < 0 { b.i += n }
-		currentIndex = b.indices[b.i]
-	}
-	
-	infos := b.filteredInfos()
-	if b.newInfo != nil {
-		b.newInfo.SetName(b.text.GetText())
-		newIndex := 0
-		for i, child := range infos {
-			if child.Name() >= b.newInfo.Name() {
-				switch child.(type) {
-				case *PackageInfo: if _, ok := b.newInfo.(*PackageInfo); !ok { continue }
-				case *FuncInfo: if _, ok := b.newInfo.(*FuncInfo); !ok { continue }
+func (b Browser) filteredInfos() (infos []Info) {
+	for _, i := range b.path[0].Children() {
+		switch b.mode {
+		case fluxSourceOnly:
+			if _, err := os.Stat(i.FluxSourcePath()); err != nil { continue }
+		case typesOnly:
+			switch i.(type) {
 				default: continue
-				}
-				newIndex = i
-				break
+				case *PackageInfo, *NamedType:
 			}
 		}
-		infos = append(infos[:newIndex], append([]Info{b.newInfo}, infos[newIndex:]...)...)
-		currentIndex = newIndex
-	}
-	
-	b.indices = nil
-	for i, child := range infos {
-		if HasPrefix(ToLower(child.Name()), ToLower(b.text.GetText())) {
-			b.indices = append(b.indices, i)
+		if b.currentPkg != nil {
+			switch i.(type) {
+			default:
+				if p := i.Parent(); p != builtinPkg && p != b.currentPkg && !ast.IsExported(i.Name()) { continue }
+			case *PackageInfo:
+			}
 		}
-	}
-	n = len(b.indices)
-	for i, index := range b.indices {
-		if index >= currentIndex {
-			b.i = i
-			break
-		}
-	}
-	if b.i >= n { b.i = n - 1 }
-	
-	if t, ok := b.lastPathText(); ok && n > 0 {
-		sep := ""; if _, ok := infos[b.indices[b.i]].(*PackageInfo); ok { sep = "/" } else { sep = "." }
-		text := t.GetText()
-		t.SetText(text[:len(text) - 1] + sep)
-	}
-	xOffset := 0.0; if t, ok := b.lastPathText(); ok { xOffset = t.Position().X + t.Width() }
-	
-	for _, l := range b.nameTexts { l.Close() }
-	b.nameTexts = []*Text{}
-	width := 0.0
-	for i, activeIndex := range b.indices {
-		child := infos[activeIndex]
-		l := NewText(child.Name())
-		l.SetTextColor(getTextColor(child, .7))
-		l.SetBackgroundColor(Color{0, 0, 0, .7})
-		b.AddChild(l)
-		b.nameTexts = append(b.nameTexts, l)
-		l.Move(Pt(xOffset, float64(n - i - 1)*l.Height()))
-		if l.Width() > width { width = l.Width() }
-	}
-	b.text.Raise()
-	b.Resize(xOffset + width, float64(len(b.nameTexts))*b.text.Height())
-	
-	yOffset := float64(n - b.i - 1)*b.text.Height()
-	b.text.Move(Pt(xOffset, yOffset))
-	if n > 0 {
-		b.text.SetTextColor(getTextColor(infos[b.indices[b.i]], 1))
-	}
-	for _, p := range b.pathTexts { p.Move(Pt(p.Position().X, yOffset)) }
-	
-	b.Pan(Pt(0, yOffset))
-}
-
-func (b Browser) filteredInfos() (infos []Info) {
-	switch b.mode {
-	case browse:
-		infos = b.path[0].Children()
-	case fluxSourceOnly:
-		for _, child := range b.path[0].Children() {
-			if _, err := os.Stat(child.FluxSourcePath()); err == nil { infos = append(infos, child) }
-		}
-	case typesOnly:
-		for _, child := range b.path[0].Children() {
-			switch child.(type) { case *PackageInfo, *NamedType: infos = append(infos, child) }
-		}
+		infos = append(infos, i)
 	}
 	return
 }
@@ -157,7 +101,7 @@ func (b Browser) currentInfo() Info {
 	return infos[b.indices[b.i]]
 }
 
-func (b Browser) lastPathText() (*Text, bool) {
+func (b Browser) lastPathText() (Text, bool) {
 	if np := len(b.pathTexts); np > 0 {
 		return b.pathTexts[np - 1], true
 	}
@@ -178,24 +122,109 @@ func (b *Browser) Paint() {
 }
 
 type nodeNameText struct {
-	Text
+	*TextBase
 	b *Browser
 }
 func newNodeNameText(b *Browser) *nodeNameText {
 	t := &nodeNameText{}
-	t.Text = *NewTextBase(t, "")
+	t.TextBase = NewTextBase(t, "")
 	t.b = b
-	t.SetValidator(func(text *string) bool {
-		if b.newInfo != nil { return true }
-		for _, info := range b.filteredInfos() {
-			if HasPrefix(ToLower(info.Name()), ToLower(*text)) {
-				*text = info.Name()[:len(*text)]
-				return true
+	return t
+}
+func (t *nodeNameText) SetText(text string) {
+	b := t.b
+	if b.newInfo == nil {
+		if infos := b.filteredInfos(); len(infos) > 0 {
+			for _, info := range infos {
+				if HasPrefix(ToLower(info.Name()), ToLower(text)) {
+					goto ok
+				}
+			}
+			return
+		}
+	}
+ok:
+	currentIndex := 0
+	n := len(b.indices)
+	if n > 0 {
+		b.i %= n
+		if b.i < 0 { b.i += n }
+		currentIndex = b.indices[b.i]
+	}
+	
+	infos := b.filteredInfos()
+	if b.newInfo != nil {
+		b.newInfo.SetName(text)
+		newIndex := 0
+		for i, child := range infos {
+			if child.Name() >= b.newInfo.Name() {
+				switch child.(type) {
+				case *PackageInfo: if _, ok := b.newInfo.(*PackageInfo); !ok { continue }
+				case *FuncInfo: if _, ok := b.newInfo.(*FuncInfo); !ok { continue }
+				default: continue
+				}
+				newIndex = i
+				break
 			}
 		}
-		return false
-	})
-	return t
+		infos = append(infos[:newIndex], append([]Info{b.newInfo}, infos[newIndex:]...)...)
+		currentIndex = newIndex
+	}
+	
+	b.indices = nil
+	for i, child := range infos {
+		if HasPrefix(ToLower(child.Name()), ToLower(text)) {
+			b.indices = append(b.indices, i)
+		}
+	}
+	n = len(b.indices)
+	for i, index := range b.indices {
+		if index >= currentIndex {
+			b.i = i
+			break
+		}
+	}
+	if b.i >= n { b.i = n - 1 }
+	
+	var cur Info; if n > 0 { cur = infos[b.indices[b.i]] }
+	if cur != nil {
+		text = cur.Name()[:len(text)]
+	} else {
+		text = ""
+	}
+	t.TextBase.SetText(text)
+	
+	if t, ok := b.lastPathText(); ok && cur != nil {
+		sep := ""; if _, ok := cur.(*PackageInfo); ok { sep = "/" } else { sep = "." }
+		text := t.GetText()
+		t.SetText(text[:len(text) - 1] + sep)
+	}
+	xOffset := 0.0; if t, ok := b.lastPathText(); ok { xOffset = t.Position().X + t.Width() }
+
+	for _, l := range b.nameTexts { l.Close() }
+	b.nameTexts = []Text{}
+	width := 0.0
+	for i, activeIndex := range b.indices {
+		child := infos[activeIndex]
+		l := NewText(child.Name())
+		l.SetTextColor(getTextColor(child, .7))
+		l.SetBackgroundColor(Color{0, 0, 0, .7})
+		b.AddChild(l)
+		b.nameTexts = append(b.nameTexts, l)
+		l.Move(Pt(xOffset, float64(n - i - 1)*l.Height()))
+		if l.Width() > width { width = l.Width() }
+	}
+	b.text.Raise()
+	b.Resize(xOffset + width, float64(len(b.nameTexts))*b.text.Height())
+
+	yOffset := float64(n - b.i - 1)*b.text.Height()
+	b.text.Move(Pt(xOffset, yOffset))
+	if cur != nil {
+		b.text.SetTextColor(getTextColor(cur, 1))
+	}
+	for _, p := range b.pathTexts { p.Move(Pt(p.Position().X, yOffset)) }
+
+	b.Pan(Pt(0, yOffset))
 }
 func (t *nodeNameText) LostKeyboardFocus() { t.b.cancel() }
 func (t *nodeNameText) KeyPressed(event KeyEvent) {
@@ -204,16 +233,16 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 	case KeyUp:
 		if b.newInfo == nil {
 			b.i--
-			b.update()
+			t.SetText(t.GetText())
 		}
 	case KeyDown:
 		if b.newInfo == nil {
 			b.i++
-			b.update()
+			t.SetText(t.GetText())
 		}
 	case KeyBackspace:
 		if len(t.GetText()) > 0 {
-			t.Text.KeyPressed(event)
+			t.TextBase.KeyPressed(event)
 			break
 		}
 		fallthrough
@@ -302,11 +331,11 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			case "3": b.newInfo = &FuncInfo{}
 			case "4": b.newInfo = &ValueInfo{}
 			case "5": b.newInfo = &ValueInfo{constant:true}
-			default: t.Text.KeyPressed(event); return
+			default: t.TextBase.KeyPressed(event); return
 			}
 			t.SetText("")
 		} else {
-			t.Text.KeyPressed(event)
+			t.TextBase.KeyPressed(event)
 		}
 	}
 }

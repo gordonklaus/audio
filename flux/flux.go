@@ -12,7 +12,7 @@ type FluxWindow struct {
 func NewFluxWindow() *FluxWindow {
 	w := &FluxWindow{}
 	w.Window = NewWindow(w)
-	w.browser = NewBrowser(fluxSourceOnly)
+	w.browser = NewBrowser(fluxSourceOnly, nil, nil)
 	w.SetCentralView(w.browser)
 	w.browser.accepted.Connect(func(info ...interface{}) {
 		switch info := info[0].(type) {

@@ -16,9 +16,18 @@ const (
 	fontSize = 18
 )
 
-type Text struct {
+type Text interface {
+	View
+	GetText() string
+	SetText(string)
+	GetTextColor() Color
+	SetTextColor(Color)
+}
+
+type TextBase struct {
 	*ViewBase
 	AggregateMouseHandler
+	Self Text
 	text string
 	textColor Color
 	frameSize float64
@@ -30,9 +39,9 @@ type Text struct {
 	TextChanged *Signal
 }
 
-func NewText(text string) *Text { return NewTextBase(nil, text) }
-func NewTextBase(self View, text string) *Text {
-	t := &Text{}
+func NewText(text string) *TextBase { return NewTextBase(nil, text) }
+func NewTextBase(self Text, text string) *TextBase {
+	t := &TextBase{}
 	if self == nil { self = t }
 	t.ViewBase = NewView(t)
 	t.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(t)}
@@ -41,66 +50,67 @@ func NewTextBase(self View, text string) *Text {
 	t.TextChanged = NewSignal()
 	t.SetText(text)
 	t.Self = self
+	t.ViewBase.Self = self
 	return t
 }
 
-func (t Text) GetText() string { return t.text }
-func (t *Text) SetText(text string) {
+func (t TextBase) GetText() string { return t.text }
+func (t *TextBase) SetText(text string) {
 	t.text = text
 	t.Resize(2*t.frameSize + font.Advance(text), 2*t.frameSize + font.LineHeight())
 	t.TextChanged.Emit(text)
 }
 
-func (t Text) GetTextColor() Color { return t.textColor }
-func (t *Text) SetTextColor(color Color) {
+func (t TextBase) GetTextColor() Color { return t.textColor }
+func (t *TextBase) SetTextColor(color Color) {
 	t.textColor = color
 	t.Repaint()
 }
 
-func (t *Text) SetBackgroundColor(color Color) {
+func (t *TextBase) SetBackgroundColor(color Color) {
 	t.backgroundColor = color
 	t.Repaint()
 }
 
-func (t *Text) SetFrameColor(color Color) {
+func (t *TextBase) SetFrameColor(color Color) {
 	t.frameColor = color
 	t.Repaint()
 }
 
-func (t *Text) SetFrameSize(size float64) {
+func (t *TextBase) SetFrameSize(size float64) {
 	t.frameSize = size
 	t.Resize(2*t.frameSize + font.Advance(t.text), 2*t.frameSize + font.LineHeight())
 }
 
-func (t *Text) SetEditable(editable bool) {
+func (t *TextBase) SetEditable(editable bool) {
 	t.editable = editable
 }
 
-func (t *Text) SetValidator(validator func(*string)bool) {
+func (t *TextBase) SetValidator(validator func(*string)bool) {
 	t.validator = validator
 }
 
-func (t *Text) GetMouseFocus(button int, p Point) MouseHandlerView {
+func (t *TextBase) GetMouseFocus(button int, p Point) MouseHandlerView {
 	if t.editable { return t.ViewBase.GetMouseFocus(button, p) }
 	return nil
 }
 
-func (t *Text) KeyPressed(event KeyEvent) {
+func (t *TextBase) KeyPressed(event KeyEvent) {
 	if len(event.Text) > 0 {
 		text := t.text + event.Text
 		if t.validator == nil || t.validator(&text) {
-			t.SetText(text)
+			t.Self.SetText(text)
 		}
 	}
 	switch event.Key {
 	case KeyBackspace:
 		if len(t.text) > 0 {
-			t.SetText(t.text[:len(t.text) - 1])
+			t.Self.SetText(t.text[:len(t.text) - 1])
 		}
 	}
 }
 
-func (t Text) Paint() {
+func (t TextBase) Paint() {
 	SetColor(t.backgroundColor)
 	FillRect(t.Rect().Inset(t.frameSize))
 	if t.frameSize > 0 {
