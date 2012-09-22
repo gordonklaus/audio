@@ -22,6 +22,11 @@ type Text interface {
 	SetText(string)
 	GetTextColor() Color
 	SetTextColor(Color)
+	SetBackgroundColor(Color)
+	SetFrameColor(Color)
+	SetFrameSize(float64)
+	SetEditable(bool)
+	SetValidator(func(*string)bool)
 }
 
 type TextBase struct {
@@ -115,7 +120,7 @@ func (t TextBase) Paint() {
 	FillRect(t.Rect().Inset(t.frameSize))
 	if t.frameSize > 0 {
 		SetColor(t.frameColor)
-		gl.LineWidth(gl.Float(t.frameSize))
+		SetLineWidth(t.frameSize)
 		DrawRect(t.Rect())
 	}
 	

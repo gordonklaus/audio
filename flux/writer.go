@@ -241,7 +241,7 @@ func (w writer) typeString(t Type) string {
 			if i > 0 {
 				s += "; "
 			}
-			s += m.name + w.signature(m.typ)
+			s += m.name + w.signature(m.typ.(FuncType))
 		}
 		return s + "}"
 	case StructType:
@@ -275,7 +275,7 @@ func (w writer) signature(f FuncType) string {
 	return s
 }
 
-func (w writer) paramsString(params []ValueInfo) string {
+func (w writer) paramsString(params []*ValueInfo) string {
 	s := "("
 	for i, p := range params {
 		if i > 0 {

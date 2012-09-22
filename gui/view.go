@@ -21,6 +21,8 @@ type View interface {
 	RemoveChild(v View)
 	ViewAt(point Point) View
 	
+	Show()
+	Hide()
 	Close()
 	
 	Raise()
@@ -69,16 +71,32 @@ type MouseHandlerView interface {
 	MouseHandler
 }
 
+func ResizeToFit(v View, margin float64) {
+	if len(v.Children()) == 0 {
+		v.Resize(0, 0)
+		return
+	}
+	c1 := v.Children()[0]
+	rect := c1.MapRectToParent(c1.Rect())
+	for _, c := range v.Children() {
+		rect = rect.Union(c.MapRectToParent(c.Rect()))
+	}
+	rect = rect.Inset(-margin)
+	v.Resize(rect.Dx(), rect.Dy())
+	v.Pan(rect.Min)
+}
+
 type ViewBase struct {
 	Self View
 	parent View
 	children []View
+	hidden bool
 	rect Rectangle
 	position Point
 }
 
 func NewView(self View) *ViewBase {
-	return &ViewBase{self, nil, make([]View, 0), ZR, ZP}
+	return &ViewBase{self, nil, make([]View, 0), false, ZR, ZP}
 }
 
 func (v *ViewBase) GetViewBase() *ViewBase { return v }
@@ -109,6 +127,8 @@ func (v ViewBase) ViewAt(point Point) View {
 	return v.Self
 }
 
+func (v *ViewBase) Show() { v.hidden = false; v.Self.Repaint() }
+func (v *ViewBase) Hide() { v.hidden = true; v.Self.Repaint() }
 func (v *ViewBase) Close() { if v.parent != nil { v.parent.RemoveChild(v.Self) } }
 
 func (v *ViewBase) Raise() { if v.parent != nil { v.parent.RaiseChild(v.Self) } }
@@ -193,6 +213,7 @@ func (v *ViewBase) GetMouseFocus(button int, p Point) MouseHandlerView {
 
 func (v ViewBase) Repaint() { if v.parent != nil { v.parent.Repaint() } }
 func (v ViewBase) paintBase() {
+	if v.hidden { return }
 	gl.PushMatrix(); defer gl.PopMatrix()
 	gl.PushAttrib(gl.ALL_ATTRIB_BITS); defer gl.PopAttrib()
 	delta := v.Position().Sub(v.Rect().Min)

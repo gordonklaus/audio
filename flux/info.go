@@ -278,7 +278,7 @@ func specType(x ast.Expr) Type {
 		for _, m := range x.Methods.List {
 			switch field := m.Type.(type) {
 			case *ast.FuncType:
-				t.methods = append(t.methods, FuncInfo{InfoBase{m.Names[0].Name, nil}, nil, specType(field).(FuncType)})
+				t.methods = append(t.methods, &ValueInfo{InfoBase{m.Names[0].Name, nil}, specType(field).(FuncType), false})
 			case *ast.Ident:
 				emb, ok := field.Obj.Type.(*NamedType).underlying.(InterfaceType)
 				if !ok {
@@ -295,8 +295,7 @@ func specType(x ast.Expr) Type {
 		}
 		return t
 	case *ast.StructType:
-		// TODO
-		return StructType{}
+		return StructType{fields:getFields(x.Fields)}
 	}
 	Panicf("unknown type:  %#v\n", x)
 	return nil
@@ -320,17 +319,15 @@ func intConstValue(x ast.Expr) int {
 	return -1
 }
 
-func getFields(f *ast.FieldList) (v []ValueInfo) {
+func getFields(f *ast.FieldList) (v []*ValueInfo) {
 	if f == nil { return }
 	for _, field := range f.List {
 		if len(field.Names) > 0 {
 			for _, name := range field.Names {
-				n := name.Name
-				if n == "_" { n = "" }
-				v = append(v, ValueInfo{InfoBase{n, nil}, specType(field.Type), false})
+				v = append(v, &ValueInfo{InfoBase{name.Name, nil}, specType(field.Type), false})
 			}
 		} else {
-			v = append(v, ValueInfo{InfoBase{"", nil}, specType(field.Type), false})
+			v = append(v, &ValueInfo{InfoBase{"", nil}, specType(field.Type), false})
 		}
 	}
 	return
@@ -380,16 +377,16 @@ type ChanType struct {
 }
 type FuncType struct {
 	implementsType
-	parameters []ValueInfo
-	results []ValueInfo
+	parameters []*ValueInfo
+	results []*ValueInfo
 }
 type InterfaceType struct {
 	implementsType
-	methods []FuncInfo
+	methods []*ValueInfo
 }
 type StructType struct {
 	implementsType
-	fields []ValueInfo
+	fields []*ValueInfo
 }
 type NamedType struct {
 	implementsType

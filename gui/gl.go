@@ -11,6 +11,7 @@ type Color struct {
 
 func SetColor(color Color) { Color4d(Double(color.Red), Double(color.Green), Double(color.Blue), Double(color.Alpha)) }
 func SetPointSize(size float64) { PointSize(Float(size)) }
+func SetLineWidth(size float64) { LineWidth(Float(size)) }
 
 func DrawPoint(p Point) {
 	Begin(POINTS); defer End()

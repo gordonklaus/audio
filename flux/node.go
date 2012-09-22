@@ -174,7 +174,7 @@ type ConstantNode struct { *NodeBase }
 func NewStringConstantNode(block *Block) *ConstantNode {
 	n := &ConstantNode{}
 	n.NodeBase = NewNodeBase(n, block)
-	p := NewOutput(n, ValueInfo{})
+	p := NewOutput(n, &ValueInfo{})
 	n.AddChild(p)
 	n.outputs = []*Output{p}
 	n.reform()

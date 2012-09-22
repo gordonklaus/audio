@@ -9,7 +9,8 @@ type put struct {
 	*ViewBase
 	spec putSpecializer
 	node Node
-	info ValueInfo
+	info *ValueInfo
+	valueView *valueView
 	connections []*Connection
 	focused bool
 }
@@ -22,12 +23,15 @@ type putSpecializer interface {
 	PassMouseFocusToFreeConnectionHandle(conn *Connection, button int)
 }
 
-func Newput(spec putSpecializer, n Node, info ValueInfo) *put {
+func Newput(spec putSpecializer, n Node, info *ValueInfo) *put {
 	p := &put{}
 	p.ViewBase = NewView(p)
 	p.spec = spec
 	p.node = n
 	p.info = info
+	p.valueView = newValueView(info)
+	p.valueView.Hide()
+	p.AddChild(p.valueView)
 	p.Resize(putSize, putSize)
 	p.Pan(Pt(putSize, putSize).Div(-2))
 	p.Self = spec
@@ -45,8 +49,8 @@ func (p *put) Disconnect(conn *Connection) {
 	}
 }
 
-func (p *put) TookKeyboardFocus() { p.focused = true; p.Repaint() }
-func (p *put) LostKeyboardFocus() { p.focused = false; p.Repaint() }
+func (p *put) TookKeyboardFocus() { p.focused = true; p.Repaint(); p.valueView.Show() }
+func (p *put) LostKeyboardFocus() { p.focused = false; p.Repaint(); p.valueView.Hide() }
 
 func (p *put) KeyPressed(event KeyEvent) {
 	switch event.Key {
@@ -87,9 +91,10 @@ func (p put) Paint() {
 type Input struct {
 	*put
 }
-func NewInput(n Node, info ValueInfo) *Input {
+func NewInput(n Node, info *ValueInfo) *Input {
 	p := &Input{}
 	p.put = Newput(p, n, info)
+	p.valueView.Move(Pt(-p.valueView.Width() - 12, -p.valueView.Height() / 2))
 	return p
 }
 
@@ -110,9 +115,10 @@ func (p *Input) KeyPressed(event KeyEvent) {
 type Output struct {
 	*put
 }
-func NewOutput(n Node, info ValueInfo) *Output {
+func NewOutput(n Node, info *ValueInfo) *Output {
 	p := &Output{}
 	p.put = Newput(p, n, info)
+	p.valueView.Move(Pt(12, -p.valueView.Height() / 2))
 	return p
 }
 

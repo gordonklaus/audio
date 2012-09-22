@@ -23,7 +23,7 @@ func (n *InputNode) KeyPressed(event KeyEvent) {
 		browser.Move(n.Center())
 		browser.accepted.Connect(func(info ...interface{}) {
 			typ := info[0].(Type)
-			param := ValueInfo{typ:typ}
+			param := &ValueInfo{typ:typ}
 			f.info.typ.parameters = append(f.info.typ.parameters, param)
 			f.AddPackageRef(typ)
 			output := NewOutput(n, param)
