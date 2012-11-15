@@ -96,7 +96,10 @@ type ViewBase struct {
 }
 
 func NewView(self View) *ViewBase {
-	return &ViewBase{self, nil, make([]View, 0), false, ZR, ZP}
+	v := &ViewBase{}
+	if self == nil { self = v }
+	v.Self = self
+	return v
 }
 
 func (v *ViewBase) GetViewBase() *ViewBase { return v }

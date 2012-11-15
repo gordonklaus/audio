@@ -8,53 +8,36 @@ import (
 	."strings"
 )
 
-type writer struct {
-	flux, go_ *os.File
-	pkgNames map[*PackageInfo]string
-	names map[string]int
-	nodeID int
-	nodeIDs map[Node]int
+func saveType(t *NamedType) {
+	w := newWriter(t)
+	defer w.close()
+	
+	u := t.underlying
+	walkType(u, func(tt *NamedType) {
+		if p := tt.parent.(*PackageInfo); p != t.parent.(*PackageInfo) && p != builtinPkg {
+			w.pkgNames[p] = w.newName(p.Name())
+		}
+	})
+	
+	tStr := w.typeString(u)
+	w.flux.WriteString("type " + tStr)
+	w.writeImports()
+	
+	Fprintf(w.go_, "type %s %s", t.name, tStr)
 }
 
 func saveFunction(f Function) {
-	w := &writer{nil, nil, map[*PackageInfo]string{}, map[string]int{}, 0, map[Node]int{}}
-	var err error
-	w.flux, err = os.Create(f.info.FluxSourcePath())
-	if err != nil { Println(err); return }
-	defer w.flux.Close()
-	w.go_, err = os.Create(Sprintf("%s/%s.go", f.info.parent.FluxSourcePath(), f.info.Name()))
-	if err != nil { Println(err); return }
-	defer w.go_.Close()
-	
-	for _, i := range append(builtinPkg.Children(), f.pkg().Children()...) {
-		if _, ok := i.(*PackageInfo); !ok {
-			w.newName(i.Name())
-		}
-	}
+	w := newWriter(f.info)
+	defer w.close()
 	
 	for p := range f.pkgRefs {
 		w.pkgNames[p] = w.newName(p.Name())
 	}
 	
 	w.flux.WriteString(w.typeString(f.info.typ))
-	for p, n := range w.pkgNames {
-		Fprintf(w.flux, "\n%s", p.importPath)
-		if n != p.name {
-			Fprintf(w.flux, " %s", n)
-		}
-	}
+	w.writeImports()
 	w.writeBlockFlux(f.block, 0)
 	
-	/////
-	
-	Fprintf(w.go_, "package %s\n\nimport (\n", f.pkg().Name())
-	for p, n := range w.pkgNames {
-		w.go_.WriteString("\t")
-		if n != p.name {
-			Fprintf(w.go_, "%s ", n)
-		}
-		Fprintf(w.go_, "\"%s\"\n", p.importPath)
-	}
 	vars := map[*Input]string{}
 	params := []string{}
 	for _, output := range f.inputNode.Outputs() {
@@ -67,9 +50,54 @@ func saveFunction(f Function) {
 		}
 		params = append(params, name + " " + w.typeString(output.info.typ))
 	}
-	Fprintf(w.go_, ")\n\nfunc %s(%s) {\n", f.info.Name(), Join(params, ", "))
+	Fprintf(w.go_, "func %s(%s) {\n", f.info.Name(), Join(params, ", "))
 	w.writeBlockGo(f.block, 0, vars)
 	w.go_.WriteString("}")
+}
+
+type writer struct {
+	flux, go_ *os.File
+	pkgNames map[*PackageInfo]string
+	names map[string]int
+	nodeID int
+	nodeIDs map[Node]int
+}
+
+func newWriter(info Info) *writer {
+	w := &writer{nil, nil, map[*PackageInfo]string{}, map[string]int{}, 0, map[Node]int{}}
+	var err error
+	w.flux, err = os.Create(info.FluxSourcePath())
+	if err != nil { Println(err); return nil }
+	w.go_, err = os.Create(Sprintf("%s/%s.go", info.Parent().FluxSourcePath(), info.Name()))
+	if err != nil { Println(err); return nil }
+	
+	for _, i := range append(builtinPkg.Children(), info.Parent().Children()...) {
+		if _, ok := i.(*PackageInfo); !ok {
+			w.newName(i.Name())
+		}
+	}
+	
+	Fprintf(w.go_, "package %s\n\n", info.Parent().Name())
+	
+	return w
+}
+
+func (w *writer) writeImports() {
+	if len(w.pkgNames) > 0 {
+		w.go_.WriteString("import (\n")
+	}
+	for p, n := range w.pkgNames {
+		Fprintf(w.flux, "\n%s", p.importPath)
+		w.go_.WriteString("\t")
+		if n != p.name {
+			Fprintf(w.flux, " %s", n)
+			Fprintf(w.go_, "%s ", n)
+		}
+		Fprintf(w.go_, "\"%s\"\n", p.importPath)
+	}
+	if len(w.pkgNames) > 0 {
+		w.go_.WriteString(")\n\n")
+	}
 }
 
 func (w *writer) writeBlockFlux(b *Block, indent int) {
@@ -214,15 +242,15 @@ func (w writer) qualifiedName(i Info) string {
 
 func (w writer) typeString(t Type) string {
 	switch t := t.(type) {
-	case PointerType:
+	case *PointerType:
 		return "*" + w.typeString(t.element)
-	case ArrayType:
+	case *ArrayType:
 		return Sprintf("[%d]%s", t.size, w.typeString(t.element))
-	case SliceType:
+	case *SliceType:
 		return "[]" + w.typeString(t.element)
-	case MapType:
-		return Sprintf("[%s]%s", w.typeString(t.key), w.typeString(t.value))
-	case ChanType:
+	case *MapType:
+		return Sprintf("map[%s]%s", w.typeString(t.key), w.typeString(t.value))
+	case *ChanType:
 		s := ""
 		switch {
 		case t.send && t.recv:
@@ -233,18 +261,18 @@ func (w writer) typeString(t Type) string {
 			s = "<-chan "
 		}
 		return s + w.typeString(t.element)
-	case FuncType:
+	case *FuncType:
 		return "func" + w.signature(t)
-	case InterfaceType:
+	case *InterfaceType:
 		s := "interface{"
 		for i, m := range t.methods {
 			if i > 0 {
 				s += "; "
 			}
-			s += m.name + w.signature(m.typ.(FuncType))
+			s += m.name + w.signature(m.typ.(*FuncType))
 		}
 		return s + "}"
-	case StructType:
+	case *StructType:
 		s := "struct{"
 		for i, f := range t.fields {
 			if i > 0 {
@@ -263,7 +291,7 @@ func (w writer) typeString(t Type) string {
 	return ""
 }
 
-func (w writer) signature(f FuncType) string {
+func (w writer) signature(f *FuncType) string {
 	s := w.paramsString(f.parameters)
 	if len(f.results) > 0 {
 		s += " "
@@ -301,19 +329,24 @@ func (w writer) zeroLiteral(t Type) string {
 			return "nil"
 		}
 		return "0"
-	case PointerType, SliceType, MapType, ChanType, FuncType, InterfaceType:
+	case *PointerType, *SliceType, *MapType, *ChanType, *FuncType, *InterfaceType:
 		return "nil"
-	case ArrayType, StructType:
+	case *ArrayType, *StructType:
 		return w.typeString(t) + "{}"
 	case *NamedType:
 		switch t.underlying.(type) {
-		case ArrayType, StructType:
+		case *ArrayType, *StructType:
 			return w.typeString(t) + "{}"
 		}
 		return w.zeroLiteral(t.underlying)
 	}
 	panic(Sprintf("no zero literal for type %#v\n", t))
 	return ""
+}
+
+func (w *writer) close() {
+	w.flux.Close()
+	w.go_.Close()
 }
 
 func tabs(n int) string { return Repeat("\t", n) }

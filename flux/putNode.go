@@ -17,23 +17,26 @@ func NewInputNode(block *Block) *InputNode {
 
 func (n *InputNode) KeyPressed(event KeyEvent) {
 	if event.Text == "," {
-		f := n.block.Outermost().function
-		browser := NewBrowser(typesOnly, f.pkg(), f.imports())
-		n.AddChild(browser)
-		browser.Move(n.Center())
-		browser.accepted.Connect(func(info ...interface{}) {
-			typ := info[0].(Type)
-			param := &ValueInfo{typ:typ}
-			f.info.typ.parameters = append(f.info.typ.parameters, param)
-			f.AddPackageRef(typ)
-			output := NewOutput(n, param)
-			n.AddChild(output)
-			n.outputs = append(n.outputs, output)
-			n.reform()
-			output.TakeKeyboardFocus()
+		output := NewOutput(n, new(ValueInfo))
+		n.AddChild(output)
+		n.outputs = append(n.outputs, output)
+		n.reform()
+		output.valueView.Show()
+		output.valueView.edit(func() {
+			if typ := *output.valueView.typ; typ != nil {
+				param := &ValueInfo{InfoBase{output.valueView.name.GetText(), nil}, typ, false}
+				output.info = param
+				f := n.block.Outermost().function
+				f.info.typ.parameters = append(f.info.typ.parameters, param)
+				f.AddPackageRef(typ)
+				output.TakeKeyboardFocus()
+			} else {
+				n.RemoveChild(output)
+				n.outputs = n.outputs[:len(n.outputs) - 1]
+				n.reform()
+				n.TakeKeyboardFocus()
+			}
 		})
-		browser.canceled.Connect(func(...interface{}) { n.TakeKeyboardFocus() })
-		browser.text.TakeKeyboardFocus()
 	} else {
 		n.NodeBase.KeyPressed(event)
 	}

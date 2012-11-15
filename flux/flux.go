@@ -16,6 +16,28 @@ func NewFluxWindow() *FluxWindow {
 	w.SetCentralView(w.browser)
 	w.browser.accepted.Connect(func(info ...interface{}) {
 		switch info := info[0].(type) {
+		case *NamedType:
+			vv := NewView(nil)
+			w.SetCentralView(vv)
+			v := newTypeView(&info.underlying)
+			vv.AddChild(v)
+			v.MoveCenter(vv.Center())
+			if info.underlying == nil {
+				v.edit(func() {
+					if v.typ == nil {
+						// TODO: delete info
+					}
+					w.SetCentralView(w.browser)
+					w.browser.text.TakeKeyboardFocus()
+				})
+			} else {
+				v.done = func() {
+					saveType(info)
+					w.SetCentralView(w.browser)
+					w.browser.text.TakeKeyboardFocus()
+				}
+				v.TakeKeyboardFocus()
+			}
 		case *FuncInfo:
 			w.SetCentralView(NewFunction(info))
 		default:

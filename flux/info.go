@@ -98,14 +98,16 @@ func (p *PackageInfo) Children() []Info {
 }
 func (p *PackageInfo) AddChild(info Info) {
 	info.SetParent(p)
-	index := 0
 	switch info := info.(type) {
 	case *PackageInfo:
-		for i, pkg := range p.subPackages { if pkg.name > info.name { index = i; break } }
-		p.subPackages = append(p.subPackages[:index], append([]*PackageInfo{info}, p.subPackages[index:]...)...)
+		p.subPackages = append(p.subPackages, info)
+		Sort(p.subPackages, "Name")
+	case *NamedType:
+		p.types = append(p.types, info)
+		Sort(p.types, "Name")
 	case *FuncInfo:
-		for i, f := range p.functions { if f.name > info.name { index = i; break } }
-		p.functions = append(p.functions[:index], append([]*FuncInfo{info}, p.functions[index:]...)...)
+		p.functions = append(p.functions, info)
+		Sort(p.functions, "Name")
 	default:
 		panic("not yet implemented")
 	}
@@ -199,12 +201,12 @@ func (p *PackageInfo) load() {
 					}
 				}
 			case *ast.FuncDecl:
-				f := &FuncInfo{InfoBase{decl.Name.Name, nil}, nil, specType(decl.Type).(FuncType)}
+				f := &FuncInfo{InfoBase{decl.Name.Name, nil}, nil, specType(decl.Type).(*FuncType)}
 				if r := decl.Recv; r != nil {
 					// TODO:  FuncType of a method should include the receiver as first argument
 					recv := specType(r.List[0].Type)
 					f.receiver = recv
-					if r, ok := recv.(PointerType); ok {
+					if r, ok := recv.(*PointerType); ok {
 						recv = r.element
 					}
 					nr := recv.(*NamedType)
@@ -259,43 +261,43 @@ func specType(x ast.Expr) Type {
 		objName := x.Sel.Name
 		return pkgScope.Objects[objName].Type.(Type)
 	case *ast.StarExpr:
-		return PointerType{element:specType(x.X)}
+		return &PointerType{element:specType(x.X)}
 	case *ast.ArrayType:
 		if x.Len != nil {
-			return ArrayType{size:intConstValue(x.Len), element:specType(x.Elt)}
+			return &ArrayType{size:intConstValue(x.Len), element:specType(x.Elt)}
 		}
-		return SliceType{element:specType(x.Elt)}
+		return &SliceType{element:specType(x.Elt)}
 	case *ast.Ellipsis:
-		return SliceType{element:specType(x.Elt)}
+		return &SliceType{element:specType(x.Elt)}
 	case *ast.MapType:
-		return MapType{key:specType(x.Key), value:specType(x.Value)}
+		return &MapType{key:specType(x.Key), value:specType(x.Value)}
 	case *ast.ChanType:
-		return ChanType{send:x.Dir&ast.SEND != 0, recv:x.Dir&ast.RECV != 0, element:specType(x.Value)}
+		return &ChanType{send:x.Dir&ast.SEND != 0, recv:x.Dir&ast.RECV != 0, element:specType(x.Value)}
 	case *ast.FuncType:
-		return FuncType{parameters:getFields(x.Params), results:getFields(x.Results)}
+		return &FuncType{parameters:getFields(x.Params), results:getFields(x.Results)}
 	case *ast.InterfaceType:
-		t := InterfaceType{}
+		t := &InterfaceType{}
 		for _, m := range x.Methods.List {
 			switch field := m.Type.(type) {
 			case *ast.FuncType:
-				t.methods = append(t.methods, &ValueInfo{InfoBase{m.Names[0].Name, nil}, specType(field).(FuncType), false})
+				t.methods = append(t.methods, &ValueInfo{InfoBase{m.Names[0].Name, nil}, specType(field).(*FuncType), false})
 			case *ast.Ident:
-				emb, ok := field.Obj.Type.(*NamedType).underlying.(InterfaceType)
+				emb, ok := field.Obj.Type.(*NamedType).underlying.(*InterfaceType)
 				if !ok {
-					emb = specType(field.Obj.Decl.(*ast.TypeSpec).Type).(InterfaceType)
+					emb = specType(field.Obj.Decl.(*ast.TypeSpec).Type).(*InterfaceType)
 				}
 				t.methods = append(t.methods, emb.methods...)
 			case *ast.SelectorExpr:
 				pkgScope := field.X.(*ast.Ident).Obj.Data.(*ast.Scope)
 				objName := field.Sel.Name
-				t.methods = append(t.methods, specType(pkgScope.Objects[objName].Decl.(*ast.TypeSpec).Type).(InterfaceType).methods...)
+				t.methods = append(t.methods, specType(pkgScope.Objects[objName].Decl.(*ast.TypeSpec).Type).(*InterfaceType).methods...)
 			default:
 				Panicf("unknown interface field:  %#v\n", field)
 			}
 		}
 		return t
 	case *ast.StructType:
-		return StructType{fields:getFields(x.Fields)}
+		return &StructType{fields:getFields(x.Fields)}
 	}
 	Panicf("unknown type:  %#v\n", x)
 	return nil
@@ -411,10 +413,36 @@ func (t *NamedType) AddChild(info Info) {
 	}
 }
 
+func walkType(t Type, op func(*NamedType)) {
+	switch t := t.(type) {
+	case *PointerType:
+		walkType(t.element, op)
+	case *ArrayType:
+		walkType(t.element, op)
+	case *SliceType:
+		walkType(t.element, op)
+	case *MapType:
+		walkType(t.key, op)
+		walkType(t.value, op)
+	case *ChanType:
+		walkType(t.element, op)
+	case *FuncType:
+		for _, v := range append(t.parameters, t.results...) { walkType(v.typ, op) }
+	case *InterfaceType:
+		for _, m := range t.methods { walkType(m.typ, op) }
+	case *StructType:
+		for _, v := range t.fields { walkType(v.typ, op) }
+	case *NamedType:
+		op(t)
+	default:
+		panic(fmt.Sprintf("unexpected type %#v\n", t))
+	}
+}
+
 type FuncInfo struct {
 	InfoBase
 	receiver Type
-	typ FuncType
+	typ *FuncType
 }
 func (FuncInfo) AddChild(info Info) { panic("functions can't have children") }
 const methodDirSuffix = ".fluxmethods"

@@ -40,8 +40,7 @@ type TextBase struct {
 	backgroundColor Color
 	editable bool
 	validator func(*string)bool
-	
-	TextChanged *Signal
+	Accept, Reject, TextChanged *Signal
 }
 
 func NewText(text string) *TextBase { return NewTextBase(nil, text) }
@@ -52,7 +51,7 @@ func NewTextBase(self Text, text string) *TextBase {
 	t.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(t)}
 	t.textColor = Color{1, 1, 1, 1}
 	t.backgroundColor = Color{0, 0, 0, 1}
-	t.TextChanged = NewSignal()
+	t.Accept, t.Reject, t.TextChanged = NewSignal(), NewSignal(), NewSignal()
 	t.SetText(text)
 	t.Self = self
 	t.ViewBase.Self = self
@@ -112,6 +111,10 @@ func (t *TextBase) KeyPressed(event KeyEvent) {
 		if len(t.text) > 0 {
 			t.Self.SetText(t.text[:len(t.text) - 1])
 		}
+	case KeyEnter:
+		t.Accept.Emit()
+	case KeyEsc:
+		t.Reject.Emit()
 	}
 }
 

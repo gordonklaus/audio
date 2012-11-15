@@ -6,7 +6,6 @@ import (
 	."fmt"
 	."github.com/jteeuwen/glfw"
 	"go/ast"
-	."io/ioutil"
 	"os"
 	."strings"
 )
@@ -25,6 +24,7 @@ type Browser struct {
 	
 	pathTexts, nameTexts []Text
 	text *nodeNameText
+	typeView *typeView
 }
 
 type browserMode int
@@ -40,10 +40,10 @@ func NewBrowser(mode browserMode, currentPkg *PackageInfo, imports []*PackageInf
 	
 	b.mode = mode
 	b.path = []Info{rootPackageInfo}
-	rootPackageInfo.types = builtinPkg.types
-	rootPackageInfo.functions = builtinPkg.functions
+	rootPackageInfo.types = append([]*NamedType{}, builtinPkg.types...)
+	rootPackageInfo.functions = append([]*FuncInfo{}, builtinPkg.functions...)
 	rootPackageInfo.variables = []*ValueInfo{}
-	rootPackageInfo.constants = builtinPkg.constants
+	rootPackageInfo.constants = append([]*ValueInfo{}, builtinPkg.constants...)
 	if currentPkg != nil { imports = append(imports, currentPkg) }
 	for _, p := range imports {
 		rootPackageInfo.types = append(rootPackageInfo.types, p.types...)
@@ -52,6 +52,7 @@ func NewBrowser(mode browserMode, currentPkg *PackageInfo, imports []*PackageInf
 		rootPackageInfo.constants = append(rootPackageInfo.constants, p.constants...)
 	}
 	Sort(rootPackageInfo.types, "Name")
+	rootPackageInfo.types = append([]*NamedType{protoPointer, protoArray, protoSlice, protoMap, protoChan, protoFunc, protoInterface, protoStruct}, rootPackageInfo.types...)
 	Sort(rootPackageInfo.functions, "Name")
 	Sort(rootPackageInfo.variables, "Name")
 	Sort(rootPackageInfo.constants, "Name")
@@ -59,6 +60,10 @@ func NewBrowser(mode browserMode, currentPkg *PackageInfo, imports []*PackageInf
 	b.text = newNodeNameText(b)
 	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	b.AddChild(b.text)
+	
+	b.typeView = newTypeView(new(Type))
+	b.AddChild(b.typeView)
+	
 	b.text.SetText("")
 	
 	return b
@@ -76,6 +81,7 @@ func (b Browser) filteredInfos() (infos []Info) {
 	for _, i := range b.path[0].Children() {
 		switch b.mode {
 		case fluxSourceOnly:
+			if p := i.Parent(); p == nil || p == builtinPkg { continue }
 			if _, err := os.Stat(i.FluxSourcePath()); err != nil { continue }
 		case typesOnly:
 			switch i.(type) {
@@ -219,8 +225,24 @@ ok:
 
 	yOffset := float64(n - b.i - 1)*b.text.Height()
 	b.text.Move(Pt(xOffset, yOffset))
+	b.typeView.Hide()
 	if cur != nil {
 		b.text.SetTextColor(getTextColor(cur, 1))
+		switch i := cur.(type) {
+		case *NamedType:
+			if i.parent != builtinPkg {
+				b.typeView.setType(i.underlying)
+				b.typeView.Show()
+			}
+		case *FuncInfo:
+			t := Type(i.typ)
+			b.typeView.setType(t)
+			b.typeView.Show()
+		case *ValueInfo:
+			b.typeView.setType(i.typ)
+			b.typeView.Show()
+		}
+		b.typeView.Move(Pt(xOffset + width + 16, yOffset - (b.typeView.Height() - b.text.Height()) / 2))
 	}
 	for _, p := range b.pathTexts { p.Move(Pt(p.Position().X, yOffset)) }
 
@@ -276,8 +298,6 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			case *PackageInfo:
 				*info = *newPackageInfo(info.parent.(*PackageInfo), info.name)
 				if err := os.Mkdir(info.FluxSourcePath(), 0755); err != nil { Println(err) }
-			case *NamedType:
-				if err := WriteFile(info.FluxSourcePath(), []byte("type"), 0644); err != nil { Println(err) }
 			case *FuncInfo:
 				NewFunction(info)
 			}
@@ -352,4 +372,32 @@ func getTextColor(info Info, alpha float64) Color {
 		return Color{.6, .6, 1, alpha}
 	}
 	return Color{}
+}
+
+var (
+	protoPointer = &NamedType{InfoBase:InfoBase{"pointer", nil}}
+	protoArray = &NamedType{InfoBase:InfoBase{"array", nil}}
+	protoSlice = &NamedType{InfoBase:InfoBase{"slice", nil}}
+	protoMap = &NamedType{InfoBase:InfoBase{"map", nil}}
+	protoChan = &NamedType{InfoBase:InfoBase{"chan", nil}}
+	protoFunc = &NamedType{InfoBase:InfoBase{"func", nil}}
+	protoInterface = &NamedType{InfoBase:InfoBase{"interface", nil}}
+	protoStruct = &NamedType{InfoBase:InfoBase{"struct", nil}}
+	
+	protoType = map[*NamedType]bool{protoPointer:true, protoArray:true, protoSlice:true, protoMap:true, protoChan:true, protoFunc:true, protoInterface:true, protoStruct:true}
+)
+
+func newProtoType(t *NamedType) (p Type) {
+	switch t {
+	case protoPointer: p = &PointerType{}
+	case protoArray: p = &ArrayType{}
+	case protoSlice: p = &SliceType{}
+	case protoMap: p = &MapType{}
+	case protoChan: p = &ChanType{send:true, recv:true}
+	case protoFunc: p = &FuncType{}
+	case protoInterface: p = &InterfaceType{}
+	case protoStruct: p = &StructType{}
+	default: panic(Sprintf("not a proto type %#v", t))
+	}
+	return
 }

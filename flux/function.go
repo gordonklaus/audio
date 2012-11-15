@@ -51,7 +51,7 @@ func (f *Function) AddPackageRef(x interface{}) {
 			f.pkgRefs[p]++
 		}
 	case Type:
-		f.walkType(x, (*Function).AddPackageRef)
+		walkType(x, func(t *NamedType) { f.AddPackageRef(t) })
 	default:
 		panic(Sprintf("can't AddPackageRef for %#v\n", x))
 	}
@@ -66,34 +66,9 @@ func (f *Function) SubPackageRef(x interface{}) {
 			}
 		}
 	case Type:
-		f.walkType(x, (*Function).SubPackageRef)
+		walkType(x, func(t *NamedType) { f.SubPackageRef(t) })
 	default:
 		panic(Sprintf("can't SubPackageRef for %#v\n", x))
-	}
-}
-func (f *Function) walkType(t Type, op func(*Function, interface{})) {
-	switch t := t.(type) {
-	case PointerType:
-		f.walkType(t.element, op)
-	case ArrayType:
-		f.walkType(t.element, op)
-	case SliceType:
-		f.walkType(t.element, op)
-	case MapType:
-		f.walkType(t.key, op)
-		f.walkType(t.value, op)
-	case ChanType:
-		f.walkType(t.element, op)
-	case FuncType:
-		for _, v := range append(t.parameters, t.results...) { f.walkType(v.typ, op) }
-	case InterfaceType:
-		for _, m := range t.methods { f.walkType(m.typ, op) }
-	case StructType:
-		for _, v := range t.fields { f.walkType(v.typ, op) }
-	case *NamedType:
-		op(f, t)
-	default:
-		panic(Sprintf("unexpected type %#v\n", t))
 	}
 }
 

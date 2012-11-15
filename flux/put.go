@@ -10,7 +10,7 @@ type put struct {
 	spec putSpecializer
 	node Node
 	info *ValueInfo
-	valueView *valueView
+	valueView *typeView
 	connections []*Connection
 	focused bool
 }
