@@ -2,6 +2,7 @@ package main
 
 import (
 	."code.google.com/p/gordon-go/gui"
+	."code.google.com/p/gordon-go/util"
 )
 
 type FluxWindow struct {
@@ -19,22 +20,28 @@ func NewFluxWindow() *FluxWindow {
 		case *NamedType:
 			vv := NewView(nil)
 			w.SetCentralView(vv)
-			v := newTypeView(&info.underlying)
+			v := w.browser.typeView
 			vv.AddChild(v)
 			v.MoveCenter(vv.Center())
+			reset := func() {
+				w.browser.AddChild(v)
+				w.SetCentralView(w.browser)
+				w.browser.text.SetText("")
+				w.browser.text.TakeKeyboardFocus()
+			}
 			if info.underlying == nil {
 				v.edit(func() {
-					if v.typ == nil {
-						// TODO: delete info
+					if info.underlying == nil {
+						SliceRemove(&info.parent.(*PackageInfo).types, info)
+					} else {
+						saveType(info)
 					}
-					w.SetCentralView(w.browser)
-					w.browser.text.TakeKeyboardFocus()
+					reset()
 				})
 			} else {
 				v.done = func() {
 					saveType(info)
-					w.SetCentralView(w.browser)
-					w.browser.text.TakeKeyboardFocus()
+					reset()
 				}
 				v.TakeKeyboardFocus()
 			}

@@ -61,9 +61,6 @@ func NewBrowser(mode browserMode, currentPkg *PackageInfo, imports []*PackageInf
 	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	b.AddChild(b.text)
 	
-	b.typeView = newTypeView(new(Type))
-	b.AddChild(b.typeView)
-	
 	b.text.SetText("")
 	
 	return b
@@ -92,7 +89,7 @@ func (b Browser) filteredInfos() (infos []Info) {
 		if b.currentPkg != nil {
 			switch i.(type) {
 			default:
-				if p := i.Parent(); p != builtinPkg && p != b.currentPkg && !ast.IsExported(i.Name()) { continue }
+				if p := i.Parent(); p != nil && p != builtinPkg && p != b.currentPkg && !ast.IsExported(i.Name()) { continue }
 			case *PackageInfo:
 			}
 		}
@@ -225,24 +222,26 @@ ok:
 
 	yOffset := float64(n - b.i - 1)*b.text.Height()
 	b.text.Move(Pt(xOffset, yOffset))
-	b.typeView.Hide()
+	if b.typeView != nil { b.RemoveChild(b.typeView) }
 	if cur != nil {
 		b.text.SetTextColor(getTextColor(cur, 1))
 		switch i := cur.(type) {
 		case *NamedType:
 			if i.parent != builtinPkg {
-				b.typeView.setType(i.underlying)
-				b.typeView.Show()
+				b.typeView = newTypeView(&i.underlying)
+				b.AddChild(b.typeView)
 			}
 		case *FuncInfo:
 			t := Type(i.typ)
-			b.typeView.setType(t)
-			b.typeView.Show()
+			b.typeView = newTypeView(&t)
+			b.AddChild(b.typeView)
 		case *ValueInfo:
-			b.typeView.setType(i.typ)
-			b.typeView.Show()
+			b.typeView = newTypeView(&i.typ)
+			b.AddChild(b.typeView)
 		}
-		b.typeView.Move(Pt(xOffset + width + 16, yOffset - (b.typeView.Height() - b.text.Height()) / 2))
+		if b.typeView != nil {
+			b.typeView.Move(Pt(xOffset + width + 16, yOffset - (b.typeView.Height() - b.text.Height()) / 2))
+		}
 	}
 	for _, p := range b.pathTexts { p.Move(Pt(p.Position().X, yOffset)) }
 
