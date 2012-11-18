@@ -24,6 +24,12 @@ func NewFunction(info *FuncInfo) *Function {
 	f.block.AddNode(f.inputNode)
 	f.AddChild(f.block)
 	
+	if info.receiver != nil {
+		r := NewOutput(f.inputNode, info.typeWithReceiver().parameters[0])
+		f.inputNode.AddChild(r)
+		f.inputNode.outputs = append(f.inputNode.outputs, r)
+	}
+	
 	if !loadFunction(f) { saveFunction(*f) }
 	
 	return f

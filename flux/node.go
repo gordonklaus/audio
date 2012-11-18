@@ -71,12 +71,12 @@ func (n *NodeBase) reform() {
 	
 	rect := ZR
 	for i, input := range n.inputs {
-		y := putSize * (float64(i) - (numInputs - 1) / 2)
+		y := -putSize * (float64(i) - (numInputs - 1) / 2)
 		input.MoveCenter(Pt(-rx * Sqrt(ry * ry - y * y) / ry, y))
 		rect = rect.Union(input.MapRectToParent(input.Rect()))
 	}
 	for i, output := range n.outputs {
-		y := putSize * (float64(i) - (numOutputs - 1) / 2)
+		y := -putSize * (float64(i) - (numOutputs - 1) / 2)
 		output.MoveCenter(Pt(rx * Sqrt(ry * ry - y * y) / ry, y))
 		rect = rect.Union(output.MapRectToParent(output.Rect()))
 	}

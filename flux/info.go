@@ -24,7 +24,7 @@ func newPackageInfo(parent *PackageInfo, name string) *PackageInfo {
 		if fileInfos, err := file.Readdir(-1); err == nil {
 			for _, fileInfo := range fileInfos {
 				name := fileInfo.Name()
-				if fileInfo.IsDir() && unicode.IsLetter(([]rune(name))[0]) && name != "testdata" && !HasSuffix(name, methodDirSuffix) {
+				if fileInfo.IsDir() && unicode.IsLetter(([]rune(name))[0]) && name != "testdata" && !HasSuffix(name, ".fluxmethods") {
 					p2 := newPackageInfo(p, name)
 					p.subPackages = append(p.subPackages, p2)
 				}
@@ -445,12 +445,21 @@ type FuncInfo struct {
 	typ *FuncType
 }
 func (FuncInfo) AddChild(info Info) { panic("functions can't have children") }
-const methodDirSuffix = ".fluxmethods"
 func (f FuncInfo) FluxSourcePath() string {
 	if _, ok := f.parent.(*NamedType); ok {
-		return fmt.Sprintf("%s%s/%s.flux", f.parent.FluxSourcePath(), methodDirSuffix, f.name)
+		return fmt.Sprintf("%smethods/%s.flux", f.parent.FluxSourcePath(), f.name)
 	}
 	return f.InfoBase.FluxSourcePath()
+}
+func (f FuncInfo) typeWithReceiver() *FuncType {
+	t := *f.typ
+	if r := f.receiver; r != nil {
+		param := &ValueInfo{typ:r}
+		if p, ok := r.(*PointerType); ok { r = p.element }
+		param.name = ToLower(r.(*NamedType).Name()[:1])
+		t.parameters = append([]*ValueInfo{param}, t.parameters...)
+	}
+	return &t
 }
 
 type ValueInfo struct {

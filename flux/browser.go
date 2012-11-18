@@ -296,7 +296,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			switch info := info.(type) {
 			case *PackageInfo:
 				*info = *newPackageInfo(info.parent.(*PackageInfo), info.name)
-				if err := os.Mkdir(info.FluxSourcePath(), 0755); err != nil { Println(err) }
+				if err := os.Mkdir(info.FluxSourcePath(), 0777); err != nil { Println(err) }
 			case *FuncInfo:
 				NewFunction(info)
 			}
@@ -342,12 +342,17 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 	default:
 		_, inPkg := b.path[0].(*PackageInfo)
-		_, inType := b.path[0].(*NamedType)
+		recv, inType := b.path[0].(*NamedType)
 		if event.Ctrl && b.mode != typesOnly && b.newInfo == nil && (inPkg || inType && event.Text == "3") {
 			switch event.Text {
 			case "1": b.newInfo = &PackageInfo{}
 			case "2": b.newInfo = &NamedType{}
-			case "3": b.newInfo = &FuncInfo{}
+			case "3":
+				f := &FuncInfo{typ:&FuncType{}}
+				if inType {
+					f.receiver = &PointerType{element:recv}
+				}
+				b.newInfo = f
 			case "4": b.newInfo = &ValueInfo{}
 			case "5": b.newInfo = &ValueInfo{constant:true}
 			default: t.TextBase.KeyPressed(event); return

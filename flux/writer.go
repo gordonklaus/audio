@@ -2,6 +2,7 @@ package main
 
 import (
 	."fmt"
+	"path/filepath"
 	"os"
 	"reflect"
 	."strconv"
@@ -34,10 +35,11 @@ func saveFunction(f Function) {
 		w.pkgNames[p] = w.newName(p.Name())
 	}
 	
-	w.flux.WriteString(w.typeString(f.info.typ))
+	w.flux.WriteString(w.typeString(f.info.typeWithReceiver()))
 	w.writeImports()
 	w.writeBlockFlux(f.block, 0)
 	
+	w.go_.WriteString("func ")
 	vars := map[*Input]string{}
 	params := []string{}
 	for _, output := range f.inputNode.Outputs() {
@@ -50,7 +52,11 @@ func saveFunction(f Function) {
 		}
 		params = append(params, name + " " + w.typeString(output.info.typ))
 	}
-	Fprintf(w.go_, "func %s(%s) {\n", f.info.Name(), Join(params, ", "))
+	if f.info.receiver != nil {
+		Fprintf(w.go_, "(%s) ", params[0])
+		params = params[1:]
+	}
+	Fprintf(w.go_, "%s(%s) {\n", f.info.Name(), Join(params, ", "))
 	w.writeBlockGo(f.block, 0, vars)
 	w.go_.WriteString("}")
 }
@@ -64,12 +70,19 @@ type writer struct {
 }
 
 func newWriter(info Info) *writer {
-	w := &writer{nil, nil, map[*PackageInfo]string{}, map[string]int{}, 0, map[Node]int{}}
+	chk := func(err error) { if err != nil { panic(err) }}
+	
+	var pkg *PackageInfo
+	p := info.Parent()
+	if t, ok := p.(*NamedType); ok { p = t }
+	pkg = p.Parent().(*PackageInfo)
+	
 	var err error
-	w.flux, err = os.Create(info.FluxSourcePath())
-	if err != nil { Println(err); return nil }
-	w.go_, err = os.Create(Sprintf("%s/%s.go", info.Parent().FluxSourcePath(), info.Name()))
-	if err != nil { Println(err); return nil }
+	w := &writer{nil, nil, map[*PackageInfo]string{}, map[string]int{}, 0, map[Node]int{}}
+	fluxPath := info.FluxSourcePath()
+	chk(os.MkdirAll(filepath.Dir(fluxPath), 0777))
+	w.flux, err = os.Create(fluxPath); chk(err)
+	w.go_, err = os.Create(Sprintf("%s/%s.go", pkg.FluxSourcePath(), info.Name())); chk(err)
 	
 	for _, i := range append(builtinPkg.Children(), info.Parent().Children()...) {
 		if _, ok := i.(*PackageInfo); !ok {
@@ -77,7 +90,7 @@ func newWriter(info Info) *writer {
 		}
 	}
 	
-	Fprintf(w.go_, "package %s\n\n", info.Parent().Name())
+	Fprintf(w.go_, "package %s\n\n", pkg.Name())
 	
 	return w
 }
