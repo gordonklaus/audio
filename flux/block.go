@@ -271,12 +271,12 @@ func (b *Block) reform() {
 	}
 }
 
-func (b *Block) GetNearestView(views []View, point Point, directionKey int) (nearest View) {
+func nearestView(parent View, views []View, point Point, directionKey int) (nearest View) {
 	dir := map[int]Point{KeyLeft:{-1, 0}, KeyRight:{1, 0}, KeyUp:{0, 1}, KeyDown:{0, -1}}[directionKey]
 	bestScore := 0.0
 	for _, view := range views {
-		d := view.MapTo(view.Center(), b).Sub(point)
-		score := (dir.X * d.X + dir.Y * d.Y) / (d.X * d.X + d.Y * d.Y);
+		d := view.MapTo(view.Center(), parent).Sub(point)
+		score := (dir.X * d.X + dir.Y * d.Y) / (d.X * d.X + d.Y * d.Y)
 		if (score > bestScore) {
 			bestScore = score
 			nearest = view
@@ -295,7 +295,7 @@ func (b *Block) FocusNearestView(v View, directionKey int) {
 	for _, connection := range b.AllConnections() {
 		views = append(views, connection)
 	}
-	nearest := b.GetNearestView(views, v.MapTo(v.Center(), b), directionKey)
+	nearest := nearestView(b, views, v.MapTo(v.Center(), b), directionKey)
 	if nearest != nil { nearest.TakeKeyboardFocus() }
 }
 
@@ -310,7 +310,7 @@ func (b *Block) KeyPressed(event KeyEvent) {
 			var v View = b.editingNode
 			if v == nil { v = b }
 			views := []View{}; for _, n := range outermost.AllNodes() { views = append(views, n) }
-			if n := outermost.GetNearestView(views, v.MapTo(v.Center(), outermost), event.Key); n != nil { b.editingNode = n.(Node) }
+			if n := nearestView(b, views, v.MapTo(v.Center(), outermost), event.Key); n != nil { b.editingNode = n.(Node) }
 		} else {
 			outermost.FocusNearestView(b, event.Key)
 		}

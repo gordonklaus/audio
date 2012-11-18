@@ -127,7 +127,11 @@ func (c *Connection) LostKeyboardFocus() { c.focused = false; c.Repaint() }
 
 func (c *Connection) KeyPressed(event KeyEvent) {
 	switch event.Key {
-	case KeyLeft, KeyRight, KeyUp, KeyDown:
+	case KeyLeft:
+		c.src.TakeKeyboardFocus()
+	case KeyRight:
+		c.dst.TakeKeyboardFocus()
+	case KeyUp, KeyDown:
 		c.block.Outermost().FocusNearestView(c, event.Key)
 	case KeyEsc:
 		c.block.TakeKeyboardFocus()

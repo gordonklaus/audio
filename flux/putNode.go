@@ -23,12 +23,10 @@ func (n *InputNode) KeyPressed(event KeyEvent) {
 		n.reform()
 		output.valueView.Show()
 		output.valueView.edit(func() {
-			if typ := *output.valueView.typ; typ != nil {
-				param := &ValueInfo{InfoBase{output.valueView.name.GetText(), nil}, typ, false}
-				output.info = param
+			if output.info.typ != nil {
 				f := n.block.Outermost().function
-				f.info.typ.parameters = append(f.info.typ.parameters, param)
-				f.AddPackageRef(typ)
+				f.info.typ.parameters = append(f.info.typ.parameters, output.info)
+				f.AddPackageRef(output.info.typ)
 				output.TakeKeyboardFocus()
 			} else {
 				n.RemoveChild(output)

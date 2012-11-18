@@ -13,7 +13,9 @@ type typeView struct {
 	childTypes struct{left, right []*typeView}
 	focused bool
 	done func()
-	name *TextBase  // typeView may also be used as a valueView, in which case this is non-nil
+	
+	// typeView is also used as a valueView, in which case these are non-nil
+	nameText *TextBase
 }
 
 func newTypeView(t *Type) *typeView {
@@ -28,13 +30,16 @@ func newTypeView(t *Type) *typeView {
 	return v
 }
 
-func newValueView(value *ValueInfo) *typeView {
-	v := newTypeView(&value.typ)
-	v.name = NewText(value.name)
-	v.name.SetTextColor(getTextColor(value, .7))
-	v.name.SetBackgroundColor(Color{0, 0, 0, .3})
-	v.name.TextChanged.Connect(func(...interface{}) { v.reform() })
-	v.AddChild(v.name)
+func newValueView(val *ValueInfo) *typeView {
+	v := newTypeView(&val.typ)
+	v.nameText = NewText(val.name)
+	v.nameText.SetTextColor(getTextColor(val, .7))
+	v.nameText.SetBackgroundColor(Color{0, 0, 0, .3})
+	v.nameText.TextChanged.Connect(func(...interface{}) {
+		val.name = v.nameText.GetText()
+		v.reform()
+	})
+	v.AddChild(v.nameText)
 	v.reform()
 	return v
 }
@@ -78,7 +83,7 @@ func (v *typeView) setType(t Type) {
 	for len(v.Children()) > 0 { v.RemoveChild(v.Children()[0]) }
 	v.AddChild(v.text)
 	for _, c := range append(v.childTypes.left, v.childTypes.right...) { v.AddChild(c) }
-	if v.name != nil { v.AddChild(v.name) }
+	if v.nameText != nil { v.AddChild(v.nameText) }
 	
 	v.reform()
 }
@@ -89,9 +94,9 @@ func (v *typeView) reform() {
 	h1 := float64(0); for i, c := range v.childTypes.left { h1 += c.Height(); if i > 0 { h1 += spacing }; if w := c.Width(); w > maxWidth { maxWidth = w } }
 	h2 := float64(0); for i, c := range v.childTypes.right { h2 += c.Height(); if i > 0 { h2 += spacing } }
 	x := 0.0
-	if v.name != nil {
-		v.name.Move(Pt(0, (Max(h1, h2) - v.name.Height()) / 2))
-		x += v.name.Width() + spacing
+	if v.nameText != nil {
+		v.nameText.Move(Pt(0, (Max(h1, h2) - v.nameText.Height()) / 2))
+		x += v.nameText.Width() + spacing
 	}
 	y := Max(0, h2 - h1) / 2
 	for i := len(v.childTypes.left) - 1; i >= 0; i-- {
@@ -116,10 +121,10 @@ func (v *typeView) reform() {
 }
 
 func (v *typeView) edit(done func()) {
-	if v.name != nil {
-		v.name.Accept.ConnectSingleShot(func(...interface{}) { v.editType(done) })
-		v.name.Reject.ConnectSingleShot(func(...interface{}) { done() })
-		v.name.TakeKeyboardFocus()
+	if v.nameText != nil {
+		v.nameText.Accept.ConnectSingleShot(func(...interface{}) { v.editType(done) })
+		v.nameText.Reject.ConnectSingleShot(func(...interface{}) { done() })
+		v.nameText.TakeKeyboardFocus()
 		return
 	}
 	v.editType(done)
@@ -152,7 +157,7 @@ l:		for v := View(v); v != nil; v = v.Parent() {
 		return
 	}
 	
-	switch (*v.typ).(type) {
+	switch t := (*v.typ).(type) {
 	case *PointerType, *ArrayType, *SliceType, *ChanType:
 		if elt := v.childTypes.right[0]; *elt.typ == nil {
 			elt.edit(func() {
@@ -178,26 +183,50 @@ l:		for v := View(v); v != nil; v = v.Parent() {
 			})
 			return
 		}
+	// next three cases assume the type is brand-new, and thus empty (otherwise we need special handling of protoTypes above)
 	case *StructType:
+		v.addFields(&t.fields, false, &v.childTypes.right, done)
+		return
 	case *FuncType:
+		v.addFields(&t.parameters, false, &v.childTypes.left, func() {
+			v.addFields(&t.results, false, &v.childTypes.right, done)
+		})
+		return
 	case *InterfaceType:
+		v.addFields(&t.methods, true, &v.childTypes.right, done)
+		return
 	}
 	
 	done()
 }
+func (v *typeView) addFields(fields *[]*ValueInfo, funcVal bool, childTypes *[]*typeView, done func()) {
+	val := &ValueInfo{}
+	if funcVal {
+		val.typ = &FuncType{}
+	}
+	*fields = append(*fields, val)
+	v.setType(*v.typ)
+	i := len(*fields) - 1
+	f := (*childTypes)[i]
+	f.edit(func() {
+		if *f.typ == nil || funcVal && len(f.nameText.GetText()) == 0 {
+			*fields = (*fields)[:i]
+			v.setType(*v.typ)
+			done()
+		} else {
+			v.addFields(fields, funcVal, childTypes, done)
+		}
+	})
+}
 
 func (v *typeView) focusNearest(child *typeView, dir int) {
-	switch (*v.typ).(type) {
-	case *MapType:
-		switch dir {
-		case KeyLeft:
-			v.childTypes.left[0].TakeKeyboardFocus()
-		case KeyRight:
-			v.childTypes.right[0].TakeKeyboardFocus()
-		}
-	case *StructType:
-	case *FuncType:
-	case *InterfaceType:
+	var views []View
+	for _, v := range append(v.childTypes.left, v.childTypes.right...) {
+		views = append(views, v)
+	}
+	nearest := nearestView(v, views, child.MapTo(child.Center(), v), dir)
+	if nearest != nil {
+		nearest.TakeKeyboardFocus()
 	}
 }
 
@@ -211,14 +240,47 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 			p.focusNearest(v, event.Key)
 		}
 	case KeyEnter:
-		switch (*v.typ).(type) {
+		done := func() { v.TakeKeyboardFocus() }
+		switch t := (*v.typ).(type) {
 		case *PointerType, *ArrayType, *SliceType, *ChanType:
 			v.childTypes.right[0].TakeKeyboardFocus()
 		case *MapType:
 			v.childTypes.left[0].TakeKeyboardFocus()
 		case *StructType:
+			if len(t.fields) == 0 {
+				v.edit(done)
+			} else {
+				v.childTypes.right[0].TakeKeyboardFocus()
+			}
 		case *FuncType:
+			switch {
+			case len(t.parameters) == 0 && len(t.results) == 0:
+				v.edit(done)
+			case len(t.parameters) == 0:
+				v.addFields(&t.parameters, false, &v.childTypes.left, func() {
+					if len(t.parameters) == 0 {
+						v.childTypes.right[0].TakeKeyboardFocus()
+					} else {
+						v.childTypes.left[0].TakeKeyboardFocus()
+					}
+				})
+			case len(t.results) == 0:
+				v.addFields(&t.results, false, &v.childTypes.right, func() {
+				if len(t.results) == 0 {
+					v.childTypes.left[0].TakeKeyboardFocus()
+				} else {
+					v.childTypes.right[0].TakeKeyboardFocus()
+				}
+				})
+			default:
+				v.childTypes.left[0].TakeKeyboardFocus()
+			}
 		case *InterfaceType:
+			if len(t.methods) == 0 {
+				v.edit(done)
+			} else {
+				v.childTypes.right[0].TakeKeyboardFocus()
+			}
 		}
 	case KeyEsc:
 		if v.done != nil {
@@ -227,10 +289,24 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 			v.Parent().TakeKeyboardFocus()
 		}
 	case KeyBackspace, KeyDel:
-		oldTyp := *v.typ
+		if p, ok := v.Parent().(*typeView); ok {
+			if _, ok := (*p.typ).(*InterfaceType); ok {
+				break
+			}
+		}
+		oldTyp, oldName := *v.typ, ""
+		if v.nameText != nil {
+			oldName = v.nameText.GetText()
+			v.nameText.SetText("")
+		}
 		v.setType(nil)
 		v.edit(func() {
-			if *v.typ == nil { v.setType(oldTyp) }
+			if *v.typ == nil {
+				v.setType(oldTyp)
+				if v.nameText != nil && len(v.nameText.GetText()) == 0 {
+					v.nameText.SetText(oldName)
+				}
+			}
 			v.TakeKeyboardFocus()
 		})
 	}

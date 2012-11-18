@@ -60,7 +60,7 @@ func (p *put) KeyPressed(event KeyEvent) {
 		conn.BeStraightLine()
 		conn.StartEditing()
 	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
-		p.node.Block().FocusNearestView(p.spec, event.Key)
+		p.node.Block().Outermost().FocusNearestView(p.spec, event.Key)
 	case glfw.KeyEsc:
 		p.node.TakeKeyboardFocus()
 	default:
@@ -102,9 +102,9 @@ func (p *Input) ConnectTo(conn *Connection) { conn.SetDestination(p) }
 func (p *Input) PassMouseFocusToFreeConnectionHandle(conn *Connection, button int) { conn.srcHandle.SetMouseFocus(conn.srcHandle, button) }
 
 func (p *Input) KeyPressed(event KeyEvent) {
-	if event.Key == glfw.KeyDown && len(p.connections) > 0 {
+	if event.Key == glfw.KeyLeft && len(p.connections) > 0 {
 		p.connections[0].TakeKeyboardFocus()
-	} else if event.Key == glfw.KeyUp {
+	} else if event.Key == glfw.KeyRight {
 		p.node.TakeKeyboardFocus()
 	} else {
 		p.put.KeyPressed(event)
@@ -126,9 +126,9 @@ func (p *Output) ConnectTo(conn *Connection) { conn.SetSource(p) }
 func (p *Output) PassMouseFocusToFreeConnectionHandle(conn *Connection, button int) { conn.dstHandle.SetMouseFocus(conn.dstHandle, button) }
 
 func (p *Output) KeyPressed(event KeyEvent) {
-	if event.Key == glfw.KeyDown {
+	if event.Key == glfw.KeyLeft {
 		p.node.TakeKeyboardFocus()
-	} else if event.Key == glfw.KeyUp && len(p.connections) > 0 {
+	} else if event.Key == glfw.KeyRight && len(p.connections) > 0 {
 		p.connections[0].TakeKeyboardFocus()
 	} else {
 		p.put.KeyPressed(event)

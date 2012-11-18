@@ -116,6 +116,8 @@ func (n *NodeBase) Move(p Point) {
 	for _, p := range n.outputs { f(p.put) }
 }
 
+func (n NodeBase) Center() Point { return ZP }
+
 func (n *NodeBase) TookKeyboardFocus() { n.focused = true; n.Repaint() }
 func (n *NodeBase) LostKeyboardFocus() { n.focused = false; n.Repaint() }
 

@@ -137,7 +137,7 @@ func (h *ConnectionSourceHandle) MoveToNearestConnectableput(key int) {
 		}
 	}
 	
-	view := block.GetNearestView(connectableputs, h.connection.srcPt, key)
+	view := nearestView(block, connectableputs, h.connection.srcPt, key)
 	if put, ok := view.(*Output); ok {
 		h.connection.SetSource(put)
 	}
@@ -191,7 +191,7 @@ func (h *ConnectionDestinationHandle) MoveToNearestConnectableput(key int) {
 		}
 	}
 	
-	view := block.GetNearestView(connectableputs, h.connection.dstPt, key)
+	view := nearestView(block, connectableputs, h.connection.dstPt, key)
 	if put, ok := view.(*Input); ok {
 		h.connection.SetDestination(put)
 	}
