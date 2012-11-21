@@ -72,17 +72,17 @@ type writer struct {
 func newWriter(info Info) *writer {
 	chk := func(err error) { if err != nil { panic(err) }}
 	
-	var pkg *PackageInfo
-	p := info.Parent()
-	if t, ok := p.(*NamedType); ok { p = t }
-	pkg = p.Parent().(*PackageInfo)
+	parent := info.Parent()
+	i := parent
+	if t, ok := i.(*NamedType); ok { i = t.parent }
+	pkg := i.(*PackageInfo)
 	
 	var err error
 	w := &writer{nil, nil, map[*PackageInfo]string{}, map[string]int{}, 0, map[Node]int{}}
 	fluxPath := info.FluxSourcePath()
 	chk(os.MkdirAll(filepath.Dir(fluxPath), 0777))
 	w.flux, err = os.Create(fluxPath); chk(err)
-	w.go_, err = os.Create(Sprintf("%s/%s.go", pkg.FluxSourcePath(), info.Name())); chk(err)
+	w.go_, err = os.Create(Sprintf("%s/%s.go", parent.FluxSourcePath(), info.Name())); chk(err)
 	
 	for _, i := range append(builtinPkg.Children(), info.Parent().Children()...) {
 		if _, ok := i.(*PackageInfo); !ok {

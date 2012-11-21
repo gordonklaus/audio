@@ -1,5 +1,7 @@
 package main
 
+import "C"
+
 import (
 	"go/ast"
 	"go/build"
@@ -16,7 +18,7 @@ func srcImport(imports map[string]*ast.Object, path string) (*ast.Object, error)
 	if err != nil { return nil, err }
 	scope := ast.NewScope(pkg.Scope.Outer)
 	for name, obj := range pkg.Scope.Objects {
-		if ast.IsExported(name) {
+		if ast.IsExported(name) || path == "C" {
 			scope.Insert(obj)
 		}
 	}
@@ -25,7 +27,7 @@ func srcImport(imports map[string]*ast.Object, path string) (*ast.Object, error)
 	return obj, nil
 }
 
-var pkgs = map[string]*ast.Package{"":&builtinAstPkg, "unsafe":&unsafePkg}
+var pkgs = map[string]*ast.Package{"":&builtinAstPkg, "unsafe":&unsafePkg, "C":&cAstPkg}
 func getPackage(path string) (*ast.Package, error) {
 	if pkg, ok := pkgs[path]; ok { return pkg, nil }
 	buildPkg, err := build.Import(path, "", 0)
@@ -47,6 +49,7 @@ func getPackage(path string) (*ast.Package, error) {
 var (
 	builtinAstPkg = ast.Package{Scope:ast.NewScope(nil)}
 	unsafePkg = ast.Package{"unsafe", ast.NewScope(nil), nil, nil}
+	cAstPkg = ast.Package{"C", ast.NewScope(nil), nil, nil}
 )
 
 func init() {
@@ -57,14 +60,26 @@ func init() {
 	b.define(ast.Typ, "error").Type = &NamedType{InfoBase:InfoBase{"error", nil}, underlying:&InterfaceType{methods:[]*ValueInfo{{InfoBase:InfoBase{name:"Error"}, typ:&FuncType{results:[]*ValueInfo{{typ:builtinAstPkg.Scope.Lookup("string").Type.(Type)}}}}}}}
 	b.defFuncs("append", "cap", "close", "complex", "copy", "delete", "imag", "len", "make", "new", "panic", "print", "println", "real", "recover")
 	b.defConsts("false", "true", "nil", "iota")
-	
-	builtinPkg = &PackageInfo{}
 	builtinPkg.load()
 	
-	unsafePkg = ast.Package{"unsafe", ast.NewScope(nil), nil, nil}
 	b = scopeBuilder{unsafePkg.Scope}
 	b.defTypes(new(unsafe.Pointer))
 	b.defFuncs("Alignof", "Offsetof", "Sizeof")
+	
+	b = scopeBuilder{cAstPkg.Scope}
+	b.defType("char", new(C.char))
+	b.defType("schar", new(C.schar))
+	b.defType("uchar", new(C.uchar))
+	b.defType("short", new(C.short))
+	b.defType("ushort", new(C.ushort))
+	b.defType("int", new(C.int))
+	b.defType("uint", new(C.uint))
+	b.defType("long", new(C.long))
+	b.defType("ulong", new(C.ulong))
+	b.defType("longlong", new(C.longlong))
+	b.defType("ulonglong", new(C.ulonglong))
+	b.defType("float", new(C.float))
+	b.defType("double", new(C.double))
 }
 
 type scopeBuilder struct {

@@ -15,7 +15,11 @@ import (
 	"unicode"
 )
 
-var builtinPkg, rootPackageInfo *PackageInfo
+var (
+	rootPackageInfo = &PackageInfo{loaded:true}
+	builtinPkg = &PackageInfo{}
+	cPkg = &PackageInfo{InfoBase:InfoBase{"C", rootPackageInfo}, importPath:"C"}
+)
 
 func newPackageInfo(parent *PackageInfo, name string) *PackageInfo {
 	p := &PackageInfo{InfoBase:InfoBase{name, parent}, importPath:filepath.Join(parent.importPath, name), fullPath:filepath.Join(parent.fullPath, name)}
@@ -45,6 +49,7 @@ func init() {
 		}
 		rootPackageInfo.subPackages = append(rootPackageInfo.subPackages, srcPackageInfo.subPackages...)
 	}
+	rootPackageInfo.subPackages = append(rootPackageInfo.subPackages, cPkg)
 	Sort(rootPackageInfo.subPackages, "Name")
 }
 
@@ -243,8 +248,10 @@ func specUnderlyingType(x ast.Expr, visitedNames map[string]bool) Type {
 	case *ast.SelectorExpr:
 		pkgScope := x.X.(*ast.Ident).Obj.Data.(*ast.Scope)
 		objName := x.Sel.Name
-		if spec, ok := pkgScope.Objects[objName].Decl.(*ast.TypeSpec); ok {
-			return specUnderlyingType(spec.Type, visitedNames)
+		if o, ok := pkgScope.Objects[objName]; ok {
+			if spec, ok := o.Decl.(*ast.TypeSpec); ok {
+				return specUnderlyingType(spec.Type, visitedNames)
+			}
 		}
 	}
 	return specType(x)
@@ -257,9 +264,15 @@ func specType(x ast.Expr) Type {
 	case *ast.Ident:
 		return x.Obj.Type.(Type)
 	case *ast.SelectorExpr:
-		pkgScope := x.X.(*ast.Ident).Obj.Data.(*ast.Scope)
+		pkgID := x.X.(*ast.Ident)
+		pkgScope := pkgID.Obj.Data.(*ast.Scope)
 		objName := x.Sel.Name
-		return pkgScope.Objects[objName].Type.(Type)
+		if o, ok := pkgScope.Objects[objName]; ok {
+			return o.Type.(Type)
+		} else if pkgID.Name == "C" {
+			// unknown C types not supported
+			return nil
+		}
 	case *ast.StarExpr:
 		return &PointerType{element:specType(x.X)}
 	case *ast.ArrayType:

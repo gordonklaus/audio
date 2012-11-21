@@ -89,7 +89,7 @@ func (b Browser) filteredInfos() (infos []Info) {
 		if b.currentPkg != nil {
 			switch i.(type) {
 			default:
-				if p := i.Parent(); p != nil && p != builtinPkg && p != b.currentPkg && !ast.IsExported(i.Name()) { continue }
+				if p := i.Parent(); p != nil && p != builtinPkg && p != cPkg && p != b.currentPkg && !ast.IsExported(i.Name()) { continue }
 			case *PackageInfo:
 			}
 		}
@@ -227,7 +227,7 @@ ok:
 		b.text.SetTextColor(getTextColor(cur, 1))
 		switch i := cur.(type) {
 		case *NamedType:
-			if i.parent != builtinPkg {
+			if p := i.parent; p != builtinPkg && p != cPkg {
 				b.typeView = newTypeView(&i.underlying)
 				b.AddChild(b.typeView)
 			}
