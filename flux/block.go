@@ -199,9 +199,10 @@ func (b *Block) reform() {
 			}
 		}
 		for conn := range b.connections {
+			xOffset := 64.0; if conn.feedback { xOffset = -256 }
 			src, dst := conn.src, conn.dst
 			if src == nil || dst == nil { continue }
-			d := dst.MapTo(dst.Position(), b).Sub(src.MapTo(src.Position(), b).Add(Pt(64, 0)))
+			d := dst.MapTo(dst.Position(), b).Sub(src.MapTo(src.Position(), b).Add(Pt(xOffset, 0)))
 			d.X *= 2
 			d.Y /= 2
 			

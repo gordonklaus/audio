@@ -57,7 +57,6 @@ func (p *put) KeyPressed(event KeyEvent) {
 	case glfw.KeyEnter:
 		conn := p.node.Block().NewConnection(p.Center())
 		p.spec.ConnectTo(conn)
-		conn.BeStraightLine()
 		conn.StartEditing()
 	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
 		p.node.Block().Outermost().FocusNearestView(p.spec, event.Key)
