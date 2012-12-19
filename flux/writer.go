@@ -27,7 +27,7 @@ func saveType(t *NamedType) {
 	Fprintf(w.go_, "type %s %s", t.name, tStr)
 }
 
-func saveFunction(f Function) {
+func saveFunc(f FuncNode) {
 	w := newWriter(f.info)
 	defer w.close()
 	
@@ -37,7 +37,7 @@ func saveFunction(f Function) {
 	
 	w.flux.WriteString(w.typeString(f.info.typeWithReceiver()))
 	w.writeImports()
-	w.writeBlockFlux(f.block, 0)
+	w.writeBlockFlux(f.funcBlock, 0)
 	
 	w.go_.WriteString("func ")
 	vars := map[*Input]string{}
@@ -57,7 +57,7 @@ func saveFunction(f Function) {
 		params = params[1:]
 	}
 	Fprintf(w.go_, "%s(%s) {\n", f.info.Name(), Join(params, ", "))
-	w.writeBlockGo(f.block, 0, vars)
+	w.writeBlockGo(f.funcBlock, 0, vars)
 	w.go_.WriteString("}")
 }
 
@@ -127,7 +127,7 @@ func (w *writer) writeBlockFlux(b *Block, indent int) {
 		w.nodeIDs[node] = w.nodeID
 		Fprintf(w.flux, "\n%s%d ", tabs(indent), w.nodeIDs[node])
 		switch n := node.(type) {
-		case *FunctionNode:
+		case *CallNode:
 			w.flux.WriteString(w.qualifiedName(n.info))
 		case *ConstantNode:
 			w.flux.WriteString(Quote(n.text.GetText()))
@@ -135,7 +135,10 @@ func (w *writer) writeBlockFlux(b *Block, indent int) {
 			w.flux.WriteString("if")
 			w.writeBlockFlux(n.trueBlock, indent)
 			w.writeBlockFlux(n.falseBlock, indent)
-		case *InputNode:
+		case *LoopNode:
+			w.flux.WriteString("loop")
+			w.writeBlockFlux(n.loopBlock, indent)
+		case *InOutNode:
 			w.flux.WriteString("\\in")
 		}
 	}
@@ -157,14 +160,12 @@ func (w *writer) writeBlockGo(b *Block, indent int, vars map[*Input]string) {
 	vars, varsCopy := map[*Input]string{}, vars
 	for k, v := range varsCopy { vars[k] = v }
 
-cx:	for conn := range b.connections {
-		if _, ok := vars[conn.dst]; ok { continue }
-		for block := conn.src.node.Block().Outer(); block != b; block = block.Outer() {
-			if block == nil { continue cx }
+	for conn := range b.connections {
+		if _, ok := vars[conn.dst]; !ok && conn.src.node.Block() != b {
+			name := w.newName("v")
+			Fprintf(w.go_, "%svar %s %s\n", tabs(indent), name, w.typeString(conn.dst.info.typ))
+			vars[conn.dst] = name
 		}
-		name := w.newName("v")
-		Fprintf(w.go_, "%svar %s %s\n", tabs(indent), name, w.typeString(conn.dst.info.typ))
-		vars[conn.dst] = name
 	}
 	for _, node := range order {
 		switch node := node.(type) {
@@ -179,24 +180,7 @@ cx:	for conn := range b.connections {
 				}
 				inputs = append(inputs, name)
 			}
-			outputs := []string{}
-			anyOutputConnections := false
-			assignExisting := map[string]string{}
-			for _, output := range node.Outputs() {
-				name := "_"
-				if len(output.connections) > 0 {
-					anyOutputConnections = true
-					name = w.newName(output.info.name)
-					for _, conn := range output.connections {
-						if existingName, ok := vars[conn.dst]; ok {
-							assignExisting[existingName] = name
-						} else {
-							vars[conn.dst] = name
-						}
-					}
-				}
-				outputs = append(outputs, name)
-			}
+			outputs, anyOutputConnections, assignExisting := w.outputNames(node, vars)
 			assignment := ""
 			if anyOutputConnections {
 				assignment = Join(outputs, ", ") + " := "
@@ -204,21 +188,14 @@ cx:	for conn := range b.connections {
 			w.go_.WriteString(tabs(indent))
 			w.go_.WriteString(assignment)
 			switch n := node.(type) {
-			case *FunctionNode:
+			case *CallNode:
 				Fprintf(w.go_, "%s(%s)", w.qualifiedName(n.info), Join(inputs, ", "))
 			case *ConstantNode:
 				w.go_.WriteString(Quote(n.text.GetText()))
 			}
 			w.go_.WriteString("\n")
-			if len(assignExisting) > 0 {
-				var existingNames, sourceNames []string
-				for v1, v2 := range assignExisting {
-					existingNames = append(existingNames, v1)
-					sourceNames = append(sourceNames, v2)
-				}
-				Fprintf(w.go_, "%s%s = %s\n", tabs(indent), Join(existingNames, ", "), Join(sourceNames, ", "))
-			}
-		case *InputNode:
+			w.assignExisting(assignExisting, indent)
+		case *InOutNode:
 		case *IfNode:
 			cond := "false"
 			if len(node.input.connections) > 0 {
@@ -231,7 +208,62 @@ cx:	for conn := range b.connections {
 				w.writeBlockGo(node.falseBlock, indent, vars)
 			}
 			Fprintf(w.go_, "%s}\n", tabs(indent))
+		case *LoopNode:
+			Fprintf(w.go_, "%sfor ", tabs(indent))
+			outputs, anyOutputConnections, assignExisting := w.outputNames(node.inputNode, vars)
+			if conns := node.input.connections; len(conns) > 0 {
+				switch conns[0].src.info.typ.(type) {
+				case *NamedType:
+					i := outputs[0]
+					Fprintf(w.go_, "%s := 0; %s < %s; %s++ ", i, i, vars[node.input], i)
+				case *ArrayType, *SliceType, *MapType, *ChanType:
+					if anyOutputConnections {
+						Fprintf(w.go_, "%s := ", Join(outputs, ", "))
+					}
+					Fprintf(w.go_, "range %s ", vars[node.input])
+				}
+			} else if anyOutputConnections {
+				i := outputs[0]
+				Fprintf(w.go_, "%s := 0;; %s++ ", i, i)
+			}
+			w.go_.WriteString("{\n")
+			w.assignExisting(assignExisting, indent + 1)
+			w.writeBlockGo(node.loopBlock, indent, vars)
+			Fprintf(w.go_, "%s}\n", tabs(indent))
 		}
+	}
+}
+
+func (w *writer) outputNames(node Node, vars map[*Input]string) ([]string, bool, map[string]string) {
+	outputs := []string{}
+	anyOutputConnections := false
+	assignExisting := map[string]string{}
+	for _, output := range node.Outputs() {
+		name := "_"
+		if len(output.connections) > 0 {
+			anyOutputConnections = true
+			name = w.newName(output.info.name)
+			for _, conn := range output.connections {
+				if existingName, ok := vars[conn.dst]; ok {
+					assignExisting[existingName] = name
+				} else {
+					vars[conn.dst] = name
+				}
+			}
+		}
+		outputs = append(outputs, name)
+	}
+	return outputs, anyOutputConnections, assignExisting
+}
+
+func (w writer) assignExisting(m map[string]string, indent int) {
+	if len(m) > 0 {
+		var existingNames, sourceNames []string
+		for v1, v2 := range m {
+			existingNames = append(existingNames, v1)
+			sourceNames = append(sourceNames, v2)
+		}
+		Fprintf(w.go_, "%s%s = %s\n", tabs(indent), Join(existingNames, ", "), Join(sourceNames, ", "))
 	}
 }
 

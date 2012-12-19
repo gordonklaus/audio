@@ -136,7 +136,7 @@ func (v *typeView) editType(done func()) {
 l:		for v := View(v); v != nil; v = v.Parent() {
 			switch v := v.(type) {
 			case Node:
-				f := v.Block().Outermost().function
+				f := v.Block().Func()
 				pkg, imports = f.pkg(), f.imports()
 				break l
 			}

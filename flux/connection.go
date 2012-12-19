@@ -45,6 +45,7 @@ func (c *Connection) SetSource(src *Output) {
 	if c.src != nil { c.src.Disconnect(c) }
 	c.src = src
 	if src != nil { src.Connect(c) }
+	if c.dst != nil { c.dst.connectionsChanged() }
 	c.reblock()
 	c.reform()
 }
@@ -57,6 +58,7 @@ func (c *Connection) SetDestination(dst *Input) {
 	if c.dst != nil { c.dst.Disconnect(c) }
 	c.dst = dst
 	if dst != nil { dst.Connect(c) }
+	if c.src != nil { c.src.connectionsChanged() }
 	c.reblock()
 	c.reform()
 }

@@ -13,6 +13,7 @@ type put struct {
 	valueView *typeView
 	connections []*Connection
 	focused bool
+	connectionsChanged func()
 }
 
 const putSize = 11
@@ -31,6 +32,7 @@ func Newput(spec putSpecializer, n Node, info *ValueInfo) *put {
 	p.info = info
 	p.valueView = newValueView(info)
 	p.valueView.Hide()
+	p.connectionsChanged = func(){}
 	p.AddChild(p.valueView)
 	p.Resize(putSize, putSize)
 	p.Pan(Pt(putSize, putSize).Div(-2))
@@ -39,11 +41,15 @@ func Newput(spec putSpecializer, n Node, info *ValueInfo) *put {
 }
 
 func (p put) CanConnect(interface{}) bool { return true }
-func (p *put) Connect(conn *Connection) { p.connections = append(p.connections, conn) }
+func (p *put) Connect(conn *Connection) {
+	p.connections = append(p.connections, conn)
+	if f := p.connectionsChanged; f != nil { f() }
+}
 func (p *put) Disconnect(conn *Connection) {
 	for i, connection := range p.connections {
 		if connection == conn {
 			p.connections = append(p.connections[:i], p.connections[i+1:]...)
+			if f := p.connectionsChanged; f != nil { f() }
 			return
 		}
 	}
@@ -78,9 +84,8 @@ func (p put) MouseDragged(button int, pt Point) {}
 func (p put) MouseReleased(button int, pt Point) {}
 
 func (p put) Paint() {
-	color := map[bool]Color{true:{.5, .5, 1, .5}, false:{1, 1, 1, .25}}[p.focused]
+	SetColor(map[bool]Color{true:{.5, .5, 1, .5}, false:{1, 1, 1, .25}}[p.focused])
 	for f := 1.0; f > .1; f /= 2 {
-		SetColor(color)
 		SetPointSize(f * putSize)
 		DrawPoint(ZP)
 	}

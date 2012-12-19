@@ -75,6 +75,10 @@ func (b *Browser) cancel() {
 }
 
 func (b Browser) filteredInfos() (infos []Info) {
+	if b.mode == browse && b.path[0] == rootPackageInfo {
+		infos = []Info{special("defer"), special("go"), special("if"), special("loop")}
+	}
+	
 	for _, i := range b.path[0].Children() {
 		switch b.mode {
 		case fluxSourceOnly:
@@ -298,7 +302,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 				*info = *newPackageInfo(info.parent.(*PackageInfo), info.name)
 				if err := os.Mkdir(info.FluxSourcePath(), 0777); err != nil { Println(err) }
 			case *FuncInfo:
-				NewFunction(info)
+				NewFuncNode(info) // bad bad, this launches animate()
 			}
 			
 			b.i = 0
@@ -366,6 +370,8 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 
 func getTextColor(info Info, alpha float64) Color {
 	switch info.(type) {
+	case SpecialInfo:
+		return Color{1, 1, .6, alpha}
 	case *PackageInfo:
 		return Color{1, 1, 1, alpha}
 	case *NamedType:

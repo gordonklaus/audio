@@ -10,9 +10,7 @@ import (
 
 type Block struct {
 	*ViewBase
-	AggregateMouseHandler
 	node Node
-	function *Function
 	nodes map[Node]bool
 	connections map[*Connection]bool
 	focused, editing bool
@@ -24,31 +22,28 @@ type Block struct {
 func NewBlock(node Node) *Block {
 	b := &Block{}
 	b.ViewBase = NewView(b)
-	b.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(b), NewViewPanner(b)}
 	b.node = node
 	b.nodes = map[Node]bool{}
 	b.connections = map[*Connection]bool{}
+	b.points = []Point{ZP}
 	b.Pan(Pt(-400, -300))
-	go b.reform()
 	return b
 }
 
-func (b *Block) Outer() *Block {
-	if b.node == nil { return nil }
-	return b.node.Block()
-}
+func (b *Block) Outer() *Block { return b.node.Block() }
 func (b *Block) Outermost() *Block {
 	if outer := b.Outer(); outer != nil { return outer.Outermost() }
 	return b
 }
+func (b *Block) Func() *FuncNode { return b.Outermost().node.(*FuncNode) }
 
 func (b *Block) AddNode(n Node) {
 	if !b.nodes[n] {
 		b.AddChild(n)
 		b.nodes[n] = true
 		switch n := n.(type) {
-		case *FunctionNode:
-			b.Outermost().function.AddPackageRef(n.info)
+		case *CallNode:
+			b.Func().AddPackageRef(n.info)
 		}
 	}
 }
@@ -57,8 +52,8 @@ func (b *Block) RemoveNode(n Node) {
 	b.RemoveChild(n)
 	delete(b.nodes, n)
 	switch n := n.(type) {
-	case *FunctionNode:
-		b.Outermost().function.SubPackageRef(n.info)
+	case *CallNode:
+		b.Func().SubPackageRef(n.info)
 	}
 }
 
@@ -90,6 +85,7 @@ func (b Block) AllNodes() (nodes []Node) {
 		switch n := n.(type) {
 		case *IfNode:
 			nodes = append(nodes, append(n.falseBlock.AllNodes(), n.trueBlock.AllNodes()...)...)
+		// TODO...
 		}
 	}
 	return nodes
@@ -103,6 +99,7 @@ func (b Block) AllConnections() (conns []*Connection) {
 		switch n := n.(type) {
 		case *IfNode:
 			conns = append(conns, append(n.falseBlock.AllConnections(), n.trueBlock.AllConnections()...)...)
+		// TODO...
 		}
 	}
 	return conns
@@ -180,7 +177,7 @@ func (b *Block) StopEditing() {
 	b.editingNode = nil
 }
 
-func (b *Block) reform() {
+func (b *Block) animate() {
 	for {
 		v := map[Node]Point{}
 		center := ZP
@@ -206,8 +203,8 @@ func (b *Block) reform() {
 			d.X *= 2
 			d.Y /= 2
 			
-			srcNode := src.node; for !b.nodes[srcNode] { srcNode = srcNode.Block().node }
-			dstNode := dst.node; for !b.nodes[dstNode] { dstNode = dstNode.Block().node }
+			srcNode := src.node; for srcNode.Block() != b { srcNode = srcNode.Block().node }
+			dstNode := dst.node; for dstNode.Block() != b { dstNode = dstNode.Block().node }
 			v[srcNode] = v[srcNode].Add(d)
 			v[dstNode] = v[dstNode].Sub(d)
 		}
@@ -218,6 +215,7 @@ func (b *Block) reform() {
 		
 		pts := []Point{}
 		for n := range b.nodes {
+			if _, ok := n.(*InOutNode); ok { continue }
 			r := n.MapRectToParent(n.Rect())
 			pts = append(pts, r.Min, r.Max, Pt(r.Min.X, r.Max.Y), Pt(r.Max.X, r.Min.Y))
 		}
@@ -261,11 +259,7 @@ func (b *Block) reform() {
 			b.points = append(b.points, p1.Add(p2).Div(2))
 		}
 		
-		rect := ZR.Add(pts[0])
-		for _, p := range pts { rect = rect.Union(ZR.Add(p)) }
-		if b.node == nil { b.Move(b.MapToParent(rect.Min)) }
-		b.Pan(rect.Min)
-		b.Resize(rect.Dx(), rect.Dy())
+		ResizeToFit(b, 0)
 		if n, ok := b.node.(interface{positionBlocks()}); ok { n.positionBlocks() }
 		
 		time.Sleep(33 * time.Millisecond)
@@ -350,7 +344,7 @@ func (b *Block) KeyPressed(event KeyEvent) {
 		if !(event.Ctrl || event.Alt || event.Super) {
 			switch event.Text {
 			default:
-				f := b.Outermost().function
+				f := b.Func()
 				browser := NewBrowser(browse, f.pkg(), f.imports())
 				b.AddChild(browser)
 				browser.Move(b.Center())
@@ -369,11 +363,6 @@ func (b *Block) KeyPressed(event KeyEvent) {
 				b.AddNode(node)
 				node.MoveCenter(b.Center())
 				node.text.TakeKeyboardFocus()
-			case ",":
-				node := NewIfNode(b)
-				b.AddNode(node)
-				node.MoveCenter(b.Center())
-				node.TakeKeyboardFocus()
 			case "":
 				b.ViewBase.KeyPressed(event)
 			}

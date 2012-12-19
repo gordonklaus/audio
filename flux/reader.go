@@ -10,12 +10,12 @@ import (
 
 type reader struct {
 	s string
-	f *Function
+	f *FuncNode
 	pkgNames map[string]*PackageInfo
 	nodes map[int]Node
 }
 
-func loadFunction(f *Function) bool {
+func loadFunc(f *FuncNode) bool {
 	r := &reader{"", f, map[string]*PackageInfo{}, map[int]Node{}}
 	if b, err := ReadFile(f.info.FluxSourcePath()); err != nil {
 		return false
@@ -41,7 +41,7 @@ func loadFunction(f *Function) bool {
 		f.AddPackageRef(parameter.typ)
 	}
 	f.inputNode.reform()
-	r.readBlock(f.block, 0)
+	r.readBlock(f.funcBlock, 0)
 	
 	return true
 }
@@ -75,38 +75,45 @@ func (r *reader) readNode(b *Block, indent int) {
 	line := ""
 	line, r.s = Split2(r.s, "\n")
 	fields := Fields(line)
-	if fields[1][0] == '"' {
-		strNode := NewStringConstantNode(b)
-		text, _ := Unquote(fields[1])
-		strNode.text.SetText(text)
-		node = strNode
-	} else if fields[1] == "\\in" {
+	switch f := fields[1]; f {
+ 	case "\\in":
 		for n := range b.nodes {
-			if _, ok := n.(*InputNode); ok {
+			if _, ok := n.(*InOutNode); ok {
 				node = n
 			}
 		}
-	} else if fields[1] == "if" {
+	case "if":
 		n := NewIfNode(b)
 		r.readBlock(n.trueBlock, indent)
 		r.readBlock(n.falseBlock, indent)
 		node = n
-	} else {
-		pkgName, name := Split2(fields[1], ".")
-		var pkg *PackageInfo
-		if name == "" {
-			name = pkgName
-			pkg = r.f.pkg()
+	case "loop":
+		n := NewLoopNode(b)
+		r.readBlock(n.loopBlock, indent)
+		node = n
+	default:
+		if f[0] == '"' {
+			strNode := NewStringConstantNode(b)
+			text, _ := Unquote(fields[1])
+			strNode.text.SetText(text)
+			node = strNode
 		} else {
-			pkg = r.pkgNames[pkgName]
-		}
-		for _, info := range pkg.Children() {
-			if info.Name() != name { continue }
-			switch info := info.(type) {
-			case *FuncInfo:
-				node = NewFunctionNode(info, b)
-			default:
-				panic("not yet implemented")
+			pkgName, name := Split2(fields[1], ".")
+			var pkg *PackageInfo
+			if name == "" {
+				name = pkgName
+				pkg = r.f.pkg()
+			} else {
+				pkg = r.pkgNames[pkgName]
+			}
+			for _, info := range pkg.Children() {
+				if info.Name() != name { continue }
+				switch info := info.(type) {
+				case *FuncInfo:
+					node = NewCallNode(info, b)
+				default:
+					panic("not yet implemented")
+				}
 			}
 		}
 	}

@@ -39,6 +39,7 @@ func (t *nodeText) KeyPressed(event KeyEvent) {
 
 type NodeBase struct {
 	*ViewBase
+	Self Node
 	AggregateMouseHandler
 	block *Block
 	text *nodeText
@@ -52,15 +53,27 @@ const (
 )
 
 func NewNodeBase(self Node, block *Block) *NodeBase {
-	n := &NodeBase{}
+	n := &NodeBase{Self:self}
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(self), NewViewDragger(self)}
 	n.block = block
 	n.text = newNodeText(n)
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	n.AddChild(n.text)
-	n.Self = self
+	n.ViewBase.Self = self
 	return n
+}
+
+func (n *NodeBase) newInput(i *ValueInfo) {
+	p := NewInput(n.Self, i)
+	n.AddChild(p)
+	n.inputs = append(n.inputs, p)
+}
+
+func (n *NodeBase) newOutput(i *ValueInfo) {
+	p := NewOutput(n.Self, i)
+	n.AddChild(p)
+	n.outputs = append(n.outputs, p)
 }
 
 func (n *NodeBase) reform() {
@@ -140,37 +153,36 @@ func (n NodeBase) Paint() {
 
 func NewNode(info Info, block *Block) Node {
 	switch info := info.(type) {
+	case SpecialInfo:
+		switch info.Name() {
+		case "if":
+			return NewIfNode(block)
+		case "loop":
+			return NewLoopNode(block)
+		}
 	// case StringType:
 	// 	return NewBasicLiteralNode(info)
 	case *FuncInfo:
-		return NewFunctionNode(info, block)
+		return NewCallNode(info, block)
 	}
 	return nil
 }
 
-type FunctionNode struct {
+type CallNode struct {
 	*NodeBase
 	info *FuncInfo
 }
-func NewFunctionNode(info *FuncInfo, block *Block) *FunctionNode {
-	n := &FunctionNode{info:info}
+func NewCallNode(info *FuncInfo, block *Block) *CallNode {
+	n := &CallNode{info:info}
 	n.NodeBase = NewNodeBase(n, block)
 	n.text.SetText(info.name)
-	for _, parameter := range info.typ.parameters {
-		p := NewInput(n, parameter)
-		n.AddChild(p)
-		n.inputs = append(n.inputs, p)
-	}
-	for _, result := range info.typ.results {
-		p := NewOutput(n, result)
-		n.AddChild(p)
-		n.outputs = append(n.outputs, p)
-	}
+	for _, parameter := range info.typ.parameters { n.newInput(parameter) }
+	for _, result := range info.typ.results { n.newOutput(result) }
 	n.reform()
 	
 	return n
 }
-func (n FunctionNode) Package() *PackageInfo { return n.info.Parent().(*PackageInfo) }
+func (n CallNode) Package() *PackageInfo { return n.info.Parent().(*PackageInfo) }
 
 type ConstantNode struct { *NodeBase }
 func NewStringConstantNode(block *Block) *ConstantNode {

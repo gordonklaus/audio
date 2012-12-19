@@ -22,18 +22,16 @@ func NewIfNode(block *Block) *IfNode {
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.block = block
 	n.input = NewInput(n, &ValueInfo{})
-	n.falseBlock = NewBlock(nil)
-	n.trueBlock = NewBlock(nil)
-	n.falseBlock.node = n
-	n.trueBlock.node = n
+	n.falseBlock = NewBlock(n)
+	n.trueBlock = NewBlock(n)
 	n.AddChild(n.input)
 	n.AddChild(n.falseBlock)
 	n.AddChild(n.trueBlock)
-	n.blockEnds = [2]Point{}
+	go n.falseBlock.animate()
+	go n.trueBlock.animate()
 
 	n.input.MoveCenter(Pt(-2*putSize, 0))
 	n.trueBlock.Move(Pt(putSize, 4))
-	n.positionBlocks()
 	return n
 }
 
@@ -52,15 +50,11 @@ func (n IfNode) OutputConnections() []*Connection {
 func (n *IfNode) positionBlocks() {
 	n.falseBlock.Move(Pt(putSize, -4 - n.falseBlock.Height()))
 	for i, b := range []*Block{n.falseBlock, n.trueBlock} {
-		if len(b.points) == 0 { continue }
 		leftmost := b.points[0]
 		for _, p := range b.points { if p.X < leftmost.X { leftmost = p } }
 		n.blockEnds[i] = b.MapToParent(leftmost)
 	}
-	
-	rect := n.input.MapRectToParent(n.input.Rect()).Union(n.falseBlock.MapRectToParent(n.falseBlock.Rect())).Union(n.trueBlock.MapRectToParent(n.trueBlock.Rect()))
-	n.Pan(rect.Min)
-	n.Resize(rect.Dx(), rect.Dy())
+	ResizeToFit(n, 0)
 }
 
 func (n *IfNode) Move(p Point) {

@@ -23,6 +23,7 @@ type View interface {
 	
 	Show()
 	Hide()
+	Visible() bool
 	Close()
 	
 	Raise()
@@ -33,6 +34,7 @@ type View interface {
 	Position() Point
 	Move(p Point)
 	MoveCenter(p Point)
+	MoveOrigin(p Point)
 	
 	Rect() Rectangle
 	Center() Point
@@ -132,6 +134,7 @@ func (v ViewBase) ViewAt(point Point) View {
 
 func (v *ViewBase) Show() { v.hidden = false; v.Self.Repaint() }
 func (v *ViewBase) Hide() { v.hidden = true; v.Self.Repaint() }
+func (v ViewBase) Visible() bool { return !v.hidden }
 func (v *ViewBase) Close() { if v.parent != nil { v.parent.RemoveChild(v.Self) } }
 
 func (v *ViewBase) Raise() { if v.parent != nil { v.parent.RaiseChild(v.Self) } }
@@ -161,6 +164,7 @@ func (v *ViewBase) Move(p Point) {
 	v.Self.Repaint()
 }
 func (v *ViewBase) MoveCenter(p Point) { v.Self.Move(p.Sub(v.Size().Div(2))) }
+func (v *ViewBase) MoveOrigin(p Point) { v.Self.Move(p.Add(v.Rect().Min)) }
 
 func (v ViewBase) Rect() Rectangle { return v.rect }
 func (v ViewBase) Center() Point { return v.rect.Min.Add(v.Size().Div(2)) }

@@ -46,7 +46,7 @@ func NewFluxWindow() *FluxWindow {
 				v.TakeKeyboardFocus()
 			}
 		case *FuncInfo:
-			w.SetCentralView(NewFunction(info))
+			w.SetCentralView(NewFuncNode(info))
 		default:
 			w.SetCentralView(w.browser)
 			w.browser.text.TakeKeyboardFocus()

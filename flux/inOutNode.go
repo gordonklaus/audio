@@ -4,19 +4,20 @@ import (
 	."code.google.com/p/gordon-go/gui"
 )
 
-type InputNode struct {
+type InOutNode struct {
 	*NodeBase
+	editable bool
 }
 
-func NewInputNode(block *Block) *InputNode {
-	n := &InputNode{}
+func NewInOutNode(block *Block) *InOutNode {
+	n := &InOutNode{}
 	n.NodeBase = NewNodeBase(n, block)
 	n.reform()
 	return n
 }
 
-func (n *InputNode) KeyPressed(event KeyEvent) {
-	if event.Text == "," {
+func (n *InOutNode) KeyPressed(event KeyEvent) {
+	if n.editable && event.Text == "," {
 		output := NewOutput(n, new(ValueInfo))
 		n.AddChild(output)
 		n.outputs = append(n.outputs, output)
@@ -24,7 +25,7 @@ func (n *InputNode) KeyPressed(event KeyEvent) {
 		output.valueView.Show()
 		output.valueView.edit(func() {
 			if output.info.typ != nil {
-				f := n.block.Outermost().function
+				f := n.block.Func()
 				f.info.typ.parameters = append(f.info.typ.parameters, output.info)
 				f.AddPackageRef(output.info.typ)
 				output.TakeKeyboardFocus()
@@ -40,11 +41,12 @@ func (n *InputNode) KeyPressed(event KeyEvent) {
 	}
 }
 
-func (n InputNode) Paint() {
-	color := map[bool]Color{true:{.5, .5, 1, .5}, false:{1, 1, 1, .25}}[n.focused]
+func (n InOutNode) Paint() {
+	SetColor(map[bool]Color{true:{.5, .5, 1, .5}, false:{1, 1, 1, .25}}[n.focused])
+	// TODO:  draw half-circle instead
 	for f := 1.0; f > .1; f /= 2 {
-		SetColor(color)
-		SetPointSize(f * 25)
+		SetPointSize(f * 12)
 		DrawPoint(ZP)
 	}
+	n.NodeBase.Paint()
 }

@@ -480,3 +480,6 @@ type ValueInfo struct {
 	typ Type
 	constant bool
 }
+
+type SpecialInfo struct { *InfoBase }
+func special(name string) SpecialInfo { return SpecialInfo{&InfoBase{name, nil}} }
