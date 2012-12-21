@@ -85,7 +85,8 @@ func (b Block) AllNodes() (nodes []Node) {
 		switch n := n.(type) {
 		case *IfNode:
 			nodes = append(nodes, append(n.falseBlock.AllNodes(), n.trueBlock.AllNodes()...)...)
-		// TODO...
+		case *LoopNode:
+			nodes = append(nodes, n.loopBlock.AllNodes()...)
 		}
 	}
 	return nodes
@@ -99,7 +100,8 @@ func (b Block) AllConnections() (conns []*Connection) {
 		switch n := n.(type) {
 		case *IfNode:
 			conns = append(conns, append(n.falseBlock.AllConnections(), n.trueBlock.AllConnections()...)...)
-		// TODO...
+		case *LoopNode:
+			conns = append(conns, n.loopBlock.AllConnections()...)
 		}
 	}
 	return conns
@@ -187,7 +189,9 @@ func (b *Block) animate() {
 		}
 		center = center.Div(float64(len(b.nodes)))
 		for n1 := range b.nodes {
+			if _, ok := n1.(*InOutNode); ok { continue }
 			for n2 := range b.nodes {
+				if _, ok := n2.(*InOutNode); ok { continue }
 				if n2 == n1 { continue }
 				dir := n1.MapToParent(n1.Center()).Sub(n2.MapToParent(n2.Center()))
 				d := Sqrt(dir.X * dir.X + dir.Y * dir.Y)
@@ -205,6 +209,8 @@ func (b *Block) animate() {
 			
 			srcNode := src.node; for srcNode.Block() != b { srcNode = srcNode.Block().node }
 			dstNode := dst.node; for dstNode.Block() != b { dstNode = dstNode.Block().node }
+			if _, ok := srcNode.(*InOutNode); ok { continue }
+			if _, ok := dstNode.(*InOutNode); ok { continue }
 			v[srcNode] = v[srcNode].Add(d)
 			v[dstNode] = v[dstNode].Sub(d)
 		}
@@ -259,7 +265,13 @@ func (b *Block) animate() {
 			b.points = append(b.points, p1.Add(p2).Div(2))
 		}
 		
-		ResizeToFit(b, 0)
+		rect := Rect(pts[0].X, pts[0].Y, pts[0].X, pts[0].Y)
+		for _, p := range append(b.points, b.intermediatePoints...) {
+			rect = rect.Union(Rect(p.X, p.Y, p.X, p.Y))
+		}
+		b.Resize(rect.Dx(), rect.Dy())
+		b.Pan(rect.Min)
+		
 		if n, ok := b.node.(interface{positionBlocks()}); ok { n.positionBlocks() }
 		
 		time.Sleep(33 * time.Millisecond)
