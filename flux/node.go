@@ -111,7 +111,6 @@ func (n *NodeBase) reform() {
 	}
 
 	n.text.MoveCenter(Pt(0, rect.Max.Y + n.text.Height() / 2))
-	rect = rect.Union(n.text.MapRectToParent(n.text.Rect()))
 	n.Pan(rect.Min)
 	n.Resize(rect.Dx(), rect.Dy())
 }

@@ -10,7 +10,7 @@ type LoopNode struct {
 	AggregateMouseHandler
 	block *Block
 	input *Input
-	inputNode *InOutNode
+	inputsNode *portsNode
 	loopBlock *Block
 	focused bool
 	leftmost Point
@@ -31,9 +31,9 @@ func NewLoopNode(block *Block) *LoopNode {
 	}
 	n.AddChild(n.input)
 	n.loopBlock = NewBlock(n)
-	n.inputNode = NewInputNode(n.loopBlock)
-	n.inputNode.newOutput(&ValueInfo{})
-	n.loopBlock.AddNode(n.inputNode)
+	n.inputsNode = newInputsNode(n.loopBlock)
+	n.inputsNode.newOutput(&ValueInfo{})
+	n.loopBlock.AddNode(n.inputsNode)
 	n.AddChild(n.loopBlock)
 	go n.loopBlock.animate()
 	
@@ -53,7 +53,7 @@ func (n LoopNode) OutputConnections() []*Connection {
 }
 
 func (n *LoopNode) updateInputType(t Type) {
-	in := n.inputNode
+	in := n.inputsNode
 	switch t.(type) {
 	case nil, *NamedType, *ChanType:
 		if len(in.outputs) == 2 {
@@ -79,7 +79,7 @@ func (n *LoopNode) positionBlocks() {
 	b := n.loopBlock
 	n.leftmost = b.points[0]
 	for _, p := range b.points { if p.X < n.leftmost.X { n.leftmost = p } }
-	n.inputNode.MoveOrigin(n.leftmost)
+	n.inputsNode.MoveOrigin(n.leftmost)
 	n.leftmost = b.MapToParent(n.leftmost)
 	n.input.MoveCenter(n.leftmost.Sub(Pt(portSize, 0)))
 	ResizeToFit(n, 0)

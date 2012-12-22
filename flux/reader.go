@@ -35,11 +35,11 @@ func loadFunc(f *FuncNode) bool {
 		r.pkgNames[name] = pkg
 	}
 	for _, parameter := range f.info.typ.parameters {
-		f.inputNode.newOutput(parameter)
+		f.inputsNode.newOutput(parameter)
 		f.AddPackageRef(parameter.typ)
 	}
 	for _, result := range f.info.typ.results {
-		f.outputNode.newInput(result)
+		f.outputsNode.newInput(result)
 		f.AddPackageRef(result.typ)
 	}
 	r.readBlock(f.funcBlock, 0)
@@ -79,13 +79,13 @@ func (r *reader) readNode(b *Block, indent int) {
 	switch f := fields[1]; f {
  	case "\\in":
 		for n := range b.nodes {
-			if n, ok := n.(*InOutNode); ok && !n.out {
+			if n, ok := n.(*portsNode); ok && !n.out {
 				node = n
 			}
 		}
  	case "\\out":
 		for n := range b.nodes {
-			if n, ok := n.(*InOutNode); ok && n.out {
+			if n, ok := n.(*portsNode); ok && n.out {
 				node = n
 			}
 		}

@@ -39,11 +39,10 @@ func saveFunc(f FuncNode) {
 	w.writeImports()
 	w.writeBlockFlux(f.funcBlock, 0)
 	
-	// TODO:  try to use w.typeString() for the Go signature (similar to above)
 	w.go_.WriteString("func ")
 	vars := map[*Input]string{}
 	params := []string{}
-	for _, p := range f.inputNode.Outputs() {
+	for _, p := range f.inputsNode.Outputs() {
 		name := w.newName(p.info.name)
 		if len(p.connections) > 0 {
 			vars[p.connections[0].dst] = name
@@ -55,16 +54,16 @@ func saveFunc(f FuncNode) {
 		params = params[1:]
 	}
 	results := []string{}
-	for _, p := range f.outputNode.Inputs() {
+	for _, p := range f.outputsNode.Inputs() {
 		name := w.newName(p.info.name)
 		vars[p] = name
 		results = append(results, name + " " + w.typeString(p.info.typ))
 	}
-	Fprintf(w.go_, "%s(%s)", f.info.Name(), Join(params, ", "))
+	Fprintf(w.go_, "%s(%s) ", f.info.Name(), Join(params, ", "))
 	if len(results) > 0 {
-		Fprintf(w.go_, " (%s)", Join(results, ", "))
+		Fprintf(w.go_, "(%s) ", Join(results, ", "))
 	}
-	w.go_.WriteString(" {\n")
+	w.go_.WriteString("{\n")
 	w.writeBlockGo(f.funcBlock, 0, vars)
 	if len(results) > 0 {
 		w.go_.WriteString("\treturn\n")
@@ -150,7 +149,7 @@ func (w *writer) writeBlockFlux(b *Block, indent int) {
 		case *LoopNode:
 			w.flux.WriteString("loop")
 			w.writeBlockFlux(n.loopBlock, indent)
-		case *InOutNode:
+		case *portsNode:
 			if n.out {
 				w.flux.WriteString("\\out")
 			} else {
@@ -211,7 +210,7 @@ func (w *writer) writeBlockGo(b *Block, indent int, vars map[*Input]string) {
 			}
 			w.go_.WriteString("\n")
 			w.assignExisting(assignExisting, indent)
-		case *InOutNode:
+		case *portsNode:
 		case *IfNode:
 			cond := "false"
 			if len(node.input.connections) > 0 {
@@ -226,7 +225,7 @@ func (w *writer) writeBlockGo(b *Block, indent int, vars map[*Input]string) {
 			Fprintf(w.go_, "%s}\n", tabs(indent))
 		case *LoopNode:
 			Fprintf(w.go_, "%sfor ", tabs(indent))
-			outputs, anyOutputConnections, assignExisting := w.outputNames(node.inputNode, vars)
+			outputs, anyOutputConnections, assignExisting := w.outputNames(node.inputsNode, vars)
 			if conns := node.input.connections; len(conns) > 0 {
 				switch conns[0].src.info.typ.(type) {
 				case *NamedType:

@@ -189,9 +189,9 @@ func (b *Block) animate() {
 		}
 		center = center.Div(float64(len(b.nodes)))
 		for n1 := range b.nodes {
-			if _, ok := n1.(*InOutNode); ok { continue }
+			if _, ok := n1.(*portsNode); ok { continue }
 			for n2 := range b.nodes {
-				if _, ok := n2.(*InOutNode); ok { continue }
+				if _, ok := n2.(*portsNode); ok { continue }
 				if n2 == n1 { continue }
 				dir := n1.MapToParent(n1.Center()).Sub(n2.MapToParent(n2.Center()))
 				d := Sqrt(dir.X * dir.X + dir.Y * dir.Y)
@@ -209,8 +209,8 @@ func (b *Block) animate() {
 			
 			srcNode := src.node; for srcNode.Block() != b { srcNode = srcNode.Block().node }
 			dstNode := dst.node; for dstNode.Block() != b { dstNode = dstNode.Block().node }
-			if _, ok := srcNode.(*InOutNode); ok { continue }
-			if _, ok := dstNode.(*InOutNode); ok { continue }
+			if _, ok := srcNode.(*portsNode); ok { continue }
+			if _, ok := dstNode.(*portsNode); ok { continue }
 			v[srcNode] = v[srcNode].Add(d)
 			v[dstNode] = v[dstNode].Sub(d)
 		}
@@ -221,7 +221,7 @@ func (b *Block) animate() {
 		
 		pts := []Point{}
 		for n := range b.nodes {
-			if _, ok := n.(*InOutNode); ok { continue }
+			if _, ok := n.(*portsNode); ok { continue }
 			r := n.MapRectToParent(n.Rect())
 			pts = append(pts, r.Min, r.Max, Pt(r.Min.X, r.Max.Y), Pt(r.Max.X, r.Min.Y))
 		}
@@ -384,16 +384,6 @@ func (b *Block) KeyPressed(event KeyEvent) {
 	}
 }
 
-// func (b *Block) MousePressed(button int, pt Point) {
-// 	b.TakeKeyboardFocus()
-// 	// conn := p.node.Block().NewConnection(p.MapTo(pt, p.node.Block()))
-// 	// p.spec.ConnectTo(conn)
-// 	// p.spec.PassMouseFocusToFreeConnectionHandle(conn, button)
-// 	// conn.StartEditing()
-// }
-// func (b Block) MouseDragged(button int, pt Point) {}
-// func (b Block) MouseReleased(button int, pt Point) {}
-// 
 func (b Block) Paint() {
 	if b.editing {
 		SetColor(Color{.7, .4, 0, 1})
@@ -407,4 +397,58 @@ func (b Block) Paint() {
 		p1, p2, p3 := b.points[i], b.intermediatePoints[(i + 1) % n], b.points[(i + 1) % n]
 		DrawQuadratic([3]Point{p1, p2, p3}, int(p3.Sub(p2).Len() + p2.Sub(p1).Len()) / 8)
 	}
+}
+
+
+type portsNode struct {
+	*NodeBase
+	out bool
+	editable bool
+}
+
+func newInputsNode(block *Block) *portsNode { return newPortsNode(false, block) }
+func newOutputsNode(block *Block) *portsNode { return newPortsNode(true, block) }
+func newPortsNode(out bool, block *Block) *portsNode {
+	n := &portsNode{out:out}
+	n.NodeBase = NewNodeBase(n, block)
+	return n
+}
+
+func (n *portsNode) KeyPressed(event KeyEvent) {
+	if n.editable && event.Text == "," {
+		var p *port
+		if n.out {
+			p = n.newInput(&ValueInfo{}).port
+		} else {
+			p = n.newOutput(&ValueInfo{}).port
+		}
+		p.valueView.Show()
+		p.valueView.edit(func() {
+			if p.info.typ != nil {
+				f := n.block.Func()
+				if n.out {
+					f.info.typ.results = append(f.info.typ.results, p.info)
+				} else {
+					f.info.typ.parameters = append(f.info.typ.parameters, p.info)
+				}
+				f.AddPackageRef(p.info.typ)
+				p.TakeKeyboardFocus()
+			} else {
+				n.RemoveChild(p.Self)
+				n.TakeKeyboardFocus()
+			}
+		})
+	} else {
+		n.NodeBase.KeyPressed(event)
+	}
+}
+
+func (n portsNode) Paint() {
+	SetColor(map[bool]Color{true:{.5, .5, 1, .5}, false:{1, 1, 1, .25}}[n.focused])
+	// TODO:  draw half-circle instead
+	for f := 1.0; f > .1; f /= 2 {
+		SetPointSize(f * 12)
+		DrawPoint(ZP)
+	}
+	n.NodeBase.Paint()
 }
