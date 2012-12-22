@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
+	."code.google.com/p/gordon-go/util"
 	."math"
 )
 
@@ -64,32 +65,47 @@ func NewNodeBase(self Node, block *Block) *NodeBase {
 	return n
 }
 
-func (n *NodeBase) newInput(i *ValueInfo) {
-	p := NewInput(n.Self, i)
+func (n *NodeBase) newInput(i *ValueInfo) *Input {
+	p := newInput(n.Self, i)
 	n.AddChild(p)
 	n.inputs = append(n.inputs, p)
+	n.reform()
+	return p
 }
 
-func (n *NodeBase) newOutput(i *ValueInfo) {
-	p := NewOutput(n.Self, i)
+func (n *NodeBase) newOutput(i *ValueInfo) *Output {
+	p := newOutput(n.Self, i)
 	n.AddChild(p)
 	n.outputs = append(n.outputs, p)
+	n.reform()
+	return p
+}
+
+func (n *NodeBase) RemoveChild(v View) {
+	n.ViewBase.RemoveChild(v)
+	switch v := v.(type) {
+	case *Input:
+		SliceRemove(&n.inputs, v)
+	case *Output:
+		SliceRemove(&n.outputs, v)
+	}
+	n.reform()
 }
 
 func (n *NodeBase) reform() {
 	numInputs := float64(len(n.inputs))
 	numOutputs := float64(len(n.outputs))
 	maxputs := Max(numInputs, numOutputs)
-	rx, ry := 2.0 * putSize, (maxputs + 1) * putSize / 2
+	rx, ry := 2.0 * portSize, (maxputs + 1) * portSize / 2
 	
 	rect := ZR
 	for i, input := range n.inputs {
-		y := -putSize * (float64(i) - (numInputs - 1) / 2)
+		y := -portSize * (float64(i) - (numInputs - 1) / 2)
 		input.MoveCenter(Pt(-rx * Sqrt(ry * ry - y * y) / ry, y))
 		rect = rect.Union(input.MapRectToParent(input.Rect()))
 	}
 	for i, output := range n.outputs {
-		y := -putSize * (float64(i) - (numOutputs - 1) / 2)
+		y := -portSize * (float64(i) - (numOutputs - 1) / 2)
 		output.MoveCenter(Pt(rx * Sqrt(ry * ry - y * y) / ry, y))
 		rect = rect.Union(output.MapRectToParent(output.Rect()))
 	}
@@ -124,9 +140,9 @@ func (n NodeBase) OutputConnections() (connections []*Connection) {
 
 func (n *NodeBase) Move(p Point) {
 	n.ViewBase.Move(p)
-	f := func(p *put) { for _, conn := range p.connections { conn.reform() } }
-	for _, p := range n.inputs { f(p.put) }
-	for _, p := range n.outputs { f(p.put) }
+	f := func(p *port) { for _, conn := range p.connections { conn.reform() } }
+	for _, p := range n.inputs { f(p.port) }
+	for _, p := range n.outputs { f(p.port) }
 }
 
 func (n NodeBase) Center() Point { return ZP }
@@ -178,7 +194,6 @@ func NewCallNode(info *FuncInfo, block *Block) *CallNode {
 	n.text.SetText(info.name)
 	for _, parameter := range info.typ.parameters { n.newInput(parameter) }
 	for _, result := range info.typ.results { n.newOutput(result) }
-	n.reform()
 	
 	return n
 }
@@ -188,9 +203,6 @@ type ConstantNode struct { *NodeBase }
 func NewStringConstantNode(block *Block) *ConstantNode {
 	n := &ConstantNode{}
 	n.NodeBase = NewNodeBase(n, block)
-	p := NewOutput(n, &ValueInfo{})
-	n.AddChild(p)
-	n.outputs = []*Output{p}
-	n.reform()
+	n.newOutput(&ValueInfo{})
 	return n
 }

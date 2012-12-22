@@ -6,10 +6,21 @@ import (
 
 type InOutNode struct {
 	*NodeBase
+	out bool
 	editable bool
 }
 
-func NewInOutNode(block *Block) *InOutNode {
+func NewInputNode(block *Block) *InOutNode {
+	n := newInOutNode(block)
+	n.out = false
+	return n
+}
+func NewOutputNode(block *Block) *InOutNode {
+	n := newInOutNode(block)
+	n.out = true
+	return n
+}
+func newInOutNode(block *Block) *InOutNode {
 	n := &InOutNode{}
 	n.NodeBase = NewNodeBase(n, block)
 	n.reform()
@@ -18,21 +29,25 @@ func NewInOutNode(block *Block) *InOutNode {
 
 func (n *InOutNode) KeyPressed(event KeyEvent) {
 	if n.editable && event.Text == "," {
-		output := NewOutput(n, new(ValueInfo))
-		n.AddChild(output)
-		n.outputs = append(n.outputs, output)
-		n.reform()
-		output.valueView.Show()
-		output.valueView.edit(func() {
-			if output.info.typ != nil {
+		var p *port
+		if n.out {
+			p = n.newInput(&ValueInfo{}).port
+		} else {
+			p = n.newOutput(&ValueInfo{}).port
+		}
+		p.valueView.Show()
+		p.valueView.edit(func() {
+			if p.info.typ != nil {
 				f := n.block.Func()
-				f.info.typ.parameters = append(f.info.typ.parameters, output.info)
-				f.AddPackageRef(output.info.typ)
-				output.TakeKeyboardFocus()
+				if n.out {
+					f.info.typ.results = append(f.info.typ.results, p.info)
+				} else {
+					f.info.typ.parameters = append(f.info.typ.parameters, p.info)
+				}
+				f.AddPackageRef(p.info.typ)
+				p.TakeKeyboardFocus()
 			} else {
-				n.RemoveChild(output)
-				n.outputs = n.outputs[:len(n.outputs) - 1]
-				n.reform()
+				n.RemoveChild(p.Self)
 				n.TakeKeyboardFocus()
 			}
 		})

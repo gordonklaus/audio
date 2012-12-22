@@ -35,12 +35,13 @@ func loadFunc(f *FuncNode) bool {
 		r.pkgNames[name] = pkg
 	}
 	for _, parameter := range f.info.typ.parameters {
-		p := NewOutput(f.inputNode, parameter)
-		f.inputNode.AddChild(p)
-		f.inputNode.outputs = append(f.inputNode.outputs, p)
+		f.inputNode.newOutput(parameter)
 		f.AddPackageRef(parameter.typ)
 	}
-	f.inputNode.reform()
+	for _, result := range f.info.typ.results {
+		f.outputNode.newInput(result)
+		f.AddPackageRef(result.typ)
+	}
 	r.readBlock(f.funcBlock, 0)
 	
 	return true
@@ -62,8 +63,8 @@ func (r *reader) readBlock(b *Block, indent int) {
 			dstNodeID, _ := Atoi(x[3])
 			iDstPut, _ := Atoi(x[4])
 			conn := b.NewConnection(ZP)
-			r.nodes[srcNodeID].Outputs()[iSrcPut].ConnectTo(conn)
-			r.nodes[dstNodeID].Inputs()[iDstPut].ConnectTo(conn)
+			conn.SetSource(r.nodes[srcNodeID].Outputs()[iSrcPut])
+			conn.SetDestination(r.nodes[dstNodeID].Inputs()[iDstPut])
 		} else {
 			r.readNode(b, indent)
 		}
@@ -78,7 +79,13 @@ func (r *reader) readNode(b *Block, indent int) {
 	switch f := fields[1]; f {
  	case "\\in":
 		for n := range b.nodes {
-			if _, ok := n.(*InOutNode); ok {
+			if n, ok := n.(*InOutNode); ok && !n.out {
+				node = n
+			}
+		}
+ 	case "\\out":
+		for n := range b.nodes {
+			if n, ok := n.(*InOutNode); ok && n.out {
 				node = n
 			}
 		}

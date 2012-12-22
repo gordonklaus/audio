@@ -11,7 +11,7 @@ type FuncNode struct {
 	AggregateMouseHandler
 	info *FuncInfo
 	pkgRefs map[*PackageInfo]int
-	inputNode *InOutNode
+	inputNode, outputNode *InOutNode
 	funcBlock *Block
 }
 
@@ -21,17 +21,17 @@ func NewFuncNode(info *FuncInfo) *FuncNode {
 	f.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(f), NewViewDragger(f)}
 	f.pkgRefs = map[*PackageInfo]int{}
 	f.funcBlock = NewBlock(f)
-	f.inputNode = NewInOutNode(f.funcBlock)
+	f.inputNode = NewInputNode(f.funcBlock)
 	f.inputNode.editable = true
 	f.funcBlock.AddNode(f.inputNode)
+	f.outputNode = NewOutputNode(f.funcBlock)
+	f.outputNode.editable = true
+	f.funcBlock.AddNode(f.outputNode)
 	f.AddChild(f.funcBlock)
 	go f.funcBlock.animate()
 	
 	if info.receiver != nil {
-		r := NewOutput(f.inputNode, info.typeWithReceiver().parameters[0])
-		f.inputNode.AddChild(r)
-		f.inputNode.outputs = append(f.inputNode.outputs, r)
-		f.inputNode.reform()
+		f.inputNode.newOutput(info.typeWithReceiver().parameters[0])
 	}
 	
 	if !loadFunc(f) { saveFunc(*f) }
@@ -90,9 +90,13 @@ func (n FuncNode) OutputConnections() []*Connection { return nil }
 
 func (n *FuncNode) positionBlocks() {
 	b := n.funcBlock
-	leftmost := b.points[0]
-	for _, p := range b.points { if p.X < leftmost.X { leftmost = p } }
+	leftmost, rightmost := b.points[0], b.points[0]
+	for _, p := range b.points {
+		if p.X < leftmost.X { leftmost = p }
+		if p.X > rightmost.X { rightmost = p }
+	}
 	n.inputNode.MoveOrigin(leftmost)
+	n.outputNode.MoveOrigin(rightmost)
 	ResizeToFit(n, 0)
 }
 

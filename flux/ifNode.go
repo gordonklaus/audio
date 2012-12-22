@@ -21,7 +21,7 @@ func NewIfNode(block *Block) *IfNode {
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.block = block
-	n.input = NewInput(n, &ValueInfo{})
+	n.input = newInput(n, &ValueInfo{})
 	n.falseBlock = NewBlock(n)
 	n.trueBlock = NewBlock(n)
 	n.AddChild(n.input)
@@ -30,8 +30,8 @@ func NewIfNode(block *Block) *IfNode {
 	go n.falseBlock.animate()
 	go n.trueBlock.animate()
 
-	n.input.MoveCenter(Pt(-2*putSize, 0))
-	n.trueBlock.Move(Pt(putSize, 4))
+	n.input.MoveCenter(Pt(-2*portSize, 0))
+	n.trueBlock.Move(Pt(portSize, 4))
 	return n
 }
 
@@ -48,7 +48,7 @@ func (n IfNode) OutputConnections() []*Connection {
 }
 
 func (n *IfNode) positionBlocks() {
-	n.falseBlock.Move(Pt(putSize, -4 - n.falseBlock.Height()))
+	n.falseBlock.Move(Pt(portSize, -4 - n.falseBlock.Height()))
 	for i, b := range []*Block{n.falseBlock, n.trueBlock} {
 		leftmost := b.points[0]
 		for _, p := range b.points { if p.X < leftmost.X { leftmost = p } }

@@ -14,7 +14,7 @@ type ConnectionHandle struct {
 	editing bool
 }
 
-const connectionHandleSize = putSize - 2
+const connectionHandleSize = portSize - 2
 
 type ConnectionHandleSpecializer interface {
 	View
@@ -138,8 +138,8 @@ func (h *ConnectionSourceHandle) MoveToNearestConnectableput(key int) {
 	}
 	
 	view := nearestView(block, connectableputs, h.connection.srcPt, key)
-	if put, ok := view.(*Output); ok {
-		h.connection.SetSource(put)
+	if p, ok := view.(*Output); ok {
+		h.connection.SetSource(p)
 	}
 }
 
@@ -192,8 +192,8 @@ func (h *ConnectionDestinationHandle) MoveToNearestConnectableput(key int) {
 	}
 	
 	view := nearestView(block, connectableputs, h.connection.dstPt, key)
-	if put, ok := view.(*Input); ok {
-		h.connection.SetDestination(put)
+	if p, ok := view.(*Input); ok {
+		h.connection.SetDestination(p)
 	}
 }
 

@@ -21,7 +21,7 @@ func NewLoopNode(block *Block) *LoopNode {
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.block = block
-	n.input = NewInput(n, &ValueInfo{})
+	n.input = newInput(n, &ValueInfo{})
 	n.input.connectionsChanged = func() {
 		if conns := n.input.connections; len(conns) > 0 {
 			if o := conns[0].src; o != nil { n.updateInputType(o.info.typ) }
@@ -31,13 +31,13 @@ func NewLoopNode(block *Block) *LoopNode {
 	}
 	n.AddChild(n.input)
 	n.loopBlock = NewBlock(n)
-	n.inputNode = NewInOutNode(n.loopBlock)
+	n.inputNode = NewInputNode(n.loopBlock)
 	n.inputNode.newOutput(&ValueInfo{})
 	n.loopBlock.AddNode(n.inputNode)
 	n.AddChild(n.loopBlock)
 	go n.loopBlock.animate()
 	
-	n.input.MoveCenter(Pt(-2*putSize, 0))
+	n.input.MoveCenter(Pt(-2*portSize, 0))
 	n.updateInputType(nil)
 	return n
 }
@@ -65,7 +65,6 @@ func (n *LoopNode) updateInputType(t Type) {
 			in.newOutput(&ValueInfo{})
 		}
 	}
-	in.reform()
 	switch t.(type) {
 	case nil:
 	case *NamedType:
@@ -82,7 +81,7 @@ func (n *LoopNode) positionBlocks() {
 	for _, p := range b.points { if p.X < n.leftmost.X { n.leftmost = p } }
 	n.inputNode.MoveOrigin(n.leftmost)
 	n.leftmost = b.MapToParent(n.leftmost)
-	n.input.MoveCenter(n.leftmost.Sub(Pt(putSize, 0)))
+	n.input.MoveCenter(n.leftmost.Sub(Pt(portSize, 0)))
 	ResizeToFit(n, 0)
 }
 

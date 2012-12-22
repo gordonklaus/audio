@@ -39,25 +39,36 @@ func saveFunc(f FuncNode) {
 	w.writeImports()
 	w.writeBlockFlux(f.funcBlock, 0)
 	
+	// TODO:  try to use w.typeString() for the Go signature (similar to above)
 	w.go_.WriteString("func ")
 	vars := map[*Input]string{}
 	params := []string{}
-	for _, output := range f.inputNode.Outputs() {
-		name := ""
-		if len(output.connections) > 0 {
-			name = w.newName(output.info.name)
-			vars[output.connections[0].dst] = name
-		} else {
-			name = "_"
+	for _, p := range f.inputNode.Outputs() {
+		name := w.newName(p.info.name)
+		if len(p.connections) > 0 {
+			vars[p.connections[0].dst] = name
 		}
-		params = append(params, name + " " + w.typeString(output.info.typ))
+		params = append(params, name + " " + w.typeString(p.info.typ))
 	}
 	if f.info.receiver != nil {
 		Fprintf(w.go_, "(%s) ", params[0])
 		params = params[1:]
 	}
-	Fprintf(w.go_, "%s(%s) {\n", f.info.Name(), Join(params, ", "))
+	results := []string{}
+	for _, p := range f.outputNode.Inputs() {
+		name := w.newName(p.info.name)
+		vars[p] = name
+		results = append(results, name + " " + w.typeString(p.info.typ))
+	}
+	Fprintf(w.go_, "%s(%s)", f.info.Name(), Join(params, ", "))
+	if len(results) > 0 {
+		Fprintf(w.go_, " (%s)", Join(results, ", "))
+	}
+	w.go_.WriteString(" {\n")
 	w.writeBlockGo(f.funcBlock, 0, vars)
+	if len(results) > 0 {
+		w.go_.WriteString("\treturn\n")
+	}
 	w.go_.WriteString("}")
 }
 
@@ -72,9 +83,9 @@ type writer struct {
 func newWriter(info Info) *writer {
 	chk := func(err error) { if err != nil { panic(err) }}
 	
-	parent := info.Parent()
-	i := parent
-	if t, ok := i.(*NamedType); ok { i = t.parent }
+	var tp *NamedType
+	i := info.Parent()
+	if t, ok := i.(*NamedType); ok { tp, i = t, t.parent }
 	pkg := i.(*PackageInfo)
 	
 	var err error
@@ -82,7 +93,8 @@ func newWriter(info Info) *writer {
 	fluxPath := info.FluxSourcePath()
 	chk(os.MkdirAll(filepath.Dir(fluxPath), 0777))
 	w.flux, err = os.Create(fluxPath); chk(err)
-	w.go_, err = os.Create(Sprintf("%s/%s.go", parent.FluxSourcePath(), info.Name())); chk(err)
+	name := info.Name(); if tp != nil { name = tp.Name() + "." + name }
+	w.go_, err = os.Create(Sprintf("%s/%s.go", pkg.FluxSourcePath(), name)); chk(err)
 	
 	for _, i := range append(builtinPkg.Children(), info.Parent().Children()...) {
 		if _, ok := i.(*PackageInfo); !ok {
@@ -139,7 +151,11 @@ func (w *writer) writeBlockFlux(b *Block, indent int) {
 			w.flux.WriteString("loop")
 			w.writeBlockFlux(n.loopBlock, indent)
 		case *InOutNode:
-			w.flux.WriteString("\\in")
+			if n.out {
+				w.flux.WriteString("\\out")
+			} else {
+				w.flux.WriteString("\\in")
+			}
 		}
 	}
 	for conn := range b.connections {
