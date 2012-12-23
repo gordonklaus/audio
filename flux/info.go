@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	rootPackageInfo = &PackageInfo{loaded:true}
+	rootPkg = &PackageInfo{loaded:true}
 	builtinPkg = &PackageInfo{}
-	cPkg = &PackageInfo{InfoBase:InfoBase{"C", rootPackageInfo}, importPath:"C"}
+	cPkg = &PackageInfo{InfoBase:InfoBase{"C", rootPkg}, importPath:"C"}
 )
 
 func newPackageInfo(parent *PackageInfo, name string) *PackageInfo {
@@ -40,21 +40,21 @@ func newPackageInfo(parent *PackageInfo, name string) *PackageInfo {
 }
 
 func init() {
-	rootPackageInfo = &PackageInfo{loaded:true}
+	rootPkg = &PackageInfo{loaded:true}
 	for _, srcDir := range build.Default.SrcDirs() {
-		rootPackageInfo.fullPath = srcDir
-		srcPackageInfo := newPackageInfo(rootPackageInfo, "")
+		rootPkg.fullPath = srcDir
+		srcPackageInfo := newPackageInfo(rootPkg, "")
 		for _, p := range srcPackageInfo.subPackages {
-			p.parent = rootPackageInfo
+			p.parent = rootPkg
 		}
-		rootPackageInfo.subPackages = append(rootPackageInfo.subPackages, srcPackageInfo.subPackages...)
+		rootPkg.subPackages = append(rootPkg.subPackages, srcPackageInfo.subPackages...)
 	}
-	rootPackageInfo.subPackages = append(rootPackageInfo.subPackages, cPkg)
-	Sort(rootPackageInfo.subPackages, "Name")
+	rootPkg.subPackages = append(rootPkg.subPackages, cPkg)
+	Sort(rootPkg.subPackages, "Name")
 }
 
 func findPackageInfo(path string) *PackageInfo {
-	return rootPackageInfo.findPackageInfo(path)
+	return rootPkg.findPackageInfo(path)
 }
 
 type Info interface {
@@ -91,15 +91,14 @@ type PackageInfo struct {
 	loaded bool
 }
 
-func (p *PackageInfo) Children() []Info {
+func (p *PackageInfo) Children() (i []Info) {
 	p.load()
-	var children []Info
-	for _, t := range p.types { children = append(children, t) }
-	for _, f := range p.functions { children = append(children, f) }
-	for _, v := range p.variables { children = append(children, v) }
-	for _, c := range p.constants { children = append(children, c) }
-	for _, p := range p.subPackages { children = append(children, p) }
-	return children
+	for _, t := range p.types { i = append(i, t) }
+	for _, f := range p.functions { i = append(i, f) }
+	for _, v := range p.variables { i = append(i, v) }
+	for _, c := range p.constants { i = append(i, c) }
+	for _, p := range p.subPackages { i = append(i, p) }
+	return
 }
 func (p *PackageInfo) AddChild(info Info) {
 	info.SetParent(p)

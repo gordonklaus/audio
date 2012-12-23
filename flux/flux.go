@@ -5,15 +5,15 @@ import (
 	."code.google.com/p/gordon-go/util"
 )
 
-type FluxWindow struct {
+type fluxWindow struct {
 	*Window
-	browser *Browser
+	browser *browser
 }
 
-func NewFluxWindow() *FluxWindow {
-	w := &FluxWindow{}
+func newFluxWindow() *fluxWindow {
+	w := &fluxWindow{}
 	w.Window = NewWindow(w)
-	w.browser = NewBrowser(fluxSourceOnly, nil, nil)
+	w.browser = newBrowser(fluxSourceOnly, nil, nil)
 	w.SetCentralView(w.browser)
 	w.browser.accepted.Connect(func(info ...interface{}) {
 		switch info := info[0].(type) {
@@ -46,7 +46,7 @@ func NewFluxWindow() *FluxWindow {
 				v.TakeKeyboardFocus()
 			}
 		case *FuncInfo:
-			w.SetCentralView(NewFuncNode(info))
+			w.SetCentralView(newFuncNode(info))
 		default:
 			w.SetCentralView(w.browser)
 			w.browser.text.TakeKeyboardFocus()
@@ -60,13 +60,13 @@ func NewFluxWindow() *FluxWindow {
 	return w
 }
 
-func (w *FluxWindow) Resize(width, height float64) {
+func (w *fluxWindow) Resize(width, height float64) {
 	w.Window.Resize(width, height)
 	w.browser.Move(w.Center())
 }
 
 func main() {
-	w := NewFluxWindow()
+	w := newFluxWindow()
 	w.HandleEvents()
 	w.Close()
 }

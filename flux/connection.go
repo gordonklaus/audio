@@ -6,16 +6,16 @@ import (
 	."math"
 )
 
-type Connection struct {
+type connection struct {
 	*ViewBase
 	AggregateMouseHandler
-	block *Block
-	src *Output
-	dst *Input
+	blk *block
+	src *output
+	dst *input
 	feedback bool
 	
-	srcHandle *ConnectionSourceHandle
-	dstHandle *ConnectionDestinationHandle
+	srcHandle *connectionSourceHandle
+	dstHandle *connectionDestinationHandle
 	
 	focused bool
 	srcPt Point
@@ -24,80 +24,80 @@ type Connection struct {
 
 const connectionThickness = 7
 
-func NewConnection(block *Block, pt Point) *Connection {
-	c := &Connection{}
+func newConnection(b *block, p Point) *connection {
+	c := &connection{blk:b}
 	c.ViewBase = NewView(c)
-	c.block = block
-	c.srcHandle = NewConnectionSourceHandle(c)
-	c.dstHandle = NewConnectionDestinationHandle(c)
-	c.srcPt = pt
-	c.dstPt = pt
+	c.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(c)}
+	c.srcHandle = newConnectionSourceHandle(c)
+	c.dstHandle = newConnectionDestinationHandle(c)
+	c.srcPt = p
+	c.dstPt = p
 	c.AddChild(c.srcHandle)
 	c.AddChild(c.dstHandle)
-	c.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(c)}
+	b.addConnection(c)
 	return c
 }
 
-func (c Connection) Connected() bool { return c.src != nil && c.dst != nil }
-func (c *Connection) Disconnect() { c.SetSource(nil); c.SetDestination(nil) }
+func (c connection) connected() bool { return c.src != nil && c.dst != nil }
+func (c *connection) disconnect() { c.setSource(nil); c.setDestination(nil) }
 
-func (c *Connection) SetSource(src *Output) {
-	if c.src != nil { c.src.Disconnect(c) }
+func (c *connection) setSource(src *output) {
+	if c.src != nil { c.src.disconnect(c) }
 	c.src = src
-	if src != nil { src.Connect(c) }
-	if c.dst != nil { c.dst.connectionsChanged() }
+	if src != nil { src.connect(c) }
+	if c.dst != nil { c.dst.connsChanged() }
 	c.reblock()
 	c.reform()
 }
-func (c *Connection) DisconnectSource(point Point) {
+func (c *connection) disconnectSource(point Point) {
 	c.srcPt = point
-	c.SetSource(nil)
+	c.setSource(nil)
 }
 
-func (c *Connection) SetDestination(dst *Input) {
-	if c.dst != nil { c.dst.Disconnect(c) }
+func (c *connection) setDestination(dst *input) {
+	if c.dst != nil { c.dst.disconnect(c) }
 	c.dst = dst
-	if dst != nil { dst.Connect(c) }
-	if c.src != nil { c.src.connectionsChanged() }
+	if dst != nil { dst.connect(c) }
+	if c.src != nil { c.src.connsChanged() }
 	c.reblock()
 	c.reform()
 }
-func (c *Connection) DisconnectDestination(point Point) {
+func (c *connection) disconnectDestination(point Point) {
 	c.dstPt = point
-	c.SetDestination(nil)
+	c.setDestination(nil)
 }
 
-func (c *Connection) reblock() {
-	var newBlock *Block
+func (c *connection) reblock() {
+	var newblk *block
 	if c.src == nil && c.dst == nil {
 		return
 	} else if c.src == nil {
-		newBlock = c.dst.node.Block()
+		newblk = c.dst.node.block()
 	} else if c.dst == nil {
-		newBlock = c.src.node.Block()
+		newblk = c.src.node.block()
 	} else {
-loop:	for srcBlock := c.src.node.Block(); srcBlock != nil; srcBlock = srcBlock.Outer() {
-			for dstBlock := c.dst.node.Block(); dstBlock != nil; dstBlock = dstBlock.Outer() {
-				if srcBlock == dstBlock {
-					newBlock = srcBlock
+loop:	for srcblk := c.src.node.block(); srcblk != nil; srcblk = srcblk.outer() {
+			for dstblk := c.dst.node.block(); dstblk != nil; dstblk = dstblk.outer() {
+				if srcblk == dstblk {
+					newblk = srcblk
 					break loop
 				}
 			}
 		}
 	}
-	newBlock.AddConnection(c)
+	newblk.addConnection(c)
 }
 
-func (c *Connection) reform() {
+func (c *connection) reform() {
 	unconnectedOffset := Pt(48, 0)
 	if c.feedback { unconnectedOffset.X = -208 }
 	if c.src != nil {
-		c.srcPt = c.src.MapTo(c.src.Center(), c.block)
+		c.srcPt = c.src.MapTo(c.src.Center(), c.blk)
 	} else {
 		c.srcPt = c.dstPt.Sub(unconnectedOffset)
 	}
 	if c.dst != nil {
-		c.dstPt = c.dst.MapTo(c.dst.Center(), c.block)
+		c.dstPt = c.dst.MapTo(c.dst.Center(), c.blk)
 	} else {
 		c.dstPt = c.srcPt.Add(unconnectedOffset)
 	}
@@ -108,39 +108,37 @@ func (c *Connection) reform() {
 	
 	handleOffset := c.dstPt.Sub(c.srcPt).Div(4)
 	if c.srcHandle.editing {
-		c.srcHandle.MoveCenter(c.MapFrom(c.srcPt, c.block))
+		c.srcHandle.MoveCenter(c.MapFromParent(c.srcPt))
 	} else {
-		c.srcHandle.MoveCenter(c.MapFrom(c.srcPt.Add(handleOffset), c.block))
+		c.srcHandle.MoveCenter(c.MapFromParent(c.srcPt.Add(handleOffset)))
 	}
 	if c.dstHandle.editing {
-		c.dstHandle.MoveCenter(c.MapFrom(c.dstPt, c.block))
+		c.dstHandle.MoveCenter(c.MapFromParent(c.dstPt))
 	} else {
-		c.dstHandle.MoveCenter(c.MapFrom(c.dstPt.Sub(handleOffset), c.block))
+		c.dstHandle.MoveCenter(c.MapFromParent(c.dstPt.Sub(handleOffset)))
 	}
 	c.Repaint()
 }
 
-func (c *Connection) StartEditing() {
+func (c *connection) startEditing() {
 	if c.src == nil {
-		c.srcHandle.StartEditing()
+		c.srcHandle.startEditing()
 	} else {
-		c.dstHandle.StartEditing()
+		c.dstHandle.startEditing()
 	}
 }
 
-func (c *Connection) TookKeyboardFocus() { c.focused = true; c.Repaint() }
-func (c *Connection) LostKeyboardFocus() { c.focused = false; c.Repaint() }
+func (c *connection) TookKeyboardFocus() { c.focused = true; c.Repaint() }
+func (c *connection) LostKeyboardFocus() { c.focused = false; c.Repaint() }
 
-func (c *Connection) KeyPressed(event KeyEvent) {
+func (c *connection) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft:
 		c.src.TakeKeyboardFocus()
 	case KeyRight:
 		c.dst.TakeKeyboardFocus()
-	case KeyUp, KeyDown:
-		c.block.Outermost().FocusNearestView(c, event.Key)
 	case KeyEsc:
-		c.block.TakeKeyboardFocus()
+		c.Parent().TakeKeyboardFocus()
 	default:
 		if event.Text == "\\" {
 			c.feedback = !c.feedback
@@ -151,9 +149,9 @@ func (c *Connection) KeyPressed(event KeyEvent) {
 	}
 }
 
-func (c Connection) Paint() {
+func (c connection) Paint() {
 	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[c.focused])
-	start, end := c.MapFrom(c.srcPt, c.block), c.MapFrom(c.dstPt, c.block)
+	start, end := c.MapFromParent(c.srcPt), c.MapFromParent(c.dstPt)
 	d := end.Sub(start)
 	mid := start.Add(d.Div(2))
 	if c.feedback { mid.Y = Max(start.Y, end.Y) + 128 }

@@ -108,17 +108,17 @@ func (v *ViewBase) GetViewBase() *ViewBase { return v }
 func (v ViewBase) Parent() View { return v.parent }
 func (v *ViewBase) SetParent(parent View) { v.parent = parent }
 func (v ViewBase) Children() []View { return v.children }
-func (v *ViewBase) AddChild(childView View) {
-	if childView.Parent() != nil {
-		childView.Parent().RemoveChild(childView)
+func (v *ViewBase) AddChild(child View) {
+	if child.Parent() != nil {
+		child.Parent().RemoveChild(child)
 	}
-	v.children = append(v.children, childView)
-	childView.SetParent(v.Self)
-	childView.Repaint()
+	v.children = append(v.children, child)
+	child.SetParent(v.Self)
+	child.Repaint()
 }
-func (v *ViewBase) RemoveChild(view View) {
-	SliceRemove(&v.children, view)
-	view.SetParent(nil)
+func (v *ViewBase) RemoveChild(child View) {
+	SliceRemove(&v.children, child)
+	child.SetParent(nil)
 	v.Self.Repaint()
 }
 func (v ViewBase) ViewAt(point Point) View {

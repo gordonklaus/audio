@@ -14,7 +14,7 @@ type typeView struct {
 	focused bool
 	done func()
 	
-	// typeView is also used as a valueView, in which case these are non-nil
+	// typeView is also used as a valueView, in which case this is non-nil
 	nameText *TextBase
 }
 
@@ -135,18 +135,18 @@ func (v *typeView) editType(done func()) {
 		var imports []*PackageInfo
 l:		for v := View(v); v != nil; v = v.Parent() {
 			switch v := v.(type) {
-			case Node:
-				f := v.Block().Func()
+			case node:
+				f := v.block().func_()
 				pkg, imports = f.pkg(), f.imports()
 				break l
 			}
 		}
-		browser := NewBrowser(typesOnly, pkg, imports)
+		browser := newBrowser(typesOnly, pkg, imports)
 		v.AddChild(browser)
 		browser.Move(v.Center())
 		browser.accepted.Connect(func(info ...interface{}) {
 			t := info[0].(Type)
-			if nt, ok := t.(*NamedType); ok && protoType[nt] { // move this into Browser?
+			if nt, ok := t.(*NamedType); ok && protoType[nt] { // move this into browser?
 				t = newProtoType(nt)
 			}
 			v.setType(t)
@@ -219,12 +219,12 @@ func (v *typeView) addFields(fields *[]*ValueInfo, funcVal bool, childTypes *[]*
 	})
 }
 
-func (v *typeView) focusNearest(child *typeView, dir int) {
+func (v *typeView) focusNearest(child *typeView, dirKey int) {
 	var views []View
 	for _, v := range append(v.childTypes.left, v.childTypes.right...) {
 		views = append(views, v)
 	}
-	nearest := nearestView(v, views, child.MapTo(child.Center(), v), dir)
+	nearest := nearestView(v, views, child.MapTo(child.Center(), v), dirKey)
 	if nearest != nil {
 		nearest.TakeKeyboardFocus()
 	}
@@ -266,11 +266,11 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 				})
 			case len(t.results) == 0:
 				v.addFields(&t.results, false, &v.childTypes.right, func() {
-				if len(t.results) == 0 {
-					v.childTypes.left[0].TakeKeyboardFocus()
-				} else {
-					v.childTypes.right[0].TakeKeyboardFocus()
-				}
+					if len(t.results) == 0 {
+						v.childTypes.left[0].TakeKeyboardFocus()
+					} else {
+						v.childTypes.right[0].TakeKeyboardFocus()
+					}
 				})
 			default:
 				v.childTypes.left[0].TakeKeyboardFocus()

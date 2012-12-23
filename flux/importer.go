@@ -87,8 +87,8 @@ type scopeBuilder struct {
 }
 
 func (b scopeBuilder) defTypes(values ...interface{}) {
-	for _, value := range values {
-		b.defType(reflect.TypeOf(value).Elem().Name(), value)
+	for _, v := range values {
+		b.defType(reflect.TypeOf(v).Elem().Name(), v)
 	}
 }
 
@@ -97,14 +97,14 @@ func (b scopeBuilder) defType(name string, value interface{}) {
 }
 
 func (b scopeBuilder) defConsts(names ...string) {
-	for _, name := range names {
-		b.define(ast.Con, name).Data = &ValueInfo{InfoBase{name, nil}, nil, true}
+	for _, n := range names {
+		b.define(ast.Con, n).Data = &ValueInfo{InfoBase{n, nil}, nil, true}
 	}
 }
 
 func (b scopeBuilder) defFuncs(names ...string) {
-	for _, name := range names {
-		b.define(ast.Fun, name).Data = &FuncInfo{InfoBase{name, nil}, nil, &FuncType{}}
+	for _, n := range names {
+		b.define(ast.Fun, n).Data = &FuncInfo{InfoBase{n, nil}, nil, &FuncType{}}
 	}
 }
 

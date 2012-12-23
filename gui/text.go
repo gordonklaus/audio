@@ -66,18 +66,18 @@ func (t *TextBase) SetText(text string) {
 }
 
 func (t TextBase) GetTextColor() Color { return t.textColor }
-func (t *TextBase) SetTextColor(color Color) {
-	t.textColor = color
+func (t *TextBase) SetTextColor(c Color) {
+	t.textColor = c
 	t.Repaint()
 }
 
-func (t *TextBase) SetBackgroundColor(color Color) {
-	t.backgroundColor = color
+func (t *TextBase) SetBackgroundColor(c Color) {
+	t.backgroundColor = c
 	t.Repaint()
 }
 
-func (t *TextBase) SetFrameColor(color Color) {
-	t.frameColor = color
+func (t *TextBase) SetFrameColor(c Color) {
+	t.frameColor = c
 	t.Repaint()
 }
 

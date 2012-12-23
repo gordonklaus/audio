@@ -8,180 +8,176 @@ import (
 	."code.google.com/p/gordon-go/util"
 )
 
-type Block struct {
+type block struct {
 	*ViewBase
-	node Node
-	nodes map[Node]bool
-	connections map[*Connection]bool
+	node node
+	nodes map[node]bool
+	conns map[*connection]bool
 	focused, editing bool
-	editingNode Node
+	editingNode node
 	points []Point
 	intermediatePoints []Point
 }
 
-func NewBlock(node Node) *Block {
-	b := &Block{}
+func newBlock(n node) *block {
+	b := &block{}
 	b.ViewBase = NewView(b)
-	b.node = node
-	b.nodes = map[Node]bool{}
-	b.connections = map[*Connection]bool{}
+	b.node = n
+	b.nodes = map[node]bool{}
+	b.conns = map[*connection]bool{}
 	b.points = []Point{ZP}
 	b.Pan(Pt(-400, -300))
 	return b
 }
 
-func (b *Block) Outer() *Block { return b.node.Block() }
-func (b *Block) Outermost() *Block {
-	if outer := b.Outer(); outer != nil { return outer.Outermost() }
+func (b *block) outer() *block { return b.node.block() }
+func (b *block) outermost() *block {
+	if outer := b.outer(); outer != nil {
+		return outer.outermost()
+	}
 	return b
 }
-func (b *Block) Func() *FuncNode { return b.Outermost().node.(*FuncNode) }
+func (b *block) func_() *funcNode { return b.outermost().node.(*funcNode) }
 
-func (b *Block) AddNode(n Node) {
+func (b *block) addNode(n node) {
 	if !b.nodes[n] {
 		b.AddChild(n)
 		b.nodes[n] = true
 		switch n := n.(type) {
-		case *CallNode:
-			b.Func().AddPackageRef(n.info)
+		case *callNode:
+			b.func_().addPackageRef(n.info)
 		}
 	}
 }
 
-func (b *Block) RemoveNode(n Node) {
+func (b *block) removeNode(n node) {
 	b.RemoveChild(n)
 	delete(b.nodes, n)
 	switch n := n.(type) {
-	case *CallNode:
-		b.Func().SubPackageRef(n.info)
+	case *callNode:
+		b.func_().subPackageRef(n.info)
 	}
 }
 
-func (b *Block) NewConnection(pt Point) *Connection {
-	conn := NewConnection(b, pt)
-	b.AddConnection(conn)
-	return conn
-}
-
-func (b *Block) AddConnection(conn *Connection) {
-	if conn.block != nil {
-		delete(conn.block.connections, conn)
+func (b *block) addConnection(c *connection) {
+	if c.blk != nil {
+		delete(c.blk.conns, c)
 	}
-	conn.block = b
-	b.AddChild(conn)
-	conn.Lower()
-	b.connections[conn] = true
+	c.blk = b
+	b.AddChild(c)
+	c.Lower()
+	b.conns[c] = true
 }
 
-func (b *Block) DeleteConnection(connection *Connection) {
-	connection.Disconnect()
-	delete(b.connections, connection)
-	b.RemoveChild(connection)
+func (b *block) removeConnection(c *connection) {
+	c.disconnect()
+	delete(b.conns, c)
+	b.RemoveChild(c)
 }
 
-func (b Block) AllNodes() (nodes []Node) {
+func (b block) allNodes() (nodes []node) {
 	for n := range b.nodes {
 		nodes = append(nodes, n)
 		switch n := n.(type) {
-		case *IfNode:
-			nodes = append(nodes, append(n.falseBlock.AllNodes(), n.trueBlock.AllNodes()...)...)
-		case *LoopNode:
-			nodes = append(nodes, n.loopBlock.AllNodes()...)
+		case *ifNode:
+			nodes = append(nodes, append(n.falseblk.allNodes(), n.trueblk.allNodes()...)...)
+		case *loopNode:
+			nodes = append(nodes, n.loopblk.allNodes()...)
 		}
 	}
-	return nodes
+	return
 }
 
-func (b Block) AllConnections() (conns []*Connection) {
-	for c := range b.connections {
+func (b block) allConns() (conns []*connection) {
+	for c := range b.conns {
 		conns = append(conns, c)
 	}
 	for n := range b.nodes {
 		switch n := n.(type) {
-		case *IfNode:
-			conns = append(conns, append(n.falseBlock.AllConnections(), n.trueBlock.AllConnections()...)...)
-		case *LoopNode:
-			conns = append(conns, n.loopBlock.AllConnections()...)
+		case *ifNode:
+			conns = append(conns, append(n.falseblk.allConns(), n.trueblk.allConns()...)...)
+		case *loopNode:
+			conns = append(conns, n.loopblk.allConns()...)
 		}
 	}
-	return conns
+	return
 }
 
-func (b Block) InputConnections() (connections []*Connection) {
-	for node := range b.nodes {
-		for _, conn := range node.InputConnections() {
-			if !b.connections[conn] {
-				connections = append(connections, conn)
+func (b block) inConns() (conns []*connection) {
+	for n := range b.nodes {
+		for _, c := range n.inConns() {
+			if !b.conns[c] {
+				conns = append(conns, c)
 			}
 		}
 	}
 	return
 }
 
-func (b Block) OutputConnections() (connections []*Connection) {
-	for node := range b.nodes {
-		for _, conn := range node.OutputConnections() {
-			if !b.connections[conn] {
-				connections = append(connections, conn)
+func (b block) outConns() (conns []*connection) {
+	for n := range b.nodes {
+		for _, c := range n.outConns() {
+			if !b.conns[c] {
+				conns = append(conns, c)
 			}
 		}
 	}
 	return
 }
 
-func (b *Block) nodeOrder() (order []Node, ok bool) {
+func (b *block) nodeOrder() (order []node, ok bool) {
 	visited := Set{}
-	var insertInOrder func(node Node, visitedThisCall Set) bool
-	insertInOrder = func(node Node, visitedThisCall Set) bool {
-		if visitedThisCall[node] { return false }
-		visitedThisCall[node] = true
+	var insertInOrder func(n node, visitedThisCall Set) bool
+	insertInOrder = func(n node, visitedThisCall Set) bool {
+		if visitedThisCall[n] { return false }
+		visitedThisCall[n] = true
 		
-		if !visited[node] {
-			visited[node] = true
-conns:		for _, conn := range node.InputConnections() {
-				if b.connections[conn] {
-					srcNode := conn.src.node
-					for !b.nodes[srcNode] {
-						srcNode = srcNode.Block().node
-						if srcNode == nil { continue conns }
+		if !visited[n] {
+			visited[n] = true
+conns:		for _, c := range n.inConns() {
+				if b.conns[c] {
+					src := c.src.node
+					for !b.nodes[src] {
+						src = src.block().node
+						if src == nil { continue conns }
 					}
-					if !insertInOrder(srcNode, visitedThisCall.Copy()) { return false }
+					if !insertInOrder(src, visitedThisCall.Copy()) { return false }
 				}
 			}
-			order = append(order, node)
+			order = append(order, n)
 		}
 		return true
 	}
 	
-	endNodes := []Node{}
-nx:	for node := range b.nodes {
-		for _, conn := range node.OutputConnections() {
-			if conn.block == b { continue nx }
+	endNodes := []node{}
+nx:	for n := range b.nodes {
+		for _, c := range n.outConns() {
+			if c.blk == b { continue nx }
 		}
-		endNodes = append(endNodes, node)
+		endNodes = append(endNodes, n)
 	}
 	if len(endNodes) == 0 && len(b.nodes) > 0 { return }
 	
-	for _, node := range endNodes {
-		if !insertInOrder(node, Set{}) { return }
+	for _, n := range endNodes {
+		if !insertInOrder(n, Set{}) { return }
 	}
 	ok = true
 	return
 }
 
-func (b *Block) StartEditing() {
+func (b *block) startEditing() {
 	b.TakeKeyboardFocus()
 	b.editing = true
 }
 
-func (b *Block) StopEditing() {
+func (b *block) stopEditing() {
 	b.editing = false
 	b.editingNode = nil
 }
 
-func (b *Block) animate() {
+func (b *block) animate() {
 	for {
-		v := map[Node]Point{}
+		v := map[node]Point{}
 		center := ZP
 		for n := range b.nodes {
 			v[n] = ZP
@@ -199,16 +195,16 @@ func (b *Block) animate() {
 				v[n1] = v[n1].Add(dir.Mul(2 * (128 - d) / (1 + d)))
 			}
 		}
-		for conn := range b.connections {
-			xOffset := 64.0; if conn.feedback { xOffset = -256 }
-			src, dst := conn.src, conn.dst
+		for c := range b.conns {
+			xOffset := 64.0; if c.feedback { xOffset = -256 }
+			src, dst := c.src, c.dst
 			if src == nil || dst == nil { continue }
 			d := dst.MapTo(dst.Position(), b).Sub(src.MapTo(src.Position(), b).Add(Pt(xOffset, 0)))
 			d.X *= 2
 			d.Y /= 2
 			
-			srcNode := src.node; for srcNode.Block() != b { srcNode = srcNode.Block().node }
-			dstNode := dst.node; for dstNode.Block() != b { dstNode = dstNode.Block().node }
+			srcNode := src.node; for srcNode.block() != b { srcNode = srcNode.block().node }
+			dstNode := dst.node; for dstNode.block() != b { dstNode = dstNode.block().node }
 			if _, ok := srcNode.(*portsNode); ok { continue }
 			if _, ok := dstNode.(*portsNode); ok { continue }
 			v[srcNode] = v[srcNode].Add(d)
@@ -272,63 +268,63 @@ func (b *Block) animate() {
 		b.Resize(rect.Dx(), rect.Dy())
 		b.Pan(rect.Min)
 		
-		if n, ok := b.node.(interface{positionBlocks()}); ok { n.positionBlocks() }
+		if n, ok := b.node.(interface{positionblocks()}); ok { n.positionblocks() }
 		
 		time.Sleep(33 * time.Millisecond)
 	}
 }
 
-func nearestView(parent View, views []View, point Point, directionKey int) (nearest View) {
-	dir := map[int]Point{KeyLeft:{-1, 0}, KeyRight:{1, 0}, KeyUp:{0, 1}, KeyDown:{0, -1}}[directionKey]
-	bestScore := 0.0
-	for _, view := range views {
-		d := view.MapTo(view.Center(), parent).Sub(point)
+func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) {
+	dir := map[int]Point{KeyLeft:{-1, 0}, KeyRight:{1, 0}, KeyUp:{0, 1}, KeyDown:{0, -1}}[dirKey]
+	best := 0.0
+	for _, v := range views {
+		d := v.MapTo(v.Center(), parent).Sub(p)
 		score := (dir.X * d.X + dir.Y * d.Y) / (d.X * d.X + d.Y * d.Y)
-		if (score > bestScore) {
-			bestScore = score
-			nearest = view
+		if (score > best) {
+			best = score
+			nearest = v
 		}
 	}
 	return
 }
 
-func (b *Block) FocusNearestView(v View, directionKey int) {
+func (b *block) focusNearestView(v View, dirKey int) {
 	views := []View{}
-	for _, node := range b.AllNodes() {
-		views = append(views, node)
-		for _, p := range node.Inputs() { views = append(views, p) }
-		for _, p := range node.Outputs() { views = append(views, p) }
+	for _, n := range b.allNodes() {
+		views = append(views, n)
+		for _, p := range n.inputs() { views = append(views, p) }
+		for _, p := range n.outputs() { views = append(views, p) }
 	}
-	for _, connection := range b.AllConnections() {
-		views = append(views, connection)
+	for _, c := range b.allConns() {
+		views = append(views, c)
 	}
-	nearest := nearestView(b, views, v.MapTo(v.Center(), b), directionKey)
+	nearest := nearestView(b, views, v.MapTo(v.Center(), b), dirKey)
 	if nearest != nil { nearest.TakeKeyboardFocus() }
 }
 
-func (b *Block) TookKeyboardFocus() { b.focused = true; b.Repaint() }
-func (b *Block) LostKeyboardFocus() { b.focused = false; b.StopEditing(); b.Repaint() }
+func (b *block) TookKeyboardFocus() { b.focused = true; b.Repaint() }
+func (b *block) LostKeyboardFocus() { b.focused = false; b.stopEditing(); b.Repaint() }
 
-func (b *Block) KeyPressed(event KeyEvent) {
+func (b *block) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft, KeyRight, KeyUp, KeyDown:
-		outermost := b.Outermost()
+		outermost := b.outermost()
 		if b.editing {
 			var v View = b.editingNode
 			if v == nil { v = b }
-			views := []View{}; for _, n := range outermost.AllNodes() { views = append(views, n) }
-			if n := nearestView(b, views, v.MapTo(v.Center(), outermost), event.Key); n != nil { b.editingNode = n.(Node) }
+			views := []View{}; for _, n := range outermost.allNodes() { views = append(views, n) }
+			if n := nearestView(b, views, v.MapTo(v.Center(), outermost), event.Key); n != nil { b.editingNode = n.(node) }
 		} else {
-			outermost.FocusNearestView(b, event.Key)
+			outermost.focusNearestView(b, event.Key)
 		}
 	case KeySpace:
 		if b.editingNode != nil {
 			if b.nodes[b.editingNode] {
 				b.RemoveChild(b.editingNode)
 				delete(b.nodes, b.editingNode)
-				b.AddNode(b.editingNode)
+				b.addNode(b.editingNode)
 			} else {
-				b.RemoveNode(b.editingNode)
+				b.removeNode(b.editingNode)
 				b.nodes[b.editingNode] = true
 				b.AddChild(b.editingNode)
 			}
@@ -338,43 +334,43 @@ func (b *Block) KeyPressed(event KeyEvent) {
 			if b.editingNode != nil && !b.nodes[b.editingNode] {
 				b.nodes[b.editingNode] = true
 			}
-			b.StopEditing()
+			b.stopEditing()
 		} else {
-			b.StartEditing()
+			b.startEditing()
 		}
 	case KeyEsc:
 		if b.editing {
 			if b.editingNode != nil {
 				b.editingNode = nil
 			} else {
-				b.StopEditing()
+				b.stopEditing()
 			}
-		} else if outer := b.Outer(); outer != nil {
+		} else if outer := b.outer(); outer != nil {
 			outer.TakeKeyboardFocus()
 		}
 	default:
 		if !(event.Ctrl || event.Alt || event.Super) {
 			switch event.Text {
 			default:
-				f := b.Func()
-				browser := NewBrowser(browse, f.pkg(), f.imports())
+				f := b.func_()
+				browser := newBrowser(browse, f.pkg(), f.imports())
 				b.AddChild(browser)
 				browser.Move(b.Center())
 				browser.accepted.Connect(func(info ...interface{}) {
-					node := NewNode(info[0].(Info), b)
-					b.AddNode(node)
-					node.MoveCenter(b.Center())
-					node.TakeKeyboardFocus()
+					n := newNode(info[0].(Info), b)
+					b.addNode(n)
+					n.MoveCenter(b.Center())
+					n.TakeKeyboardFocus()
 				})
 				browser.canceled.Connect(func(...interface{}) { b.TakeKeyboardFocus() })
 				browser.text.KeyPressed(event)
 				browser.text.TakeKeyboardFocus()
 			case "\"":
-				node := NewStringConstantNode(b)
-				node.text.SetEditable(true)
-				b.AddNode(node)
-				node.MoveCenter(b.Center())
-				node.text.TakeKeyboardFocus()
+				n := newStringConstantNode(b)
+				n.text.SetEditable(true)
+				b.addNode(n)
+				n.MoveCenter(b.Center())
+				n.text.TakeKeyboardFocus()
 			case "":
 				b.ViewBase.KeyPressed(event)
 			}
@@ -384,7 +380,7 @@ func (b *Block) KeyPressed(event KeyEvent) {
 	}
 }
 
-func (b Block) Paint() {
+func (b block) Paint() {
 	if b.editing {
 		SetColor(Color{.7, .4, 0, 1})
 	} else if b.focused {
@@ -401,16 +397,16 @@ func (b Block) Paint() {
 
 
 type portsNode struct {
-	*NodeBase
+	*nodeBase
 	out bool
 	editable bool
 }
 
-func newInputsNode(block *Block) *portsNode { return newPortsNode(false, block) }
-func newOutputsNode(block *Block) *portsNode { return newPortsNode(true, block) }
-func newPortsNode(out bool, block *Block) *portsNode {
+func newInputsNode(b *block) *portsNode { return newPortsNode(false, b) }
+func newOutputsNode(b *block) *portsNode { return newPortsNode(true, b) }
+func newPortsNode(out bool, b *block) *portsNode {
 	n := &portsNode{out:out}
-	n.NodeBase = NewNodeBase(n, block)
+	n.nodeBase = newNodeBase(n, b)
 	return n
 }
 
@@ -425,13 +421,13 @@ func (n *portsNode) KeyPressed(event KeyEvent) {
 		p.valueView.Show()
 		p.valueView.edit(func() {
 			if p.info.typ != nil {
-				f := n.block.Func()
+				f := n.blk.func_()
 				if n.out {
 					f.info.typ.results = append(f.info.typ.results, p.info)
 				} else {
 					f.info.typ.parameters = append(f.info.typ.parameters, p.info)
 				}
-				f.AddPackageRef(p.info.typ)
+				f.addPackageRef(p.info.typ)
 				p.TakeKeyboardFocus()
 			} else {
 				n.RemoveChild(p.Self)
@@ -439,7 +435,7 @@ func (n *portsNode) KeyPressed(event KeyEvent) {
 			}
 		})
 	} else {
-		n.NodeBase.KeyPressed(event)
+		n.nodeBase.KeyPressed(event)
 	}
 }
 
@@ -450,5 +446,5 @@ func (n portsNode) Paint() {
 		SetPointSize(f * 12)
 		DrawPoint(ZP)
 	}
-	n.NodeBase.Paint()
+	n.nodeBase.Paint()
 }

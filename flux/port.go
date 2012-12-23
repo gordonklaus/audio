@@ -5,39 +5,39 @@ import (
 	."code.google.com/p/gordon-go/gui"
 )
 
-type Input struct { *port }
-type Output struct { *port }
+type input struct { *port }
+type output struct { *port }
 type port struct {
 	*ViewBase
 	out bool
-	node Node
+	node node
 	info *ValueInfo
 	valueView *typeView
-	connections []*Connection
+	conns []*connection
 	focused bool
-	connectionsChanged func()
+	connsChanged func()
 }
 
 const portSize = 11
 
-func newInput(n Node, info *ValueInfo) *Input {
-	p := &Input{}
+func newInput(n node, info *ValueInfo) *input {
+	p := &input{}
 	p.port = newPort(p, false, n, info)
 	p.valueView.Move(Pt(-p.valueView.Width() - 12, -p.valueView.Height() / 2))
 	return p
 }
-func newOutput(n Node, info *ValueInfo) *Output {
-	p := &Output{}
+func newOutput(n node, info *ValueInfo) *output {
+	p := &output{}
 	p.port = newPort(p, true, n, info)
 	p.valueView.Move(Pt(12, -p.valueView.Height() / 2))
 	return p
 }
-func newPort(self View, out bool, n Node, info *ValueInfo) *port {
+func newPort(self View, out bool, n node, info *ValueInfo) *port {
 	p := &port{out:out, node:n, info:info}
 	p.ViewBase = NewView(p)
 	p.valueView = newValueView(info)
 	p.valueView.Hide()
-	p.connectionsChanged = func(){}
+	p.connsChanged = func(){}
 	p.AddChild(p.valueView)
 	p.Resize(portSize, portSize)
 	p.Pan(Pt(portSize, portSize).Div(-2))
@@ -45,16 +45,16 @@ func newPort(self View, out bool, n Node, info *ValueInfo) *port {
 	return p
 }
 
-func (p port) CanConnect(interface{}) bool { return true }
-func (p *port) Connect(conn *Connection) {
-	p.connections = append(p.connections, conn)
-	if f := p.connectionsChanged; f != nil { f() }
+func (p port) canConnect(interface{}) bool { return true }
+func (p *port) connect(c *connection) {
+	p.conns = append(p.conns, c)
+	if f := p.connsChanged; f != nil { f() }
 }
-func (p *port) Disconnect(conn *Connection) {
-	for i, connection := range p.connections {
-		if connection == conn {
-			p.connections = append(p.connections[:i], p.connections[i+1:]...)
-			if f := p.connectionsChanged; f != nil { f() }
+func (p *port) disconnect(c *connection) {
+	for i, c2 := range p.conns {
+		if c2 == c {
+			p.conns = append(p.conns[:i], p.conns[i+1:]...)
+			if f := p.connsChanged; f != nil { f() }
 			return
 		}
 	}
@@ -68,22 +68,22 @@ func (p *port) KeyPressed(event KeyEvent) {
 		p.node.TakeKeyboardFocus()
 		return
 	}
-	if p.out && event.Key == glfw.KeyRight && len(p.connections) > 0 || !p.out && event.Key == glfw.KeyLeft && len(p.connections) > 0 {
-		p.connections[0].TakeKeyboardFocus()
+	if p.out && event.Key == glfw.KeyRight && len(p.conns) > 0 || !p.out && event.Key == glfw.KeyLeft && len(p.conns) > 0 {
+		p.conns[0].TakeKeyboardFocus()
 		return
 	}
 	
 	switch event.Key {
 	case glfw.KeyEnter:
-		conn := p.node.Block().NewConnection(p.Center())
+		c := newConnection(p.node.block(), p.Center())
 		if p.out {
-			conn.SetSource(p.Self.(*Output))
+			c.setSource(p.Self.(*output))
 		} else {
-			conn.SetDestination(p.Self.(*Input))
+			c.setDestination(p.Self.(*input))
 		}
-		conn.StartEditing()
+		c.startEditing()
 	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
-		p.node.Block().Outermost().FocusNearestView(p, event.Key)
+		p.node.block().outermost().focusNearestView(p, event.Key)
 	case glfw.KeyEsc:
 		p.node.TakeKeyboardFocus()
 	default:
@@ -93,15 +93,15 @@ func (p *port) KeyPressed(event KeyEvent) {
 
 func (p *port) MousePressed(button int, pt Point) {
 	p.TakeKeyboardFocus()
-	conn := p.node.Block().NewConnection(p.MapTo(pt, p.node.Block()))
+	c := newConnection(p.node.block(), p.MapTo(pt, p.node.block()))
 	if p.out {
-		conn.SetSource(p.Self.(*Output))
-		conn.dstHandle.SetMouseFocus(conn.dstHandle, button)
+		c.setSource(p.Self.(*output))
+		c.dstHandle.SetMouseFocus(c.dstHandle, button)
 	} else {
-		conn.SetDestination(p.Self.(*Input))
-		conn.srcHandle.SetMouseFocus(conn.srcHandle, button)
+		c.setDestination(p.Self.(*input))
+		c.srcHandle.SetMouseFocus(c.srcHandle, button)
 	}
-	conn.StartEditing()
+	c.startEditing()
 }
 func (p port) MouseDragged(button int, pt Point) {}
 func (p port) MouseReleased(button int, pt Point) {}

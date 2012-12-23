@@ -10,13 +10,13 @@ import (
 
 type reader struct {
 	s string
-	f *FuncNode
+	f *funcNode
 	pkgNames map[string]*PackageInfo
-	nodes map[int]Node
+	nodes map[int]node
 }
 
-func loadFunc(f *FuncNode) bool {
-	r := &reader{"", f, map[string]*PackageInfo{}, map[int]Node{}}
+func loadFunc(f *funcNode) bool {
+	r := &reader{"", f, map[string]*PackageInfo{}, map[int]node{}}
 	if b, err := ReadFile(f.info.FluxSourcePath()); err != nil {
 		return false
 	} else {
@@ -34,20 +34,20 @@ func loadFunc(f *FuncNode) bool {
 		}
 		r.pkgNames[name] = pkg
 	}
-	for _, parameter := range f.info.typ.parameters {
-		f.inputsNode.newOutput(parameter)
-		f.AddPackageRef(parameter.typ)
+	for _, v := range f.info.typ.parameters {
+		f.inputsNode.newOutput(v)
+		f.addPackageRef(v.typ)
 	}
-	for _, result := range f.info.typ.results {
-		f.outputsNode.newInput(result)
-		f.AddPackageRef(result.typ)
+	for _, v := range f.info.typ.results {
+		f.outputsNode.newInput(v)
+		f.addPackageRef(v.typ)
 	}
-	r.readBlock(f.funcBlock, 0)
+	r.readBlock(f.funcblk, 0)
 	
 	return true
 }
 
-func (r *reader) readBlock(b *Block, indent int) {
+func (r *reader) readBlock(b *block, indent int) {
 	_, r.s = Split2(r.s, "\n")
 	indent++
 	for len(r.s) > 0 {
@@ -58,21 +58,21 @@ func (r *reader) readBlock(b *Block, indent int) {
 			var line string
 			line, r.s = Split2(r.s, "\n")
 			x := Fields(line)
-			srcNodeID, _ := Atoi(x[1])
-			iSrcPut, _ := Atoi(x[2])
-			dstNodeID, _ := Atoi(x[3])
-			iDstPut, _ := Atoi(x[4])
-			conn := b.NewConnection(ZP)
-			conn.SetSource(r.nodes[srcNodeID].Outputs()[iSrcPut])
-			conn.SetDestination(r.nodes[dstNodeID].Inputs()[iDstPut])
+			srcID, _ := Atoi(x[1])
+			srcPort, _ := Atoi(x[2])
+			dstID, _ := Atoi(x[3])
+			dstPort, _ := Atoi(x[4])
+			c := newConnection(b, ZP)
+			c.setSource(r.nodes[srcID].outputs()[srcPort])
+			c.setDestination(r.nodes[dstID].inputs()[dstPort])
 		} else {
 			r.readNode(b, indent)
 		}
 	}
 }
 
-func (r *reader) readNode(b *Block, indent int) {
-	var node Node
+func (r *reader) readNode(b *block, indent int) {
+	var node node
 	line := ""
 	line, r.s = Split2(r.s, "\n")
 	fields := Fields(line)
@@ -90,20 +90,20 @@ func (r *reader) readNode(b *Block, indent int) {
 			}
 		}
 	case "if":
-		n := NewIfNode(b)
-		r.readBlock(n.trueBlock, indent)
-		r.readBlock(n.falseBlock, indent)
+		n := newIfNode(b)
+		r.readBlock(n.trueblk, indent)
+		r.readBlock(n.falseblk, indent)
 		node = n
 	case "loop":
-		n := NewLoopNode(b)
-		r.readBlock(n.loopBlock, indent)
+		n := newLoopNode(b)
+		r.readBlock(n.loopblk, indent)
 		node = n
 	default:
 		if f[0] == '"' {
-			strNode := NewStringConstantNode(b)
+			n := newStringConstantNode(b)
 			text, _ := Unquote(fields[1])
-			strNode.text.SetText(text)
-			node = strNode
+			n.text.SetText(text)
+			node = n
 		} else {
 			pkgName, name := Split2(fields[1], ".")
 			var pkg *PackageInfo
@@ -117,14 +117,14 @@ func (r *reader) readNode(b *Block, indent int) {
 				if info.Name() != name { continue }
 				switch info := info.(type) {
 				case *FuncInfo:
-					node = NewCallNode(info, b)
+					node = newCallNode(info, b)
 				default:
 					panic("not yet implemented")
 				}
 			}
 		}
 	}
-	nodeID, _ := Atoi(fields[0])
-	r.nodes[nodeID] = node
-	b.AddNode(node)
+	id, _ := Atoi(fields[0])
+	r.nodes[id] = node
+	b.addNode(node)
 }

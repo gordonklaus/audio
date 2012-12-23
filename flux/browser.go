@@ -10,7 +10,7 @@ import (
 	."strings"
 )
 
-type Browser struct {
+type browser struct {
 	*ViewBase
 	mode browserMode
 	currentPkg *PackageInfo
@@ -34,28 +34,28 @@ const (
 	typesOnly
 )
 
-func NewBrowser(mode browserMode, currentPkg *PackageInfo, imports []*PackageInfo) *Browser {
-	b := &Browser{currentPkg:currentPkg, accepted:NewSignal(), canceled:NewSignal()}
+func newBrowser(mode browserMode, currentPkg *PackageInfo, imports []*PackageInfo) *browser {
+	b := &browser{currentPkg:currentPkg, accepted:NewSignal(), canceled:NewSignal()}
 	b.ViewBase = NewView(b)
 	
 	b.mode = mode
-	b.path = []Info{rootPackageInfo}
-	rootPackageInfo.types = append([]*NamedType{}, builtinPkg.types...)
-	rootPackageInfo.functions = append([]*FuncInfo{}, builtinPkg.functions...)
-	rootPackageInfo.variables = []*ValueInfo{}
-	rootPackageInfo.constants = append([]*ValueInfo{}, builtinPkg.constants...)
+	b.path = []Info{rootPkg}
+	rootPkg.types = append([]*NamedType{}, builtinPkg.types...)
+	rootPkg.functions = append([]*FuncInfo{}, builtinPkg.functions...)
+	rootPkg.variables = []*ValueInfo{}
+	rootPkg.constants = append([]*ValueInfo{}, builtinPkg.constants...)
 	if currentPkg != nil { imports = append(imports, currentPkg) }
 	for _, p := range imports {
-		rootPackageInfo.types = append(rootPackageInfo.types, p.types...)
-		rootPackageInfo.functions = append(rootPackageInfo.functions, p.functions...)
-		rootPackageInfo.variables = append(rootPackageInfo.variables, p.variables...)
-		rootPackageInfo.constants = append(rootPackageInfo.constants, p.constants...)
+		rootPkg.types = append(rootPkg.types, p.types...)
+		rootPkg.functions = append(rootPkg.functions, p.functions...)
+		rootPkg.variables = append(rootPkg.variables, p.variables...)
+		rootPkg.constants = append(rootPkg.constants, p.constants...)
 	}
-	Sort(rootPackageInfo.types, "Name")
-	rootPackageInfo.types = append([]*NamedType{protoPointer, protoArray, protoSlice, protoMap, protoChan, protoFunc, protoInterface, protoStruct}, rootPackageInfo.types...)
-	Sort(rootPackageInfo.functions, "Name")
-	Sort(rootPackageInfo.variables, "Name")
-	Sort(rootPackageInfo.constants, "Name")
+	Sort(rootPkg.types, "Name")
+	rootPkg.types = append([]*NamedType{protoPointer, protoArray, protoSlice, protoMap, protoChan, protoFunc, protoInterface, protoStruct}, rootPkg.types...)
+	Sort(rootPkg.functions, "Name")
+	Sort(rootPkg.variables, "Name")
+	Sort(rootPkg.constants, "Name")
 	
 	b.text = newNodeNameText(b)
 	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
@@ -66,7 +66,7 @@ func NewBrowser(mode browserMode, currentPkg *PackageInfo, imports []*PackageInf
 	return b
 }
 
-func (b *Browser) cancel() {
+func (b *browser) cancel() {
 	if !b.finished {
 		b.finished = true
 		b.Close()
@@ -74,8 +74,8 @@ func (b *Browser) cancel() {
 	}
 }
 
-func (b Browser) filteredInfos() (infos []Info) {
-	if b.mode == browse && b.path[0] == rootPackageInfo {
+func (b browser) filteredInfos() (infos []Info) {
+	if b.mode == browse && b.path[0] == rootPkg {
 		infos = []Info{special("defer"), special("go"), special("if"), special("loop")}
 	}
 	
@@ -102,20 +102,20 @@ func (b Browser) filteredInfos() (infos []Info) {
 	return
 }
 
-func (b Browser) currentInfo() Info {
+func (b browser) currentInfo() Info {
 	infos := b.filteredInfos()
 	if len(b.indices) == 0 || len(infos) == 0 { return nil }
 	return infos[b.indices[b.i]]
 }
 
-func (b Browser) lastPathText() (Text, bool) {
+func (b browser) lastPathText() (Text, bool) {
 	if np := len(b.pathTexts); np > 0 {
 		return b.pathTexts[np - 1], true
 	}
 	return nil, false
 }
 
-func (b *Browser) Paint() {
+func (b *browser) Paint() {
 	rect := ZR
 	if b.newInfo == nil && len(b.nameTexts) > 0 {
 		cur := b.nameTexts[b.i]
@@ -130,9 +130,9 @@ func (b *Browser) Paint() {
 
 type nodeNameText struct {
 	*TextBase
-	b *Browser
+	b *browser
 }
-func newNodeNameText(b *Browser) *nodeNameText {
+func newNodeNameText(b *browser) *nodeNameText {
 	t := &nodeNameText{}
 	t.TextBase = NewTextBase(t, "")
 	t.b = b
@@ -142,8 +142,8 @@ func (t *nodeNameText) SetText(text string) {
 	b := t.b
 	if b.newInfo == nil {
 		if infos := b.filteredInfos(); len(infos) > 0 {
-			for _, info := range infos {
-				if HasPrefix(ToLower(info.Name()), ToLower(text)) {
+			for _, i := range infos {
+				if HasPrefix(ToLower(i.Name()), ToLower(text)) {
 					goto ok
 				}
 			}
@@ -302,7 +302,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 				*info = *newPackageInfo(info.parent.(*PackageInfo), info.name)
 				if err := os.Mkdir(info.FluxSourcePath(), 0777); err != nil { Println(err) }
 			case *FuncInfo:
-				NewFuncNode(info) // bad bad, this launches animate()
+				newFuncNode(info) // bad bad, this launches animate()
 			}
 			
 			b.i = 0
@@ -320,14 +320,14 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		fallthrough
 	case KeyRight:
 		if b.newInfo == nil {
-			switch info := b.currentInfo().(type) {
+			switch i := b.currentInfo().(type) {
 			case *PackageInfo, *NamedType:
-				b.path = append([]Info{info}, b.path...)
+				b.path = append([]Info{i}, b.path...)
 				b.indices = nil
 				
-				sep := ""; if _, ok := info.(*PackageInfo); ok { sep = "/" } else { sep = "." }
-				pathText := NewText(info.Name() + sep)
-				pathText.SetTextColor(getTextColor(info, 1))
+				sep := ""; if _, ok := i.(*PackageInfo); ok { sep = "/" } else { sep = "." }
+				pathText := NewText(i.Name() + sep)
+				pathText.SetTextColor(getTextColor(i, 1))
 				pathText.SetBackgroundColor(Color{0, 0, 0, .7})
 				b.AddChild(pathText)
 				x := 0.0; if t, ok := b.lastPathText(); ok { x = t.Position().X + t.Width() }
@@ -368,8 +368,8 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 	}
 }
 
-func getTextColor(info Info, alpha float64) Color {
-	switch info.(type) {
+func getTextColor(i Info, alpha float64) Color {
+	switch i.(type) {
 	case SpecialInfo:
 		return Color{1, 1, .6, alpha}
 	case *PackageInfo:

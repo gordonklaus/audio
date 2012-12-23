@@ -7,21 +7,21 @@ import (
 	."math"
 )
 
-type Node interface {
+type node interface {
 	View
 	MouseHandler
-	Block() *Block
-	Inputs() []*Input
-	Outputs() []*Output
-	InputConnections() []*Connection
-	OutputConnections() []*Connection
+	block() *block
+	inputs() []*input
+	outputs() []*output
+	inConns() []*connection
+	outConns() []*connection
 }
 
 type nodeText struct {
 	*TextBase
-	node *NodeBase
+	node *nodeBase
 }
-func newNodeText(node *NodeBase) *nodeText {
+func newNodeText(node *nodeBase) *nodeText {
 	t := &nodeText{node:node}
 	t.TextBase = NewTextBase(t, "")
 	return t
@@ -38,14 +38,14 @@ func (t *nodeText) KeyPressed(event KeyEvent) {
 	t.node.reform()
 }
 
-type NodeBase struct {
+type nodeBase struct {
 	*ViewBase
-	Self Node
+	self node
 	AggregateMouseHandler
-	block *Block
+	blk *block
 	text *nodeText
-	inputs []*Input
-	outputs []*Output
+	ins []*input
+	outs []*output
 	focused bool
 }
 
@@ -53,11 +53,11 @@ const (
 	nodeMargin = 3
 )
 
-func NewNodeBase(self Node, block *Block) *NodeBase {
-	n := &NodeBase{Self:self}
+func newNodeBase(self node, b *block) *nodeBase {
+	n := &nodeBase{self:self}
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(self), NewViewDragger(self)}
-	n.block = block
+	n.blk = b
 	n.text = newNodeText(n)
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	n.AddChild(n.text)
@@ -65,49 +65,48 @@ func NewNodeBase(self Node, block *Block) *NodeBase {
 	return n
 }
 
-func (n *NodeBase) newInput(i *ValueInfo) *Input {
-	p := newInput(n.Self, i)
+func (n *nodeBase) newInput(i *ValueInfo) *input {
+	p := newInput(n.self, i)
 	n.AddChild(p)
-	n.inputs = append(n.inputs, p)
+	n.ins = append(n.ins, p)
 	n.reform()
 	return p
 }
 
-func (n *NodeBase) newOutput(i *ValueInfo) *Output {
-	p := newOutput(n.Self, i)
+func (n *nodeBase) newOutput(i *ValueInfo) *output {
+	p := newOutput(n.self, i)
 	n.AddChild(p)
-	n.outputs = append(n.outputs, p)
+	n.outs = append(n.outs, p)
 	n.reform()
 	return p
 }
 
-func (n *NodeBase) RemoveChild(v View) {
+func (n *nodeBase) RemoveChild(v View) {
 	n.ViewBase.RemoveChild(v)
 	switch v := v.(type) {
-	case *Input:
-		SliceRemove(&n.inputs, v)
-	case *Output:
-		SliceRemove(&n.outputs, v)
+	case *input:
+		SliceRemove(&n.ins, v)
+	case *output:
+		SliceRemove(&n.outs, v)
 	}
 	n.reform()
 }
 
-func (n *NodeBase) reform() {
-	numInputs := float64(len(n.inputs))
-	numOutputs := float64(len(n.outputs))
-	maxputs := Max(numInputs, numOutputs)
-	rx, ry := 2.0 * portSize, (maxputs + 1) * portSize / 2
+func (n *nodeBase) reform() {
+	numIn := float64(len(n.ins))
+	numOut := float64(len(n.outs))
+	rx, ry := 2.0 * portSize, (Max(numIn, numOut) + 1) * portSize / 2
 	
 	rect := ZR
-	for i, input := range n.inputs {
-		y := -portSize * (float64(i) - (numInputs - 1) / 2)
-		input.MoveCenter(Pt(-rx * Sqrt(ry * ry - y * y) / ry, y))
-		rect = rect.Union(input.MapRectToParent(input.Rect()))
+	for i, p := range n.ins {
+		y := -portSize * (float64(i) - (numIn - 1) / 2)
+		p.MoveCenter(Pt(-rx * Sqrt(ry * ry - y * y) / ry, y))
+		rect = rect.Union(p.MapRectToParent(p.Rect()))
 	}
-	for i, output := range n.outputs {
-		y := -portSize * (float64(i) - (numOutputs - 1) / 2)
-		output.MoveCenter(Pt(rx * Sqrt(ry * ry - y * y) / ry, y))
-		rect = rect.Union(output.MapRectToParent(output.Rect()))
+	for i, p := range n.outs {
+		y := -portSize * (float64(i) - (numOut - 1) / 2)
+		p.MoveCenter(Pt(rx * Sqrt(ry * ry - y * y) / ry, y))
+		rect = rect.Union(p.MapRectToParent(p.Rect()))
 	}
 
 	n.text.MoveCenter(Pt(0, rect.Max.Y + n.text.Height() / 2))
@@ -115,93 +114,92 @@ func (n *NodeBase) reform() {
 	n.Resize(rect.Dx(), rect.Dy())
 }
 
-func (n NodeBase) Block() *Block { return n.block }
-func (n NodeBase) Inputs() []*Input { return n.inputs }
-func (n NodeBase) Outputs() []*Output { return n.outputs }
+func (n nodeBase) block() *block { return n.blk }
+func (n nodeBase) inputs() []*input { return n.ins }
+func (n nodeBase) outputs() []*output { return n.outs }
 
-func (n NodeBase) InputConnections() (connections []*Connection) {
-	for _, input := range n.Inputs() {
-		for _, conn := range input.connections {
-			connections = append(connections, conn)
+func (n nodeBase) inConns() (conns []*connection) {
+	for _, p := range n.inputs() {
+		for _, c := range p.conns {
+			conns = append(conns, c)
 		}
 	}
 	return
 }
 
-func (n NodeBase) OutputConnections() (connections []*Connection) {
-	for _, output := range n.Outputs() {
-		for _, conn := range output.connections {
-			connections = append(connections, conn)
+func (n nodeBase) outConns() (conns []*connection) {
+	for _, p := range n.outputs() {
+		for _, c := range p.conns {
+			conns = append(conns, c)
 		}
 	}
 	return
 }
 
-func (n *NodeBase) Move(p Point) {
+func (n *nodeBase) Move(p Point) {
 	n.ViewBase.Move(p)
-	f := func(p *port) { for _, conn := range p.connections { conn.reform() } }
-	for _, p := range n.inputs { f(p.port) }
-	for _, p := range n.outputs { f(p.port) }
+	f := func(p *port) { for _, c := range p.conns { c.reform() } }
+	for _, p := range n.ins { f(p.port) }
+	for _, p := range n.outs { f(p.port) }
 }
 
-func (n NodeBase) Center() Point { return ZP }
+func (n nodeBase) Center() Point { return ZP }
 
-func (n *NodeBase) TookKeyboardFocus() { n.focused = true; n.Repaint() }
-func (n *NodeBase) LostKeyboardFocus() { n.focused = false; n.Repaint() }
+func (n *nodeBase) TookKeyboardFocus() { n.focused = true; n.Repaint() }
+func (n *nodeBase) LostKeyboardFocus() { n.focused = false; n.Repaint() }
 
-func (n *NodeBase) KeyPressed(event KeyEvent) {
+func (n *nodeBase) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
-		n.block.Outermost().FocusNearestView(n, event.Key)
+		n.blk.outermost().focusNearestView(n, event.Key)
 	case glfw.KeyEsc:
-		n.block.TakeKeyboardFocus()
+		n.blk.TakeKeyboardFocus()
 	default:
 		n.ViewBase.KeyPressed(event)
 	}
 }
 
-func (n NodeBase) Paint() {
+func (n nodeBase) Paint() {
 	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
-	for _, p := range n.inputs { DrawLine(ZP, p.MapToParent(p.Center())) }
-	for _, p := range n.outputs { DrawLine(ZP, p.MapToParent(p.Center())) }
+	for _, p := range n.ins { DrawLine(ZP, p.MapToParent(p.Center())) }
+	for _, p := range n.outs { DrawLine(ZP, p.MapToParent(p.Center())) }
 }
 
-func NewNode(info Info, block *Block) Node {
-	switch info := info.(type) {
+func newNode(i Info, b *block) node {
+	switch i := i.(type) {
 	case SpecialInfo:
-		switch info.Name() {
+		switch i.Name() {
 		case "if":
-			return NewIfNode(block)
+			return newIfNode(b)
 		case "loop":
-			return NewLoopNode(block)
+			return newLoopNode(b)
 		}
 	// case StringType:
-	// 	return NewBasicLiteralNode(info)
+	// 	return NewBasicLiteralNode(i)
 	case *FuncInfo:
-		return NewCallNode(info, block)
+		return newCallNode(i, b)
 	}
 	return nil
 }
 
-type CallNode struct {
-	*NodeBase
+type callNode struct {
+	*nodeBase
 	info *FuncInfo
 }
-func NewCallNode(info *FuncInfo, block *Block) *CallNode {
-	n := &CallNode{info:info}
-	n.NodeBase = NewNodeBase(n, block)
-	n.text.SetText(info.name)
-	for _, parameter := range info.typ.parameters { n.newInput(parameter) }
-	for _, result := range info.typ.results { n.newOutput(result) }
+func newCallNode(i *FuncInfo, b *block) *callNode {
+	n := &callNode{info:i}
+	n.nodeBase = newNodeBase(n, b)
+	n.text.SetText(i.name)
+	for _, v := range i.typ.parameters { n.newInput(v) }
+	for _, v := range i.typ.results { n.newOutput(v) }
 	
 	return n
 }
-func (n CallNode) Package() *PackageInfo { return n.info.Parent().(*PackageInfo) }
 
-type ConstantNode struct { *NodeBase }
-func NewStringConstantNode(block *Block) *ConstantNode {
-	n := &ConstantNode{}
-	n.NodeBase = NewNodeBase(n, block)
+type constantNode struct { *nodeBase }
+func newStringConstantNode(b *block) *constantNode {
+	n := &constantNode{}
+	n.nodeBase = newNodeBase(n, b)
 	n.newOutput(&ValueInfo{})
 	return n
 }

@@ -5,209 +5,207 @@ import (
 	."code.google.com/p/gordon-go/gui"
 )
 
-type ConnectionHandle struct {
+type connectionHandle struct {
 	*ViewBase
-	spec ConnectionHandleSpecializer
-	connection *Connection
-	
-	focused bool
-	editing bool
+	spec connectionHandleSpecializer
+	conn *connection
+	focused, editing bool
 }
 
 const connectionHandleSize = portSize - 2
 
-type ConnectionHandleSpecializer interface {
+type connectionHandleSpecializer interface {
 	View
-	SaveConnection()
-	RestoreSavedConnection()
-	UpdateConnection(p Point)
-	MoveToNearestConnectableput(key int)
+	saveConnection()
+	restoreSavedConnection()
+	updateConnection(p Point)
+	moveToNearestConnectablePort(dirKey int)
 }
 
-func NewConnectionHandle(spec ConnectionHandleSpecializer, conn *Connection) *ConnectionHandle {
-	h := &ConnectionHandle{}
+func newConnectionHandle(spec connectionHandleSpecializer, c *connection) *connectionHandle {
+	h := &connectionHandle{}
 	h.ViewBase = NewView(h)
 	h.spec = spec
-	h.connection = conn
+	h.conn = c
 	h.Resize(connectionHandleSize, connectionHandleSize)
 	h.Self = spec
 	return h
 }
 
-func (h *ConnectionHandle) StartEditing() {
-	h.spec.SaveConnection()
+func (h *connectionHandle) startEditing() {
+	h.spec.saveConnection()
 	h.TakeKeyboardFocus()
 	h.editing = true
-	h.connection.reform()
+	h.conn.reform()
 }
 
-func (h *ConnectionHandle) CancelEditing() {
-	h.spec.RestoreSavedConnection()
-	h.StopEditing()
+func (h *connectionHandle) cancelEditing() {
+	h.spec.restoreSavedConnection()
+	h.stopEditing()
 }
 
-func (h *ConnectionHandle) StopEditing() {
+func (h *connectionHandle) stopEditing() {
 	if h.editing {
 		h.editing = false
-		if h.connection.Connected() {
-			h.connection.reform()
+		if h.conn.connected() {
+			h.conn.reform()
 		} else {
-			h.connection.block.DeleteConnection(h.connection)
-			h.connection.block.TakeKeyboardFocus()
+			h.conn.blk.removeConnection(h.conn)
+			h.conn.blk.TakeKeyboardFocus()
 		}
 	}
 }
 
-func (h *ConnectionHandle) TookKeyboardFocus() { h.focused = true; h.Repaint() }
-func (h *ConnectionHandle) LostKeyboardFocus() { h.focused = false; h.StopEditing(); h.Repaint() }
+func (h *connectionHandle) TookKeyboardFocus() { h.focused = true; h.Repaint() }
+func (h *connectionHandle) LostKeyboardFocus() { h.focused = false; h.stopEditing(); h.Repaint() }
 
-func (h *ConnectionHandle) KeyPressed(event KeyEvent) {
+func (h *connectionHandle) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
 		if h.editing {
-			h.spec.MoveToNearestConnectableput(event.Key)
+			h.spec.moveToNearestConnectablePort(event.Key)
 		} else {
-			h.connection.block.Outermost().FocusNearestView(h.spec, event.Key)
+			h.conn.blk.outermost().focusNearestView(h.spec, event.Key)
 		}
 	case glfw.KeyEnter:
 		if h.editing {
-			h.StopEditing()
+			h.stopEditing()
 		} else {
-			h.StartEditing()
+			h.startEditing()
 		}
 	case glfw.KeyEsc:
 		if h.editing {
-			h.CancelEditing()
+			h.cancelEditing()
 		} else {
-			h.connection.TakeKeyboardFocus()
+			h.conn.TakeKeyboardFocus()
 		}
 	default:
 		h.ViewBase.KeyPressed(event)
 	}
 }
 
-func (h *ConnectionHandle) MousePressed(button int, p Point) {
-	h.StartEditing()
-	h.spec.UpdateConnection(p)
+func (h *connectionHandle) MousePressed(button int, p Point) {
+	h.startEditing()
+	h.spec.updateConnection(p)
 }
-func (h *ConnectionHandle) MouseDragged(button int, p Point) {
-	if h.editing { h.spec.UpdateConnection(p) }
+func (h *connectionHandle) MouseDragged(button int, p Point) {
+	if h.editing { h.spec.updateConnection(p) }
 }
-func (h *ConnectionHandle) MouseReleased(button int, p Point) {
-	if h.editing { h.spec.UpdateConnection(p) }
-	h.StopEditing()
+func (h *connectionHandle) MouseReleased(button int, p Point) {
+	if h.editing { h.spec.updateConnection(p) }
+	h.stopEditing()
 }
 
-func (h ConnectionHandle) Paint() {
+func (h connectionHandle) Paint() {
 	SetColor(map[bool]Color{true:{1, .5, 0, .5}, false:map[bool]Color{true:{.4, .4, 1, .4}, false:{0, 0, 0, .5}}[h.focused]}[h.editing])
 	SetPointSize(connectionHandleSize)
 	DrawPoint(h.Center())
 }
 
 
-type ConnectionSourceHandle struct {
-	*ConnectionHandle
-	savedConnection *Output
+type connectionSourceHandle struct {
+	*connectionHandle
+	savedConnection *output
 }
 
-func NewConnectionSourceHandle(conn *Connection) *ConnectionSourceHandle {
-	h := &ConnectionSourceHandle{}
-	h.ConnectionHandle = NewConnectionHandle(h, conn)
+func newConnectionSourceHandle(conn *connection) *connectionSourceHandle {
+	h := &connectionSourceHandle{}
+	h.connectionHandle = newConnectionHandle(h, conn)
 	return h
 }
 
-func (h *ConnectionSourceHandle) SaveConnection() { h.savedConnection = h.connection.src }
-func (h *ConnectionSourceHandle) RestoreSavedConnection() { h.connection.SetSource(h.savedConnection) }
+func (h *connectionSourceHandle) saveConnection() { h.savedConnection = h.conn.src }
+func (h *connectionSourceHandle) restoreSavedConnection() { h.conn.setSource(h.savedConnection) }
 
-func (h ConnectionSourceHandle) UpdateConnection(p Point) {
-	outermost := h.connection.block.Outermost()
-	if output, ok := outermost.ViewAt(h.MapTo(p, outermost)).(*Output); ok && h.connection.dst.CanConnect(output) {
-		h.connection.SetSource(output)
+func (h connectionSourceHandle) updateConnection(p Point) {
+	b := h.conn.blk.outermost()
+	if output, ok := b.ViewAt(h.MapTo(p, b)).(*output); ok && h.conn.dst.canConnect(output) {
+		h.conn.setSource(output)
 	} else {
-		h.connection.DisconnectSource(h.MapTo(p, h.connection.block))
+		h.conn.disconnectSource(h.MapTo(p, h.conn.blk))
 	}
 }
 
-func (h *ConnectionSourceHandle) MoveToNearestConnectableput(key int) {
-	block := h.connection.block.Outermost()
-	connectableputs := []View{}
-	for _, node := range block.AllNodes() {
-		for _, output := range node.Outputs() {
-			if h.connection.dst.CanConnect(output) { connectableputs = append(connectableputs, output) }
+func (h *connectionSourceHandle) moveToNearestConnectablePort(dirKey int) {
+	b := h.conn.blk.outermost()
+	ports := []View{}
+	for _, n := range b.allNodes() {
+		for _, p := range n.outputs() {
+			if h.conn.dst.canConnect(p) { ports = append(ports, p) }
 		}
 	}
 	
-	view := nearestView(block, connectableputs, h.connection.srcPt, key)
-	if p, ok := view.(*Output); ok {
-		h.connection.SetSource(p)
+	v := nearestView(b, ports, h.conn.srcPt, dirKey)
+	if p, ok := v.(*output); ok {
+		h.conn.setSource(p)
 	}
 }
 
-func (h *ConnectionSourceHandle) KeyPressed(event KeyEvent) {
+func (h *connectionSourceHandle) KeyPressed(event KeyEvent) {
 	if h.editing {
-		h.ConnectionHandle.KeyPressed(event)
+		h.connectionHandle.KeyPressed(event)
 		return
 	}
 	
-	if event.Key == glfw.KeyDown && h.connection.src != nil {
-		h.connection.src.TakeKeyboardFocus()
+	if event.Key == glfw.KeyDown && h.conn.src != nil {
+		h.conn.src.TakeKeyboardFocus()
 	} else if event.Key == glfw.KeyUp {
-		h.connection.dstHandle.TakeKeyboardFocus()
+		h.conn.dstHandle.TakeKeyboardFocus()
 	} else {
-		h.ConnectionHandle.KeyPressed(event)
+		h.connectionHandle.KeyPressed(event)
 	}
 }
 
 
-type ConnectionDestinationHandle struct {
-	*ConnectionHandle
-	savedConnection *Input
+type connectionDestinationHandle struct {
+	*connectionHandle
+	savedConnection *input
 }
 
-func NewConnectionDestinationHandle(conn *Connection) *ConnectionDestinationHandle {
-	h := &ConnectionDestinationHandle{}
-	h.ConnectionHandle = NewConnectionHandle(h, conn)
+func newConnectionDestinationHandle(conn *connection) *connectionDestinationHandle {
+	h := &connectionDestinationHandle{}
+	h.connectionHandle = newConnectionHandle(h, conn)
 	return h
 }
 
-func (h *ConnectionDestinationHandle) SaveConnection() { h.savedConnection = h.connection.dst }
-func (h *ConnectionDestinationHandle) RestoreSavedConnection() { h.connection.SetDestination(h.savedConnection) }
+func (h *connectionDestinationHandle) saveConnection() { h.savedConnection = h.conn.dst }
+func (h *connectionDestinationHandle) restoreSavedConnection() { h.conn.setDestination(h.savedConnection) }
 
-func (h ConnectionDestinationHandle) UpdateConnection(p Point) {
-	outermost := h.connection.block.Outermost()
-	if input, ok := outermost.ViewAt(h.MapTo(p, outermost)).(*Input); ok && input.CanConnect(h.connection.src) {
-		h.connection.SetDestination(input)
+func (h connectionDestinationHandle) updateConnection(p Point) {
+	b := h.conn.blk.outermost()
+	if input, ok := b.ViewAt(h.MapTo(p, b)).(*input); ok && input.canConnect(h.conn.src) {
+		h.conn.setDestination(input)
 	} else {
-		h.connection.DisconnectDestination(h.MapTo(p, h.connection.block))
+		h.conn.disconnectDestination(h.MapTo(p, h.conn.blk))
 	}
 }
 
-func (h *ConnectionDestinationHandle) MoveToNearestConnectableput(key int) {
-	block := h.connection.block.Outermost()
-	connectableputs := []View{}
-	for _, node := range block.AllNodes() {
-		for _, input := range node.Inputs() {
-			if input.CanConnect(h.connection.src) { connectableputs = append(connectableputs, input) }
+func (h *connectionDestinationHandle) moveToNearestConnectablePort(dirKey int) {
+	b := h.conn.blk.outermost()
+	ports := []View{}
+	for _, n := range b.allNodes() {
+		for _, p := range n.inputs() {
+			if p.canConnect(h.conn.src) { ports = append(ports, p) }
 		}
 	}
 	
-	view := nearestView(block, connectableputs, h.connection.dstPt, key)
-	if p, ok := view.(*Input); ok {
-		h.connection.SetDestination(p)
+	v := nearestView(b, ports, h.conn.dstPt, dirKey)
+	if p, ok := v.(*input); ok {
+		h.conn.setDestination(p)
 	}
 }
 
-func (h *ConnectionDestinationHandle) KeyPressed(event KeyEvent) {
+func (h *connectionDestinationHandle) KeyPressed(event KeyEvent) {
 	if h.editing {
-		h.ConnectionHandle.KeyPressed(event)
+		h.connectionHandle.KeyPressed(event)
 		return
 	}
 	
 	if event.Key == glfw.KeyDown {
-		h.connection.srcHandle.TakeKeyboardFocus()
-	} else if event.Key == glfw.KeyUp && h.connection.dst != nil {
-		h.connection.dst.TakeKeyboardFocus()
+		h.conn.srcHandle.TakeKeyboardFocus()
+	} else if event.Key == glfw.KeyUp && h.conn.dst != nil {
+		h.conn.dst.TakeKeyboardFocus()
 	} else {
-		h.ConnectionHandle.KeyPressed(event)
+		h.connectionHandle.KeyPressed(event)
 	}
 }
