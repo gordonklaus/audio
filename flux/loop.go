@@ -21,10 +21,10 @@ func newLoopNode(b *block) *loopNode {
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.blk = b
-	n.input = newInput(n, &ValueInfo{})
+	n.input = newInput(n, &Value{})
 	n.input.connsChanged = func() {
 		if conns := n.input.conns; len(conns) > 0 {
-			if o := conns[0].src; o != nil { n.updateInputType(o.info.typ) }
+			if o := conns[0].src; o != nil { n.updateInputType(o.val.typ) }
 		} else {
 			n.updateInputType(nil)
 		}
@@ -32,7 +32,7 @@ func newLoopNode(b *block) *loopNode {
 	n.AddChild(n.input)
 	n.loopblk = newBlock(n)
 	n.inputsNode = newInputsNode(n.loopblk)
-	n.inputsNode.newOutput(&ValueInfo{})
+	n.inputsNode.newOutput(&Value{})
 	n.loopblk.addNode(n.inputsNode)
 	n.AddChild(n.loopblk)
 	go n.loopblk.animate()
@@ -62,7 +62,7 @@ func (n *loopNode) updateInputType(t Type) {
 		}
 	case *ArrayType, *SliceType, *MapType:
 		if len(in.outs) == 1 {
-			in.newOutput(&ValueInfo{})
+			in.newOutput(&Value{})
 		}
 	}
 	switch t.(type) {

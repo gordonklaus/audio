@@ -13,7 +13,7 @@ import (
 type browser struct {
 	*ViewBase
 	mode browserMode
-	currentPkg *PackageInfo
+	currentPkg *Package
 	finished bool
 	accepted, canceled *Signal
 	
@@ -34,28 +34,28 @@ const (
 	typesOnly
 )
 
-func newBrowser(mode browserMode, currentPkg *PackageInfo, imports []*PackageInfo) *browser {
+func newBrowser(mode browserMode, currentPkg *Package, imports []*Package) *browser {
 	b := &browser{currentPkg:currentPkg, accepted:NewSignal(), canceled:NewSignal()}
 	b.ViewBase = NewView(b)
 	
 	b.mode = mode
 	b.path = []Info{rootPkg}
 	rootPkg.types = append([]*NamedType{}, builtinPkg.types...)
-	rootPkg.functions = append([]*FuncInfo{}, builtinPkg.functions...)
-	rootPkg.variables = []*ValueInfo{}
-	rootPkg.constants = append([]*ValueInfo{}, builtinPkg.constants...)
+	rootPkg.funcs = append([]*Func{}, builtinPkg.funcs...)
+	rootPkg.vars = []*Value{}
+	rootPkg.consts = append([]*Value{}, builtinPkg.consts...)
 	if currentPkg != nil { imports = append(imports, currentPkg) }
 	for _, p := range imports {
 		rootPkg.types = append(rootPkg.types, p.types...)
-		rootPkg.functions = append(rootPkg.functions, p.functions...)
-		rootPkg.variables = append(rootPkg.variables, p.variables...)
-		rootPkg.constants = append(rootPkg.constants, p.constants...)
+		rootPkg.funcs = append(rootPkg.funcs, p.funcs...)
+		rootPkg.vars = append(rootPkg.vars, p.vars...)
+		rootPkg.consts = append(rootPkg.consts, p.consts...)
 	}
 	Sort(rootPkg.types, "Name")
 	rootPkg.types = append([]*NamedType{protoPointer, protoArray, protoSlice, protoMap, protoChan, protoFunc, protoInterface, protoStruct}, rootPkg.types...)
-	Sort(rootPkg.functions, "Name")
-	Sort(rootPkg.variables, "Name")
-	Sort(rootPkg.constants, "Name")
+	Sort(rootPkg.funcs, "Name")
+	Sort(rootPkg.vars, "Name")
+	Sort(rootPkg.consts, "Name")
 	
 	b.text = newNodeNameText(b)
 	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
@@ -87,14 +87,14 @@ func (b browser) filteredInfos() (infos []Info) {
 		case typesOnly:
 			switch i.(type) {
 				default: continue
-				case *PackageInfo, *NamedType:
+				case *Package, *NamedType:
 			}
 		}
 		if b.currentPkg != nil {
 			switch i.(type) {
 			default:
 				if p := i.Parent(); p != nil && p != builtinPkg && p != cPkg && p != b.currentPkg && !ast.IsExported(i.Name()) { continue }
-			case *PackageInfo:
+			case *Package:
 			}
 		}
 		infos = append(infos, i)
@@ -166,8 +166,8 @@ ok:
 		for i, child := range infos {
 			if child.Name() >= b.newInfo.Name() {
 				switch child.(type) {
-				case *PackageInfo: if _, ok := b.newInfo.(*PackageInfo); !ok { continue }
-				case *FuncInfo: if _, ok := b.newInfo.(*FuncInfo); !ok { continue }
+				case *Package: if _, ok := b.newInfo.(*Package); !ok { continue }
+				case *Func: if _, ok := b.newInfo.(*Func); !ok { continue }
 				default: continue
 				}
 				newIndex = i
@@ -202,7 +202,7 @@ ok:
 	t.TextBase.SetText(text)
 	
 	if t, ok := b.lastPathText(); ok && cur != nil {
-		sep := ""; if _, ok := cur.(*PackageInfo); ok { sep = "/" } else { sep = "." }
+		sep := ""; if _, ok := cur.(*Package); ok { sep = "/" } else { sep = "." }
 		text := t.GetText()
 		t.SetText(text[:len(text) - 1] + sep)
 	}
@@ -235,11 +235,11 @@ ok:
 				b.typeView = newTypeView(&i.underlying)
 				b.AddChild(b.typeView)
 			}
-		case *FuncInfo:
+		case *Func:
 			t := Type(i.typ)
 			b.typeView = newTypeView(&t)
 			b.AddChild(b.typeView)
-		case *ValueInfo:
+		case *Value:
 			b.typeView = newTypeView(&i.typ)
 			b.AddChild(b.typeView)
 		}
@@ -298,10 +298,10 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		if b.newInfo != nil && !existing {
 			b.path[0].AddChild(info)
 			switch info := info.(type) {
-			case *PackageInfo:
-				*info = *newPackageInfo(info.parent.(*PackageInfo), info.name)
+			case *Package:
+				*info = *newPackage(info.parent.(*Package), info.name)
 				if err := os.Mkdir(info.FluxSourcePath(), 0777); err != nil { Println(err) }
-			case *FuncInfo:
+			case *Func:
 				newFuncNode(info) // bad bad, this launches animate()
 			}
 			
@@ -311,7 +311,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			}
 		}
 		b.newInfo = nil
-		if _, ok := info.(*PackageInfo); !ok {
+		if _, ok := info.(*Package); !ok {
 			b.Close()
 			b.finished = true
 			b.accepted.Emit(info)
@@ -321,11 +321,11 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 	case KeyRight:
 		if b.newInfo == nil {
 			switch i := b.currentInfo().(type) {
-			case *PackageInfo, *NamedType:
+			case *Package, *NamedType:
 				b.path = append([]Info{i}, b.path...)
 				b.indices = nil
 				
-				sep := ""; if _, ok := i.(*PackageInfo); ok { sep = "/" } else { sep = "." }
+				sep := ""; if _, ok := i.(*Package); ok { sep = "/" } else { sep = "." }
 				pathText := NewText(i.Name() + sep)
 				pathText.SetTextColor(getTextColor(i, 1))
 				pathText.SetBackgroundColor(Color{0, 0, 0, .7})
@@ -345,20 +345,20 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			t.SetText("")
 		}
 	default:
-		_, inPkg := b.path[0].(*PackageInfo)
+		_, inPkg := b.path[0].(*Package)
 		recv, inType := b.path[0].(*NamedType)
 		if event.Ctrl && b.mode != typesOnly && b.newInfo == nil && (inPkg || inType && event.Text == "3") {
 			switch event.Text {
-			case "1": b.newInfo = &PackageInfo{}
+			case "1": b.newInfo = &Package{}
 			case "2": b.newInfo = &NamedType{}
 			case "3":
-				f := &FuncInfo{typ:&FuncType{}}
+				f := &Func{typ:&FuncType{}}
 				if inType {
 					f.receiver = &PointerType{element:recv}
 				}
 				b.newInfo = f
-			case "4": b.newInfo = &ValueInfo{}
-			case "5": b.newInfo = &ValueInfo{constant:true}
+			case "4": b.newInfo = &Value{}
+			case "5": b.newInfo = &Value{constant:true}
 			default: t.TextBase.KeyPressed(event); return
 			}
 			t.SetText("")
@@ -370,15 +370,15 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 
 func getTextColor(i Info, alpha float64) Color {
 	switch i.(type) {
-	case SpecialInfo:
+	case Special:
 		return Color{1, 1, .6, alpha}
-	case *PackageInfo:
+	case *Package:
 		return Color{1, 1, 1, alpha}
 	case *NamedType:
 		return Color{.6, 1, .6, alpha}
-	case *FuncInfo:
+	case *Func:
 		return Color{1, .6, .6, alpha}
-	case *ValueInfo:
+	case *Value:
 		return Color{.6, .6, 1, alpha}
 	}
 	return Color{}

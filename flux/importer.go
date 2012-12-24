@@ -57,7 +57,7 @@ func init() {
 	b.defTypes(new(bool), new(int8), new(int16), new(int32), new(int64), new(int), new(uint8), new(uint16), new(uint32), new(uint64), new(uint), new(uintptr), new(float32), new(float64), new(complex64), new(complex128), new(string))
 	b.defType("byte", new(byte))
 	b.defType("rune", new(rune))
-	b.define(ast.Typ, "error").Type = &NamedType{InfoBase:InfoBase{"error", nil}, underlying:&InterfaceType{methods:[]*ValueInfo{{InfoBase:InfoBase{name:"Error"}, typ:&FuncType{results:[]*ValueInfo{{typ:builtinAstPkg.Scope.Lookup("string").Type.(Type)}}}}}}}
+	b.define(ast.Typ, "error").Type = &NamedType{InfoBase:InfoBase{"error", nil}, underlying:&InterfaceType{methods:[]*Value{{InfoBase:InfoBase{name:"Error"}, typ:&FuncType{results:[]*Value{{typ:builtinAstPkg.Scope.Lookup("string").Type.(Type)}}}}}}}
 	b.defFuncs("append", "cap", "close", "complex", "copy", "delete", "imag", "len", "make", "new", "panic", "print", "println", "real", "recover")
 	b.defConsts("false", "true", "nil", "iota")
 	builtinPkg.load()
@@ -98,13 +98,13 @@ func (b scopeBuilder) defType(name string, value interface{}) {
 
 func (b scopeBuilder) defConsts(names ...string) {
 	for _, n := range names {
-		b.define(ast.Con, n).Data = &ValueInfo{InfoBase{n, nil}, nil, true}
+		b.define(ast.Con, n).Data = &Value{InfoBase{n, nil}, nil, true}
 	}
 }
 
 func (b scopeBuilder) defFuncs(names ...string) {
 	for _, n := range names {
-		b.define(ast.Fun, n).Data = &FuncInfo{InfoBase{n, nil}, nil, &FuncType{}}
+		b.define(ast.Fun, n).Data = &Func{InfoBase{n, nil}, nil, &FuncType{}}
 	}
 }
 

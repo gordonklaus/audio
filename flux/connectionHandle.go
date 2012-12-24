@@ -115,14 +115,15 @@ func newConnectionSourceHandle(conn *connection) *connectionSourceHandle {
 }
 
 func (h *connectionSourceHandle) saveConnection() { h.savedConnection = h.conn.src }
-func (h *connectionSourceHandle) restoreSavedConnection() { h.conn.setSource(h.savedConnection) }
+func (h *connectionSourceHandle) restoreSavedConnection() { h.conn.setSrc(h.savedConnection) }
 
 func (h connectionSourceHandle) updateConnection(p Point) {
 	b := h.conn.blk.outermost()
 	if output, ok := b.ViewAt(h.MapTo(p, b)).(*output); ok && h.conn.dst.canConnect(output) {
-		h.conn.setSource(output)
+		h.conn.setSrc(output)
 	} else {
-		h.conn.disconnectSource(h.MapTo(p, h.conn.blk))
+		h.conn.dstPt = h.MapTo(p, h.conn.blk)
+		h.conn.setDst(nil)
 	}
 }
 
@@ -137,7 +138,7 @@ func (h *connectionSourceHandle) moveToNearestConnectablePort(dirKey int) {
 	
 	v := nearestView(b, ports, h.conn.srcPt, dirKey)
 	if p, ok := v.(*output); ok {
-		h.conn.setSource(p)
+		h.conn.setSrc(p)
 	}
 }
 
@@ -169,14 +170,15 @@ func newConnectionDestinationHandle(conn *connection) *connectionDestinationHand
 }
 
 func (h *connectionDestinationHandle) saveConnection() { h.savedConnection = h.conn.dst }
-func (h *connectionDestinationHandle) restoreSavedConnection() { h.conn.setDestination(h.savedConnection) }
+func (h *connectionDestinationHandle) restoreSavedConnection() { h.conn.setDst(h.savedConnection) }
 
 func (h connectionDestinationHandle) updateConnection(p Point) {
 	b := h.conn.blk.outermost()
 	if input, ok := b.ViewAt(h.MapTo(p, b)).(*input); ok && input.canConnect(h.conn.src) {
-		h.conn.setDestination(input)
+		h.conn.setDst(input)
 	} else {
-		h.conn.disconnectDestination(h.MapTo(p, h.conn.blk))
+		h.conn.srcPt = h.MapTo(p, h.conn.blk)
+		h.conn.setSrc(nil)
 	}
 }
 
@@ -191,7 +193,7 @@ func (h *connectionDestinationHandle) moveToNearestConnectablePort(dirKey int) {
 	
 	v := nearestView(b, ports, h.conn.dstPt, dirKey)
 	if p, ok := v.(*input); ok {
-		h.conn.setDestination(p)
+		h.conn.setDst(p)
 	}
 }
 

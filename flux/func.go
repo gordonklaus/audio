@@ -9,17 +9,17 @@ import (
 type funcNode struct {
 	*ViewBase
 	AggregateMouseHandler
-	info *FuncInfo
-	pkgRefs map[*PackageInfo]int
+	info *Func
+	pkgRefs map[*Package]int
 	inputsNode, outputsNode *portsNode
 	funcblk *block
 }
 
-func newFuncNode(info *FuncInfo) *funcNode {
+func newFuncNode(info *Func) *funcNode {
 	f := &funcNode{info:info}
 	f.ViewBase = NewView(f)
 	f.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(f), NewViewDragger(f)}
-	f.pkgRefs = map[*PackageInfo]int{}
+	f.pkgRefs = map[*Package]int{}
 	f.funcblk = newBlock(f)
 	f.inputsNode = newInputsNode(f.funcblk)
 	f.inputsNode.editable = true
@@ -39,46 +39,46 @@ func newFuncNode(info *FuncInfo) *funcNode {
 	return f
 }
 
-func (f funcNode) pkg() *PackageInfo {
+func (f funcNode) pkg() *Package {
 	parent := f.info.parent
 	if t, ok := parent.(*NamedType); ok {
-		return t.parent.(*PackageInfo)
+		return t.parent.(*Package)
 	}
-	return parent.(*PackageInfo)
+	return parent.(*Package)
 }
 
-func (f funcNode) imports() (x []*PackageInfo) {
+func (f funcNode) imports() (x []*Package) {
 	for p := range f.pkgRefs {
 		x = append(x, p)
 	}
 	return
 }
 
-func (f *funcNode) addPackageRef(x interface{}) {
+func (f *funcNode) addPkgRef(x interface{}) {
 	switch x := x.(type) {
 	case Info:
-		if p, ok := x.Parent().(*PackageInfo); ok && p != f.pkg() && p != builtinPkg {
+		if p, ok := x.Parent().(*Package); ok && p != f.pkg() && p != builtinPkg {
 			f.pkgRefs[p]++
 		}
 	case Type:
-		walkType(x, func(t *NamedType) { f.addPackageRef(t) })
+		walkType(x, func(t *NamedType) { f.addPkgRef(t) })
 	default:
-		panic(Sprintf("can't addPackageRef for %#v\n", x))
+		panic(Sprintf("can't addPkgRef for %#v\n", x))
 	}
 }
-func (f *funcNode) subPackageRef(x interface{}) {
+func (f *funcNode) subPkgRef(x interface{}) {
 	switch x := x.(type) {
 	case Info:
-		if p, ok := x.Parent().(*PackageInfo); ok {
+		if p, ok := x.Parent().(*Package); ok {
 			f.pkgRefs[p]--
 			if f.pkgRefs[p] <= 0 {
 				delete(f.pkgRefs, p)
 			}
 		}
 	case Type:
-		walkType(x, func(t *NamedType) { f.subPackageRef(t) })
+		walkType(x, func(t *NamedType) { f.subPkgRef(t) })
 	default:
-		panic(Sprintf("can't subPackageRef for %#v\n", x))
+		panic(Sprintf("can't subPkgRef for %#v\n", x))
 	}
 }
 

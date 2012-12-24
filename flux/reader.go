@@ -11,12 +11,12 @@ import (
 type reader struct {
 	s string
 	f *funcNode
-	pkgNames map[string]*PackageInfo
+	pkgNames map[string]*Package
 	nodes map[int]node
 }
 
 func loadFunc(f *funcNode) bool {
-	r := &reader{"", f, map[string]*PackageInfo{}, map[int]node{}}
+	r := &reader{"", f, map[string]*Package{}, map[int]node{}}
 	if b, err := ReadFile(f.info.FluxSourcePath()); err != nil {
 		return false
 	} else {
@@ -28,7 +28,7 @@ func loadFunc(f *funcNode) bool {
 	for r.s[0] != '\\' {
 		line, r.s = Split2(r.s, "\n")
 		importPath, name := Split2(line, " ")
-		pkg := findPackageInfo(importPath)
+		pkg := findPackage(importPath)
 		if name == "" {
 			name = pkg.name
 		}
@@ -36,11 +36,11 @@ func loadFunc(f *funcNode) bool {
 	}
 	for _, v := range f.info.typ.parameters {
 		f.inputsNode.newOutput(v)
-		f.addPackageRef(v.typ)
+		f.addPkgRef(v.typ)
 	}
 	for _, v := range f.info.typ.results {
 		f.outputsNode.newInput(v)
-		f.addPackageRef(v.typ)
+		f.addPkgRef(v.typ)
 	}
 	r.readBlock(f.funcblk, 0)
 	
@@ -63,8 +63,8 @@ func (r *reader) readBlock(b *block, indent int) {
 			dstID, _ := Atoi(x[3])
 			dstPort, _ := Atoi(x[4])
 			c := newConnection(b, ZP)
-			c.setSource(r.nodes[srcID].outputs()[srcPort])
-			c.setDestination(r.nodes[dstID].inputs()[dstPort])
+			c.setSrc(r.nodes[srcID].outputs()[srcPort])
+			c.setDst(r.nodes[dstID].inputs()[dstPort])
 		} else {
 			r.readNode(b, indent)
 		}
@@ -106,7 +106,7 @@ func (r *reader) readNode(b *block, indent int) {
 			node = n
 		} else {
 			pkgName, name := Split2(fields[1], ".")
-			var pkg *PackageInfo
+			var pkg *Package
 			if name == "" {
 				name = pkgName
 				pkg = r.f.pkg()
@@ -116,7 +116,7 @@ func (r *reader) readNode(b *block, indent int) {
 			for _, info := range pkg.Children() {
 				if info.Name() != name { continue }
 				switch info := info.(type) {
-				case *FuncInfo:
+				case *Func:
 					node = newCallNode(info, b)
 				default:
 					panic("not yet implemented")

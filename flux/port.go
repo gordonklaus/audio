@@ -11,8 +11,8 @@ type port struct {
 	*ViewBase
 	out bool
 	node node
-	info *ValueInfo
-	valueView *typeView
+	val *Value
+	valView *typeView
 	conns []*connection
 	focused bool
 	connsChanged func()
@@ -20,25 +20,25 @@ type port struct {
 
 const portSize = 11
 
-func newInput(n node, info *ValueInfo) *input {
+func newInput(n node, v *Value) *input {
 	p := &input{}
-	p.port = newPort(p, false, n, info)
-	p.valueView.Move(Pt(-p.valueView.Width() - 12, -p.valueView.Height() / 2))
+	p.port = newPort(p, false, n, v)
+	p.valView.Move(Pt(-p.valView.Width() - 12, -p.valView.Height() / 2))
 	return p
 }
-func newOutput(n node, info *ValueInfo) *output {
+func newOutput(n node, v *Value) *output {
 	p := &output{}
-	p.port = newPort(p, true, n, info)
-	p.valueView.Move(Pt(12, -p.valueView.Height() / 2))
+	p.port = newPort(p, true, n, v)
+	p.valView.Move(Pt(12, -p.valView.Height() / 2))
 	return p
 }
-func newPort(self View, out bool, n node, info *ValueInfo) *port {
-	p := &port{out:out, node:n, info:info}
+func newPort(self View, out bool, n node, v *Value) *port {
+	p := &port{out:out, node:n, val:v}
 	p.ViewBase = NewView(p)
-	p.valueView = newValueView(info)
-	p.valueView.Hide()
+	p.valView = newValueView(v)
+	p.valView.Hide()
 	p.connsChanged = func(){}
-	p.AddChild(p.valueView)
+	p.AddChild(p.valView)
 	p.Resize(portSize, portSize)
 	p.Pan(Pt(portSize, portSize).Div(-2))
 	p.Self = self
@@ -48,20 +48,20 @@ func newPort(self View, out bool, n node, info *ValueInfo) *port {
 func (p port) canConnect(interface{}) bool { return true }
 func (p *port) connect(c *connection) {
 	p.conns = append(p.conns, c)
-	if f := p.connsChanged; f != nil { f() }
+	p.connsChanged()
 }
 func (p *port) disconnect(c *connection) {
 	for i, c2 := range p.conns {
 		if c2 == c {
 			p.conns = append(p.conns[:i], p.conns[i+1:]...)
-			if f := p.connsChanged; f != nil { f() }
+			p.connsChanged()
 			return
 		}
 	}
 }
 
-func (p *port) TookKeyboardFocus() { p.focused = true; p.Repaint(); p.valueView.Show() }
-func (p *port) LostKeyboardFocus() { p.focused = false; p.Repaint(); p.valueView.Hide() }
+func (p *port) TookKeyboardFocus() { p.focused = true; p.Repaint(); p.valView.Show() }
+func (p *port) LostKeyboardFocus() { p.focused = false; p.Repaint(); p.valView.Hide() }
 
 func (p *port) KeyPressed(event KeyEvent) {
 	if p.out && event.Key == glfw.KeyLeft || !p.out && event.Key == glfw.KeyRight {
@@ -77,9 +77,9 @@ func (p *port) KeyPressed(event KeyEvent) {
 	case glfw.KeyEnter:
 		c := newConnection(p.node.block(), p.Center())
 		if p.out {
-			c.setSource(p.Self.(*output))
+			c.setSrc(p.Self.(*output))
 		} else {
-			c.setDestination(p.Self.(*input))
+			c.setDst(p.Self.(*input))
 		}
 		c.startEditing()
 	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
@@ -95,10 +95,10 @@ func (p *port) MousePressed(button int, pt Point) {
 	p.TakeKeyboardFocus()
 	c := newConnection(p.node.block(), p.MapTo(pt, p.node.block()))
 	if p.out {
-		c.setSource(p.Self.(*output))
+		c.setSrc(p.Self.(*output))
 		c.dstHandle.SetMouseFocus(c.dstHandle, button)
 	} else {
-		c.setDestination(p.Self.(*input))
+		c.setDst(p.Self.(*input))
 		c.srcHandle.SetMouseFocus(c.srcHandle, button)
 	}
 	c.startEditing()

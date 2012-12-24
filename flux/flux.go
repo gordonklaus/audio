@@ -32,7 +32,7 @@ func newFluxWindow() *fluxWindow {
 			if info.underlying == nil {
 				v.edit(func() {
 					if info.underlying == nil {
-						SliceRemove(&info.parent.(*PackageInfo).types, info)
+						SliceRemove(&info.parent.(*Package).types, info)
 					} else {
 						saveType(info)
 					}
@@ -45,7 +45,7 @@ func newFluxWindow() *fluxWindow {
 				}
 				v.TakeKeyboardFocus()
 			}
-		case *FuncInfo:
+		case *Func:
 			w.SetCentralView(newFuncNode(info))
 		default:
 			w.SetCentralView(w.browser)

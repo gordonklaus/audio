@@ -39,9 +39,9 @@ func newConnection(b *block, p Point) *connection {
 }
 
 func (c connection) connected() bool { return c.src != nil && c.dst != nil }
-func (c *connection) disconnect() { c.setSource(nil); c.setDestination(nil) }
+func (c *connection) disconnect() { c.setSrc(nil); c.setDst(nil) }
 
-func (c *connection) setSource(src *output) {
+func (c *connection) setSrc(src *output) {
 	if c.src != nil { c.src.disconnect(c) }
 	c.src = src
 	if src != nil { src.connect(c) }
@@ -49,22 +49,14 @@ func (c *connection) setSource(src *output) {
 	c.reblock()
 	c.reform()
 }
-func (c *connection) disconnectSource(point Point) {
-	c.srcPt = point
-	c.setSource(nil)
-}
 
-func (c *connection) setDestination(dst *input) {
+func (c *connection) setDst(dst *input) {
 	if c.dst != nil { c.dst.disconnect(c) }
 	c.dst = dst
 	if dst != nil { dst.connect(c) }
 	if c.src != nil { c.src.connsChanged() }
 	c.reblock()
 	c.reform()
-}
-func (c *connection) disconnectDestination(point Point) {
-	c.dstPt = point
-	c.setDestination(nil)
 }
 
 func (c *connection) reblock() {

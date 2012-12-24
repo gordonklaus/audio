@@ -15,7 +15,7 @@ func saveType(t *NamedType) {
 	
 	u := t.underlying
 	walkType(u, func(tt *NamedType) {
-		if p := tt.parent.(*PackageInfo); p != t.parent.(*PackageInfo) && p != builtinPkg {
+		if p := tt.parent.(*Package); p != t.parent.(*Package) && p != builtinPkg {
 			w.pkgNames[p] = w.newName(p.Name())
 		}
 	})
@@ -43,11 +43,11 @@ func saveFunc(f funcNode) {
 	vars := map[*input]string{}
 	params := []string{}
 	for _, p := range f.inputsNode.outputs() {
-		name := w.newName(p.info.name)
+		name := w.newName(p.val.name)
 		if len(p.conns) > 0 {
 			vars[p.conns[0].dst] = name
 		}
-		params = append(params, name + " " + w.typeString(p.info.typ))
+		params = append(params, name + " " + w.typeString(p.val.typ))
 	}
 	if f.info.receiver != nil {
 		Fprintf(w.go_, "(%s) ", params[0])
@@ -55,9 +55,9 @@ func saveFunc(f funcNode) {
 	}
 	results := []string{}
 	for _, p := range f.outputsNode.inputs() {
-		name := w.newName(p.info.name)
+		name := w.newName(p.val.name)
 		vars[p] = name
-		results = append(results, name + " " + w.typeString(p.info.typ))
+		results = append(results, name + " " + w.typeString(p.val.typ))
 	}
 	Fprintf(w.go_, "%s(%s) ", f.info.Name(), Join(params, ", "))
 	if len(results) > 0 {
@@ -73,7 +73,7 @@ func saveFunc(f funcNode) {
 
 type writer struct {
 	flux, go_ *os.File
-	pkgNames map[*PackageInfo]string
+	pkgNames map[*Package]string
 	names map[string]int
 	nodeID int
 	nodeIDs map[node]int
@@ -85,10 +85,10 @@ func newWriter(info Info) *writer {
 	var typ *NamedType
 	i := info.Parent()
 	if t, ok := i.(*NamedType); ok { typ, i = t, t.parent }
-	pkg := i.(*PackageInfo)
+	pkg := i.(*Package)
 	
 	var err error
-	w := &writer{nil, nil, map[*PackageInfo]string{}, map[string]int{}, 0, map[node]int{}}
+	w := &writer{nil, nil, map[*Package]string{}, map[string]int{}, 0, map[node]int{}}
 	fluxPath := info.FluxSourcePath()
 	chk(os.MkdirAll(filepath.Dir(fluxPath), 0777))
 	w.flux, err = os.Create(fluxPath); chk(err)
@@ -96,7 +96,7 @@ func newWriter(info Info) *writer {
 	w.go_, err = os.Create(Sprintf("%s/%s.go", pkg.FluxSourcePath(), name)); chk(err)
 	
 	for _, i := range append(builtinPkg.Children(), info.Parent().Children()...) {
-		if _, ok := i.(*PackageInfo); !ok {
+		if _, ok := i.(*Package); !ok {
 			w.newName(i.Name())
 		}
 	}
@@ -178,7 +178,7 @@ func (w *writer) writeBlockGo(b *block, indent int, vars map[*input]string) {
 	for c := range b.conns {
 		if _, ok := vars[c.dst]; !ok && c.src.node.block() != b {
 			name := w.newName("v")
-			Fprintf(w.go_, "%svar %s %s\n", tabs(indent), name, w.typeString(c.dst.info.typ))
+			Fprintf(w.go_, "%svar %s %s\n", tabs(indent), name, w.typeString(c.dst.val.typ))
 			vars[c.dst] = name
 		}
 	}
@@ -191,7 +191,7 @@ func (w *writer) writeBlockGo(b *block, indent int, vars map[*input]string) {
 				if len(input.conns) > 0 {
 					name = vars[input.conns[0].dst]
 				} else {
-					name = w.zeroLiteral(input.info.typ)
+					name = w.zeroLiteral(input.val.typ)
 				}
 				inputs = append(inputs, name)
 			}
@@ -225,7 +225,7 @@ func (w *writer) writeBlockGo(b *block, indent int, vars map[*input]string) {
 			Fprintf(w.go_, "%sfor ", tabs(indent))
 			out, assignExisting := w.outputNames(n.inputsNode, vars)
 			if conns := n.input.conns; len(conns) > 0 {
-				switch conns[0].src.info.typ.(type) {
+				switch conns[0].src.val.typ.(type) {
 				case *NamedType:
 					Fprintf(w.go_, "%s := 0; %s < %s; %s++ ", out, out, vars[n.input], out)
 				case *ArrayType, *SliceType, *MapType, *ChanType:
@@ -253,7 +253,7 @@ func (w *writer) outputNames(n node, vars map[*input]string) (string, map[string
 		name := "_"
 		if len(p.conns) > 0 {
 			any = true
-			name = w.newName(p.info.name)
+			name = w.newName(p.val.name)
 			for _, c := range p.conns {
 				if existingName, ok := vars[c.dst]; ok {
 					assignExisting[existingName] = name
@@ -293,7 +293,7 @@ func (w writer) newName(s string) string {
 
 func (w writer) qualifiedName(i Info) string {
 	s := ""
-	if n, ok := w.pkgNames[i.Parent().(*PackageInfo)]; ok {
+	if n, ok := w.pkgNames[i.Parent().(*Package)]; ok {
 		s = n + "."
 	}
 	return s + i.Name()
@@ -362,7 +362,7 @@ func (w writer) signature(f *FuncType) string {
 	return s
 }
 
-func (w writer) paramsString(params []*ValueInfo) string {
+func (w writer) paramsString(params []*Value) string {
 	s := "("
 	for i, p := range params {
 		if i > 0 {

@@ -21,7 +21,7 @@ func newIfNode(b *block) *ifNode {
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.blk = b
-	n.input = newInput(n, &ValueInfo{})
+	n.input = newInput(n, &Value{})
 	n.falseblk = newBlock(n)
 	n.trueblk = newBlock(n)
 	n.AddChild(n.input)

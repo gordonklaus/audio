@@ -16,21 +16,21 @@ import (
 )
 
 var (
-	rootPkg = &PackageInfo{loaded:true}
-	builtinPkg = &PackageInfo{}
-	cPkg = &PackageInfo{InfoBase:InfoBase{"C", rootPkg}, importPath:"C"}
+	rootPkg = &Package{loaded:true}
+	builtinPkg = &Package{}
+	cPkg = &Package{InfoBase:InfoBase{"C", rootPkg}, importPath:"C"}
 )
 
-func newPackageInfo(parent *PackageInfo, name string) *PackageInfo {
-	p := &PackageInfo{InfoBase:InfoBase{name, parent}, importPath:filepath.Join(parent.importPath, name), fullPath:filepath.Join(parent.fullPath, name)}
+func newPackage(parent *Package, name string) *Package {
+	p := &Package{InfoBase:InfoBase{name, parent}, importPath:filepath.Join(parent.importPath, name), fullPath:filepath.Join(parent.fullPath, name)}
 	
 	if file, err := os.Open(p.fullPath); err == nil {
 		if fileInfos, err := file.Readdir(-1); err == nil {
 			for _, fileInfo := range fileInfos {
 				name := fileInfo.Name()
 				if fileInfo.IsDir() && unicode.IsLetter(([]rune(name))[0]) && name != "testdata" && !HasSuffix(name, ".fluxmethods") {
-					p2 := newPackageInfo(p, name)
-					p.subPackages = append(p.subPackages, p2)
+					p2 := newPackage(p, name)
+					p.subPkgs = append(p.subPkgs, p2)
 				}
 			}
 		}
@@ -40,21 +40,21 @@ func newPackageInfo(parent *PackageInfo, name string) *PackageInfo {
 }
 
 func init() {
-	rootPkg = &PackageInfo{loaded:true}
+	rootPkg = &Package{loaded:true}
 	for _, srcDir := range build.Default.SrcDirs() {
 		rootPkg.fullPath = srcDir
-		srcPackageInfo := newPackageInfo(rootPkg, "")
-		for _, p := range srcPackageInfo.subPackages {
+		srcPackage := newPackage(rootPkg, "")
+		for _, p := range srcPackage.subPkgs {
 			p.parent = rootPkg
 		}
-		rootPkg.subPackages = append(rootPkg.subPackages, srcPackageInfo.subPackages...)
+		rootPkg.subPkgs = append(rootPkg.subPkgs, srcPackage.subPkgs...)
 	}
-	rootPkg.subPackages = append(rootPkg.subPackages, cPkg)
-	Sort(rootPkg.subPackages, "Name")
+	rootPkg.subPkgs = append(rootPkg.subPkgs, cPkg)
+	Sort(rootPkg.subPkgs, "Name")
 }
 
-func findPackageInfo(path string) *PackageInfo {
-	return rootPkg.findPackageInfo(path)
+func findPackage(path string) *Package {
+	return rootPkg.findPackage(path)
 }
 
 type Info interface {
@@ -79,46 +79,46 @@ func (i InfoBase) Children() []Info { return nil }
 func (i InfoBase) AddChild(info Info) {}
 func (i InfoBase) FluxSourcePath() string { return fmt.Sprintf("%v/%v.flux", i.parent.FluxSourcePath(), i.name) }
 
-type PackageInfo struct {
+type Package struct {
 	InfoBase
 	importPath string
 	fullPath string
 	types []*NamedType
-	functions []*FuncInfo
-	variables []*ValueInfo
-	constants []*ValueInfo
-	subPackages []*PackageInfo
+	funcs []*Func
+	vars []*Value
+	consts []*Value
+	subPkgs []*Package
 	loaded bool
 }
 
-func (p *PackageInfo) Children() (i []Info) {
+func (p *Package) Children() (i []Info) {
 	p.load()
 	for _, t := range p.types { i = append(i, t) }
-	for _, f := range p.functions { i = append(i, f) }
-	for _, v := range p.variables { i = append(i, v) }
-	for _, c := range p.constants { i = append(i, c) }
-	for _, p := range p.subPackages { i = append(i, p) }
+	for _, f := range p.funcs { i = append(i, f) }
+	for _, v := range p.vars { i = append(i, v) }
+	for _, c := range p.consts { i = append(i, c) }
+	for _, p := range p.subPkgs { i = append(i, p) }
 	return
 }
-func (p *PackageInfo) AddChild(info Info) {
+func (p *Package) AddChild(info Info) {
 	info.SetParent(p)
 	switch info := info.(type) {
-	case *PackageInfo:
-		p.subPackages = append(p.subPackages, info)
-		Sort(p.subPackages, "Name")
+	case *Package:
+		p.subPkgs = append(p.subPkgs, info)
+		Sort(p.subPkgs, "Name")
 	case *NamedType:
 		p.types = append(p.types, info)
 		Sort(p.types, "Name")
-	case *FuncInfo:
-		p.functions = append(p.functions, info)
-		Sort(p.functions, "Name")
+	case *Func:
+		p.funcs = append(p.funcs, info)
+		Sort(p.funcs, "Name")
 	default:
 		panic("not yet implemented")
 	}
 }
-func (p PackageInfo) FluxSourcePath() string { return p.fullPath }
+func (p Package) FluxSourcePath() string { return p.fullPath }
 
-func (p *PackageInfo) load() {
+func (p *Package) load() {
 	if p.loaded { return }
 	p.loaded = true
 	
@@ -131,7 +131,7 @@ func (p *PackageInfo) load() {
 	}
 	
 	for id := range pkg.Imports {
-		findPackageInfo(id).load()
+		findPackage(id).load()
 	}
 	
 	// create NamedTypes first (to support recursive types); also, parent and add existing types, funcs, consts (special support for builtinPkg and unsafePkg)
@@ -145,13 +145,13 @@ func (p *PackageInfo) load() {
 			n.parent = p
 			p.types = append(p.types, n)
 		}
-		if f, ok := obj.Data.(*FuncInfo); ok {
+		if f, ok := obj.Data.(*Func); ok {
 			f.parent = p
-			p.functions = append(p.functions, f)
+			p.funcs = append(p.funcs, f)
 		}
-		if v, ok := obj.Data.(*ValueInfo); ok {
+		if v, ok := obj.Data.(*Value); ok {
 			v.parent = p
-			p.constants = append(p.constants, v)
+			p.consts = append(p.consts, v)
 		}
 	}
 	
@@ -176,13 +176,13 @@ func (p *PackageInfo) load() {
 							_ = iota
 							typ = builtinAstPkg.Scope.Lookup("int").Type.(Type)
 						}
-						p.constants = append(p.constants, &ValueInfo{InfoBase{name.Name, p}, typ, true})
+						p.consts = append(p.consts, &Value{InfoBase{name.Name, p}, typ, true})
 					}
 				}
 			}
 		}
 	}
-	Sort(p.constants, "Name")
+	Sort(p.consts, "Name")
 	for _, file := range pkg.Files {
 		for _, decl := range file.Decls {
 			switch decl := decl.(type) {
@@ -200,12 +200,12 @@ func (p *PackageInfo) load() {
 								// typ = exprType(spec.Values[i])
 								typ = builtinAstPkg.Scope.Lookup("int").Type.(Type)
 							}
-							p.variables = append(p.variables, &ValueInfo{InfoBase{name.Name, p}, typ, false})
+							p.vars = append(p.vars, &Value{InfoBase{name.Name, p}, typ, false})
 						}
 					}
 				}
 			case *ast.FuncDecl:
-				f := &FuncInfo{InfoBase{decl.Name.Name, nil}, nil, specType(decl.Type).(*FuncType)}
+				f := &Func{InfoBase{decl.Name.Name, nil}, nil, specType(decl.Type).(*FuncType)}
 				if r := decl.Recv; r != nil {
 					// TODO:  FuncType of a method should include the receiver as first argument
 					recv := specType(r.List[0].Type)
@@ -218,16 +218,16 @@ func (p *PackageInfo) load() {
 					nr.methods = append(nr.methods, f)
 				} else {
 					f.parent = p
-					p.functions = append(p.functions, f)
+					p.funcs = append(p.funcs, f)
 				}
 			}
 		}
 	}
-	Sort(p.variables, "Name")
+	Sort(p.vars, "Name")
 	for _, t := range p.types {
 		Sort(t.methods, "Name")
 	}
-	Sort(p.functions, "Name")
+	Sort(p.funcs, "Name")
 }
 
 func specUnderlyingType(x ast.Expr, visitedNames map[string]bool) Type {
@@ -292,7 +292,7 @@ func specType(x ast.Expr) Type {
 		for _, m := range x.Methods.List {
 			switch field := m.Type.(type) {
 			case *ast.FuncType:
-				t.methods = append(t.methods, &ValueInfo{InfoBase{m.Names[0].Name, nil}, specType(field).(*FuncType), false})
+				t.methods = append(t.methods, &Value{InfoBase{m.Names[0].Name, nil}, specType(field).(*FuncType), false})
 			case *ast.Ident:
 				emb, ok := field.Obj.Type.(*NamedType).underlying.(*InterfaceType)
 				if !ok {
@@ -333,24 +333,24 @@ func intConstValue(x ast.Expr) int {
 	return -1
 }
 
-func getFields(f *ast.FieldList) (v []*ValueInfo) {
+func getFields(f *ast.FieldList) (v []*Value) {
 	if f == nil { return }
 	for _, field := range f.List {
 		if len(field.Names) > 0 {
 			for _, name := range field.Names {
-				v = append(v, &ValueInfo{InfoBase{name.Name, nil}, specType(field.Type), false})
+				v = append(v, &Value{InfoBase{name.Name, nil}, specType(field.Type), false})
 			}
 		} else {
-			v = append(v, &ValueInfo{InfoBase{"", nil}, specType(field.Type), false})
+			v = append(v, &Value{InfoBase{"", nil}, specType(field.Type), false})
 		}
 	}
 	return
 }
 
-func (p *PackageInfo) findPackageInfo(path string) *PackageInfo {
+func (p *Package) findPackage(path string) *Package {
 	if path == p.importPath { return p }
-	for _, pkg := range p.subPackages {
-		if info := pkg.findPackageInfo(path); info != nil {
+	for _, pkg := range p.subPkgs {
+		if info := pkg.findPackage(path); info != nil {
 			return info
 		}
 	}
@@ -391,37 +391,36 @@ type ChanType struct {
 }
 type FuncType struct {
 	implementsType
-	parameters []*ValueInfo
-	results []*ValueInfo
+	parameters []*Value
+	results []*Value
 }
 type InterfaceType struct {
 	implementsType
-	methods []*ValueInfo
+	methods []*Value
 }
 type StructType struct {
 	implementsType
-	fields []*ValueInfo
+	fields []*Value
 }
 type NamedType struct {
 	implementsType
 	InfoBase
 	underlying Type
-	methods []*FuncInfo
+	methods []*Func
 }
 
-func (t NamedType) Children() []Info {
-	var children []Info
-	for _, m := range t.methods { children = append(children, m) }
-	return children
+func (t NamedType) Children() (i []Info) {
+	for _, m := range t.methods { i = append(i, m) }
+	return
 }
 func (t *NamedType) AddChild(info Info) {
 	info.SetParent(t)
-	if info, ok := info.(*FuncInfo); ok {
+	if info, ok := info.(*Func); ok {
 		index := 0
 		for i, f := range t.methods { if f.name > info.name { index = i; break } }
-		t.methods = append(t.methods[:index], append([]*FuncInfo{info}, t.methods[index:]...)...)
+		t.methods = append(t.methods[:index], append([]*Func{info}, t.methods[index:]...)...)
 	} else {
-		panic("types can only contain functions")
+		panic("types can only contain funcs")
 	}
 }
 
@@ -451,34 +450,34 @@ func walkType(t Type, op func(*NamedType)) {
 	}
 }
 
-type FuncInfo struct {
+type Func struct {
 	InfoBase
 	receiver Type
 	typ *FuncType
 }
-func (FuncInfo) AddChild(info Info) { panic("functions can't have children") }
-func (f FuncInfo) FluxSourcePath() string {
+func (Func) AddChild(info Info) { panic("funcs can't have children") }
+func (f Func) FluxSourcePath() string {
 	if _, ok := f.parent.(*NamedType); ok {
 		return fmt.Sprintf("%smethods/%s.flux", f.parent.FluxSourcePath(), f.name)
 	}
 	return f.InfoBase.FluxSourcePath()
 }
-func (f FuncInfo) typeWithReceiver() *FuncType {
+func (f Func) typeWithReceiver() *FuncType {
 	t := *f.typ
 	if r := f.receiver; r != nil {
-		param := &ValueInfo{typ:r}
+		param := &Value{typ:r}
 		if p, ok := r.(*PointerType); ok { r = p.element }
 		param.name = ToLower(r.(*NamedType).Name()[:1])
-		t.parameters = append([]*ValueInfo{param}, t.parameters...)
+		t.parameters = append([]*Value{param}, t.parameters...)
 	}
 	return &t
 }
 
-type ValueInfo struct {
+type Value struct {
 	InfoBase
 	typ Type
 	constant bool
 }
 
-type SpecialInfo struct { *InfoBase }
-func special(name string) SpecialInfo { return SpecialInfo{&InfoBase{name, nil}} }
+type Special struct { *InfoBase }
+func special(name string) Special { return Special{&InfoBase{name, nil}} }

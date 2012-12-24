@@ -30,7 +30,7 @@ func newTypeView(t *Type) *typeView {
 	return v
 }
 
-func newValueView(val *ValueInfo) *typeView {
+func newValueView(val *Value) *typeView {
 	v := newTypeView(&val.typ)
 	v.nameText = NewText(val.name)
 	v.nameText.SetTextColor(getTextColor(val, .7))
@@ -131,8 +131,8 @@ func (v *typeView) edit(done func()) {
 }
 func (v *typeView) editType(done func()) {
 	if *v.typ == nil {
-		var pkg *PackageInfo
-		var imports []*PackageInfo
+		var pkg *Package
+		var imports []*Package
 l:		for v := View(v); v != nil; v = v.Parent() {
 			switch v := v.(type) {
 			case node:
@@ -199,8 +199,8 @@ l:		for v := View(v); v != nil; v = v.Parent() {
 	
 	done()
 }
-func (v *typeView) addFields(fields *[]*ValueInfo, funcVal bool, childTypes *[]*typeView, done func()) {
-	val := &ValueInfo{}
+func (v *typeView) addFields(fields *[]*Value, funcVal bool, childTypes *[]*typeView, done func()) {
+	val := &Value{}
 	if funcVal {
 		val.typ = &FuncType{}
 	}

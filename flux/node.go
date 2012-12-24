@@ -65,16 +65,16 @@ func newNodeBase(self node, b *block) *nodeBase {
 	return n
 }
 
-func (n *nodeBase) newInput(i *ValueInfo) *input {
-	p := newInput(n.self, i)
+func (n *nodeBase) newInput(v *Value) *input {
+	p := newInput(n.self, v)
 	n.AddChild(p)
 	n.ins = append(n.ins, p)
 	n.reform()
 	return p
 }
 
-func (n *nodeBase) newOutput(i *ValueInfo) *output {
-	p := newOutput(n.self, i)
+func (n *nodeBase) newOutput(v *Value) *output {
+	p := newOutput(n.self, v)
 	n.AddChild(p)
 	n.outs = append(n.outs, p)
 	n.reform()
@@ -167,7 +167,7 @@ func (n nodeBase) Paint() {
 
 func newNode(i Info, b *block) node {
 	switch i := i.(type) {
-	case SpecialInfo:
+	case Special:
 		switch i.Name() {
 		case "if":
 			return newIfNode(b)
@@ -176,7 +176,7 @@ func newNode(i Info, b *block) node {
 		}
 	// case StringType:
 	// 	return NewBasicLiteralNode(i)
-	case *FuncInfo:
+	case *Func:
 		return newCallNode(i, b)
 	}
 	return nil
@@ -184,9 +184,9 @@ func newNode(i Info, b *block) node {
 
 type callNode struct {
 	*nodeBase
-	info *FuncInfo
+	info *Func
 }
-func newCallNode(i *FuncInfo, b *block) *callNode {
+func newCallNode(i *Func, b *block) *callNode {
 	n := &callNode{info:i}
 	n.nodeBase = newNodeBase(n, b)
 	n.text.SetText(i.name)
@@ -200,6 +200,6 @@ type constantNode struct { *nodeBase }
 func newStringConstantNode(b *block) *constantNode {
 	n := &constantNode{}
 	n.nodeBase = newNodeBase(n, b)
-	n.newOutput(&ValueInfo{})
+	n.newOutput(&Value{})
 	return n
 }

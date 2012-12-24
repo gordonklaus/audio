@@ -45,7 +45,7 @@ func (b *block) addNode(n node) {
 		b.nodes[n] = true
 		switch n := n.(type) {
 		case *callNode:
-			b.func_().addPackageRef(n.info)
+			b.func_().addPkgRef(n.info)
 		}
 	}
 }
@@ -55,7 +55,7 @@ func (b *block) removeNode(n node) {
 	delete(b.nodes, n)
 	switch n := n.(type) {
 	case *callNode:
-		b.func_().subPackageRef(n.info)
+		b.func_().subPkgRef(n.info)
 	}
 }
 
@@ -414,20 +414,20 @@ func (n *portsNode) KeyPressed(event KeyEvent) {
 	if n.editable && event.Text == "," {
 		var p *port
 		if n.out {
-			p = n.newInput(&ValueInfo{}).port
+			p = n.newInput(&Value{}).port
 		} else {
-			p = n.newOutput(&ValueInfo{}).port
+			p = n.newOutput(&Value{}).port
 		}
-		p.valueView.Show()
-		p.valueView.edit(func() {
-			if p.info.typ != nil {
+		p.valView.Show()
+		p.valView.edit(func() {
+			if p.val.typ != nil {
 				f := n.blk.func_()
 				if n.out {
-					f.info.typ.results = append(f.info.typ.results, p.info)
+					f.info.typ.results = append(f.info.typ.results, p.val)
 				} else {
-					f.info.typ.parameters = append(f.info.typ.parameters, p.info)
+					f.info.typ.parameters = append(f.info.typ.parameters, p.val)
 				}
-				f.addPackageRef(p.info.typ)
+				f.addPkgRef(p.val.typ)
 				p.TakeKeyboardFocus()
 			} else {
 				n.RemoveChild(p.Self)
