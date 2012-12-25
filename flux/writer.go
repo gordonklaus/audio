@@ -89,13 +89,13 @@ func newWriter(info Info) *writer {
 	
 	var err error
 	w := &writer{nil, nil, map[*Package]string{}, map[string]int{}, 0, map[node]int{}}
-	fluxPath := info.FluxSourcePath()
+	fluxPath := FluxSourcePath(info)
 	chk(os.MkdirAll(filepath.Dir(fluxPath), 0777))
 	w.flux, err = os.Create(fluxPath); chk(err)
 	name := info.Name(); if typ != nil { name = typ.Name() + "." + name }
-	w.go_, err = os.Create(Sprintf("%s/%s.go", pkg.FluxSourcePath(), name)); chk(err)
+	w.go_, err = os.Create(Sprintf("%s/%s.go", FluxSourcePath(pkg), name)); chk(err)
 	
-	for _, i := range append(builtinPkg.Children(), info.Parent().Children()...) {
+	for _, i := range append(Children(builtinPkg), Children(info.Parent())...) {
 		if _, ok := i.(*Package); !ok {
 			w.newName(i.Name())
 		}

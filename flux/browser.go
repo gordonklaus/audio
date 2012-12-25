@@ -76,14 +76,14 @@ func (b *browser) cancel() {
 
 func (b browser) filteredInfos() (infos []Info) {
 	if b.mode == browse && b.path[0] == rootPkg {
-		infos = []Info{special("defer"), special("go"), special("if"), special("loop")}
+		infos = []Info{NewSpecial("defer"), NewSpecial("go"), NewSpecial("if"), NewSpecial("loop")}
 	}
 	
-	for _, i := range b.path[0].Children() {
+	for _, i := range Children(b.path[0]) {
 		switch b.mode {
 		case fluxSourceOnly:
 			if p := i.Parent(); p == nil || p == builtinPkg { continue }
-			if _, err := os.Stat(i.FluxSourcePath()); err != nil { continue }
+			if _, err := os.Stat(FluxSourcePath(i)); err != nil { continue }
 		case typesOnly:
 			switch i.(type) {
 				default: continue
@@ -296,11 +296,11 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			existing = true
 		}
 		if b.newInfo != nil && !existing {
-			b.path[0].AddChild(info)
+			AddInfo(b.path[0], info)
 			switch info := info.(type) {
 			case *Package:
-				*info = *newPackage(info.parent.(*Package), info.name)
-				if err := os.Mkdir(info.FluxSourcePath(), 0777); err != nil { Println(err) }
+				*info = *NewPackage(info.parent.(*Package), info.name)
+				if err := os.Mkdir(FluxSourcePath(info), 0777); err != nil { Println(err) }
 			case *Func:
 				newFuncNode(info) // bad bad, this launches animate()
 			}

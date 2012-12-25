@@ -1,17 +1,16 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/util"
+	"fmt"
 	"go/ast"
 	"go/build"
 	"go/token"
-	"os"
-	"fmt"
 	."log"
+	"os"
 	"path/filepath"
 	"reflect"
-	."strings"
 	."strconv"
+	."strings"
 	"unicode"
 )
 
@@ -21,40 +20,20 @@ var (
 	cPkg = &Package{InfoBase:InfoBase{"C", rootPkg}, importPath:"C"}
 )
 
-func newPackage(parent *Package, name string) *Package {
-	p := &Package{InfoBase:InfoBase{name, parent}, importPath:filepath.Join(parent.importPath, name), fullPath:filepath.Join(parent.fullPath, name)}
-	
-	if file, err := os.Open(p.fullPath); err == nil {
-		if fileInfos, err := file.Readdir(-1); err == nil {
-			for _, fileInfo := range fileInfos {
-				name := fileInfo.Name()
-				if fileInfo.IsDir() && unicode.IsLetter(([]rune(name))[0]) && name != "testdata" && !HasSuffix(name, ".fluxmethods") {
-					p2 := newPackage(p, name)
-					p.subPkgs = append(p.subPkgs, p2)
-				}
-			}
-		}
-	}
-	
-	return p
-}
-
 func init() {
-	rootPkg = &Package{loaded:true}
 	for _, srcDir := range build.Default.SrcDirs() {
 		rootPkg.fullPath = srcDir
-		srcPackage := newPackage(rootPkg, "")
+		srcPackage := NewPackage(rootPkg, "")
 		for _, p := range srcPackage.subPkgs {
 			p.parent = rootPkg
+			AddInfo(rootPkg, p)
 		}
-		rootPkg.subPkgs = append(rootPkg.subPkgs, srcPackage.subPkgs...)
 	}
-	rootPkg.subPkgs = append(rootPkg.subPkgs, cPkg)
-	Sort(rootPkg.subPkgs, "Name")
+	AddInfo(rootPkg, cPkg)
 }
 
-func findPackage(path string) *Package {
-	return rootPkg.findPackage(path)
+func FindPackage(path string) *Package {
+	return rootPkg.FindPackage(path)
 }
 
 type Info interface {
@@ -62,9 +41,69 @@ type Info interface {
 	SetName(name string)
 	Parent() Info
 	SetParent(info Info)
-	Children() []Info
-	AddChild(info Info)
-	FluxSourcePath() string
+}
+
+func Children(i Info) (c []Info) {
+	switch i := i.(type) {
+	case *Package:
+		i.load()
+		for _, x := range i.types { c = append(c, x) }
+		for _, x := range i.funcs { c = append(c, x) }
+		for _, x := range i.vars { c = append(c, x) }
+		for _, x := range i.consts { c = append(c, x) }
+		for _, x := range i.subPkgs { c = append(c, x) }
+	case *NamedType:
+		for _, x := range i.methods { c = append(c, x) }
+	}
+	return
+}
+
+func AddInfo(p, c Info) {
+	c.SetParent(p)
+	index := 0
+	switch p := p.(type) {
+	case *Package:
+		switch c := c.(type) {
+		case *Package:
+			for i, x := range p.subPkgs { if x.name > c.name { index = i; break } }
+			p.subPkgs = append(p.subPkgs[:index], append([]*Package{c}, p.subPkgs[index:]...)...)
+		case *NamedType:
+			for i, x := range p.types { if x.name > c.name { index = i; break } }
+			p.types = append(p.types[:index], append([]*NamedType{c}, p.types[index:]...)...)
+		case *Func:
+			for i, x := range p.funcs { if x.name > c.name { index = i; break } }
+			p.funcs = append(p.funcs[:index], append([]*Func{c}, p.funcs[index:]...)...)
+		case *Value:
+			if c.constant {
+				for i, x := range p.consts { if x.name > c.name { index = i; break } }
+				p.consts = append(p.consts[:index], append([]*Value{c}, p.consts[index:]...)...)
+			} else {
+				for i, x := range p.vars { if x.name > c.name { index = i; break } }
+				p.vars = append(p.vars[:index], append([]*Value{c}, p.vars[index:]...)...)
+			}
+		}
+	case *NamedType:
+		if f, ok := c.(*Func); ok {
+			for i, m := range p.methods { if m.name > f.name { index = i; break } }
+			p.methods = append(p.methods[:index], append([]*Func{f}, p.methods[index:]...)...)
+		} else {
+			panic("types can only contain funcs")
+		}
+	default:
+		Panicf("a %T cannot have children", p)
+	}
+}
+
+func FluxSourcePath(i Info) string {
+	switch i := i.(type) {
+	case *Package:
+		return i.fullPath
+	case *Func:
+		if t, ok := i.parent.(*NamedType); ok {
+			return fmt.Sprintf("%smethods/%s.flux", FluxSourcePath(t), i.name)
+		}
+	}
+	return fmt.Sprintf("%v/%v.flux", FluxSourcePath(i.Parent()), i.Name())
 }
 
 type InfoBase struct {
@@ -75,9 +114,6 @@ func (i InfoBase) Name() string { return i.name }
 func (i *InfoBase) SetName(name string) { i.name = name }
 func (i InfoBase) Parent() Info { return i.parent }
 func (i *InfoBase) SetParent(info Info) { i.parent = info }
-func (i InfoBase) Children() []Info { return nil }
-func (i InfoBase) AddChild(info Info) {}
-func (i InfoBase) FluxSourcePath() string { return fmt.Sprintf("%v/%v.flux", i.parent.FluxSourcePath(), i.name) }
 
 type Package struct {
 	InfoBase
@@ -91,32 +127,22 @@ type Package struct {
 	loaded bool
 }
 
-func (p *Package) Children() (i []Info) {
-	p.load()
-	for _, t := range p.types { i = append(i, t) }
-	for _, f := range p.funcs { i = append(i, f) }
-	for _, v := range p.vars { i = append(i, v) }
-	for _, c := range p.consts { i = append(i, c) }
-	for _, p := range p.subPkgs { i = append(i, p) }
-	return
-}
-func (p *Package) AddChild(info Info) {
-	info.SetParent(p)
-	switch info := info.(type) {
-	case *Package:
-		p.subPkgs = append(p.subPkgs, info)
-		Sort(p.subPkgs, "Name")
-	case *NamedType:
-		p.types = append(p.types, info)
-		Sort(p.types, "Name")
-	case *Func:
-		p.funcs = append(p.funcs, info)
-		Sort(p.funcs, "Name")
-	default:
-		panic("not yet implemented")
+func NewPackage(parent *Package, name string) *Package {
+	p := &Package{InfoBase:InfoBase{name, parent}, importPath:filepath.Join(parent.importPath, name), fullPath:filepath.Join(parent.fullPath, name)}
+	
+	if file, err := os.Open(p.fullPath); err == nil {
+		if fileInfos, err := file.Readdir(-1); err == nil {
+			for _, fileInfo := range fileInfos {
+				name := fileInfo.Name()
+				if fileInfo.IsDir() && unicode.IsLetter(([]rune(name))[0]) && name != "testdata" && !HasSuffix(name, ".fluxmethods") {
+					AddInfo(p, NewPackage(p, name))
+				}
+			}
+		}
 	}
+	
+	return p
 }
-func (p Package) FluxSourcePath() string { return p.fullPath }
 
 func (p *Package) load() {
 	if p.loaded { return }
@@ -131,7 +157,7 @@ func (p *Package) load() {
 	}
 	
 	for id := range pkg.Imports {
-		findPackage(id).load()
+		FindPackage(id).load()
 	}
 	
 	// create NamedTypes first (to support recursive types); also, parent and add existing types, funcs, consts (special support for builtinPkg and unsafePkg)
@@ -142,16 +168,13 @@ func (p *Package) load() {
 				n = &NamedType{InfoBase:InfoBase{name, p}}
 				obj.Type = n
 			}
-			n.parent = p
-			p.types = append(p.types, n)
+			AddInfo(p, n)
 		}
 		if f, ok := obj.Data.(*Func); ok {
-			f.parent = p
-			p.funcs = append(p.funcs, f)
+			AddInfo(p, f)
 		}
 		if v, ok := obj.Data.(*Value); ok {
-			v.parent = p
-			p.consts = append(p.consts, v)
+			AddInfo(p, v)
 		}
 	}
 	
@@ -160,7 +183,6 @@ func (p *Package) load() {
 			obj.Type.(*NamedType).underlying = specUnderlyingType(t.Type, map[string]bool{})
 		}
 	}
-	Sort(p.types, "Name")
 	for _, file := range pkg.Files {
 		for _, decl := range file.Decls {
 			if decl, ok := decl.(*ast.GenDecl); ok && decl.Tok == token.CONST {
@@ -176,13 +198,12 @@ func (p *Package) load() {
 							_ = iota
 							typ = builtinAstPkg.Scope.Lookup("int").Type.(Type)
 						}
-						p.consts = append(p.consts, &Value{InfoBase{name.Name, p}, typ, true})
+						AddInfo(p, &Value{InfoBase{name.Name, p}, typ, true})
 					}
 				}
 			}
 		}
 	}
-	Sort(p.consts, "Name")
 	for _, file := range pkg.Files {
 		for _, decl := range file.Decls {
 			switch decl := decl.(type) {
@@ -200,12 +221,13 @@ func (p *Package) load() {
 								// typ = exprType(spec.Values[i])
 								typ = builtinAstPkg.Scope.Lookup("int").Type.(Type)
 							}
-							p.vars = append(p.vars, &Value{InfoBase{name.Name, p}, typ, false})
+							AddInfo(p, &Value{InfoBase{name.Name, p}, typ, false})
 						}
 					}
 				}
 			case *ast.FuncDecl:
 				f := &Func{InfoBase{decl.Name.Name, nil}, nil, specType(decl.Type).(*FuncType)}
+				parent := Info(p)
 				if r := decl.Recv; r != nil {
 					// TODO:  FuncType of a method should include the receiver as first argument
 					recv := specType(r.List[0].Type)
@@ -213,21 +235,12 @@ func (p *Package) load() {
 					if r, ok := recv.(*PointerType); ok {
 						recv = r.element
 					}
-					nr := recv.(*NamedType)
-					f.parent = nr
-					nr.methods = append(nr.methods, f)
-				} else {
-					f.parent = p
-					p.funcs = append(p.funcs, f)
+					parent = recv.(*NamedType)
 				}
+				AddInfo(parent, f)
 			}
 		}
 	}
-	Sort(p.vars, "Name")
-	for _, t := range p.types {
-		Sort(t.methods, "Name")
-	}
-	Sort(p.funcs, "Name")
 }
 
 func specUnderlyingType(x ast.Expr, visitedNames map[string]bool) Type {
@@ -347,10 +360,10 @@ func getFields(f *ast.FieldList) (v []*Value) {
 	return
 }
 
-func (p *Package) findPackage(path string) *Package {
+func (p *Package) FindPackage(path string) *Package {
 	if path == p.importPath { return p }
 	for _, pkg := range p.subPkgs {
-		if info := pkg.findPackage(path); info != nil {
+		if info := pkg.FindPackage(path); info != nil {
 			return info
 		}
 	}
@@ -409,21 +422,6 @@ type NamedType struct {
 	methods []*Func
 }
 
-func (t NamedType) Children() (i []Info) {
-	for _, m := range t.methods { i = append(i, m) }
-	return
-}
-func (t *NamedType) AddChild(info Info) {
-	info.SetParent(t)
-	if info, ok := info.(*Func); ok {
-		index := 0
-		for i, f := range t.methods { if f.name > info.name { index = i; break } }
-		t.methods = append(t.methods[:index], append([]*Func{info}, t.methods[index:]...)...)
-	} else {
-		panic("types can only contain funcs")
-	}
-}
-
 func walkType(t Type, op func(*NamedType)) {
 	switch t := t.(type) {
 	case *PointerType:
@@ -455,13 +453,6 @@ type Func struct {
 	receiver Type
 	typ *FuncType
 }
-func (Func) AddChild(info Info) { panic("funcs can't have children") }
-func (f Func) FluxSourcePath() string {
-	if _, ok := f.parent.(*NamedType); ok {
-		return fmt.Sprintf("%smethods/%s.flux", f.parent.FluxSourcePath(), f.name)
-	}
-	return f.InfoBase.FluxSourcePath()
-}
 func (f Func) typeWithReceiver() *FuncType {
 	t := *f.typ
 	if r := f.receiver; r != nil {
@@ -480,4 +471,4 @@ type Value struct {
 }
 
 type Special struct { *InfoBase }
-func special(name string) Special { return Special{&InfoBase{name, nil}} }
+func NewSpecial(name string) Special { return Special{&InfoBase{name:name}} }

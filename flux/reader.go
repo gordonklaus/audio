@@ -17,7 +17,7 @@ type reader struct {
 
 func loadFunc(f *funcNode) bool {
 	r := &reader{"", f, map[string]*Package{}, map[int]node{}}
-	if b, err := ReadFile(f.info.FluxSourcePath()); err != nil {
+	if b, err := ReadFile(FluxSourcePath(f.info)); err != nil {
 		return false
 	} else {
 		r.s = string(b)
@@ -28,7 +28,7 @@ func loadFunc(f *funcNode) bool {
 	for r.s[0] != '\\' {
 		line, r.s = Split2(r.s, "\n")
 		importPath, name := Split2(line, " ")
-		pkg := findPackage(importPath)
+		pkg := FindPackage(importPath)
 		if name == "" {
 			name = pkg.name
 		}
@@ -113,7 +113,7 @@ func (r *reader) readNode(b *block, indent int) {
 			} else {
 				pkg = r.pkgNames[pkgName]
 			}
-			for _, info := range pkg.Children() {
+			for _, info := range Children(pkg) {
 				if info.Name() != name { continue }
 				switch info := info.(type) {
 				case *Func:
