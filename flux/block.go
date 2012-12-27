@@ -26,7 +26,6 @@ func newBlock(n node) *block {
 	b.nodes = map[node]bool{}
 	b.conns = map[*connection]bool{}
 	b.points = []Point{ZP}
-	b.Pan(Pt(-400, -300))
 	return b
 }
 
@@ -268,7 +267,7 @@ func (b *block) animate() {
 		b.Resize(rect.Dx(), rect.Dy())
 		b.Pan(rect.Min)
 		
-		if n, ok := b.node.(interface{positionblocks()}); ok { n.positionblocks() }
+		if n, ok := b.node.(interface{positionBlocks()}); ok { n.positionBlocks() }
 		
 		time.Sleep(33 * time.Millisecond)
 	}
@@ -357,12 +356,16 @@ func (b *block) KeyPressed(event KeyEvent) {
 				b.AddChild(browser)
 				browser.Move(b.Center())
 				browser.accepted.Connect(func(info ...interface{}) {
+					browser.Close()
 					n := newNode(info[0].(Info), b)
 					b.addNode(n)
 					n.MoveCenter(b.Center())
 					n.TakeKeyboardFocus()
 				})
-				browser.canceled.Connect(func(...interface{}) { b.TakeKeyboardFocus() })
+				browser.canceled.Connect(func(...interface{}) {
+					browser.Close()
+					b.TakeKeyboardFocus()
+				})
 				browser.text.KeyPressed(event)
 				browser.text.TakeKeyboardFocus()
 			case "\"":

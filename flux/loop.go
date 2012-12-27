@@ -75,7 +75,7 @@ func (n *loopNode) updateInputType(t Type) {
 	}
 }
 
-func (n *loopNode) positionblocks() {
+func (n *loopNode) positionBlocks() {
 	b := n.loopblk
 	n.leftmost = b.points[0]
 	for _, p := range b.points { if p.X < n.leftmost.X { n.leftmost = p } }

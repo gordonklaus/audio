@@ -16,67 +16,67 @@ type funcNode struct {
 }
 
 func newFuncNode(info *Func) *funcNode {
-	f := &funcNode{info:info}
-	f.ViewBase = NewView(f)
-	f.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(f), NewViewDragger(f)}
-	f.pkgRefs = map[*Package]int{}
-	f.funcblk = newBlock(f)
-	f.inputsNode = newInputsNode(f.funcblk)
-	f.inputsNode.editable = true
-	f.funcblk.addNode(f.inputsNode)
-	f.outputsNode = newOutputsNode(f.funcblk)
-	f.outputsNode.editable = true
-	f.funcblk.addNode(f.outputsNode)
-	f.AddChild(f.funcblk)
-	go f.funcblk.animate()
+	n := &funcNode{info:info}
+	n.ViewBase = NewView(n)
+	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
+	n.pkgRefs = map[*Package]int{}
+	n.funcblk = newBlock(n)
+	n.inputsNode = newInputsNode(n.funcblk)
+	n.inputsNode.editable = true
+	n.funcblk.addNode(n.inputsNode)
+	n.outputsNode = newOutputsNode(n.funcblk)
+	n.outputsNode.editable = true
+	n.funcblk.addNode(n.outputsNode)
+	n.AddChild(n.funcblk)
+	go n.funcblk.animate()
 	
 	if info.receiver != nil {
-		f.inputsNode.newOutput(info.typeWithReceiver().parameters[0])
+		n.inputsNode.newOutput(info.typeWithReceiver().parameters[0])
 	}
 	
-	if !loadFunc(f) { saveFunc(*f) }
+	if !loadFunc(n) { saveFunc(*n) }
 	
-	return f
+	return n
 }
 
-func (f funcNode) pkg() *Package {
-	parent := f.info.parent
+func (n funcNode) pkg() *Package {
+	parent := n.info.parent
 	if t, ok := parent.(*NamedType); ok {
 		return t.parent.(*Package)
 	}
 	return parent.(*Package)
 }
 
-func (f funcNode) imports() (x []*Package) {
-	for p := range f.pkgRefs {
+func (n funcNode) imports() (x []*Package) {
+	for p := range n.pkgRefs {
 		x = append(x, p)
 	}
 	return
 }
 
-func (f *funcNode) addPkgRef(x interface{}) {
+func (n *funcNode) addPkgRef(x interface{}) {
 	switch x := x.(type) {
 	case Info:
-		if p, ok := x.Parent().(*Package); ok && p != f.pkg() && p != builtinPkg {
-			f.pkgRefs[p]++
+		if p, ok := x.Parent().(*Package); ok && p != n.pkg() && p != builtinPkg {
+			n.pkgRefs[p]++
 		}
 	case Type:
-		walkType(x, func(t *NamedType) { f.addPkgRef(t) })
+		walkType(x, func(t *NamedType) { n.addPkgRef(t) })
 	default:
 		panic(Sprintf("can't addPkgRef for %#v\n", x))
 	}
 }
-func (f *funcNode) subPkgRef(x interface{}) {
+func (n *funcNode) subPkgRef(x interface{}) {
 	switch x := x.(type) {
 	case Info:
 		if p, ok := x.Parent().(*Package); ok {
-			f.pkgRefs[p]--
-			if f.pkgRefs[p] <= 0 {
-				delete(f.pkgRefs, p)
+			n.pkgRefs[p]--
+			if n.pkgRefs[p] <= 0 {
+				delete(n.pkgRefs, p)
 			}
 		}
 	case Type:
-		walkType(x, func(t *NamedType) { f.subPkgRef(t) })
+		walkType(x, func(t *NamedType) { n.subPkgRef(t) })
 	default:
 		panic(Sprintf("can't subPkgRef for %#v\n", x))
 	}
@@ -88,7 +88,7 @@ func (n funcNode) outputs() []*output { return nil }
 func (n funcNode) inConns() []*connection { return nil }
 func (n funcNode) outConns() []*connection { return nil }
 
-func (n *funcNode) positionblocks() {
+func (n *funcNode) positionBlocks() {
 	b := n.funcblk
 	leftmost, rightmost := b.points[0], b.points[0]
 	for _, p := range b.points {
@@ -100,13 +100,13 @@ func (n *funcNode) positionblocks() {
 	ResizeToFit(n, 0)
 }
 
-func (f *funcNode) TookKeyboardFocus() { f.funcblk.TakeKeyboardFocus() }
+func (n *funcNode) TookKeyboardFocus() { n.funcblk.TakeKeyboardFocus() }
 
-func (f *funcNode) KeyPressed(event KeyEvent) {
+func (n *funcNode) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case KeyF1:
-		saveFunc(*f)
+		saveFunc(*n)
 	default:
-		f.ViewBase.KeyPressed(event)
+		n.ViewBase.KeyPressed(event)
 	}
 }

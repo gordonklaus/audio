@@ -47,7 +47,7 @@ func (n ifNode) outConns() []*connection {
 	return append(n.falseblk.outConns(), n.trueblk.outConns()...)
 }
 
-func (n *ifNode) positionblocks() {
+func (n *ifNode) positionBlocks() {
 	n.falseblk.Move(Pt(portSize, -4 - n.falseblk.Height()))
 	for i, b := range []*block{n.falseblk, n.trueblk} {
 		leftmost := b.points[0]

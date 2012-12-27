@@ -69,7 +69,6 @@ func newBrowser(mode browserMode, currentPkg *Package, imports []*Package) *brow
 func (b *browser) cancel() {
 	if !b.finished {
 		b.finished = true
-		b.Close()
 		b.canceled.Emit()
 	}
 }
@@ -312,7 +311,6 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 		b.newInfo = nil
 		if _, ok := info.(*Package); !ok {
-			b.Close()
 			b.finished = true
 			b.accepted.Emit(info)
 			return

@@ -14,18 +14,17 @@ func newFluxWindow() *fluxWindow {
 	w := &fluxWindow{}
 	w.Window = NewWindow(w)
 	w.browser = newBrowser(fluxSourceOnly, nil, nil)
-	w.SetCentralView(w.browser)
+	w.AddChild(w.browser)
 	w.browser.accepted.Connect(func(info ...interface{}) {
 		switch info := info[0].(type) {
 		case *NamedType:
-			vv := NewView(nil)
-			w.SetCentralView(vv)
+			w.browser.Hide()
 			v := w.browser.typeView
-			vv.AddChild(v)
-			v.MoveCenter(vv.Center())
+			w.AddChild(v)
+			v.MoveCenter(w.Center())
 			reset := func() {
 				w.browser.AddChild(v)
-				w.SetCentralView(w.browser)
+				w.browser.Show()
 				w.browser.text.SetText("")
 				w.browser.text.TakeKeyboardFocus()
 			}
@@ -46,15 +45,12 @@ func newFluxWindow() *fluxWindow {
 				v.TakeKeyboardFocus()
 			}
 		case *Func:
-			w.SetCentralView(newFuncNode(info))
-		default:
-			w.SetCentralView(w.browser)
-			w.browser.text.TakeKeyboardFocus()
+			n := newFuncNode(info)
+			w.browser.Hide()
+			w.AddChild(n)
+			n.Move(w.Center())
+			n.TakeKeyboardFocus()
 		}
-	})
-	w.browser.canceled.Connect(func(...interface{}) {
-		w.SetCentralView(w.browser)
-		w.browser.text.TakeKeyboardFocus()
 	})
 	w.browser.text.TakeKeyboardFocus()
 	return w

@@ -141,10 +141,11 @@ l:		for v := View(v); v != nil; v = v.Parent() {
 				break l
 			}
 		}
-		browser := newBrowser(typesOnly, pkg, imports)
-		v.AddChild(browser)
-		browser.Move(v.Center())
-		browser.accepted.Connect(func(info ...interface{}) {
+		b := newBrowser(typesOnly, pkg, imports)
+		v.AddChild(b)
+		b.Move(v.Center())
+		b.accepted.Connect(func(info ...interface{}) {
+			b.Close()
 			t := info[0].(Type)
 			if nt, ok := t.(*NamedType); ok && protoType[nt] { // move this into browser?
 				t = newProtoType(nt)
@@ -152,8 +153,11 @@ l:		for v := View(v); v != nil; v = v.Parent() {
 			v.setType(t)
 			v.editType(done)
 		})
-		browser.canceled.Connect(func(...interface{}) { done() })
-		browser.text.TakeKeyboardFocus()
+		b.canceled.Connect(func(...interface{}) {
+			b.Close()
+			done()
+		})
+		b.text.TakeKeyboardFocus()
 		return
 	}
 	
