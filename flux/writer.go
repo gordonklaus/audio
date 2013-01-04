@@ -16,7 +16,7 @@ func saveType(t *NamedType) {
 	u := t.underlying
 	walkType(u, func(tt *NamedType) {
 		if p := tt.parent.(*Package); p != t.parent.(*Package) && p != builtinPkg {
-			w.pkgNames[p] = w.newName(p.Name())
+			w.pkgNames[p] = w.newName(p.pkgName)
 		}
 	})
 	
@@ -32,7 +32,7 @@ func saveFunc(f funcNode) {
 	defer w.close()
 	
 	for p := range f.pkgRefs {
-		w.pkgNames[p] = w.newName(p.Name())
+		w.pkgNames[p] = w.newName(p.pkgName)
 	}
 	
 	w.flux.WriteString(w.typeString(f.info.typeWithReceiver()))
@@ -101,7 +101,7 @@ func newWriter(info Info) *writer {
 		}
 	}
 	
-	Fprintf(w.go_, "package %s\n\n", pkg.Name())
+	Fprintf(w.go_, "package %s\n\n", pkg.pkgName)
 	
 	return w
 }
@@ -113,7 +113,7 @@ func (w *writer) writeImports() {
 	for p, n := range w.pkgNames {
 		Fprintf(w.flux, "\n%s", p.importPath)
 		w.go_.WriteString("\t")
-		if n != p.name {
+		if n != p.pkgName {
 			Fprintf(w.flux, " %s", n)
 			Fprintf(w.go_, "%s ", n)
 		}

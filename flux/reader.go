@@ -30,7 +30,7 @@ func loadFunc(f *funcNode) bool {
 		importPath, name := Split2(line, " ")
 		pkg := FindPackage(importPath)
 		if name == "" {
-			name = pkg.name
+			name = pkg.pkgName
 		}
 		r.pkgNames[name] = pkg
 	}

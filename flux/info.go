@@ -17,7 +17,7 @@ import (
 var (
 	rootPkg = &Package{loaded:true}
 	builtinPkg = &Package{}
-	cPkg = &Package{InfoBase:InfoBase{"C", rootPkg}, importPath:"C"}
+	cPkg = &Package{InfoBase:InfoBase{"C", rootPkg}, pkgName:"C", importPath:"C"}
 )
 
 func init() {
@@ -117,6 +117,7 @@ func (i *InfoBase) SetParent(info Info) { i.parent = info }
 
 type Package struct {
 	InfoBase
+	pkgName string
 	importPath string
 	fullPath string
 	types []*NamedType
@@ -129,6 +130,9 @@ type Package struct {
 
 func NewPackage(parent *Package, name string) *Package {
 	p := &Package{InfoBase:InfoBase{name, parent}, importPath:filepath.Join(parent.importPath, name), fullPath:filepath.Join(parent.fullPath, name)}
+	if pkg, err := build.Import(p.importPath, "", 0); err == nil {
+		p.pkgName = pkg.Name
+	}
 	
 	if file, err := os.Open(p.fullPath); err == nil {
 		if fileInfos, err := file.Readdir(-1); err == nil {
