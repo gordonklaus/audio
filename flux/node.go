@@ -26,11 +26,9 @@ func newNodeText(node *nodeBase) *nodeText {
 	t.TextBase = NewTextBase(t, "")
 	return t
 }
-func (t *nodeText) LostKeyboardFocus() { t.SetEditable(false) }
 func (t *nodeText) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case glfw.KeyEnter:
-		t.SetEditable(false)
 		t.node.TakeKeyboardFocus()
 	default:
 		t.TextBase.KeyPressed(event)

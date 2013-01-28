@@ -370,7 +370,6 @@ func (b *block) KeyPressed(event KeyEvent) {
 				browser.text.TakeKeyboardFocus()
 			case "\"":
 				n := newStringConstantNode(b)
-				n.text.SetEditable(true)
 				b.addNode(n)
 				n.MoveCenter(b.Center())
 				n.text.TakeKeyboardFocus()

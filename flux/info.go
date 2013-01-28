@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/build"
 	"go/token"
+	"io/ioutil"
 	."log"
 	"os"
 	"path/filepath"
@@ -98,12 +99,20 @@ func FluxSourcePath(i Info) string {
 	switch i := i.(type) {
 	case *Package:
 		return i.fullPath
+	case *NamedType:
+		return fmt.Sprintf("%s/%s.flux/type.flux", FluxSourcePath(i.parent), i.name)
 	case *Func:
-		if t, ok := i.parent.(*NamedType); ok {
-			return fmt.Sprintf("%smethods/%s.flux", FluxSourcePath(t), i.name)
+		s := FluxSourcePath(i.parent)
+		if _, ok := i.parent.(*NamedType); ok {
+			s = filepath.Dir(s)
 		}
+		return fmt.Sprintf("%s/%s.flux", s, i.name)
+	case *Value:
+		return fmt.Sprintf("%s/%s.flux", FluxSourcePath(i.parent), i.name)
+	default:
+		Panicf("unknown Info %#v", i)
 	}
-	return fmt.Sprintf("%v/%v.flux", FluxSourcePath(i.Parent()), i.Name())
+	return ""
 }
 
 type InfoBase struct {
@@ -130,7 +139,9 @@ type Package struct {
 
 func NewPackage(parent *Package, name string) *Package {
 	p := &Package{InfoBase:InfoBase{name, parent}, importPath:filepath.Join(parent.importPath, name), fullPath:filepath.Join(parent.fullPath, name)}
-	if pkg, err := build.Import(p.importPath, "", 0); err == nil {
+	if b, err := ioutil.ReadFile(filepath.Join(p.fullPath, "package.flux")); err == nil {
+		p.pkgName = string(b)
+	} else if pkg, err := build.Import(p.importPath, "", 0); err == nil {
 		p.pkgName = pkg.Name
 	}
 	
@@ -138,7 +149,7 @@ func NewPackage(parent *Package, name string) *Package {
 		if fileInfos, err := file.Readdir(-1); err == nil {
 			for _, fileInfo := range fileInfos {
 				name := fileInfo.Name()
-				if fileInfo.IsDir() && unicode.IsLetter(([]rune(name))[0]) && name != "testdata" && !HasSuffix(name, ".fluxmethods") {
+				if fileInfo.IsDir() && unicode.IsLetter(([]rune(name))[0]) && name != "testdata" && !HasSuffix(name, ".flux") {
 					AddInfo(p, NewPackage(p, name))
 				}
 			}

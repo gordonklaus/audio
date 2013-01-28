@@ -2,12 +2,22 @@ package main
 
 import (
 	."fmt"
-	"path/filepath"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
 	."strconv"
 	."strings"
 )
+
+func savePackageName(p *Package) {
+	path := filepath.Join(FluxSourcePath(p), "package.flux")
+	if p.pkgName == p.name {
+		os.Remove(path)
+	} else {
+		ioutil.WriteFile(path, []byte(p.pkgName), 0777)
+	}
+}
 
 func saveType(t *NamedType) {
 	w := newWriter(t)
@@ -21,7 +31,7 @@ func saveType(t *NamedType) {
 	})
 	
 	tStr := w.typeString(u)
-	w.flux.WriteString("type " + tStr)
+	w.flux.WriteString(tStr)
 	w.writeImports()
 	
 	Fprintf(w.go_, "type %s %s", t.name, tStr)
@@ -93,7 +103,7 @@ func newWriter(info Info) *writer {
 	chk(os.MkdirAll(filepath.Dir(fluxPath), 0777))
 	w.flux, err = os.Create(fluxPath); chk(err)
 	name := info.Name(); if typ != nil { name = typ.Name() + "." + name }
-	w.go_, err = os.Create(Sprintf("%s/%s.go", FluxSourcePath(pkg), name)); chk(err)
+	w.go_, err = os.Create(Sprintf("%s/%s.flux.go", FluxSourcePath(pkg), name)); chk(err)
 	
 	for _, i := range append(Children(builtinPkg), Children(info.Parent())...) {
 		if _, ok := i.(*Package); !ok {

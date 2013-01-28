@@ -25,6 +25,7 @@ type browser struct {
 	pathTexts, nameTexts []Text
 	text *nodeNameText
 	typeView *typeView
+	pkgNameText *TextBase
 }
 
 type browserMode int
@@ -60,6 +61,10 @@ func newBrowser(mode browserMode, currentPkg *Package, imports []*Package) *brow
 	b.text = newNodeNameText(b)
 	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	b.AddChild(b.text)
+	
+	b.pkgNameText = NewText("")
+	b.pkgNameText.SetBackgroundColor(Color{0, 0, 0, .7})
+	b.AddChild(b.pkgNameText)
 	
 	b.text.SetText("")
 	
@@ -225,7 +230,19 @@ ok:
 
 	yOffset := float64(n - b.i - 1)*b.text.Height()
 	b.text.Move(Pt(xOffset, yOffset))
-	if b.typeView != nil { b.RemoveChild(b.typeView) }
+	if b.typeView != nil { b.typeView.Close() }
+	if pkg, ok := cur.(*Package); ok {
+		t := b.pkgNameText
+		t.SetText(pkg.pkgName)
+		t.Move(Pt(xOffset + width + 16, yOffset - (t.Height() - b.text.Height()) / 2))
+		if pkg.pkgName != pkg.name {
+			t.Show()
+		} else {
+			t.Hide()
+		}
+	} else {
+		b.pkgNameText.Hide()
+	}
 	if cur != nil {
 		b.text.SetTextColor(getTextColor(cur, 1))
 		switch i := cur.(type) {
@@ -286,9 +303,29 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			t.SetText("")
 		}
 	case KeyEnter:
+		cur := b.currentInfo()
+		if pkg, ok := cur.(*Package); ok && event.Shift {
+			t := b.pkgNameText
+			t.Show()
+			t.Accept.ConnectSingleShot(func(...interface{}) {
+				if n := t.GetText(); n != pkg.pkgName {
+					pkg.pkgName = n
+					savePackageName(pkg)
+				}
+				b.text.SetText("")
+				b.text.TakeKeyboardFocus()
+			})
+			t.Reject.ConnectSingleShot(func(...interface{}) {
+				b.text.SetText(b.text.GetText())
+				b.text.TakeKeyboardFocus()
+			})
+			t.TakeKeyboardFocus()
+			return
+		}
+		
 		info := b.newInfo
 		existing := false
-		if cur := b.currentInfo(); info == nil {
+		if info == nil {
 			info = cur
 		} else if cur != nil && info.Name() == cur.Name() {
 			info = cur
