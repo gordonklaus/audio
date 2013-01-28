@@ -337,6 +337,49 @@ func (b *block) KeyPressed(event KeyEvent) {
 		} else {
 			b.startEditing()
 		}
+	case KeyBackspace, KeyDel:
+		foc := View(b)
+		switch v := b.GetKeyboardFocus().(type) {
+		case *block:
+			if v.node != nil {
+				foc = v.node
+			}
+		case *portsNode:
+			return
+		case node:
+			in, out := v.inConns(), v.outConns()
+			switch {
+			case event.Key == KeyBackspace && len(in) > 0:  foc = in[0].src.node
+			case event.Key == KeyDel       && len(out) > 0: foc = out[0].dst.node
+			default:
+				switch {
+				case len(in) > 0:  foc = in[0].src.node
+				case len(out) > 0: foc = out[0].dst.node
+				}
+			}
+			for _, c := range append(in, out...) {
+				c.blk.removeConnection(c)
+			}
+			b.removeNode(v)
+		case *input:
+			foc = v.node
+			if event.Key == KeyBackspace && len(v.conns) > 0 {
+				foc = v.conns[0]
+			}
+		case *output:
+			foc = v.node
+			if event.Key == KeyDel && len(v.conns) > 0 {
+				foc = v.conns[0]
+			}
+		case *connection:
+			if event.Key == KeyBackspace {
+				foc = v.src
+			} else {
+				foc = v.dst
+			}
+			v.blk.removeConnection(v)
+		}
+		foc.TakeKeyboardFocus()
 	case KeyEsc:
 		if b.editing {
 			if b.editingNode != nil {

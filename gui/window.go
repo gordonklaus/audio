@@ -124,6 +124,7 @@ func (w *Window) SetKeyboardFocus(view View) {
 		if w.keyboardFocus != nil { w.keyboardFocus.TookKeyboardFocus() }
 	}
 }
+func (w Window) GetKeyboardFocus() View { return w.keyboardFocus }
 
 func (w *Window) SetMouseFocus(focus MouseHandlerView, button int) { w.mouseFocus[button] = focus }
 

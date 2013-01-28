@@ -55,6 +55,7 @@ type View interface {
 	MapRectTo(rect Rectangle, parent View) Rectangle
 	
 	SetKeyboardFocus(view View)
+	GetKeyboardFocus() View
 	TakeKeyboardFocus()
 	TookKeyboardFocus()
 	LostKeyboardFocus()
@@ -201,6 +202,7 @@ func (v ViewBase) MapRectToParent(rect Rectangle) Rectangle { return Rectangle{v
 func (v ViewBase) MapRectTo(rect Rectangle, parent View) Rectangle { return Rectangle{v.MapTo(rect.Min, parent), v.MapTo(rect.Max, parent)} }
 
 func (v *ViewBase) SetKeyboardFocus(view View) { if v.parent != nil { v.parent.SetKeyboardFocus(view) } }
+func (v ViewBase) GetKeyboardFocus() View { if v.parent != nil { return v.parent.GetKeyboardFocus() }; return nil }
 func (v *ViewBase) TakeKeyboardFocus() { v.Self.SetKeyboardFocus(v.Self) }
 func (v *ViewBase) TookKeyboardFocus() {}
 func (v *ViewBase) LostKeyboardFocus() {}
