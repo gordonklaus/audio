@@ -80,7 +80,7 @@ func (b *browser) cancel() {
 
 func (b browser) filteredInfos() (infos []Info) {
 	if b.mode == browse && b.path[0] == rootPkg {
-		infos = []Info{NewSpecial("defer"), NewSpecial("go"), NewSpecial("if"), NewSpecial("loop")}
+		infos = []Info{NewSpecial("[]"), NewSpecial("[]="), NewSpecial("defer"), NewSpecial("go"), NewSpecial("if"), NewSpecial("loop")}
 	}
 	
 	for _, i := range Children(b.path[0]) {

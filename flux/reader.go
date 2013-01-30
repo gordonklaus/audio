@@ -89,6 +89,10 @@ func (r *reader) readNode(b *block, indent int) {
 				node = n
 			}
 		}
+	case "[]":
+		node = newIndexNode(b, false)
+	case "[]=":
+		node = newIndexNode(b, true)
 	case "if":
 		n := newIfNode(b)
 		r.readBlock(n.trueblk, indent)

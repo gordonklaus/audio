@@ -167,6 +167,10 @@ func newNode(i Info, b *block) node {
 	switch i := i.(type) {
 	case Special:
 		switch i.Name() {
+		case "[]":
+			return newIndexNode(b, false)
+		case "[]=":
+			return newIndexNode(b, true)
 		case "if":
 			return newIfNode(b)
 		case "loop":

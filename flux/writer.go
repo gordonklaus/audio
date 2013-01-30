@@ -152,6 +152,12 @@ func (w *writer) writeBlockFlux(b *block, indent int) {
 			w.flux.WriteString(w.qualifiedName(n.info))
 		case *constantNode:
 			w.flux.WriteString(Quote(n.text.GetText()))
+		case *indexNode:
+			if n.set {
+				w.flux.WriteString("[]=")
+			} else {
+				w.flux.WriteString("[]")
+			}
 		case *ifNode:
 			w.flux.WriteString("if")
 			w.writeBlockFlux(n.trueblk, indent)
@@ -213,6 +219,12 @@ func (w *writer) writeBlockGo(b *block, indent int, vars map[*input]string) {
 			switch n := n.(type) {
 			case *callNode:
 				Fprintf(w.go_, "%s(%s)", w.qualifiedName(n.info), Join(inputs, ", "))
+			case *indexNode:
+				if n.set {
+					Fprintf(w.go_, "%s[%s] = %s", inputs[0], inputs[1], inputs[2])
+				} else {
+					Fprintf(w.go_, "%s[%s]", inputs[0], inputs[1])
+				}
 			case *constantNode:
 				w.go_.WriteString(Quote(n.text.GetText()))
 			}
