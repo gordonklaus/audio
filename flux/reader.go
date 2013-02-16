@@ -54,20 +54,7 @@ func (r *reader) readBlock(b *block, indent int) {
 		i := 0
 		for r.s[i] == '\t' { i++ }
 		if i < indent { return }
-		if r.s[i] == '-' {
-			var line string
-			line, r.s = Split2(r.s, "\n")
-			x := Fields(line)
-			srcID, _ := Atoi(x[1])
-			srcPort, _ := Atoi(x[2])
-			dstID, _ := Atoi(x[3])
-			dstPort, _ := Atoi(x[4])
-			c := newConnection(b, ZP)
-			c.setSrc(r.nodes[srcID].outputs()[srcPort])
-			c.setDst(r.nodes[dstID].inputs()[dstPort])
-		} else {
-			r.readNode(b, indent)
-		}
+		r.readNode(b, indent)
 	}
 }
 
@@ -95,12 +82,9 @@ func (r *reader) readNode(b *block, indent int) {
 		node = newIndexNode(b, true)
 	case "if":
 		n := newIfNode(b)
-		r.readBlock(n.trueblk, indent)
-		r.readBlock(n.falseblk, indent)
 		node = n
 	case "loop":
 		n := newLoopNode(b)
-		r.readBlock(n.loopblk, indent)
 		node = n
 	default:
 		if f[0] == '"' {
@@ -131,4 +115,21 @@ func (r *reader) readNode(b *block, indent int) {
 	id, _ := Atoi(fields[0])
 	r.nodes[id] = node
 	b.addNode(node)
+	for _, f := range fields[2:] {
+		i := Index(f, ".")
+		j := Index(f, "-")
+		srcID, _ := Atoi(f[:i])
+		srcPort, _ := Atoi(f[i+1:j])
+		dstPort, _ := Atoi(f[j+1:])
+		c := newConnection(b, ZP)
+		c.setSrc(r.nodes[srcID].outputs()[srcPort])
+		c.setDst(node.inputs()[dstPort])
+	}
+	switch n := node.(type) {
+	case *ifNode:
+		r.readBlock(n.trueblk, indent)
+		r.readBlock(n.falseblk, indent)
+	case *loopNode:
+		r.readBlock(n.loopblk, indent)
+	}
 }

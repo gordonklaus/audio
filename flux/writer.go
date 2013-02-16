@@ -160,11 +160,8 @@ func (w *writer) writeBlockFlux(b *block, indent int) {
 			}
 		case *ifNode:
 			w.flux.WriteString("if")
-			w.writeBlockFlux(n.trueblk, indent)
-			w.writeBlockFlux(n.falseblk, indent)
 		case *loopNode:
 			w.flux.WriteString("loop")
-			w.writeBlockFlux(n.loopblk, indent)
 		case *portsNode:
 			if n.out {
 				w.flux.WriteString("\\out")
@@ -172,11 +169,25 @@ func (w *writer) writeBlockFlux(b *block, indent int) {
 				w.flux.WriteString("\\in")
 			}
 		}
-	}
-	for c := range b.conns {
-		iSrc := -1; for i, src := range c.src.node.outputs() { if src == c.src { iSrc = i; break } }
-		iDst := -1; for i, dst := range c.dst.node.inputs() { if dst == c.dst { iDst = i; break } }
-		Fprintf(w.flux, "\n%s- %d %d %d %d", tabs(indent), w.nodeIDs[c.src.node], iSrc, w.nodeIDs[c.dst.node], iDst)
+		for iDst, p := range n.inputs() {
+			for _, c := range p.conns {
+				iSrc := -1
+				for i, src := range c.src.node.outputs() {
+					if src == c.src {
+						iSrc = i
+						break
+					}
+				}
+				Fprintf(w.flux, " %d.%d-%d", w.nodeIDs[c.src.node], iSrc, iDst)
+			}
+		}
+		switch n := n.(type) {
+		case *ifNode:
+			w.writeBlockFlux(n.trueblk, indent)
+			w.writeBlockFlux(n.falseblk, indent)
+		case *loopNode:
+			w.writeBlockFlux(n.loopblk, indent)
+		}
 	}
 }
 
@@ -249,6 +260,9 @@ func (w *writer) writeBlockGo(b *block, indent int, vars map[*input]string) {
 			if conns := n.input.conns; len(conns) > 0 {
 				switch conns[0].src.val.typ.(type) {
 				case *NamedType:
+					if out == "" {
+						out = w.newName("")
+					}
 					Fprintf(w.go_, "%s := 0; %s < %s; %s++ ", out, out, vars[n.input], out)
 				case *ArrayType, *SliceType, *MapType, *ChanType:
 					if len(out) > 0 {
