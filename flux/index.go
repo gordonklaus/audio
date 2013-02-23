@@ -12,7 +12,6 @@ type indexNode struct {
 func newIndexNode(b *block, set bool) *indexNode {
 	n := &indexNode{set:set}
 	n.nodeBase = newNodeBase(n, b)
-	n.text.SetText("[]")
 	n.x = n.newInput(&Value{})
 	n.x.connsChanged = func() {
 		if conns := n.x.conns; len(conns) > 0 {
@@ -24,8 +23,10 @@ func newIndexNode(b *block, set bool) *indexNode {
 	n.key = n.newInput(&Value{})
 	if set {
 		n.inVal = n.newInput(&Value{})
+		n.text.SetText("[]=")
 	} else {
 		n.outVal = n.newOutput(&Value{})
+		n.text.SetText("[]")
 	}
 	return n
 }

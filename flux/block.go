@@ -1,7 +1,6 @@
 package main
 
 import (
-	."math"
 	"time"
 	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
@@ -189,9 +188,9 @@ func (b *block) animate() {
 				if _, ok := n2.(*portsNode); ok { continue }
 				if n2 == n1 { continue }
 				dir := n1.MapToParent(n1.Center()).Sub(n2.MapToParent(n2.Center()))
-				d := Sqrt(dir.X * dir.X + dir.Y * dir.Y)
-				if d > 128 { continue }
-				v[n1] = v[n1].Add(dir.Mul(2 * (128 - d) / (1 + d)))
+				d := dir.Len() - n1.Size().Add(n2.Size()).Len() / 2
+				if d > 0 { continue }
+				v[n1] = v[n1].Add(dir.Mul(-2 * d / (1 + dir.Len())))
 			}
 		}
 		for c := range b.conns {
@@ -251,7 +250,7 @@ func (b *block) animate() {
 		for i, p := range pts {
 			dir := p.Sub(center)
 			d := dir.Len()
-			if len(pts) > 3 { pts[i] = p.Add(dir.Mul(32 / d)) }
+			pts[i] = p.Add(dir.Mul(64 / d))
 		}
 		b.intermediatePoints = pts
 		b.points = []Point{}
