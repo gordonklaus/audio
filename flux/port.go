@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 )
 
@@ -64,17 +63,17 @@ func (p *port) TookKeyboardFocus() { p.focused = true; p.Repaint(); p.valView.Sh
 func (p *port) LostKeyboardFocus() { p.focused = false; p.Repaint(); p.valView.Hide() }
 
 func (p *port) KeyPressed(event KeyEvent) {
-	if p.out && event.Key == glfw.KeyLeft || !p.out && event.Key == glfw.KeyRight {
+	if p.out && event.Key == KeyLeft || !p.out && event.Key == KeyRight {
 		p.node.TakeKeyboardFocus()
 		return
 	}
-	if p.out && event.Key == glfw.KeyRight && len(p.conns) > 0 || !p.out && event.Key == glfw.KeyLeft && len(p.conns) > 0 {
+	if p.out && event.Key == KeyRight && len(p.conns) > 0 || !p.out && event.Key == KeyLeft && len(p.conns) > 0 {
 		p.conns[0].TakeKeyboardFocus()
 		return
 	}
 	
 	switch event.Key {
-	case glfw.KeyEnter:
+	case KeyEnter:
 		c := newConnection(p.node.block(), p.Center())
 		if p.out {
 			c.setSrc(p.Self.(*output))
@@ -82,9 +81,9 @@ func (p *port) KeyPressed(event KeyEvent) {
 			c.setDst(p.Self.(*input))
 		}
 		c.startEditing()
-	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
+	case KeyLeft, KeyRight, KeyUp, KeyDown:
 		p.node.block().outermost().focusNearestView(p, event.Key)
-	case glfw.KeyEsc:
+	case KeyEscape:
 		p.node.TakeKeyboardFocus()
 	default:
 		p.ViewBase.KeyPressed(event)

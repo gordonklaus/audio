@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
 	."math"
@@ -28,7 +27,7 @@ func newNodeText(node *nodeBase) *nodeText {
 }
 func (t *nodeText) KeyPressed(event KeyEvent) {
 	switch event.Key {
-	case glfw.KeyEnter:
+	case KeyEnter:
 		t.node.TakeKeyboardFocus()
 	default:
 		t.TextBase.KeyPressed(event)
@@ -148,9 +147,9 @@ func (n *nodeBase) LostKeyboardFocus() { n.focused = false; n.Repaint() }
 
 func (n *nodeBase) KeyPressed(event KeyEvent) {
 	switch event.Key {
-	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
+	case KeyLeft, KeyRight, KeyUp, KeyDown:
 		n.blk.outermost().focusNearestView(n, event.Key)
-	case glfw.KeyEsc:
+	case KeyEscape:
 		n.blk.TakeKeyboardFocus()
 	default:
 		n.ViewBase.KeyPressed(event)

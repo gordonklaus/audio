@@ -1,7 +1,6 @@
 package main
 
 import (
-	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 	."fmt"
 )

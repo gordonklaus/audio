@@ -1,7 +1,6 @@
 package main
 
 import (
-	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 )
 
@@ -69,7 +68,7 @@ func (n *ifNode) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft, KeyRight, KeyUp, KeyDown:
 		n.blk.outermost().focusNearestView(n, event.Key)
-	case KeyEsc:
+	case KeyEscape:
 		n.blk.TakeKeyboardFocus()
 	default:
 		n.ViewBase.KeyPressed(event)

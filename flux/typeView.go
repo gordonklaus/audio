@@ -2,7 +2,6 @@ package main
 
 import (
 	."code.google.com/p/gordon-go/gui"
-	."github.com/jteeuwen/glfw"
 	."math"
 )
 
@@ -286,13 +285,13 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 				v.childTypes.right[0].TakeKeyboardFocus()
 			}
 		}
-	case KeyEsc:
+	case KeyEscape:
 		if v.done != nil {
 			v.done()
 		} else {
 			v.Parent().TakeKeyboardFocus()
 		}
-	case KeyBackspace, KeyDel:
+	case KeyBackspace, KeyDelete:
 		if p, ok := v.Parent().(*typeView); ok {
 			if _, ok := (*p.typ).(*InterfaceType); ok {
 				break

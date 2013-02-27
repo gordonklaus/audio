@@ -1,20 +1,26 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
+	"code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
 )
 
+func main() {
+	newFluxWindow()
+	gui.Run()
+}
+
 type fluxWindow struct {
-	*Window
+	*gui.Window
 	browser *browser
 }
 
 func newFluxWindow() *fluxWindow {
 	w := &fluxWindow{}
-	w.Window = NewWindow(w)
+	w.Window = gui.NewWindow(w)
 	w.browser = newBrowser(fluxSourceOnly, nil, nil)
 	w.AddChild(w.browser)
+	w.Resize(w.Size().XY())
 	w.browser.accepted.Connect(func(info ...interface{}) {
 		switch info := info[0].(type) {
 		case *NamedType:
@@ -59,10 +65,4 @@ func newFluxWindow() *fluxWindow {
 func (w *fluxWindow) Resize(width, height float64) {
 	w.Window.Resize(width, height)
 	w.browser.Move(w.Center())
-}
-
-func main() {
-	w := newFluxWindow()
-	w.HandleEvents()
-	w.Close()
 }

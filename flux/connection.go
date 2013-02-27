@@ -1,7 +1,6 @@
 package main
 
 import (
-	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 	."math"
 )
@@ -129,7 +128,7 @@ func (c *connection) KeyPressed(event KeyEvent) {
 		c.src.TakeKeyboardFocus()
 	case KeyRight:
 		c.dst.TakeKeyboardFocus()
-	case KeyEsc:
+	case KeyEscape:
 		c.Parent().TakeKeyboardFocus()
 	default:
 		if event.Text == "\\" {

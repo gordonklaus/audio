@@ -1,20 +1,16 @@
 package gui
 
 import (
-	."github.com/jteeuwen/glfw"
 	gl "github.com/chsc/gogl/gl21"
 	."code.google.com/p/gordon-go/ftgl"
 	."code.google.com/p/gordon-go/util"
 )
 
-var font Font = CreateTextureFont(fontpath)
-func init() {
-	font.SetFaceSize(fontSize, 1)
+var font Font
+func initFont() {
+	font = CreateTextureFont(fontpath)
+	font.SetFaceSize(18, 1)
 }
-
-const (
-	fontSize = 18
-)
 
 type Text interface {
 	View
@@ -113,7 +109,7 @@ func (t *TextBase) KeyPressed(event KeyEvent) {
 		}
 	case KeyEnter:
 		t.Accept.Emit()
-	case KeyEsc:
+	case KeyEscape:
 		t.Reject.Emit()
 	}
 }

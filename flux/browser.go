@@ -4,10 +4,9 @@ import (
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
 	."fmt"
-	."github.com/jteeuwen/glfw"
 	"go/ast"
 	"os"
-	."strings"
+	"strings"
 )
 
 type browser struct {
@@ -147,7 +146,7 @@ func (t *nodeNameText) SetText(text string) {
 	if b.newInfo == nil {
 		if infos := b.filteredInfos(); len(infos) > 0 {
 			for _, i := range infos {
-				if HasPrefix(ToLower(i.Name()), ToLower(text)) {
+				if strings.HasPrefix(strings.ToLower(i.Name()), strings.ToLower(text)) {
 					goto ok
 				}
 			}
@@ -184,7 +183,7 @@ ok:
 	
 	b.indices = nil
 	for i, child := range infos {
-		if HasPrefix(ToLower(child.Name()), ToLower(text)) {
+		if strings.HasPrefix(strings.ToLower(child.Name()), strings.ToLower(text)) {
 			b.indices = append(b.indices, i)
 		}
 	}
@@ -372,7 +371,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 				t.SetText("")
 			}
 		}
-	case KeyEsc:
+	case KeyEscape:
 		if b.newInfo == nil {
 			b.cancel()
 		} else {

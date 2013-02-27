@@ -2,7 +2,6 @@ package main
 
 import (
 	"time"
-	."github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
 )
@@ -336,7 +335,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 		} else {
 			b.startEditing()
 		}
-	case KeyBackspace, KeyDel:
+	case KeyBackspace, KeyDelete:
 		foc := View(b)
 		switch v := b.GetKeyboardFocus().(type) {
 		case *block:
@@ -349,7 +348,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 			in, out := v.inConns(), v.outConns()
 			switch {
 			case event.Key == KeyBackspace && len(in) > 0:  foc = in[0].src.node
-			case event.Key == KeyDel       && len(out) > 0: foc = out[0].dst.node
+			case event.Key == KeyDelete       && len(out) > 0: foc = out[0].dst.node
 			default:
 				switch {
 				case len(in) > 0:  foc = in[0].src.node
@@ -367,7 +366,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 			}
 		case *output:
 			foc = v.node
-			if event.Key == KeyDel && len(v.conns) > 0 {
+			if event.Key == KeyDelete && len(v.conns) > 0 {
 				foc = v.conns[0]
 			}
 		case *connection:
@@ -379,7 +378,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 			v.blk.removeConnection(v)
 		}
 		foc.TakeKeyboardFocus()
-	case KeyEsc:
+	case KeyEscape:
 		if b.editing {
 			if b.editingNode != nil {
 				b.editingNode = nil

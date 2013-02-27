@@ -4,7 +4,7 @@ import (
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
 	."io/ioutil"
-	."strings"
+	"strings"
 	."strconv"
 )
 
@@ -62,7 +62,7 @@ func (r *reader) readNode(b *block, indent int) {
 	var node node
 	line := ""
 	line, r.s = Split2(r.s, "\n")
-	fields := Fields(line)
+	fields := strings.Fields(line)
 	switch f := fields[1]; f {
  	case "\\in":
 		for n := range b.nodes {
@@ -116,8 +116,8 @@ func (r *reader) readNode(b *block, indent int) {
 	r.nodes[id] = node
 	b.addNode(node)
 	for _, f := range fields[2:] {
-		i := Index(f, ".")
-		j := Index(f, "-")
+		i := strings.Index(f, ".")
+		j := strings.Index(f, "-")
 		srcID, _ := Atoi(f[:i])
 		srcPort, _ := Atoi(f[i+1:j])
 		dstPort, _ := Atoi(f[j+1:])

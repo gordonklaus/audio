@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/jteeuwen/glfw"
 	."code.google.com/p/gordon-go/gui"
 )
 
@@ -61,19 +60,19 @@ func (h *connectionHandle) LostKeyboardFocus() { h.focused = false; h.stopEditin
 
 func (h *connectionHandle) KeyPressed(event KeyEvent) {
 	switch event.Key {
-	case glfw.KeyLeft, glfw.KeyRight, glfw.KeyUp, glfw.KeyDown:
+	case KeyLeft, KeyRight, KeyUp, KeyDown:
 		if h.editing {
 			h.spec.moveToNearestConnectablePort(event.Key)
 		} else {
 			h.conn.blk.outermost().focusNearestView(h.spec, event.Key)
 		}
-	case glfw.KeyEnter:
+	case KeyEnter:
 		if h.editing {
 			h.stopEditing()
 		} else {
 			h.startEditing()
 		}
-	case glfw.KeyEsc:
+	case KeyEscape:
 		if h.editing {
 			h.cancelEditing()
 		} else {
@@ -148,9 +147,9 @@ func (h *connectionSourceHandle) KeyPressed(event KeyEvent) {
 		return
 	}
 	
-	if event.Key == glfw.KeyDown && h.conn.src != nil {
+	if event.Key == KeyDown && h.conn.src != nil {
 		h.conn.src.TakeKeyboardFocus()
-	} else if event.Key == glfw.KeyUp {
+	} else if event.Key == KeyUp {
 		h.conn.dstHandle.TakeKeyboardFocus()
 	} else {
 		h.connectionHandle.KeyPressed(event)
@@ -203,9 +202,9 @@ func (h *connectionDestinationHandle) KeyPressed(event KeyEvent) {
 		return
 	}
 	
-	if event.Key == glfw.KeyDown {
+	if event.Key == KeyDown {
 		h.conn.srcHandle.TakeKeyboardFocus()
-	} else if event.Key == glfw.KeyUp && h.conn.dst != nil {
+	} else if event.Key == KeyUp && h.conn.dst != nil {
 		h.conn.dst.TakeKeyboardFocus()
 	} else {
 		h.connectionHandle.KeyPressed(event)

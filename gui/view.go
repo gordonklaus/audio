@@ -7,7 +7,8 @@ import (
 
 type KeyEvent struct {
 	Key int
-	Text string
+	Action int
+	Text string  // only present on Press and Repeat, not Release
 	Shift, Ctrl, Alt, Super bool
 }
 
@@ -224,7 +225,6 @@ func (v ViewBase) Repaint() { if v.parent != nil { v.parent.Repaint() } }
 func (v ViewBase) paintBase() {
 	if v.hidden { return }
 	gl.PushMatrix(); defer gl.PopMatrix()
-	gl.PushAttrib(gl.ALL_ATTRIB_BITS); defer gl.PopAttrib()
 	delta := v.Position().Sub(v.Rect().Min)
 	gl.Translated(gl.Double(delta.X), gl.Double(delta.Y), 0)
 	v.Self.Paint()
