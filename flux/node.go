@@ -158,8 +158,18 @@ func (n *nodeBase) KeyPressed(event KeyEvent) {
 
 func (n nodeBase) Paint() {
 	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
-	for _, p := range n.ins { DrawLine(ZP, p.MapToParent(p.Center())) }
-	for _, p := range n.outs { DrawLine(ZP, p.MapToParent(p.Center())) }
+	for _, p := range n.ins {
+		pt := p.MapToParent(p.Center())
+		DrawCubic([4]Point{ZP, Pt(pt.X / 2, 0), Pt(pt.X / 2, pt.Y), pt}, int(pt.Len() / 2))
+	}
+	for _, p := range n.outs {
+		pt := p.MapToParent(p.Center())
+		DrawCubic([4]Point{ZP, Pt(pt.X / 2, 0), Pt(pt.X / 2, pt.Y), pt}, int(pt.Len() / 2))
+	}
+	if len(n.ins) == 0 || len(n.outs) == 0 {
+		SetPointSize(7)
+		DrawPoint(ZP)
+	}
 }
 
 func newNode(i Info, b *block) node {

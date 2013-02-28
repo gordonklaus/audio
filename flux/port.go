@@ -106,9 +106,9 @@ func (p port) MouseDragged(button int, pt Point) {}
 func (p port) MouseReleased(button int, pt Point) {}
 
 func (p port) Paint() {
-	SetColor(map[bool]Color{true:{.5, .5, 1, .5}, false:{1, 1, 1, .25}}[p.focused])
-	for f := 1.0; f > .1; f /= 2 {
-		SetPointSize(f * portSize)
+	if p.focused {
+		SetColor(Color{.3, .3, .7, .5})
+		SetPointSize(portSize)
 		DrawPoint(ZP)
 	}
 }

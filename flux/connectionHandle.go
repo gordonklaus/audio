@@ -96,9 +96,9 @@ func (h *connectionHandle) MouseReleased(button int, p Point) {
 }
 
 func (h connectionHandle) Paint() {
-	SetColor(map[bool]Color{true:{1, .5, 0, .5}, false:map[bool]Color{true:{.4, .4, 1, .4}, false:{0, 0, 0, .5}}[h.focused]}[h.editing])
-	SetPointSize(connectionHandleSize)
-	DrawPoint(h.Center())
+	// SetColor(map[bool]Color{true:{1, .5, 0, .5}, false:map[bool]Color{true:{.4, .4, 1, .4}, false:{0, 0, 0, .5}}[h.focused]}[h.editing])
+	// SetPointSize(connectionHandleSize)
+	// DrawPoint(h.Center())
 }
 
 

@@ -33,8 +33,8 @@ func NewWindow(self View) *Window {
 	w.ViewBase = NewView(w)
 	w.mouseFocus = make(map[int]MouseHandlerView)
 	w.control = make(chan interface{})
-	w.key = make(chan KeyEvent, 1)
-	w.mouse = make(chan interface{})
+	w.key = make(chan KeyEvent, 10)
+	w.mouse = make(chan interface{}, 100)
 	w.paint = make(chan Paint, 1)
 	
 	windows[w] = true

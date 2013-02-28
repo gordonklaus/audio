@@ -1,9 +1,10 @@
 package main
 
 import (
-	"time"
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
+	"math"
+	"time"
 )
 
 type block struct {
@@ -175,95 +176,83 @@ func (b *block) stopEditing() {
 func (b *block) animate() {
 	for {
 		v := map[node]Point{}
+		
+		// center nodes at (0, 0)
 		center := ZP
 		for n := range b.nodes {
 			v[n] = ZP
 			center = center.Add(n.Position())
 		}
 		center = center.Div(float64(len(b.nodes)))
+		for n := range b.nodes {
+			n.Move(n.Position().Sub(center))
+		}
+		// attract nodes to (0, 0)
+		for n := range b.nodes {
+			v[n] = v[n].Sub(n.Position().Div(4))
+		}
+		
 		for n1 := range b.nodes {
-			if _, ok := n1.(*portsNode); ok { continue }
 			for n2 := range b.nodes {
-				if _, ok := n2.(*portsNode); ok { continue }
 				if n2 == n1 { continue }
 				dir := n1.MapToParent(n1.Center()).Sub(n2.MapToParent(n2.Center()))
 				d := dir.Len() - n1.Size().Add(n2.Size()).Len() / 2
 				if d > 0 { continue }
 				v[n1] = v[n1].Add(dir.Mul(-2 * d / (1 + dir.Len())))
 			}
+			for c := range b.conns {
+				src, dst := c.src, c.dst
+				if src == nil || src.node == n1 || dst == nil || dst.node == n1 { continue }
+				dir := n1.MapToParent(n1.Center()).Sub(c.MapToParent(c.Center()))
+				d := dir.Len() - n1.Size().Add(c.Size()).Len() / 2
+				if d > 0 { continue }
+				v[n1] = v[n1].Add(dir.Mul(-.25 * d / (1 + dir.Len())))
+			}
 		}
 		for c := range b.conns {
-			xOffset := 64.0; if c.feedback { xOffset = -256 }
 			src, dst := c.src, c.dst
 			if src == nil || dst == nil { continue }
-			d := dst.MapTo(dst.Position(), b).Sub(src.MapTo(src.Position(), b).Add(Pt(xOffset, 0)))
-			d.X *= 2
-			d.Y /= 2
+			d := dst.MapTo(dst.Position(), b).Sub(src.MapTo(src.Position(), b))
+			if c.feedback {
+				d.X += 256
+			} else {
+				d.X -= 64
+			}
 			
 			srcNode := src.node; for srcNode.block() != b { srcNode = srcNode.block().node }
 			dstNode := dst.node; for dstNode.block() != b { dstNode = dstNode.block().node }
-			if _, ok := srcNode.(*portsNode); ok { continue }
-			if _, ok := dstNode.(*portsNode); ok { continue }
 			v[srcNode] = v[srcNode].Add(d)
 			v[dstNode] = v[dstNode].Sub(d)
 		}
-		for n, v := range v {
-			v = v.Add(center.Sub(n.Position()).Div(4))
-			n.Move(n.Position().Add(v.Mul(2 * .033)))
+		for n := range b.nodes {
+			// v = v.Mul(100*math.Tanh(100*v.Len()) / v.Len())
+			n.Move(n.Position().Add(v[n].Mul(2 * .033)))
 		}
 		
-		pts := []Point{}
+		rect := ZR
 		for n := range b.nodes {
 			if _, ok := n.(*portsNode); ok { continue }
 			r := n.MapRectToParent(n.Rect())
-			pts = append(pts, r.Min, r.Max, Pt(r.Min.X, r.Max.Y), Pt(r.Max.X, r.Min.Y))
-		}
-		if len(pts) == 0 { pts = append(pts, ZP, Pt(0, 37), Pt(32, 18)) }
-		iLowerLeft, lowerLeft := 0, pts[0]
-		for i, p := range pts {
-			if p.Y < lowerLeft.Y || p.Y == lowerLeft.Y && p.X < lowerLeft.X {
-				iLowerLeft, lowerLeft = i, p
+			r.Min.X -= 16
+			r.Max.X += 16
+			if rect == ZR {
+				rect = r
+			} else {
+				rect = rect.Union(r)
 			}
 		}
-		pts[0], pts[iLowerLeft] = pts[iLowerLeft], pts[0]
-		Sort(pts[1:], func(p1, p2 Point) bool {
-			x := p1.Sub(lowerLeft).Cross(p2.Sub(lowerLeft))
-			if x > 0 { return true }
-			if x == 0 { return p1.X < p2.X }
-			return false
-		})
-		N := len(pts)
-		pts = append([]Point{pts[N-1]}, pts...)
-		m := 1
-		for i := 2; i <= N; i++ {
-			for pts[m].Sub(pts[m - 1]).Cross(pts[i].Sub(pts[m - 1])) <= 0 {
-				if m > 1 { m-- } else if i == N { break } else { i++ }
-			}
-			m++
-			pts[m], pts[i] = pts[i], pts[m]
+		if rect == ZR {
+			rect = Rect(0, 0, 48, 32)
 		}
-		pts = pts[:m]
-		center = ZP
-		for _, p := range pts { center = center.Add(p) }
-		center = center.Div(float64(len(pts)))
-		for i, p := range pts {
-			dir := p.Sub(center)
-			d := dir.Len()
-			pts[i] = p.Add(dir.Mul(64 / d))
-		}
-		b.intermediatePoints = pts
-		b.points = []Point{}
-		for i := range pts {
-			p1, p2 := pts[i], pts[(i + 1) % len(pts)]
-			b.points = append(b.points, p1.Add(p2).Div(2))
-		}
-		
-		rect := Rect(pts[0].X, pts[0].Y, pts[0].X, pts[0].Y)
-		for _, p := range append(b.points, b.intermediatePoints...) {
-			rect = rect.Union(Rect(p.X, p.Y, p.X, p.Y))
-		}
+		s := rect.Size().Mul((math.Sqrt2 - 1) / 2)
+		rect.Min = rect.Min.Sub(s)
+		rect.Max = rect.Max.Add(s)
 		b.Resize(rect.Dx(), rect.Dy())
 		b.Pan(rect.Min)
+		x, y := rect.Size().Div(2).XY()
+		c := rect.Center()
+		b.points = []Point{c.Add(Pt(x, 0)), c.Add(Pt(0, y)), c.Add(Pt(-x, 0)), c.Add(Pt(0, -y))}
+		b.intermediatePoints = []Point{c.Add(Pt(x, -y)), c.Add(Pt(x, y)), c.Add(Pt(-x, y)), c.Add(Pt(-x, -y))}
 		
 		if n, ok := b.node.(interface{positionBlocks()}); ok { n.positionBlocks() }
 		
@@ -480,14 +469,4 @@ func (n *portsNode) KeyPressed(event KeyEvent) {
 	} else {
 		n.nodeBase.KeyPressed(event)
 	}
-}
-
-func (n portsNode) Paint() {
-	SetColor(map[bool]Color{true:{.5, .5, 1, .5}, false:{1, 1, 1, .25}}[n.focused])
-	// TODO:  draw half-circle instead
-	for f := 1.0; f > .1; f /= 2 {
-		SetPointSize(f * 12)
-		DrawPoint(ZP)
-	}
-	n.nodeBase.Paint()
 }
