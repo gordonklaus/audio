@@ -108,7 +108,6 @@ func (c *connection) reform() {
 	} else {
 		c.dstHandle.MoveCenter(c.MapFromParent(c.dstPt.Sub(handleOffset)))
 	}
-	c.Repaint()
 }
 
 func (c *connection) startEditing() {

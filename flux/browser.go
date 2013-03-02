@@ -337,7 +337,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 				*info = *NewPackage(info.parent.(*Package), info.name)
 				if err := os.Mkdir(FluxSourcePath(info), 0777); err != nil { Println(err) }
 			case *Func:
-				newFuncNode(info) // bad bad, this launches animate()
+				newFuncNode(info)
 			}
 			
 			b.i = 0

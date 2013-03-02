@@ -5,7 +5,6 @@ import (
 	gl "github.com/chsc/gogl/gl21"
 	"runtime"
 	"sync"
-	"time"
 )
 
 type Window struct {
@@ -18,6 +17,7 @@ type Window struct {
 	key chan KeyEvent
 	mouse chan interface{}
 	paint chan Paint
+	do chan func()
 }
 
 func NewWindow(self View) *Window {
@@ -36,6 +36,7 @@ func NewWindow(self View) *Window {
 	w.key = make(chan KeyEvent, 10)
 	w.mouse = make(chan interface{}, 100)
 	w.paint = make(chan Paint, 1)
+	w.do = make(chan func())
 	
 	windows[w] = true
 	w.run()
@@ -129,7 +130,6 @@ func (w *Window) run() {
 		gl.Enable(gl.LINE_SMOOTH)
 		gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 		
-		ticker := time.NewTicker(33 * time.Millisecond)
 		for {
 			select {
 			case c := <-w.control:
@@ -172,8 +172,10 @@ func (w *Window) run() {
 						}
 					}
 				}
-			case <-ticker.C:
+			case <-w.paint:
 				w.repaint()
+			case f := <-w.do:
+				f()
 			}
 		}
 	} ()
@@ -215,4 +217,8 @@ func (w Window) repaint() {
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 	w.GetViewBase().paintBase()
 	w.w.SwapBuffers()
+}
+
+func (w Window) Do(f func()) {
+	w.do <- f
 }

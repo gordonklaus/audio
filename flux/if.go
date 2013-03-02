@@ -25,8 +25,6 @@ func newIfNode(b *block) *ifNode {
 	n.AddChild(n.input)
 	n.AddChild(n.falseblk)
 	n.AddChild(n.trueblk)
-	go n.falseblk.animate()
-	go n.trueblk.animate()
 
 	n.input.MoveCenter(Pt(-2*portSize, 0))
 	n.trueblk.Move(Pt(portSize, 4))
@@ -45,9 +43,13 @@ func (n ifNode) outConns() []*connection {
 	return append(n.falseblk.outConns(), n.trueblk.outConns()...)
 }
 
-func (n *ifNode) positionBlocks() {
+func (n *ifNode) update() bool {
+	if !n.falseblk.update() && !n.trueblk.update() {
+		return false
+	}
 	n.falseblk.Move(Pt(portSize, -4 - n.falseblk.Height()))
 	ResizeToFit(n, 0)
+	return true
 }
 
 func (n *ifNode) Move(p Point) {

@@ -4,7 +4,7 @@ import (
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
 	"math"
-	"time"
+	"math/rand"
 )
 
 type block struct {
@@ -170,93 +170,118 @@ func (b *block) stopEditing() {
 	b.editingNode = nil
 }
 
-func (b *block) animate() {
-	for {
-		v := map[node]Point{}
-		
-		// center nodes at (0, 0)
-		center := ZP
-		for n := range b.nodes {
-			v[n] = ZP
-			center = center.Add(n.Position())
+func (b *block) update() (updated bool) {
+	for n := range b.nodes {
+		if n, ok := n.(interface { update() bool }); ok {
+			updated = updated || n.update()
 		}
-		center = center.Div(float64(len(b.nodes)))
-		for n := range b.nodes {
-			n.Move(n.Position().Sub(center))
-		}
-		// attract nodes to (0, 0)
-		for n := range b.nodes {
-			v[n] = v[n].Sub(n.Position().Div(4))
-		}
-		
-		for n1 := range b.nodes {
-			for n2 := range b.nodes {
-				if n2 == n1 { continue }
-				dir := n1.MapToParent(n1.Center()).Sub(n2.MapToParent(n2.Center()))
-				d := dir.Len() - n1.Size().Add(n2.Size()).Len() / 2
-				if d > 0 { continue }
-				v[n1] = v[n1].Add(dir.Mul(-2 * d / (1 + dir.Len())))
+	}
+	
+	v := map[node]Point{}
+	
+	for n1 := range b.nodes {
+		for n2 := range b.nodes {
+			if n2 == n1 { continue }
+			dir := n1.MapToParent(n1.Center()).Sub(n2.MapToParent(n2.Center()))
+			if dir == ZP {
+				dir = Pt(rand.NormFloat64(), rand.NormFloat64())
 			}
-			for c := range b.conns {
-				src, dst := c.src, c.dst
-				if src == nil || src.node == n1 || dst == nil || dst.node == n1 { continue }
-				dir := n1.MapToParent(n1.Center()).Sub(c.MapToParent(c.Center()))
-				d := dir.Len() - n1.Size().Add(c.Size()).Len() / 2
-				if d > 0 { continue }
-				v[n1] = v[n1].Add(dir.Mul(-.25 * d / (1 + dir.Len())))
-			}
+			d := dir.Len() - n1.Size().Add(n2.Size()).Len() / 2
+			if d > 0 { continue }
+			v[n1] = v[n1].Add(dir.Mul(-2 * d / dir.Len()))
 		}
 		for c := range b.conns {
 			src, dst := c.src, c.dst
-			if src == nil || dst == nil { continue }
-			d := dst.MapTo(dst.Position(), b).Sub(src.MapTo(src.Position(), b))
-			if c.feedback {
-				d.X += 256
-				if d.X < 0 {
-					d.X *= 4
-				}
-			} else {
-				d.X -= 64
-				if d.X > 0 {
-					d.X *= 4
-				}
+			if src == nil || src.node == n1 || dst == nil || dst.node == n1 { continue }
+			dir := n1.MapToParent(n1.Center()).Sub(c.MapToParent(c.Center()))
+			if dir == ZP {
+				dir = Pt(rand.NormFloat64(), rand.NormFloat64())
 			}
-			
-			srcNode := src.node; for srcNode.block() != b { srcNode = srcNode.block().node }
-			dstNode := dst.node; for dstNode.block() != b { dstNode = dstNode.block().node }
-			v[srcNode] = v[srcNode].Add(d)
-			v[dstNode] = v[dstNode].Sub(d)
+			d := dir.Len() - n1.Size().Add(c.Size()).Len() / 2
+			if d > 0 { continue }
+			v[n1] = v[n1].Add(dir.Mul(-.25 * d / dir.Len()))
 		}
-		for n := range b.nodes {
-			// v = v.Mul(100*math.Tanh(100*v.Len()) / v.Len())
-			n.Move(n.Position().Add(v[n].Mul(2 * .033)))
+	}
+	for c := range b.conns {
+		src, dst := c.src, c.dst
+		if src == nil || dst == nil { continue }
+		d := dst.MapTo(dst.Position(), b).Sub(src.MapTo(src.Position(), b))
+		if c.feedback {
+			d.X += 256
+			// if d.X < 0 {
+			// 	d.X *= 4
+			// }
+		} else {
+			d.X -= 64
+			// if d.X > 0 {
+			// 	d.X *= 4
+			// }
 		}
 		
-		rect := ZR
+		srcNode := src.node; for srcNode.block() != b { srcNode = srcNode.block().node }
+		dstNode := dst.node; for dstNode.block() != b { dstNode = dstNode.block().node }
+		v[srcNode] = v[srcNode].Add(d)
+		v[dstNode] = v[dstNode].Sub(d)
+	}
+	
+	center := ZP
+	for n := range b.nodes {
+		center = center.Add(n.Position())
+	}
+	center = center.Div(float64(len(b.nodes)))
+	for n := range b.nodes {
+		v[n] = v[n].Add(center.Sub(n.Position().Div(4)))
+	}
+	
+	meanVel := ZP
+	nVel := 0.0
+	for n := range b.nodes {
+		if _, ok := n.(*portsNode); ok { continue }
+		meanVel = meanVel.Add(v[n])
+		nVel++
+	}
+	// if there is only one (non-port) node then it is definitely stationary
+	// but we still have to check if the rect needs updating
+	if nVel > 1 {
+		meanVel = meanVel.Div(nVel)
+		meanSpeed := 0.0
 		for n := range b.nodes {
 			if _, ok := n.(*portsNode); ok { continue }
-			r := n.MapRectToParent(n.Rect())
-			r.Min.X -= 16
-			r.Max.X += 16
-			if rect == ZR {
-				rect = r
-			} else {
-				rect = rect.Union(r)
-			}
+			meanSpeed += v[n].Sub(meanVel).Len()
 		}
-		if rect == ZR {
-			rect = Rect(0, 0, 48, 32)
+		meanSpeed /= nVel
+		if meanSpeed < .01 {
+			return
 		}
-		s := rect.Size().Mul((math.Sqrt2 - 1) / 2)
-		rect.Min = rect.Min.Sub(s)
-		rect.Max = rect.Max.Add(s)
-		b.Resize(rect.Dx(), rect.Dy())
-		b.Pan(rect.Min)
 		
-		if n, ok := b.node.(interface{positionBlocks()}); ok { n.positionBlocks() }
-		
-		time.Sleep(33 * time.Millisecond)
+		for n := range b.nodes {
+			n.Move(n.Position().Add(v[n].Mul(2.0 / fps)).Sub(center))
+		}
 	}
+	
+	rect := ZR
+	for n := range b.nodes {
+		if _, ok := n.(*portsNode); ok { continue }
+		r := n.MapRectToParent(n.Rect())
+		r.Min.X -= 16
+		r.Max.X += 16
+		if rect == ZR {
+			rect = r
+		} else {
+			rect = rect.Union(r)
+		}
+	}
+	if rect == ZR {
+		rect = Rect(0, 0, 48, 32)
+	}
+	s := rect.Size().Mul((math.Sqrt2 - 1) / 2)
+	rect.Min = rect.Min.Sub(s)
+	rect.Max = rect.Max.Add(s)
+	if b.Rect() == rect { return }
+	b.Resize(rect.Dx(), rect.Dy())
+	b.Pan(rect.Min)
+	
+	return true
 }
 
 func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) {

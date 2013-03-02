@@ -52,6 +52,7 @@ func newFluxWindow() *fluxWindow {
 			}
 		case *Func:
 			n := newFuncNode(info)
+			go n.animate()
 			w.browser.Hide()
 			w.AddChild(n)
 			n.Move(w.Center())

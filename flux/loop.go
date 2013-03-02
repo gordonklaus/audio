@@ -33,7 +33,6 @@ func newLoopNode(b *block) *loopNode {
 	n.inputsNode.newOutput(&Value{})
 	n.loopblk.addNode(n.inputsNode)
 	n.AddChild(n.loopblk)
-	go n.loopblk.animate()
 	
 	n.input.MoveCenter(Pt(-2*portSize, 0))
 	n.updateInputType(nil)
@@ -73,12 +72,16 @@ func (n *loopNode) updateInputType(t Type) {
 	}
 }
 
-func (n *loopNode) positionBlocks() {
+func (n *loopNode) update() bool {
 	b := n.loopblk
+	if !b.update() {
+		return false
+	}
 	y2 := b.Size().Y / 2
 	b.Move(Pt(0, -y2))
 	n.inputsNode.MoveOrigin(b.Rect().Min.Add(Pt(0, y2)))
 	ResizeToFit(n, 0)
+	return true
 }
 
 func (n *loopNode) Move(p Point) {

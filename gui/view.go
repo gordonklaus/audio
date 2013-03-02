@@ -68,6 +68,8 @@ type View interface {
 	
 	Repaint()
 	Paint()
+	
+	Do(func())
 }
 
 type MouseHandlerView interface {
@@ -233,3 +235,5 @@ func (v ViewBase) paintBase() {
 	}
 }
 func (v ViewBase) Paint() {}
+
+func (v ViewBase) Do(f func()) { if v.parent != nil { v.parent.Do(f) } }

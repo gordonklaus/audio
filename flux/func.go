@@ -2,7 +2,8 @@ package main
 
 import (
 	."code.google.com/p/gordon-go/gui"
-	."fmt"
+	"fmt"
+	"time"
 )
 
 type funcNode struct {
@@ -12,6 +13,7 @@ type funcNode struct {
 	pkgRefs map[*Package]int
 	inputsNode, outputsNode *portsNode
 	funcblk *block
+	awaken chan bool
 }
 
 func newFuncNode(info *Func) *funcNode {
@@ -27,7 +29,7 @@ func newFuncNode(info *Func) *funcNode {
 	n.outputsNode.editable = true
 	n.funcblk.addNode(n.outputsNode)
 	n.AddChild(n.funcblk)
-	go n.funcblk.animate()
+	n.awaken = make(chan bool, 1)
 	
 	if info.receiver != nil {
 		n.inputsNode.newOutput(info.typeWithReceiver().parameters[0])
@@ -62,7 +64,7 @@ func (n *funcNode) addPkgRef(x interface{}) {
 	case Type:
 		walkType(x, func(t *NamedType) { n.addPkgRef(t) })
 	default:
-		panic(Sprintf("can't addPkgRef for %#v\n", x))
+		panic(fmt.Sprintf("can't addPkgRef for %#v\n", x))
 	}
 }
 func (n *funcNode) subPkgRef(x interface{}) {
@@ -77,7 +79,7 @@ func (n *funcNode) subPkgRef(x interface{}) {
 	case Type:
 		walkType(x, func(t *NamedType) { n.subPkgRef(t) })
 	default:
-		panic(Sprintf("can't subPkgRef for %#v\n", x))
+		panic(fmt.Sprintf("can't subPkgRef for %#v\n", x))
 	}
 }
 
@@ -87,12 +89,34 @@ func (n funcNode) outputs() []*output { return nil }
 func (n funcNode) inConns() []*connection { return nil }
 func (n funcNode) outConns() []*connection { return nil }
 
-func (n *funcNode) positionBlocks() {
+const fps = 60
+
+func (n *funcNode) animate() {
+	updated := make(chan bool)
+	// TODO:  end me
+	for {
+		next := time.After(time.Second / fps)
+		n.Do(func() {
+			updated <- n.update()
+		})
+		if <-updated {
+			<-next
+		} else {
+			<-n.awaken
+		}
+	}
+}
+
+func (n *funcNode) update() bool {
 	b := n.funcblk
+	if !b.update() {
+		return false
+	}
 	y := b.Center().Y
 	n.inputsNode.MoveOrigin(Pt(b.Rect().Min.X, y))
 	n.outputsNode.MoveOrigin(Pt(b.Rect().Max.X, y))
 	ResizeToFit(n, 0)
+	return true
 }
 
 func (n *funcNode) TookKeyboardFocus() { n.funcblk.TakeKeyboardFocus() }
@@ -103,5 +127,13 @@ func (n *funcNode) KeyPressed(event KeyEvent) {
 		saveFunc(*n)
 	default:
 		n.ViewBase.KeyPressed(event)
+	}
+}
+
+func (n *funcNode) Repaint() {
+	n.ViewBase.Repaint()
+	select {
+	case n.awaken <- true:
+	default:
 	}
 }
