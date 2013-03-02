@@ -12,7 +12,6 @@ type ifNode struct {
 	falseblk *block
 	trueblk *block
 	focused bool
-	blkEnds [2]Point
 }
 
 func newIfNode(b *block) *ifNode {
@@ -48,11 +47,6 @@ func (n ifNode) outConns() []*connection {
 
 func (n *ifNode) positionBlocks() {
 	n.falseblk.Move(Pt(portSize, -4 - n.falseblk.Height()))
-	for i, b := range []*block{n.falseblk, n.trueblk} {
-		leftmost := b.points[0]
-		for _, p := range b.points { if p.X < leftmost.X { leftmost = p } }
-		n.blkEnds[i] = b.MapToParent(leftmost)
-	}
 	ResizeToFit(n, 0)
 }
 
@@ -78,8 +72,8 @@ func (n *ifNode) KeyPressed(event KeyEvent) {
 func (n ifNode) Paint() {
 	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
 	DrawLine(ZP, n.input.MapToParent(n.input.Center()))
-	top, bottom := n.blkEnds[0], n.blkEnds[1]; top.X, bottom.X = 0, 0
-	DrawLine(top, bottom)
-	DrawLine(top, n.blkEnds[0])
-	DrawLine(bottom, n.blkEnds[1])
+	top, bottom := 4 + n.trueblk.Size().Y / 2, -4 - n.falseblk.Size().Y / 2
+	DrawLine(Pt(0, top), Pt(0, bottom))
+	DrawLine(Pt(0, top), Pt(portSize, top))
+	DrawLine(Pt(0, bottom), Pt(portSize, bottom))
 }

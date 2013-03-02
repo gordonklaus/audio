@@ -14,8 +14,6 @@ type block struct {
 	conns map[*connection]bool
 	focused, editing bool
 	editingNode node
-	points []Point
-	intermediatePoints []Point
 }
 
 func newBlock(n node) *block {
@@ -24,7 +22,6 @@ func newBlock(n node) *block {
 	b.node = n
 	b.nodes = map[node]bool{}
 	b.conns = map[*connection]bool{}
-	b.points = []Point{ZP}
 	return b
 }
 
@@ -215,8 +212,14 @@ func (b *block) animate() {
 			d := dst.MapTo(dst.Position(), b).Sub(src.MapTo(src.Position(), b))
 			if c.feedback {
 				d.X += 256
+				if d.X < 0 {
+					d.X *= 4
+				}
 			} else {
 				d.X -= 64
+				if d.X > 0 {
+					d.X *= 4
+				}
 			}
 			
 			srcNode := src.node; for srcNode.block() != b { srcNode = srcNode.block().node }
@@ -249,10 +252,6 @@ func (b *block) animate() {
 		rect.Max = rect.Max.Add(s)
 		b.Resize(rect.Dx(), rect.Dy())
 		b.Pan(rect.Min)
-		x, y := rect.Size().Div(2).XY()
-		c := rect.Center()
-		b.points = []Point{c.Add(Pt(x, 0)), c.Add(Pt(0, y)), c.Add(Pt(-x, 0)), c.Add(Pt(0, -y))}
-		b.intermediatePoints = []Point{c.Add(Pt(x, -y)), c.Add(Pt(x, y)), c.Add(Pt(-x, y)), c.Add(Pt(-x, -y))}
 		
 		if n, ok := b.node.(interface{positionBlocks()}); ok { n.positionBlocks() }
 		
@@ -420,10 +419,17 @@ func (b block) Paint() {
 	} else {
 		SetColor(Color{.5, .5, .5, 1})
 	}
-	n := len(b.points)
-	for i := range b.points {
-		p1, p2, p3 := b.points[i], b.intermediatePoints[(i + 1) % n], b.points[(i + 1) % n]
-		DrawQuadratic([3]Point{p1, p2, p3}, int(p3.Sub(p2).Len() + p2.Sub(p1).Len()) / 8)
+	{
+		x := Pt(b.Rect().Dx() / 2, 0)
+		y := Pt(0, b.Rect().Dy() / 2)
+		c := b.Rect().Center()
+		r, t, l, b := c.Add(x), c.Add(y), c.Sub(x), c.Sub(y)
+		tr, tl, bl, br := c.Add(x).Add(y), c.Sub(x).Add(y), c.Sub(x).Sub(y), c.Add(x).Sub(y)
+		steps := int(x.X + y.Y)
+		DrawQuadratic([3]Point{r, tr, t}, steps)
+		DrawQuadratic([3]Point{t, tl, l}, steps)
+		DrawQuadratic([3]Point{l, bl, b}, steps)
+		DrawQuadratic([3]Point{b, br, r}, steps)
 	}
 }
 

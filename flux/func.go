@@ -89,13 +89,9 @@ func (n funcNode) outConns() []*connection { return nil }
 
 func (n *funcNode) positionBlocks() {
 	b := n.funcblk
-	leftmost, rightmost := b.points[0], b.points[0]
-	for _, p := range b.points {
-		if p.X < leftmost.X { leftmost = p }
-		if p.X > rightmost.X { rightmost = p }
-	}
-	n.inputsNode.MoveOrigin(leftmost)
-	n.outputsNode.MoveOrigin(rightmost)
+	y := b.Center().Y
+	n.inputsNode.MoveOrigin(Pt(b.Rect().Min.X, y))
+	n.outputsNode.MoveOrigin(Pt(b.Rect().Max.X, y))
 	ResizeToFit(n, 0)
 }
 

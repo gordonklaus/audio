@@ -12,7 +12,6 @@ type loopNode struct {
 	inputsNode *portsNode
 	loopblk *block
 	focused bool
-	leftmost Point
 }
 
 func newLoopNode(b *block) *loopNode {
@@ -76,11 +75,9 @@ func (n *loopNode) updateInputType(t Type) {
 
 func (n *loopNode) positionBlocks() {
 	b := n.loopblk
-	n.leftmost = b.points[0]
-	for _, p := range b.points { if p.X < n.leftmost.X { n.leftmost = p } }
-	n.inputsNode.MoveOrigin(n.leftmost)
-	n.leftmost = b.MapToParent(n.leftmost)
-	n.input.MoveCenter(n.leftmost.Sub(Pt(portSize, 0)))
+	y2 := b.Size().Y / 2
+	b.Move(Pt(0, -y2))
+	n.inputsNode.MoveOrigin(b.Rect().Min.Add(Pt(0, y2)))
 	ResizeToFit(n, 0)
 }
 
@@ -105,5 +102,5 @@ func (n *loopNode) KeyPressed(event KeyEvent) {
 
 func (n loopNode) Paint() {
 	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
-	DrawLine(n.leftmost, n.input.MapToParent(n.input.Center()))
+	DrawLine(ZP, Pt(-2*portSize, 0))
 }

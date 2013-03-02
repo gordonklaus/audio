@@ -157,5 +157,5 @@ func (c connection) Paint() {
 			len += pts[i].Sub(pts[i-1]).Len()
 		}
 	}
-	DrawBezier(pts, int(len) / 8)
+	DrawBezier(pts, int(len))
 }
