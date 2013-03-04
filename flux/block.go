@@ -179,6 +179,21 @@ func (b *block) update() (updated bool) {
 	
 	v := map[node]Point{}
 	
+	const (
+		nodeCenterCoef = .25
+		nodeSep = 32
+		nodeSepCoef = 2
+		nodeConnSep = 32
+		nodeConnSepCoef = 2
+		connLen = 64
+		connLenFB = 256
+		connAngleCoef = 16
+		connContractCoef = .25
+		connExpandCoef = 2
+		topSpeed = 200
+		speedCompress = 5
+	)
+	
 	for n1 := range b.nodes {
 		for n2 := range b.nodes {
 			if n2 == n1 { continue }
@@ -186,42 +201,55 @@ func (b *block) update() (updated bool) {
 			if dir == ZP {
 				dir = Pt(rand.NormFloat64(), rand.NormFloat64())
 			}
-			d := dir.Len() - n1.Size().Add(n2.Size()).Len() / 2
+			d := dir.Len() - n1.Size().Add(n2.Size()).Len() / 2 - nodeSep
 			if d > 0 { continue }
-			v[n1] = v[n1].Add(dir.Mul(-2 * d / dir.Len()))
+			v[n1] = v[n1].Add(dir.Mul(-nodeSepCoef * d / dir.Len()))
 		}
 		for c := range b.conns {
 			src, dst := c.src, c.dst
 			if src == nil || src.node == n1 || dst == nil || dst.node == n1 { continue }
-			dir := n1.MapToParent(n1.Center()).Sub(c.MapToParent(c.Center()))
+			x := src.MapTo(src.Center(), b)
+			y := dst.MapTo(dst.Center(), b)
+			p := n1.MapToParent(n1.Center())
+			xy := y.Sub(x)
+			xp := p.Sub(x)
+			proj := ZP
+			switch t := xp.Dot(xy) / xy.Dot(xy); {
+			case t <= 0:  proj = x
+			default:      proj = x.Add(xy.Mul(t))
+			case t >= 1:  proj = y
+			}
+			dir := p.Sub(proj)
 			if dir == ZP {
 				dir = Pt(rand.NormFloat64(), rand.NormFloat64())
 			}
-			d := dir.Len() - n1.Size().Add(c.Size()).Len() / 2
+			d := dir.Len() - n1.Size().Len() / 2 - nodeConnSep
 			if d > 0 { continue }
-			v[n1] = v[n1].Add(dir.Mul(-.25 * d / dir.Len()))
+			v[n1] = v[n1].Add(dir.Mul(-nodeConnSepCoef * d / dir.Len()))
 		}
 	}
 	for c := range b.conns {
 		src, dst := c.src, c.dst
 		if src == nil || dst == nil { continue }
-		d := dst.MapTo(dst.Position(), b).Sub(src.MapTo(src.Position(), b))
+		d := dst.MapTo(dst.Center(), b).Sub(src.MapTo(src.Center(), b))
+		l := d.Len()
+		var offset, rot float64 = connLen, 0
 		if c.feedback {
-			d.X += 256
-			// if d.X < 0 {
-			// 	d.X *= 4
-			// }
-		} else {
-			d.X -= 64
-			// if d.X > 0 {
-			// 	d.X *= 4
-			// }
+			offset, rot = connLenFB, .5
 		}
+		l = (offset - l) / l
+		if l < 0 {
+			l *= connContractCoef
+		} else {
+			l *= connExpandCoef
+		}
+		angle := math.Mod(d.Angle() / 2 / math.Pi + rot + .5, 1) - .5
+		u := Pt(d.Y, -d.X).Mul(connAngleCoef * 2 * angle).Add(d.Mul(l))
 		
 		srcNode := src.node; for srcNode.block() != b { srcNode = srcNode.block().node }
 		dstNode := dst.node; for dstNode.block() != b { dstNode = dstNode.block().node }
-		v[srcNode] = v[srcNode].Add(d)
-		v[dstNode] = v[dstNode].Sub(d)
+		v[srcNode] = v[srcNode].Sub(u)
+		v[dstNode] = v[dstNode].Add(u)
 	}
 	
 	center := ZP
@@ -230,7 +258,9 @@ func (b *block) update() (updated bool) {
 	}
 	center = center.Div(float64(len(b.nodes)))
 	for n := range b.nodes {
-		v[n] = v[n].Add(center.Sub(n.Position().Div(4)))
+		v[n] = v[n].Add(center.Sub(n.Position().Mul(nodeCenterCoef)))
+		l := v[n].Len()
+		v[n] = v[n].Mul(math.Tanh(speedCompress * l / topSpeed) * topSpeed / l)
 	}
 	
 	meanVel := ZP
