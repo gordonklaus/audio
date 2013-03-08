@@ -1,0 +1,35 @@
+TODO
+
+- fix bug in indexNode and loopNode:  crash when changing/deleting input connection (something to do with outputs changing)?
+- fix typeView bug(s):
+  - type T big.Int, e.g.,  shows up as the struct{} that big.Int is
+  - browser shows unexported types
+- handle funcs with an unconnected input whose type must be named to make a zero value (i.e., is ArrayType or StructType):  import package or, if it is an unexported type, complain and don't write files.
+- stabilize order of imports (alphabetical).    Also nodes? pro: deterministic build, stable files; con: hides bugs  (option:  deterministic in .flux files, random in .go)
+- prefix all names with "pkg." in .flux files, including names in current package.  then, .flux files don't change when moved between packages.  downside:  we would have to strip these prefixes when writing decl sources in importer.go
+- color conns by type.  hash type name, interpret as color.  or, use multiple colors to describe the whole type tree (outlined, woven, etc).
+- improve valueView editing; currently, name and type can't be edited separately.  solution:  allow to focus name text.
+- fix connection drawing during mouse editing
+- embed font (see https://github.com/jteeuwen/go-bindata, https://groups.google.com/forum/#!msg/golang-nuts/UOIUyn7uFsY/Uescy-cI7hQJ, https://github.com/sbinet/go-root2pb/blob/master/utils.go#L32)
+
+before releasing:
+- handle all errors
+  - including reader.go parsing errors?
+- gofmt
+
+
+DONE
+
+- automatic arrangment
+- pretty blocks, nodes, conns
+- funcs:  inputs, outputs
+- types, methods
+- loops
+- allow package name to differ from directory name
+
+
+LINKS
+http://martinfowler.com/bliki/ProjectionalEditing.html
+http://concrete-editor.org/#documentation
+http://audicle.cs.princeton.edu/
+http://sbel.wisc.edu/Courses/ME964/Literature/knuthProgramming1974.pdf
