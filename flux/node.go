@@ -3,6 +3,7 @@ package main
 import (
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
+	"go/ast"
 	."math"
 )
 
@@ -213,4 +214,57 @@ func newStringConstantNode(b *block) *constantNode {
 	n.nodeBase = newNodeBase(n, b)
 	n.newOutput(&Value{})
 	return n
+}
+
+type compositeLiteralNode struct {
+	*nodeBase
+	typ *typeView
+}
+func newCompositeLiteralNode(b *block) *compositeLiteralNode {
+	n := &compositeLiteralNode{}
+	n.nodeBase = newNodeBase(n, b)
+	out := n.newOutput(&Value{})
+	n.typ = newTypeView(&out.val.typ)
+	n.AddChild(n.typ)
+	return n
+}
+func (n *compositeLiteralNode) editType() {
+	n.typ.edit(func() {
+		if t := *n.typ.typ; t != nil {
+			n.blk.func_().addPkgRef(t)
+			switch t := t.(type) {
+			case *NamedType:
+				for _, f := range t.underlying.(*StructType).fields {
+					if t.parent == n.blk.func_().pkg() || fieldIsExported(f) {
+						n.newInput(f)
+					}
+				}
+			case *StructType:
+				for _, f := range t.fields {
+					n.newInput(f)
+				}
+			case *SliceType:
+				// TODO: variable number of inputs? (same can be achieved using append.)  variable number of index/value input pairs?
+			case *MapType:
+				// TODO: variable number of key/value input pairs?
+			}
+			n.typ.MoveCenter(Pt(0, n.Rect().Max.Y + n.typ.Height() / 2))
+			n.TakeKeyboardFocus()
+		} else {
+			n.blk.removeNode(n)
+			n.blk.TakeKeyboardFocus()
+		}
+	})
+}
+
+func fieldIsExported(f *Value) bool {
+	name := f.name
+	if name == "" {
+		t := f.typ
+		if pt, ok := t.(*PointerType); ok { 
+			t = pt.element
+		}
+		name = t.(*NamedType).name
+	}
+	return ast.IsExported(name)
 }

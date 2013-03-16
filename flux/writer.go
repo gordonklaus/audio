@@ -152,6 +152,8 @@ func (w *writer) writeBlockFlux(b *block, indent int) {
 			w.flux.WriteString(w.qualifiedName(n.info))
 		case *constantNode:
 			w.flux.WriteString(Quote(n.text.GetText()))
+		case *compositeLiteralNode:
+			w.flux.WriteString(w.typeString(*n.typ.typ))
 		case *indexNode:
 			if n.set {
 				w.flux.WriteString("[]=")

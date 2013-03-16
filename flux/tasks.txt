@@ -3,7 +3,8 @@ TODO
 - fix bug in indexNode and loopNode:  crash when changing/deleting input connection (something to do with outputs changing)?
 - fix typeView bug(s):
   - type T big.Int, e.g.,  shows up as the struct{} that big.Int is
-  - browser shows unexported types
+- browser shows unexported types and struct fields
+- prefix names with pkg name in browser and typeView
 - handle funcs with an unconnected input whose type must be named to make a zero value (i.e., is ArrayType or StructType):  import package or, if it is an unexported type, complain and don't write files.
 - stabilize order of imports (alphabetical).    Also nodes? pro: deterministic build, stable files; con: hides bugs  (option:  deterministic in .flux files, random in .go)
 - prefix all names with "pkg." in .flux files, including names in current package.  then, .flux files don't change when moved between packages.  downside:  we would have to strip these prefixes when writing decl sources in importer.go

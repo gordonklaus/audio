@@ -457,6 +457,11 @@ func (b *block) KeyPressed(event KeyEvent) {
 				b.addNode(n)
 				n.MoveCenter(b.Center())
 				n.text.TakeKeyboardFocus()
+			case "{":
+				n := newCompositeLiteralNode(b)
+				b.addNode(n)
+				n.MoveCenter(b.Center())
+				n.editType()
 			case "":
 				b.ViewBase.KeyPressed(event)
 			}
