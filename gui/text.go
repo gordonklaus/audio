@@ -58,7 +58,7 @@ func NewTextBase(self Text, text string) *TextBase {
 func (t TextBase) GetText() string { return t.text }
 func (t *TextBase) SetText(text string) {
 	t.text = text
-	t.Resize(2*t.frameSize + font.Advance(text), 2*t.frameSize + font.LineHeight())
+	t.Resize(2*t.frameSize + font.Advance(t.text), 2*t.frameSize - font.Descender() + font.Ascender())
 	t.TextChanged.Emit(text)
 }
 
@@ -80,7 +80,7 @@ func (t *TextBase) SetFrameColor(c Color) {
 
 func (t *TextBase) SetFrameSize(size float64) {
 	t.frameSize = size
-	t.Resize(2*t.frameSize + font.Advance(t.text), 2*t.frameSize + font.LineHeight())
+	t.Resize(2*t.frameSize + font.Advance(t.text), 2*t.frameSize - font.Descender() + font.Ascender())
 }
 
 func (t *TextBase) SetEditable(editable bool) {
