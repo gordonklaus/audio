@@ -18,6 +18,13 @@ func CreateTextureFont(filePath string) Font {
 	return Font{font}
 }
 
+// the caller must ensure that buffer is not collected before the Font is done being used
+func CreateTextureFontFromBuffer(buffer []byte) Font {
+	font := C.ftglCreateTextureFontFromBuffer((*C.uchar)(&buffer[0]), C.size_t(len(buffer)))
+	if font == nil { panic("couldn't create font") }
+	return Font{font}
+}
+
 func (font Font) SetFaceSize(size, res uint) bool {
 	return C.ftglSetFontFaceSize(font.font, C.uint(size), C.uint(res)) == 1
 }

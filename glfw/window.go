@@ -38,7 +38,7 @@ func (w *Window) Size() (width, height int) {
 }
 
 func (w *Window) ShouldClose() bool {
-	return C.glfwGetWindowParam(w.w, C.GLFW_SHOULD_CLOSE) == C.GL_TRUE
+	return C.glfwWindowShouldClose(w.w) == C.GL_TRUE
 }
 
 func (w *Window) SwapBuffers() {

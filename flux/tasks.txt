@@ -10,7 +10,7 @@ TODO
 - color conns by type.  hash type name, interpret as color.  or, use multiple colors to describe the whole type tree (outlined, woven, etc).
 - improve valueView editing; currently, name and type can't be edited separately.  solution:  allow to focus name text.
 - fix connection drawing during mouse editing
-- embed font (see https://github.com/jteeuwen/go-bindata, https://groups.google.com/forum/#!msg/golang-nuts/UOIUyn7uFsY/Uescy-cI7hQJ, https://github.com/sbinet/go-root2pb/blob/master/utils.go#L32)
+- find a better way to embed font (current using something like https://github.com/jteeuwen/go-bindata, https://groups.google.com/forum/#!msg/golang-nuts/UOIUyn7uFsY/Uescy-cI7hQJ) (best to wait for this https://code.google.com/p/go/issues/detail?id=3035)
 
 before releasing:
 - handle all errors
