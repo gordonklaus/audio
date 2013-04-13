@@ -2,6 +2,7 @@ package main
 
 import (
 	."code.google.com/p/gordon-go/gui"
+	"code.google.com/p/go.exp/go/types"
 	"fmt"
 	"time"
 )
@@ -9,18 +10,18 @@ import (
 type funcNode struct {
 	*ViewBase
 	AggregateMouseHandler
-	info *Func
-	pkgRefs map[*Package]int
+	obj types.Object
+	pkgRefs map[*types.Package]int
 	inputsNode, outputsNode *portsNode
 	funcblk *block
 	awaken chan bool
 }
 
-func newFuncNode(info *Func) *funcNode {
-	n := &funcNode{info:info}
+func newFuncNode(obj types.Object) *funcNode {
+	n := &funcNode{obj:obj}
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
-	n.pkgRefs = map[*Package]int{}
+	n.pkgRefs = map[*types.Package]int{}
 	n.funcblk = newBlock(n)
 	n.inputsNode = newInputsNode(n.funcblk)
 	n.inputsNode.editable = true
@@ -31,8 +32,8 @@ func newFuncNode(info *Func) *funcNode {
 	n.AddChild(n.funcblk)
 	n.awaken = make(chan bool, 1)
 	
-	if info.receiver != nil {
-		n.inputsNode.newOutput(info.typeWithReceiver().parameters[0])
+	if m, ok := obj.(method); ok {
+		n.inputsNode.newOutput(m.Type.Recv)
 	}
 	
 	if !loadFunc(n) { saveFunc(*n) }
@@ -40,15 +41,11 @@ func newFuncNode(info *Func) *funcNode {
 	return n
 }
 
-func (n funcNode) pkg() *Package {
-	parent := n.info.parent
-	if t, ok := parent.(*NamedType); ok {
-		return t.parent.(*Package)
-	}
-	return parent.(*Package)
+func (n funcNode) pkg() *types.Package {
+	return n.obj.GetPkg()
 }
 
-func (n funcNode) imports() (x []*Package) {
+func (n funcNode) imports() (x []*types.Package) {
 	for p := range n.pkgRefs {
 		x = append(x, p)
 	}
@@ -57,27 +54,26 @@ func (n funcNode) imports() (x []*Package) {
 
 func (n *funcNode) addPkgRef(x interface{}) {
 	switch x := x.(type) {
-	case Info:
-		if p, ok := x.Parent().(*Package); ok && p != n.pkg() && p != builtinPkg {
+	case types.Object:
+		if p := x.GetPkg(); p != n.pkg() && p != nil {
 			n.pkgRefs[p]++
 		}
-	case Type:
-		walkType(x, func(t *NamedType) { n.addPkgRef(t) })
+	case types.Type:
+		walkType(x, func(t *types.NamedType) { n.addPkgRef(t.Obj) })
 	default:
 		panic(fmt.Sprintf("can't addPkgRef for %#v\n", x))
 	}
 }
 func (n *funcNode) subPkgRef(x interface{}) {
 	switch x := x.(type) {
-	case Info:
-		if p, ok := x.Parent().(*Package); ok {
-			n.pkgRefs[p]--
-			if n.pkgRefs[p] <= 0 {
-				delete(n.pkgRefs, p)
-			}
+	case types.Object:
+		p := x.GetPkg()
+		n.pkgRefs[p]--
+		if n.pkgRefs[p] <= 0 {
+			delete(n.pkgRefs, p)
 		}
-	case Type:
-		walkType(x, func(t *NamedType) { n.subPkgRef(t) })
+	case types.Type:
+		walkType(x, func(t *types.NamedType) { n.subPkgRef(t.Obj) })
 	default:
 		panic(fmt.Sprintf("can't subPkgRef for %#v\n", x))
 	}

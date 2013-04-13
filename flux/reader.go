@@ -3,7 +3,8 @@ package main
 import (
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
-	."io/ioutil"
+	"code.google.com/p/go.exp/go/types"
+	// ."io/ioutil"
 	"strings"
 	."strconv"
 )
@@ -11,40 +12,40 @@ import (
 type reader struct {
 	s string
 	f *funcNode
-	pkgNames map[string]*Package
+	pkgNames map[string]*types.Package
 	nodes map[int]node
 }
 
 func loadFunc(f *funcNode) bool {
-	r := &reader{"", f, map[string]*Package{}, map[int]node{}}
-	if b, err := ReadFile(FluxSourcePath(f.info)); err != nil {
-		return false
-	} else {
-		r.s = string(b)
-	}
+	// r := &reader{"", f, map[string]*types.Package{}, map[int]node{}}
+	// if b, err := ReadFile(FluxSourcePath(f.obj)); err != nil {
+	// 	return false
+	// } else {
+	// 	r.s = string(b)
+	// }
+	// 
+	// line := ""
+	// line, r.s = Split2(r.s, "\n")
+	// for r.s[0] != '\\' {
+	// 	line, r.s = Split2(r.s, "\n")
+	// 	importPath, name := Split2(line, " ")
+	// 	pkg := FindPackage(importPath)
+	// 	if name == "" {
+	// 		name = pkg.pkgName
+	// 	}
+	// 	r.pkgNames[name] = pkg
+	// }
+	// for _, v := range f.obj.Params {
+	// 	f.inputsNode.newOutput(v)
+	// 	f.addPkgRef(v.obj)
+	// }
+	// for _, v := range f.obj.Results {
+	// 	f.outputsNode.newInput(v)
+	// 	f.addPkgRef(v.obj)
+	// }
+	// r.readBlock(f.funcblk, 0)
 	
-	line := ""
-	line, r.s = Split2(r.s, "\n")
-	for r.s[0] != '\\' {
-		line, r.s = Split2(r.s, "\n")
-		importPath, name := Split2(line, " ")
-		pkg := FindPackage(importPath)
-		if name == "" {
-			name = pkg.pkgName
-		}
-		r.pkgNames[name] = pkg
-	}
-	for _, v := range f.info.typ.parameters {
-		f.inputsNode.newOutput(v)
-		f.addPkgRef(v.typ)
-	}
-	for _, v := range f.info.typ.results {
-		f.outputsNode.newInput(v)
-		f.addPkgRef(v.typ)
-	}
-	r.readBlock(f.funcblk, 0)
-	
-	return true
+	return false
 }
 
 func (r *reader) readBlock(b *block, indent int) {
@@ -94,18 +95,18 @@ func (r *reader) readNode(b *block, indent int) {
 			node = n
 		} else {
 			pkgName, name := Split2(fields[1], ".")
-			var pkg *Package
+			var pkg *types.Package
 			if name == "" {
 				name = pkgName
 				pkg = r.f.pkg()
 			} else {
 				pkg = r.pkgNames[pkgName]
 			}
-			for _, info := range Children(pkg) {
-				if info.Name() != name { continue }
-				switch info := info.(type) {
-				case *Func:
-					node = newCallNode(info, b)
+			for _, obj := range pkg.Scope.Entries {
+				if obj.GetName() != name { continue }
+				switch obj := obj.(type) {
+				case *types.Func:
+					node = newCallNode(obj, b)
 				default:
 					panic("not yet implemented")
 				}

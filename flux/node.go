@@ -3,6 +3,7 @@ package main
 import (
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
+	"code.google.com/p/go.exp/go/types"
 	"go/ast"
 	."math"
 )
@@ -63,7 +64,7 @@ func newNodeBase(self node, b *block) *nodeBase {
 	return n
 }
 
-func (n *nodeBase) newInput(v *Value) *input {
+func (n *nodeBase) newInput(v types.Object) *input {
 	p := newInput(n.self, v)
 	n.AddChild(p)
 	n.ins = append(n.ins, p)
@@ -71,7 +72,7 @@ func (n *nodeBase) newInput(v *Value) *input {
 	return p
 }
 
-func (n *nodeBase) newOutput(v *Value) *output {
+func (n *nodeBase) newOutput(v types.Object) *output {
 	p := newOutput(n.self, v)
 	n.AddChild(p)
 	n.outs = append(n.outs, p)
@@ -173,10 +174,10 @@ func (n nodeBase) Paint() {
 	}
 }
 
-func newNode(i Info, b *block) node {
-	switch i := i.(type) {
-	case Special:
-		switch i.Name() {
+func newNode(obj types.Object, b *block) node {
+	switch obj := obj.(type) {
+	case special:
+		switch obj.name {
 		case "[]":
 			return newIndexNode(b, false)
 		case "[]=":
@@ -188,22 +189,27 @@ func newNode(i Info, b *block) node {
 		}
 	// case StringType:
 	// 	return NewBasicLiteralNode(i)
-	case *Func:
-		return newCallNode(i, b)
+	case *types.Func, method:
+		return newCallNode(obj, b)
 	}
 	return nil
 }
 
 type callNode struct {
 	*nodeBase
-	info *Func
+	obj types.Object
 }
-func newCallNode(i *Func, b *block) *callNode {
-	n := &callNode{info:i}
+func newCallNode(obj types.Object, b *block) *callNode {
+	n := &callNode{obj:obj}
 	n.nodeBase = newNodeBase(n, b)
-	n.text.SetText(i.name)
-	for _, v := range i.typ.parameters { n.newInput(v) }
-	for _, v := range i.typ.results { n.newOutput(v) }
+	n.text.SetText(obj.GetName())
+	switch t := obj.GetType().(type) {
+	case *types.Signature:
+		if t.Recv != nil { n.newInput(t.Recv) }
+		for _, v := range t.Params { n.newInput(v) }
+		for _, v := range t.Results { n.newOutput(v) }
+	default: // builtin -- handled specially elsewhere?
+	}
 	
 	return n
 }
@@ -212,7 +218,7 @@ type constantNode struct { *nodeBase }
 func newStringConstantNode(b *block) *constantNode {
 	n := &constantNode{}
 	n.nodeBase = newNodeBase(n, b)
-	n.newOutput(&Value{})
+	n.newOutput(&types.Var{})
 	return n
 }
 
@@ -223,8 +229,9 @@ type compositeLiteralNode struct {
 func newCompositeLiteralNode(b *block) *compositeLiteralNode {
 	n := &compositeLiteralNode{}
 	n.nodeBase = newNodeBase(n, b)
-	out := n.newOutput(&Value{})
-	n.typ = newTypeView(&out.val.typ)
+	v := &types.Var{}
+	n.newOutput(v)
+	n.typ = newTypeView(&v.Type)
 	n.AddChild(n.typ)
 	return n
 }
@@ -233,19 +240,19 @@ func (n *compositeLiteralNode) editType() {
 		if t := *n.typ.typ; t != nil {
 			n.blk.func_().addPkgRef(t)
 			switch t := t.(type) {
-			case *NamedType:
-				for _, f := range t.underlying.(*StructType).fields {
-					if t.parent == n.blk.func_().pkg() || fieldIsExported(f) {
-						n.newInput(f)
+			case *types.NamedType:
+				for _, f := range t.Underlying.(*types.Struct).Fields {
+					if t.Obj.Pkg == n.blk.func_().pkg() || fieldIsExported(f) {
+						n.newInput(field{nil, f})
 					}
 				}
-			case *StructType:
-				for _, f := range t.fields {
-					n.newInput(f)
+			case *types.Struct:
+				for _, f := range t.Fields {
+					n.newInput(field{nil, f})
 				}
-			case *SliceType:
+			case *types.Slice:
 				// TODO: variable number of inputs? (same can be achieved using append.)  variable number of index/value input pairs?
-			case *MapType:
+			case *types.Map:
 				// TODO: variable number of key/value input pairs?
 			}
 			n.typ.MoveCenter(Pt(0, n.Rect().Max.Y + n.typ.Height() / 2))
@@ -257,14 +264,14 @@ func (n *compositeLiteralNode) editType() {
 	})
 }
 
-func fieldIsExported(f *Value) bool {
-	name := f.name
+func fieldIsExported(f *types.Field) bool {
+	name := f.Name
 	if name == "" {
-		t := f.typ
-		if pt, ok := t.(*PointerType); ok { 
-			t = pt.element
+		t := f.Type
+		if pt, ok := t.(*types.Pointer); ok { 
+			t = pt.Base
 		}
-		name = t.(*NamedType).name
+		name = t.(*types.NamedType).Obj.Name
 	}
 	return ast.IsExported(name)
 }

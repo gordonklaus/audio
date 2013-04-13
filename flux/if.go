@@ -2,6 +2,7 @@ package main
 
 import (
 	."code.google.com/p/gordon-go/gui"
+	"code.google.com/p/go.exp/go/types"
 )
 
 type ifNode struct {
@@ -19,7 +20,7 @@ func newIfNode(b *block) *ifNode {
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.blk = b
-	n.input = newInput(n, &Value{})
+	n.input = newInput(n, &types.Var{})
 	n.falseblk = newBlock(n)
 	n.trueblk = newBlock(n)
 	n.AddChild(n.input)

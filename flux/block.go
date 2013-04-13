@@ -3,6 +3,7 @@ package main
 import (
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
+	"code.google.com/p/go.exp/go/types"
 	"math"
 	"math/rand"
 )
@@ -40,7 +41,7 @@ func (b *block) addNode(n node) {
 		b.nodes[n] = true
 		switch n := n.(type) {
 		case *callNode:
-			b.func_().addPkgRef(n.info)
+			b.func_().addPkgRef(n.obj)
 		}
 	}
 }
@@ -50,7 +51,7 @@ func (b *block) removeNode(n node) {
 	delete(b.nodes, n)
 	switch n := n.(type) {
 	case *callNode:
-		b.func_().subPkgRef(n.info)
+		b.func_().subPkgRef(n.obj)
 	}
 }
 
@@ -439,9 +440,9 @@ func (b *block) KeyPressed(event KeyEvent) {
 				browser := newBrowser(browse, f.pkg(), f.imports())
 				b.AddChild(browser)
 				browser.Move(b.Center())
-				browser.accepted.Connect(func(info ...interface{}) {
+				browser.accepted.Connect(func(obj ...interface{}) {
 					browser.Close()
-					n := newNode(info[0].(Info), b)
+					n := newNode(obj[0].(types.Object), b)
 					b.addNode(n)
 					n.MoveCenter(b.Center())
 					n.TakeKeyboardFocus()
@@ -511,21 +512,23 @@ func newPortsNode(out bool, b *block) *portsNode {
 func (n *portsNode) KeyPressed(event KeyEvent) {
 	if n.editable && event.Text == "," {
 		var p *port
+		v := &types.Var{}
 		if n.out {
-			p = n.newInput(&Value{}).port
+			p = n.newInput(v).port
 		} else {
-			p = n.newOutput(&Value{}).port
+			p = n.newOutput(v).port
 		}
 		p.valView.Show()
 		p.valView.edit(func() {
-			if p.val.typ != nil {
+			if p.obj != nil {
 				f := n.blk.func_()
+				sig := f.obj.GetType().(*types.Signature)
 				if n.out {
-					f.info.typ.results = append(f.info.typ.results, p.val)
+					sig.Results = append(sig.Results, v)
 				} else {
-					f.info.typ.parameters = append(f.info.typ.parameters, p.val)
+					sig.Params = append(sig.Params, v)
 				}
-				f.addPkgRef(p.val.typ)
+				f.addPkgRef(p.obj)
 				p.TakeKeyboardFocus()
 			} else {
 				n.RemoveChild(p.Self)

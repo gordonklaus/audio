@@ -2,6 +2,7 @@ package main
 
 import (
 	."code.google.com/p/gordon-go/gui"
+	"code.google.com/p/go.exp/go/types"
 )
 
 type loopNode struct {
@@ -19,10 +20,10 @@ func newLoopNode(b *block) *loopNode {
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.blk = b
-	n.input = newInput(n, &Value{})
+	n.input = newInput(n, &types.Var{})
 	n.input.connsChanged = func() {
 		if conns := n.input.conns; len(conns) > 0 {
-			if o := conns[0].src; o != nil { n.updateInputType(o.val.typ) }
+			if o := conns[0].src; o != nil { n.updateInputType(o.obj.GetType()) }
 		} else {
 			n.updateInputType(nil)
 		}
@@ -30,7 +31,7 @@ func newLoopNode(b *block) *loopNode {
 	n.AddChild(n.input)
 	n.loopblk = newBlock(n)
 	n.inputsNode = newInputsNode(n.loopblk)
-	n.inputsNode.newOutput(&Value{})
+	n.inputsNode.newOutput(&types.Var{})
 	n.loopblk.addNode(n.inputsNode)
 	n.AddChild(n.loopblk)
 	
@@ -49,26 +50,27 @@ func (n loopNode) outConns() []*connection {
 	return n.loopblk.outConns()
 }
 
-func (n *loopNode) updateInputType(t Type) {
+func (n *loopNode) updateInputType(t types.Type) {
 	in := n.inputsNode
 	switch t.(type) {
-	case nil, *NamedType, *ChanType:
+	case nil, *types.Basic, *types.NamedType, *types.Chan:
 		if len(in.outs) == 2 {
 			in.RemoveChild(in.outs[1])
 			in.outs = in.outs[:1]
 		}
-	case *ArrayType, *SliceType, *MapType:
+	case *types.Array, *types.Slice, *types.Map:
 		if len(in.outs) == 1 {
-			in.newOutput(&Value{})
+			in.newOutput(&types.Var{})
 		}
 	}
 	switch t.(type) {
 	case nil:
-	case *NamedType:
-	case *ArrayType:
-	case *SliceType:
-	case *MapType:
-	case *ChanType:
+	case *types.Basic:
+	case *types.NamedType:
+	case *types.Array:
+	case *types.Slice:
+	case *types.Map:
+	case *types.Chan:
 	}
 }
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	."code.google.com/p/gordon-go/gui"
+	"code.google.com/p/go.exp/go/types"
 )
 
 type input struct { *port }
@@ -10,7 +11,7 @@ type port struct {
 	*ViewBase
 	out bool
 	node node
-	val *Value
+	obj types.Object
 	valView *typeView
 	conns []*connection
 	focused bool
@@ -19,20 +20,20 @@ type port struct {
 
 const portSize = 11
 
-func newInput(n node, v *Value) *input {
+func newInput(n node, v types.Object) *input {
 	p := &input{}
 	p.port = newPort(p, false, n, v)
 	p.valView.Move(Pt(-p.valView.Width() - 12, -p.valView.Height() / 2))
 	return p
 }
-func newOutput(n node, v *Value) *output {
+func newOutput(n node, v types.Object) *output {
 	p := &output{}
 	p.port = newPort(p, true, n, v)
 	p.valView.Move(Pt(12, -p.valView.Height() / 2))
 	return p
 }
-func newPort(self View, out bool, n node, v *Value) *port {
-	p := &port{out:out, node:n, val:v}
+func newPort(self View, out bool, n node, v types.Object) *port {
+	p := &port{out:out, node:n, obj:v}
 	p.ViewBase = NewView(p)
 	p.valView = newValueView(v)
 	p.valView.Hide()
