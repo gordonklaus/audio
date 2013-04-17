@@ -166,6 +166,7 @@ func (w *writer) writeBlockGo(b *block, indent int, vars map[*input]string) {
 			switch n := n.(type) {
 			case *callNode:
 				Fprintf(w.src, "%s(%s)", w.qualifiedName(n.obj), Join(inputs, ", "))
+				// TODO: handle methods
 			case *indexNode:
 				if n.set {
 					Fprintf(w.src, "%s[%s] = %s", inputs[0], inputs[1], inputs[2])
@@ -195,7 +196,7 @@ func (w *writer) writeBlockGo(b *block, indent int, vars map[*input]string) {
 			out, assignExisting := w.outputNames(n.inputsNode, vars)
 			if conns := n.input.conns; len(conns) > 0 {
 				switch conns[0].src.obj.GetType().(type) {
-				case *types.NamedType:
+				case *types.Basic, *types.NamedType:
 					if out == "" {
 						out = w.newName("")
 					}
@@ -203,6 +204,8 @@ func (w *writer) writeBlockGo(b *block, indent int, vars map[*input]string) {
 				case *types.Array, *types.Slice, *types.Map, *types.Chan:
 					if len(out) > 0 {
 						Fprintf(w.src, "%s := ", out)
+					} else {
+						Fprint(w.src, "_ = ")
 					}
 					Fprintf(w.src, "range %s ", vars[n.input])
 				}

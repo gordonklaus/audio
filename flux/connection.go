@@ -23,17 +23,14 @@ type connection struct {
 
 const connectionThickness = 7
 
-func newConnection(b *block, p Point) *connection {
-	c := &connection{blk:b}
+func newConnection() *connection {
+	c := &connection{}
 	c.ViewBase = NewView(c)
 	c.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(c)}
 	c.srcHandle = newConnectionSourceHandle(c)
 	c.dstHandle = newConnectionDestinationHandle(c)
-	c.srcPt = p
-	c.dstPt = p
 	c.AddChild(c.srcHandle)
 	c.AddChild(c.dstHandle)
-	b.addConnection(c)
 	return c
 }
 

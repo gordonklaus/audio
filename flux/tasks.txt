@@ -1,6 +1,7 @@
 TODO
 
-- fix bug in indexNode and loopNode:  crash when changing/deleting input connection (something to do with outputs changing)?
+- consider the matter of addressability and copying.  currently, there is one variable per output, plus one variable for each connection that exits a block.  there should be a clear rule for when a copy is made so that it is obvious which connections refer to the same value.
+- fix bug in indexNode and loopNode:  crash when changing/deleting input connection (something to do with outputs changing)?  might have to do with trying to connect the input to the 2nd inputsNode output, which disappears before the connection is made.
 - fix typeView bug(s):
   - type T big.Int, e.g.,  shows up as the struct{} that big.Int is
 - browser shows unexported types and struct fields
@@ -13,7 +14,7 @@ TODO
 - color conns by type.  hash type name, interpret as color.  or, use multiple colors to describe the whole type tree (outlined, woven, etc).
 - improve valueView editing; currently, name and type can't be edited separately.  solution:  allow to focus name text.
 - fix connection drawing during mouse editing
-- find a better way to embed font (current using something like https://github.com/jteeuwen/go-bindata, https://groups.google.com/forum/#!msg/golang-nuts/UOIUyn7uFsY/Uescy-cI7hQJ) (best to wait for this https://code.google.com/p/go/issues/detail?id=3035).  Or consider installing it in a fixed location (OS X: in app bundle.  Linux: in /usr/share?  Windows: in application directory?)
+- find a better way to embed font (current using something like https://github.com/jteeuwen/go-bindata, https://groups.google.com/forum/#!msg/golang-nuts/UOIUyn7uFsY/Uescy-cI7hQJ) (best to wait for this https://code.google.com/p/go/issues/detail?id=3035).  Or consider installing it in a fixed location (OS X: in app bundle.  Linux: in /usr/share?  Windows: in application directory?)  Also check the go src directory in case someone has go-gotten flux?
 
 before releasing:
 - handle all errors

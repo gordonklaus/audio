@@ -1,136 +1,207 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
-	."code.google.com/p/gordon-go/util"
 	"code.google.com/p/go.exp/go/types"
-	// ."io/ioutil"
-	"strings"
-	."strconv"
+	"go/ast"
+	"go/token"
+	"strconv"
 )
 
 type reader struct {
-	s string
-	f *funcNode
+	pkg *types.Package
 	pkgNames map[string]*types.Package
-	nodes map[int]node
+	vars map[string][]*output
+	varTypes map[string]types.Type
 }
 
 func loadFunc(f *funcNode) bool {
-	// r := &reader{"", f, map[string]*types.Package{}, map[int]node{}}
-	// if b, err := ReadFile(FluxSourcePath(f.obj)); err != nil {
-	// 	return false
-	// } else {
-	// 	r.s = string(b)
-	// }
-	// 
-	// line := ""
-	// line, r.s = Split2(r.s, "\n")
-	// for r.s[0] != '\\' {
-	// 	line, r.s = Split2(r.s, "\n")
-	// 	importPath, name := Split2(line, " ")
-	// 	pkg := FindPackage(importPath)
-	// 	if name == "" {
-	// 		name = pkg.pkgName
-	// 	}
-	// 	r.pkgNames[name] = pkg
-	// }
-	// for _, v := range f.obj.Params {
-	// 	f.inputsNode.newOutput(v)
-	// 	f.addPkgRef(v.obj)
-	// }
-	// for _, v := range f.obj.Results {
-	// 	f.outputsNode.newInput(v)
-	// 	f.addPkgRef(v.obj)
-	// }
-	// r.readBlock(f.funcblk, 0)
-	
-	return false
-}
-
-func (r *reader) readBlock(b *block, indent int) {
-	_, r.s = Split2(r.s, "\n")
-	indent++
-	for len(r.s) > 0 {
-		i := 0
-		for r.s[i] == '\t' { i++ }
-		if i < indent { return }
-		r.readNode(b, indent)
+	file := fluxObjs[f.obj]
+	if file == nil {
+		return false
 	}
+	r := &reader{f.obj.GetPkg(), map[string]*types.Package{}, map[string][]*output{}, map[string]types.Type{}}
+	for _, i := range file.Imports {
+		path, _ := strconv.Unquote(i.Path.Value)
+		pkg := r.pkg.Imports[path]
+		name := pkg.Name
+		if i.Name != nil {
+			name = i.Name.Name
+		}
+		r.pkgNames[name] = pkg
+	}
+	t := f.obj.GetType().(*types.Signature)
+	if t.Recv != nil {
+		r.addVar(t.Recv.Name, f.inputsNode.newOutput(t.Recv))
+	}
+	for _, v := range t.Params {
+		r.addVar(v.Name, f.inputsNode.newOutput(v))
+		f.addPkgRef(v)
+	}
+	for _, d := range file.Decls {
+		if d, ok := d.(*ast.FuncDecl); ok {
+			r.readBlock(f.funcblk, d.Body.List)
+		}
+	}
+	for _, v := range t.Results {
+		r.connect(v.Name, f.outputsNode.newInput(v))
+		f.addPkgRef(v)
+	}
+	return true
 }
 
-func (r *reader) readNode(b *block, indent int) {
-	var node node
-	line := ""
-	line, r.s = Split2(r.s, "\n")
-	fields := strings.Fields(line)
-	switch f := fields[1]; f {
- 	case "\\in":
-		for n := range b.nodes {
-			if n, ok := n.(*portsNode); ok && !n.out {
-				node = n
-			}
-		}
- 	case "\\out":
-		for n := range b.nodes {
-			if n, ok := n.(*portsNode); ok && n.out {
-				node = n
-			}
-		}
-	case "[]":
-		node = newIndexNode(b, false)
-	case "[]=":
-		node = newIndexNode(b, true)
-	case "if":
-		n := newIfNode(b)
-		node = n
-	case "loop":
-		n := newLoopNode(b)
-		node = n
-	default:
-		if f[0] == '"' {
-			n := newStringConstantNode(b)
-			text, _ := Unquote(fields[1])
-			n.text.SetText(text)
-			node = n
-		} else {
-			pkgName, name := Split2(fields[1], ".")
-			var pkg *types.Package
-			if name == "" {
-				name = pkgName
-				pkg = r.f.pkg()
+func (r *reader) readBlock(b *block, s []ast.Stmt) {
+	for _, s := range s {
+		switch s := s.(type) {
+		case *ast.AssignStmt:
+			if s.Tok == token.DEFINE {
+				switch x := s.Rhs[0].(type) {
+				case *ast.BasicLit:
+					switch x.Kind {
+					case token.INT, token.FLOAT, token.IMAG, token.CHAR:
+					case token.STRING:
+						n := newStringConstantNode()
+						b.addNode(n)
+						text, _ := strconv.Unquote(x.Value)
+						n.text.SetText(text)
+						r.addVar(id(s.Lhs[0]), n.outs[0])
+					}
+				case *ast.CallExpr:
+					n := r.newCallNode(b, x)
+					for i, lhs := range s.Lhs {
+						r.addVar(id(lhs), n.outs[i])
+					}
+				case *ast.IndexExpr:
+					n := newIndexNode(false)
+					b.addNode(n)
+					r.connect(id(x.X), n.x)
+					r.connect(id(x.Index), n.key)
+					r.addVar(id(s.Lhs[0]), n.outVal)
+					if len(s.Lhs) == 2 {
+						r.addVar(id(s.Lhs[1]), n.ok)
+					}
+				}
 			} else {
-				pkg = r.pkgNames[pkgName]
-			}
-			for _, obj := range pkg.Scope.Entries {
-				if obj.GetName() != name { continue }
-				switch obj := obj.(type) {
-				case *types.Func:
-					node = newCallNode(obj, b)
-				default:
-					panic("not yet implemented")
+				if x, ok := s.Lhs[0].(*ast.IndexExpr); ok {
+					n := newIndexNode(true)
+					b.addNode(n)
+					r.connect(id(x.X), n.x)
+					r.connect(id(x.Index), n.key)
+					if i, ok := s.Rhs[0].(*ast.Ident); ok {
+						r.connect(i.Name, n.inVal)
+					}
+				} else {
+					for i := range s.Lhs {
+						lh := id(s.Lhs[i])
+						rh := id(s.Rhs[i])
+						r.vars[lh] = append(r.vars[lh], r.vars[rh]...)
+						// the static type of lhs and rhs are not necessarily the same.
+						// varType is set under DeclStmt.
+						// until go/types is complete, setting varType here, which will work in most cases but fail in a few
+						r.varTypes[lh] = r.varTypes[rh]
+					}
 				}
 			}
+		case *ast.DeclStmt:
+			v := s.Decl.(*ast.GenDecl).Specs[0].(*ast.ValueSpec)
+			// this only handles named types; when will go/types do it all for me?
+			var t types.Type
+			switch x := v.Type.(type) {
+			case *ast.Ident:
+				t = r.pkg.Scope.Lookup(x.Name).(*types.TypeName).Type
+			case *ast.SelectorExpr:
+				t = r.pkgNames[id(x.X)].Scope.Lookup(x.Sel.Name).(*types.TypeName).Type
+			}
+			if t != nil {
+				r.varTypes[v.Names[0].Name] = t
+			}
+		case *ast.ForStmt:
+			n := newLoopNode()
+			b.addNode(n)
+			if s.Cond != nil {
+				r.connect(id(s.Cond.(*ast.BinaryExpr).Y), n.input)
+				if s.Init != nil {
+					r.addVar(id(s.Init.(*ast.AssignStmt).Lhs[0]), n.inputsNode.outs[0])
+				}
+			}
+			r.readBlock(n.loopblk, s.Body.List)
+		case *ast.IfStmt:
+			n := newIfNode()
+			b.addNode(n)
+			r.connect(id(s.Cond), n.input)
+			r.readBlock(n.trueblk, s.Body.List)
+			if s.Else != nil {
+				r.readBlock(n.falseblk, s.Else.(*ast.BlockStmt).List)
+			}
+		case *ast.RangeStmt:
+			n := newLoopNode()
+			b.addNode(n)
+			r.connect(id(s.X), n.input)
+			r.addVar(id(s.Key), n.inputsNode.outs[0])
+			if s.Value != nil {
+				r.addVar(id(s.Value), n.inputsNode.outs[1])
+			}
+			r.readBlock(n.loopblk, s.Body.List)
+		case *ast.ExprStmt:
+			switch x := s.X.(type) {
+			case *ast.CallExpr:
+				r.newCallNode(b, x)
+			}
 		}
 	}
-	id, _ := Atoi(fields[0])
-	r.nodes[id] = node
-	b.addNode(node)
-	for _, f := range fields[2:] {
-		i := strings.Index(f, ".")
-		j := strings.Index(f, "-")
-		srcID, _ := Atoi(f[:i])
-		srcPort, _ := Atoi(f[i+1:j])
-		dstPort, _ := Atoi(f[j+1:])
-		c := newConnection(b, ZP)
-		c.setSrc(r.nodes[srcID].outputs()[srcPort])
-		c.setDst(node.inputs()[dstPort])
+}
+
+func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n *callNode) {
+	var recvExpr ast.Expr
+	switch f := x.Fun.(type) {
+	case *ast.Ident:
+		n = newCallNode(r.pkg.Scope.Lookup(f.Name))
+	case *ast.SelectorExpr:
+		n1 := id(f.X)
+		n2 := f.Sel.Name
+		if pkg, ok := r.pkgNames[n1]; ok {
+			n = newCallNode(pkg.Scope.Lookup(n2))
+		} else {
+			recv := r.varTypes[n1]
+			if p, ok := recv.(*types.Pointer); ok {
+				recv = p.Base
+			}
+			for _, m := range recv.(*types.NamedType).Methods {
+				if m.Name == n2 {
+					n = newCallNode(method{nil, m})
+					break
+				}
+			}
+			recvExpr = f.X
+		}
 	}
-	switch n := node.(type) {
-	case *ifNode:
-		r.readBlock(n.trueblk, indent)
-		r.readBlock(n.falseblk, indent)
-	case *loopNode:
-		r.readBlock(n.loopblk, indent)
+	b.addNode(n)
+	args := x.Args
+	if recvExpr != nil {
+		args = append([]ast.Expr{recvExpr}, args...)
 	}
+	for i, arg := range args {
+		if arg, ok := arg.(*ast.Ident); ok {
+			r.connect(arg.Name, n.ins[i])
+		}
+	}
+	return
+}
+
+func (r *reader) connect(name string, in *input) {
+	for _, out := range r.vars[name] {
+		c := newConnection()
+		c.setSrc(out)
+		c.setDst(in)
+	}
+}
+
+func (r *reader) addVar(name string, out *output) {
+	if name != "" && name != "_" {
+		r.vars[name] = append(r.vars[name], out)
+		r.varTypes[name] = out.obj.GetType()
+	}
+}
+
+func id(x ast.Expr) string {
+	return x.(*ast.Ident).Name
 }

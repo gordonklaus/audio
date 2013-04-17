@@ -10,9 +10,9 @@ type indexNode struct {
 	x, key, inVal *input
 	outVal, ok *output
 }
-func newIndexNode(b *block, set bool) *indexNode {
+func newIndexNode(set bool) *indexNode {
 	n := &indexNode{set:set}
-	n.nodeBase = newNodeBase(n, b)
+	n.nodeBase = newNodeBase(n)
 	n.x = n.newInput(&types.Var{})
 	n.x.connsChanged = func() {
 		if conns := n.x.conns; len(conns) > 0 {

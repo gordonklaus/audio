@@ -12,6 +12,7 @@ type node interface {
 	View
 	MouseHandler
 	block() *block
+	setBlock(b *block)
 	inputs() []*input
 	outputs() []*output
 	inConns() []*connection
@@ -52,11 +53,10 @@ const (
 	nodeMargin = 3
 )
 
-func newNodeBase(self node, b *block) *nodeBase {
+func newNodeBase(self node) *nodeBase {
 	n := &nodeBase{self:self}
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(self), NewViewDragger(self)}
-	n.blk = b
 	n.text = newNodeText(n)
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	n.AddChild(n.text)
@@ -114,6 +114,7 @@ func (n *nodeBase) reform() {
 }
 
 func (n nodeBase) block() *block { return n.blk }
+func (n *nodeBase) setBlock(b *block) { n.blk = b }
 func (n nodeBase) inputs() []*input { return n.ins }
 func (n nodeBase) outputs() []*output { return n.outs }
 
@@ -174,23 +175,23 @@ func (n nodeBase) Paint() {
 	}
 }
 
-func newNode(obj types.Object, b *block) node {
+func newNode(obj types.Object) node {
 	switch obj := obj.(type) {
 	case special:
 		switch obj.name {
 		case "[]":
-			return newIndexNode(b, false)
+			return newIndexNode(false)
 		case "[]=":
-			return newIndexNode(b, true)
+			return newIndexNode(true)
 		case "if":
-			return newIfNode(b)
+			return newIfNode()
 		case "loop":
-			return newLoopNode(b)
+			return newLoopNode()
 		}
 	// case StringType:
 	// 	return NewBasicLiteralNode(i)
 	case *types.Func, method:
-		return newCallNode(obj, b)
+		return newCallNode(obj)
 	}
 	return nil
 }
@@ -199,9 +200,9 @@ type callNode struct {
 	*nodeBase
 	obj types.Object
 }
-func newCallNode(obj types.Object, b *block) *callNode {
+func newCallNode(obj types.Object) *callNode {
 	n := &callNode{obj:obj}
-	n.nodeBase = newNodeBase(n, b)
+	n.nodeBase = newNodeBase(n)
 	n.text.SetText(obj.GetName())
 	switch t := obj.GetType().(type) {
 	case *types.Signature:
@@ -215,9 +216,9 @@ func newCallNode(obj types.Object, b *block) *callNode {
 }
 
 type constantNode struct { *nodeBase }
-func newStringConstantNode(b *block) *constantNode {
+func newStringConstantNode() *constantNode {
 	n := &constantNode{}
-	n.nodeBase = newNodeBase(n, b)
+	n.nodeBase = newNodeBase(n)
 	n.newOutput(&types.Var{})
 	return n
 }
@@ -226,9 +227,9 @@ type compositeLiteralNode struct {
 	*nodeBase
 	typ *typeView
 }
-func newCompositeLiteralNode(b *block) *compositeLiteralNode {
+func newCompositeLiteralNode() *compositeLiteralNode {
 	n := &compositeLiteralNode{}
-	n.nodeBase = newNodeBase(n, b)
+	n.nodeBase = newNodeBase(n)
 	v := &types.Var{}
 	n.newOutput(v)
 	n.typ = newTypeView(&v.Type)

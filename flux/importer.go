@@ -2,7 +2,6 @@ package main
 
 import (
 	"code.google.com/p/go.exp/go/types"
-	"fmt"
 	"go/ast"
 	"go/build"
 	"go/parser"
@@ -13,7 +12,7 @@ import (
 
 var pkgs = map[string]*types.Package{"unsafe":types.Unsafe}
 
-var fluxObjs = map[types.Object]bool{}
+var fluxObjs = map[types.Object]*ast.File{}
 
 func getPackage(path string) (*types.Package, error) {
 	if pkg, ok := pkgs[path]; ok {
@@ -25,19 +24,19 @@ func getPackage(path string) (*types.Package, error) {
 		return nil, err
 	}
 	
-	var fluxNames []string
+	var fluxFiles []*ast.File
 	
 	files := []*ast.File{}
 	fset := token.NewFileSet()
 	for _, fileName := range append(buildPkg.GoFiles, buildPkg.CgoFiles...) {
-		if strings.HasSuffix(fileName, ".flux.go") {
-			fluxNames = append(fluxNames, fileName[:len(fileName) - 8])
-		}
 		file, err := parser.ParseFile(fset, filepath.Join(buildPkg.Dir, fileName), nil, 0)
 		if err != nil {
 			return nil, err
 		}
 		files = append(files, file)
+		if strings.HasSuffix(fileName, ".flux.go") {
+			fluxFiles = append(fluxFiles, file)
+		}
 	}
 	ctx := types.Context{Import:srcImport}
 	pkg, err := ctx.Check(fset, files)
@@ -50,28 +49,30 @@ func getPackage(path string) (*types.Package, error) {
 	pkg.Path = buildPkg.ImportPath
 	pkgs[path] = pkg
 	
-fluxNames:
-	for _, n := range fluxNames {
-		i := strings.Index(n, ".")
-		if i < 0 {
-			if obj := pkg.Scope.Lookup(n); obj != nil {
-				fluxObjs[obj] = true
-				continue
-			}
-		} else {
-			t, f := n[:i], n[i+1:]
-			if t, ok := pkg.Scope.Lookup(t).(*types.TypeName); ok {
-				if t, ok := t.Type.(*types.NamedType); ok {
-					for _, m := range t.Methods {
-						if m.Name == f {
-							fluxObjs[method{nil, m}] = true
-							continue fluxNames
+	for _, file := range fluxFiles {
+		for _, d := range file.Decls {
+			// go/types doesn't set the Objects yet, so we have to look them up
+			switch d := d.(type) {
+			case *ast.FuncDecl:
+				if d.Recv != nil {
+					t := d.Recv.List[0].Type
+					if p, ok := t.(*ast.StarExpr); ok {
+						t = p.X
+					}
+					for _, m := range pkg.Scope.Lookup(t.(*ast.Ident).Name).GetType().(*types.NamedType).Methods {
+						if m.Name == d.Name.Name {
+							fluxObjs[method{nil, m}] = file
 						}
 					}
+				} else {
+					fluxObjs[pkg.Scope.Lookup(d.Name.Name)] = file
+				}
+			case *ast.GenDecl:
+				if s, ok := d.Specs[0].(*ast.TypeSpec); ok {
+					fluxObjs[pkg.Scope.Lookup(s.Name.Name)] = file
 				}
 			}
 		}
-		fmt.Printf("flux object %s not found in package %s\n", n, path)
 	}
 	
 	return pkg, nil

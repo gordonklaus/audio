@@ -23,20 +23,21 @@ func newFuncNode(obj types.Object) *funcNode {
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.pkgRefs = map[*types.Package]int{}
 	n.funcblk = newBlock(n)
-	n.inputsNode = newInputsNode(n.funcblk)
+	n.inputsNode = newInputsNode()
 	n.inputsNode.editable = true
 	n.funcblk.addNode(n.inputsNode)
-	n.outputsNode = newOutputsNode(n.funcblk)
+	n.outputsNode = newOutputsNode()
 	n.outputsNode.editable = true
 	n.funcblk.addNode(n.outputsNode)
 	n.AddChild(n.funcblk)
 	n.awaken = make(chan bool, 1)
 	
-	if m, ok := obj.(method); ok {
-		n.inputsNode.newOutput(m.Type.Recv)
+	if !loadFunc(n) {
+		if m, ok := obj.(method); ok {
+			n.inputsNode.newOutput(m.Type.Recv)
+		}
+		saveFunc(*n)
 	}
-	
-	if !loadFunc(n) { saveFunc(*n) }
 	
 	return n
 }
@@ -80,6 +81,7 @@ func (n *funcNode) subPkgRef(x interface{}) {
 }
 
 func (n funcNode) block() *block { return nil }
+func (n funcNode) setBlock(b *block) {}
 func (n funcNode) inputs() []*input { return nil }
 func (n funcNode) outputs() []*output { return nil }
 func (n funcNode) inConns() []*connection { return nil }

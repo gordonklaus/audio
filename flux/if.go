@@ -15,11 +15,10 @@ type ifNode struct {
 	focused bool
 }
 
-func newIfNode(b *block) *ifNode {
+func newIfNode() *ifNode {
 	n := &ifNode{}
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
-	n.blk = b
 	n.input = newInput(n, &types.Var{})
 	n.falseblk = newBlock(n)
 	n.trueblk = newBlock(n)
@@ -33,6 +32,7 @@ func newIfNode(b *block) *ifNode {
 }
 
 func (n ifNode) block() *block { return n.blk }
+func (n *ifNode) setBlock(b *block) { n.blk = b }
 func (n ifNode) inputs() []*input { return []*input{n.input} }
 func (n ifNode) outputs() []*output { return nil }
 

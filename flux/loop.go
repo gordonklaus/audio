@@ -15,11 +15,10 @@ type loopNode struct {
 	focused bool
 }
 
-func newLoopNode(b *block) *loopNode {
+func newLoopNode() *loopNode {
 	n := &loopNode{}
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
-	n.blk = b
 	n.input = newInput(n, &types.Var{})
 	n.input.connsChanged = func() {
 		if conns := n.input.conns; len(conns) > 0 {
@@ -30,7 +29,7 @@ func newLoopNode(b *block) *loopNode {
 	}
 	n.AddChild(n.input)
 	n.loopblk = newBlock(n)
-	n.inputsNode = newInputsNode(n.loopblk)
+	n.inputsNode = newInputsNode()
 	n.inputsNode.newOutput(&types.Var{})
 	n.loopblk.addNode(n.inputsNode)
 	n.AddChild(n.loopblk)
@@ -41,6 +40,7 @@ func newLoopNode(b *block) *loopNode {
 }
 
 func (n loopNode) block() *block { return n.blk }
+func (n *loopNode) setBlock(b *block) { n.blk = b }
 func (n loopNode) inputs() []*input { return []*input{n.input} }
 func (n loopNode) outputs() []*output { return nil }
 func (n loopNode) inConns() []*connection {

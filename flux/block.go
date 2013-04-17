@@ -39,6 +39,7 @@ func (b *block) addNode(n node) {
 	if !b.nodes[n] {
 		b.AddChild(n)
 		b.nodes[n] = true
+		n.setBlock(b)
 		switch n := n.(type) {
 		case *callNode:
 			b.func_().addPkgRef(n.obj)
@@ -442,7 +443,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 				browser.Move(b.Center())
 				browser.accepted.Connect(func(obj ...interface{}) {
 					browser.Close()
-					n := newNode(obj[0].(types.Object), b)
+					n := newNode(obj[0].(types.Object))
 					b.addNode(n)
 					n.MoveCenter(b.Center())
 					n.TakeKeyboardFocus()
@@ -454,12 +455,12 @@ func (b *block) KeyPressed(event KeyEvent) {
 				browser.text.KeyPressed(event)
 				browser.text.TakeKeyboardFocus()
 			case "\"":
-				n := newStringConstantNode(b)
+				n := newStringConstantNode()
 				b.addNode(n)
 				n.MoveCenter(b.Center())
 				n.text.TakeKeyboardFocus()
 			case "{":
-				n := newCompositeLiteralNode(b)
+				n := newCompositeLiteralNode()
 				b.addNode(n)
 				n.MoveCenter(b.Center())
 				n.editType()
@@ -501,11 +502,11 @@ type portsNode struct {
 	editable bool
 }
 
-func newInputsNode(b *block) *portsNode { return newPortsNode(false, b) }
-func newOutputsNode(b *block) *portsNode { return newPortsNode(true, b) }
-func newPortsNode(out bool, b *block) *portsNode {
+func newInputsNode() *portsNode { return newPortsNode(false) }
+func newOutputsNode() *portsNode { return newPortsNode(true) }
+func newPortsNode(out bool) *portsNode {
 	n := &portsNode{out:out}
-	n.nodeBase = newNodeBase(n, b)
+	n.nodeBase = newNodeBase(n)
 	return n
 }
 

@@ -75,7 +75,7 @@ func (p *port) KeyPressed(event KeyEvent) {
 	
 	switch event.Key {
 	case KeyEnter:
-		c := newConnection(p.node.block(), p.Center())
+		c := newConnection()
 		if p.out {
 			c.setSrc(p.Self.(*output))
 		} else {
@@ -93,7 +93,7 @@ func (p *port) KeyPressed(event KeyEvent) {
 
 func (p *port) MousePressed(button int, pt Point) {
 	p.TakeKeyboardFocus()
-	c := newConnection(p.node.block(), p.MapTo(pt, p.node.block()))
+	c := newConnection()
 	if p.out {
 		c.setSrc(p.Self.(*output))
 		c.dstHandle.SetMouseFocus(c.dstHandle, button)
