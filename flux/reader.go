@@ -7,13 +7,6 @@ import (
 	"strconv"
 )
 
-type reader struct {
-	pkg *types.Package
-	pkgNames map[string]*types.Package
-	vars map[string][]*output
-	varTypes map[string]types.Type
-}
-
 func loadFunc(f *funcNode) bool {
 	file := fluxObjs[f.obj]
 	if file == nil {
@@ -37,16 +30,21 @@ func loadFunc(f *funcNode) bool {
 		r.addVar(v.Name, f.inputsNode.newOutput(v))
 		f.addPkgRef(v)
 	}
-	for _, d := range file.Decls {
-		if d, ok := d.(*ast.FuncDecl); ok {
-			r.readBlock(f.funcblk, d.Body.List)
-		}
+	if d, ok := file.Decls[len(file.Decls)-1].(*ast.FuncDecl); ok {
+		r.readBlock(f.funcblk, d.Body.List)
 	}
 	for _, v := range t.Results {
 		r.connect(v.Name, f.outputsNode.newInput(v))
 		f.addPkgRef(v)
 	}
 	return true
+}
+
+type reader struct {
+	pkg *types.Package
+	pkgNames map[string]*types.Package
+	vars map[string][]*output // there is a bug here; names can be reused between disjoint blocks; vars should be passed as a param, as in writer
+	varTypes map[string]types.Type
 }
 
 func (r *reader) readBlock(b *block, s []ast.Stmt) {
@@ -63,36 +61,36 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 						b.addNode(n)
 						text, _ := strconv.Unquote(x.Value)
 						n.text.SetText(text)
-						r.addVar(id(s.Lhs[0]), n.outs[0])
+						r.addVar(name(s.Lhs[0]), n.outs[0])
 					}
 				case *ast.CallExpr:
 					n := r.newCallNode(b, x)
 					for i, lhs := range s.Lhs {
-						r.addVar(id(lhs), n.outs[i])
+						r.addVar(name(lhs), n.outs[i])
 					}
 				case *ast.IndexExpr:
 					n := newIndexNode(false)
 					b.addNode(n)
-					r.connect(id(x.X), n.x)
-					r.connect(id(x.Index), n.key)
-					r.addVar(id(s.Lhs[0]), n.outVal)
+					r.connect(name(x.X), n.x)
+					r.connect(name(x.Index), n.key)
+					r.addVar(name(s.Lhs[0]), n.outVal)
 					if len(s.Lhs) == 2 {
-						r.addVar(id(s.Lhs[1]), n.ok)
+						r.addVar(name(s.Lhs[1]), n.ok)
 					}
 				}
 			} else {
 				if x, ok := s.Lhs[0].(*ast.IndexExpr); ok {
 					n := newIndexNode(true)
 					b.addNode(n)
-					r.connect(id(x.X), n.x)
-					r.connect(id(x.Index), n.key)
+					r.connect(name(x.X), n.x)
+					r.connect(name(x.Index), n.key)
 					if i, ok := s.Rhs[0].(*ast.Ident); ok {
 						r.connect(i.Name, n.inVal)
 					}
 				} else {
 					for i := range s.Lhs {
-						lh := id(s.Lhs[i])
-						rh := id(s.Rhs[i])
+						lh := name(s.Lhs[i])
+						rh := name(s.Rhs[i])
 						r.vars[lh] = append(r.vars[lh], r.vars[rh]...)
 						// the static type of lhs and rhs are not necessarily the same.
 						// varType is set under DeclStmt.
@@ -109,7 +107,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 			case *ast.Ident:
 				t = r.pkg.Scope.Lookup(x.Name).(*types.TypeName).Type
 			case *ast.SelectorExpr:
-				t = r.pkgNames[id(x.X)].Scope.Lookup(x.Sel.Name).(*types.TypeName).Type
+				t = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name).(*types.TypeName).Type
 			}
 			if t != nil {
 				r.varTypes[v.Names[0].Name] = t
@@ -118,16 +116,16 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 			n := newLoopNode()
 			b.addNode(n)
 			if s.Cond != nil {
-				r.connect(id(s.Cond.(*ast.BinaryExpr).Y), n.input)
-				if s.Init != nil {
-					r.addVar(id(s.Init.(*ast.AssignStmt).Lhs[0]), n.inputsNode.outs[0])
-				}
+				r.connect(name(s.Cond.(*ast.BinaryExpr).Y), n.input)
+			}
+			if s.Init != nil {
+				r.addVar(name(s.Init.(*ast.AssignStmt).Lhs[0]), n.inputsNode.outs[0])
 			}
 			r.readBlock(n.loopblk, s.Body.List)
 		case *ast.IfStmt:
 			n := newIfNode()
 			b.addNode(n)
-			r.connect(id(s.Cond), n.input)
+			r.connect(name(s.Cond), n.input)
 			r.readBlock(n.trueblk, s.Body.List)
 			if s.Else != nil {
 				r.readBlock(n.falseblk, s.Else.(*ast.BlockStmt).List)
@@ -135,10 +133,10 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 		case *ast.RangeStmt:
 			n := newLoopNode()
 			b.addNode(n)
-			r.connect(id(s.X), n.input)
-			r.addVar(id(s.Key), n.inputsNode.outs[0])
+			r.connect(name(s.X), n.input)
+			r.addVar(name(s.Key), n.inputsNode.outs[0])
 			if s.Value != nil {
-				r.addVar(id(s.Value), n.inputsNode.outs[1])
+				r.addVar(name(s.Value), n.inputsNode.outs[1])
 			}
 			r.readBlock(n.loopblk, s.Body.List)
 		case *ast.ExprStmt:
@@ -156,7 +154,7 @@ func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n *callNode) {
 	case *ast.Ident:
 		n = newCallNode(r.pkg.Scope.Lookup(f.Name))
 	case *ast.SelectorExpr:
-		n1 := id(f.X)
+		n1 := name(f.X)
 		n2 := f.Sel.Name
 		if pkg, ok := r.pkgNames[n1]; ok {
 			n = newCallNode(pkg.Scope.Lookup(n2))
@@ -202,6 +200,6 @@ func (r *reader) addVar(name string, out *output) {
 	}
 }
 
-func id(x ast.Expr) string {
+func name(x ast.Expr) string {
 	return x.(*ast.Ident).Name
 }

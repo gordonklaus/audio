@@ -41,9 +41,10 @@ func getPackage(path string) (*types.Package, error) {
 	ctx := types.Context{Import:srcImport}
 	pkg, err := ctx.Check(fset, files)
 	if err != nil {
+		origErr := err
 		pkg, err = types.GcImport(pkgs, path)
 		if err != nil {
-			return nil, err
+			return nil, origErr
 		}
 	}
 	pkg.Path = buildPkg.ImportPath
@@ -68,8 +69,10 @@ func getPackage(path string) (*types.Package, error) {
 					fluxObjs[pkg.Scope.Lookup(d.Name.Name)] = file
 				}
 			case *ast.GenDecl:
-				if s, ok := d.Specs[0].(*ast.TypeSpec); ok {
-					fluxObjs[pkg.Scope.Lookup(s.Name.Name)] = file
+				if len(d.Specs) > 0 {
+					if s, ok := d.Specs[0].(*ast.TypeSpec); ok {
+						fluxObjs[pkg.Scope.Lookup(s.Name.Name)] = file
+					}
 				}
 			}
 		}
