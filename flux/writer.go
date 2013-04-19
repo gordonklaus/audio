@@ -6,14 +6,40 @@ import (
 	"go/ast"
 	"go/build"
 	"go/format"
+	"go/parser"
 	"go/token"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 )
 
-func savePackageName(p *types.Package) {
-	// replace package name in all .go files
+func savePackageName(p *build.Package) {
+	for _, name := range append(append(append(p.GoFiles, p.IgnoredGoFiles...), p.CgoFiles...), p.TestGoFiles...) {
+		path := filepath.Join(p.Dir, name)
+		b, err := ioutil.ReadFile(path)
+		if err != nil {
+			panic(err)
+		}
+		src := string(b)
+		fset := token.NewFileSet()
+		astFile, err := parser.ParseFile(fset, "", src, parser.PackageClauseOnly)
+		if err != nil {
+			panic(err)
+		}
+		oldName := astFile.Name
+		i := fset.Position(oldName.Pos()).Offset
+		src = src[:i] + p.Name + src[i+len(oldName.Name):]
+		if err := ioutil.WriteFile(path, []byte(src), 0666); err != nil {
+			panic(err)
+		}
+	}
+	
+	if pkg, ok := pkgs[p.ImportPath]; ok {
+		pkg.Name = p.Name
+	}
+	
+	// TODO: update all uses?  could get messy with name conflicts.  not that everything has work perfectly.
 }
 
 func saveType(t *types.NamedType) {

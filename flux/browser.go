@@ -445,7 +445,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			t.Accept.ConnectSingleShot(func(...interface{}) {
 				if n := t.GetText(); n != pkg.Name {
 					pkg.Name = n
-					// TODO: savePackageName(pkg)
+					savePackageName(pkg.Package)
 				}
 				b.text.SetText("")
 				b.text.TakeKeyboardFocus()
