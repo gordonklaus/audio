@@ -239,30 +239,36 @@ func newCompositeLiteralNode() *compositeLiteralNode {
 func (n *compositeLiteralNode) editType() {
 	n.typ.edit(func() {
 		if t := *n.typ.typ; t != nil {
-			n.blk.func_().addPkgRef(t)
-			switch t := t.(type) {
-			case *types.NamedType:
-				for _, f := range t.Underlying.(*types.Struct).Fields {
-					if t.Obj.Pkg == n.blk.func_().pkg() || fieldIsExported(f) {
-						n.newInput(field{nil, f})
-					}
-				}
-			case *types.Struct:
-				for _, f := range t.Fields {
-					n.newInput(field{nil, f})
-				}
-			case *types.Slice:
-				// TODO: variable number of inputs? (same can be achieved using append.)  variable number of index/value input pairs?
-			case *types.Map:
-				// TODO: variable number of key/value input pairs?
-			}
-			n.typ.MoveCenter(Pt(0, n.Rect().Max.Y + n.typ.Height() / 2))
-			n.TakeKeyboardFocus()
+			n.setType(t)
 		} else {
 			n.blk.removeNode(n)
 			n.blk.TakeKeyboardFocus()
 		}
 	})
+}
+func (n *compositeLiteralNode) setType(t types.Type) {
+	n.typ.setType(t)
+	if t != nil {
+		n.blk.func_().addPkgRef(t)
+		switch t := t.(type) {
+		case *types.NamedType:
+			for _, f := range t.Underlying.(*types.Struct).Fields {
+				if t.Obj.Pkg == n.blk.func_().pkg() || fieldIsExported(f) {
+					n.newInput(field{nil, f})
+				}
+			}
+		case *types.Struct:
+			for _, f := range t.Fields {
+				n.newInput(field{nil, f})
+			}
+		case *types.Slice:
+			// TODO: variable number of inputs? (same can be achieved using append.)  variable number of index/value input pairs?
+		case *types.Map:
+			// TODO: variable number of key/value input pairs?
+		}
+		n.typ.MoveCenter(Pt(0, n.Rect().Max.Y + n.typ.Height() / 2))
+		n.TakeKeyboardFocus()
+	}
 }
 
 func fieldIsExported(f *types.Field) bool {

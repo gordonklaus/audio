@@ -254,6 +254,24 @@ func (w *writer) block(b *block, vars map[*input]*ast.Ident) (s []ast.Stmt) {
 			if assignExisting != nil {
 				s = append(s, assignExisting)
 			}
+		case *compositeLiteralNode:
+			results, assignExisting := w.results(n, vars)
+			if len(results) > 0 {
+				cl := &ast.CompositeLit{Type: w.typ(*n.typ.typ)}
+				for _, in := range n.inputs() {
+					if len(in.conns) > 0 {
+						cl.Elts = append(cl.Elts, &ast.KeyValueExpr{Key: id(in.obj.GetName()), Value: vars[in.conns[0].dst]})
+					}
+				}
+				s = append(s, &ast.AssignStmt{
+					Tok: token.DEFINE,
+					Lhs: results,
+					Rhs: []ast.Expr{cl},
+				})
+				if assignExisting != nil {
+					s = append(s, assignExisting)
+				}
+			}
 		case *portsNode:
 		case *ifNode:
 			cond := id("false")
