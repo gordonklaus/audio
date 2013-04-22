@@ -124,8 +124,14 @@ func (c *connection) KeyPressed(event KeyEvent) {
 		c.src.TakeKeyboardFocus()
 	case KeyRight:
 		c.dst.TakeKeyboardFocus()
+	case KeyBackspace:
+		c.src.TakeKeyboardFocus()
+		c.blk.removeConnection(c)
+	case KeyDelete:
+		c.dst.TakeKeyboardFocus()
+		c.blk.removeConnection(c)
 	case KeyEscape:
-		c.Parent().TakeKeyboardFocus()
+		c.blk.TakeKeyboardFocus()
 	default:
 		if event.Text == "\\" {
 			c.feedback = !c.feedback

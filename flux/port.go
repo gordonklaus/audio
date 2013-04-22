@@ -84,6 +84,16 @@ func (p *port) KeyPressed(event KeyEvent) {
 		c.startEditing()
 	case KeyLeft, KeyRight, KeyUp, KeyDown:
 		p.node.block().outermost().focusNearestView(p, event.Key)
+	case KeyBackspace, KeyDelete:
+		if p.out && event.Key == KeyBackspace || !p.out && event.Key == KeyDelete {
+			if n, ok := p.node.(interface{removePort(*port)}); ok {
+				n.removePort(p)
+			} else {
+				p.node.TakeKeyboardFocus()
+			}
+		} else if len(p.conns) > 0 {
+			p.conns[len(p.conns) - 1].TakeKeyboardFocus()
+		}
 	case KeyEscape:
 		p.node.TakeKeyboardFocus()
 	default:

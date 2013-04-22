@@ -295,8 +295,8 @@ func (b *block) update() (updated bool) {
 	for n := range b.nodes {
 		if _, ok := n.(*portsNode); ok { continue }
 		r := n.MapRectToParent(n.Rect())
-		r.Min.X -= 16
-		r.Max.X += 16
+		r.Min.X -= 48
+		r.Max.X += 48
 		if rect == ZR {
 			rect = r
 		} else {
@@ -381,48 +381,27 @@ func (b *block) KeyPressed(event KeyEvent) {
 			b.startEditing()
 		}
 	case KeyBackspace, KeyDelete:
-		foc := View(b)
 		switch v := b.GetKeyboardFocus().(type) {
 		case *block:
 			if v.node != nil {
-				foc = v.node
+				v.node.TakeKeyboardFocus()
 			}
 		case *portsNode:
-			return
 		case node:
+			foc := View(b)
 			in, out := v.inConns(), v.outConns()
-			switch {
-			case event.Key == KeyBackspace && len(in) > 0:  foc = in[0].src.node
-			case event.Key == KeyDelete       && len(out) > 0: foc = out[0].dst.node
-			default:
-				switch {
-				case len(in) > 0:  foc = in[0].src.node
-				case len(out) > 0: foc = out[0].dst.node
-				}
+			if len(in) > 0 {
+				foc = in[len(in) - 1].src.node
+			}
+			if (len(in) == 0 || event.Key == KeyDelete) && len(out) > 0 {
+				foc = out[len(out) - 1].dst.node
 			}
 			for _, c := range append(in, out...) {
 				c.blk.removeConnection(c)
 			}
 			b.removeNode(v)
-		case *input:
-			foc = v.node
-			if event.Key == KeyBackspace && len(v.conns) > 0 {
-				foc = v.conns[0]
-			}
-		case *output:
-			foc = v.node
-			if event.Key == KeyDelete && len(v.conns) > 0 {
-				foc = v.conns[0]
-			}
-		case *connection:
-			if event.Key == KeyBackspace {
-				foc = v.src
-			} else {
-				foc = v.dst
-			}
-			v.blk.removeConnection(v)
+			foc.TakeKeyboardFocus()
 		}
-		foc.TakeKeyboardFocus()
 	case KeyEscape:
 		if b.editing {
 			if b.editingNode != nil {
@@ -510,6 +489,37 @@ func newPortsNode(out bool) *portsNode {
 	return n
 }
 
+func (n *portsNode) removePort(p *port) {
+	f := n.blk.func_()
+	sig := f.obj.GetType().(*types.Signature)
+	if p.out {
+		outs := n.outs
+		if _, ok := f.obj.(method); ok { // can't remove receiver
+			outs = outs[1:]
+		}
+		for i, out := range outs {
+			if out.port == p {
+				sig.Params = append(sig.Params[:i], sig.Params[i+1:]...)
+				n.RemoveChild(out)
+				break
+			}
+		}
+	} else {
+		for i, in := range n.ins {
+			if in.port == p {
+				sig.Results = append(sig.Results[:i], sig.Results[i+1:]...)
+				n.RemoveChild(in)
+				break
+			}
+		}
+	}
+	f.subPkgRef(p.obj)
+	for _, c := range p.conns {
+		c.blk.removeConnection(c)
+	}
+	n.TakeKeyboardFocus()
+}
+
 func (n *portsNode) KeyPressed(event KeyEvent) {
 	if n.editable && event.Text == "," {
 		var p *port
@@ -521,7 +531,7 @@ func (n *portsNode) KeyPressed(event KeyEvent) {
 		}
 		p.valView.Show()
 		p.valView.edit(func() {
-			if p.obj != nil {
+			if v.Type != nil {
 				f := n.blk.func_()
 				sig := f.obj.GetType().(*types.Signature)
 				if n.out {
