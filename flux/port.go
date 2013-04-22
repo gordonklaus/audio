@@ -5,8 +5,6 @@ import (
 	"code.google.com/p/go.exp/go/types"
 )
 
-type input struct { *port }
-type output struct { *port }
 type port struct {
 	*ViewBase
 	out bool
@@ -20,19 +18,17 @@ type port struct {
 
 const portSize = 11
 
-func newInput(n node, v types.Object) *input {
-	p := &input{}
-	p.port = newPort(p, false, n, v)
+func newInput(n node, v types.Object) *port {
+	p := newPort(false, n, v)
 	p.valView.Move(Pt(-p.valView.Width() - 12, -p.valView.Height() / 2))
 	return p
 }
-func newOutput(n node, v types.Object) *output {
-	p := &output{}
-	p.port = newPort(p, true, n, v)
+func newOutput(n node, v types.Object) *port {
+	p := newPort(true, n, v)
 	p.valView.Move(Pt(12, -p.valView.Height() / 2))
 	return p
 }
-func newPort(self View, out bool, n node, v types.Object) *port {
+func newPort(out bool, n node, v types.Object) *port {
 	p := &port{out:out, node:n, obj:v}
 	p.ViewBase = NewView(p)
 	p.valView = newValueView(v)
@@ -41,11 +37,12 @@ func newPort(self View, out bool, n node, v types.Object) *port {
 	p.AddChild(p.valView)
 	p.Resize(portSize, portSize)
 	p.Pan(Pt(portSize, portSize).Div(-2))
-	p.Self = self
 	return p
 }
 
-func (p port) canConnect(interface{}) bool { return true }
+func (p port) canConnect(q *port) bool {
+	return p.out != q.out
+}
 func (p *port) connect(c *connection) {
 	p.conns = append(p.conns, c)
 	p.connsChanged()
@@ -77,9 +74,9 @@ func (p *port) KeyPressed(event KeyEvent) {
 	case KeyEnter:
 		c := newConnection()
 		if p.out {
-			c.setSrc(p.Self.(*output))
+			c.setSrc(p)
 		} else {
-			c.setDst(p.Self.(*input))
+			c.setDst(p)
 		}
 		c.startEditing()
 	case KeyLeft, KeyRight, KeyUp, KeyDown:
@@ -105,10 +102,10 @@ func (p *port) MousePressed(button int, pt Point) {
 	p.TakeKeyboardFocus()
 	c := newConnection()
 	if p.out {
-		c.setSrc(p.Self.(*output))
+		c.setSrc(p)
 		c.dstHandle.SetMouseFocus(c.dstHandle, button)
 	} else {
-		c.setDst(p.Self.(*input))
+		c.setDst(p)
 		c.srcHandle.SetMouseFocus(c.srcHandle, button)
 	}
 	c.startEditing()

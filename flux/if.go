@@ -9,7 +9,7 @@ type ifNode struct {
 	*ViewBase
 	AggregateMouseHandler
 	blk *block
-	input *input
+	input *port
 	falseblk *block
 	trueblk *block
 	focused bool
@@ -33,8 +33,8 @@ func newIfNode() *ifNode {
 
 func (n ifNode) block() *block { return n.blk }
 func (n *ifNode) setBlock(b *block) { n.blk = b }
-func (n ifNode) inputs() []*input { return []*input{n.input} }
-func (n ifNode) outputs() []*output { return nil }
+func (n ifNode) inputs() []*port { return []*port{n.input} }
+func (n ifNode) outputs() []*port { return nil }
 
 func (n ifNode) inConns() []*connection {
 	return append(append(n.input.conns, n.falseblk.inConns()...), n.trueblk.inConns()...)

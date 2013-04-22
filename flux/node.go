@@ -13,8 +13,8 @@ type node interface {
 	MouseHandler
 	block() *block
 	setBlock(b *block)
-	inputs() []*input
-	outputs() []*output
+	inputs() []*port
+	outputs() []*port
 	inConns() []*connection
 	outConns() []*connection
 }
@@ -44,8 +44,8 @@ type nodeBase struct {
 	AggregateMouseHandler
 	blk *block
 	text *nodeText
-	ins []*input
-	outs []*output
+	ins []*port
+	outs []*port
 	focused bool
 }
 
@@ -64,7 +64,7 @@ func newNodeBase(self node) *nodeBase {
 	return n
 }
 
-func (n *nodeBase) newInput(v types.Object) *input {
+func (n *nodeBase) newInput(v types.Object) *port {
 	p := newInput(n.self, v)
 	n.AddChild(p)
 	n.ins = append(n.ins, p)
@@ -72,7 +72,7 @@ func (n *nodeBase) newInput(v types.Object) *input {
 	return p
 }
 
-func (n *nodeBase) newOutput(v types.Object) *output {
+func (n *nodeBase) newOutput(v types.Object) *port {
 	p := newOutput(n.self, v)
 	n.AddChild(p)
 	n.outs = append(n.outs, p)
@@ -80,14 +80,13 @@ func (n *nodeBase) newOutput(v types.Object) *output {
 	return p
 }
 
-func (n *nodeBase) RemoveChild(v View) {
-	n.ViewBase.RemoveChild(v)
-	switch v := v.(type) {
-	case *input:
-		SliceRemove(&n.ins, v)
-	case *output:
-		SliceRemove(&n.outs, v)
+func (n *nodeBase) removePortBase(p *port) { // intentionally named to not implement interface{removePort(*port)}
+	if p.out {
+		SliceRemove(&n.outs, p)
+	} else {
+		SliceRemove(&n.ins, p)
 	}
+	n.RemoveChild(p)
 	n.reform()
 }
 
@@ -115,8 +114,8 @@ func (n *nodeBase) reform() {
 
 func (n nodeBase) block() *block { return n.blk }
 func (n *nodeBase) setBlock(b *block) { n.blk = b }
-func (n nodeBase) inputs() []*input { return n.ins }
-func (n nodeBase) outputs() []*output { return n.outs }
+func (n nodeBase) inputs() []*port { return n.ins }
+func (n nodeBase) outputs() []*port { return n.outs }
 
 func (n nodeBase) inConns() (conns []*connection) {
 	for _, p := range n.inputs() {
@@ -138,9 +137,11 @@ func (n nodeBase) outConns() (conns []*connection) {
 
 func (n *nodeBase) Move(p Point) {
 	n.ViewBase.Move(p)
-	f := func(p *port) { for _, c := range p.conns { c.reform() } }
-	for _, p := range n.ins { f(p.port) }
-	for _, p := range n.outs { f(p.port) }
+	for _, p := range append(n.ins, n.outs...) {
+		for _, c := range p.conns {
+			c.reform()
+		}
+	}
 }
 
 func (n nodeBase) Center() Point { return ZP }

@@ -9,7 +9,7 @@ type loopNode struct {
 	*ViewBase
 	AggregateMouseHandler
 	blk *block
-	input *input
+	input *port
 	inputsNode *portsNode
 	loopblk *block
 	focused bool
@@ -41,8 +41,8 @@ func newLoopNode() *loopNode {
 
 func (n loopNode) block() *block { return n.blk }
 func (n *loopNode) setBlock(b *block) { n.blk = b }
-func (n loopNode) inputs() []*input { return []*input{n.input} }
-func (n loopNode) outputs() []*output { return nil }
+func (n loopNode) inputs() []*port { return []*port{n.input} }
+func (n loopNode) outputs() []*port { return nil }
 func (n loopNode) inConns() []*connection {
 	return append(n.input.conns, n.loopblk.inConns()...)
 }

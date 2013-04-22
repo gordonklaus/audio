@@ -7,8 +7,8 @@ import (
 type indexNode struct {
 	*nodeBase
 	set bool
-	x, key, inVal *input
-	outVal, ok *output
+	x, key, inVal *port
+	outVal, ok *port
 }
 func newIndexNode(set bool) *indexNode {
 	n := &indexNode{set:set}

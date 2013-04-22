@@ -492,57 +492,54 @@ func newPortsNode(out bool) *portsNode {
 func (n *portsNode) removePort(p *port) {
 	f := n.blk.func_()
 	sig := f.obj.GetType().(*types.Signature)
+	var ports []*port
+	var vars *[]*types.Var
 	if p.out {
-		outs := n.outs
-		if _, ok := f.obj.(method); ok { // can't remove receiver
-			outs = outs[1:]
+		ports = n.outs
+		if _, ok := f.obj.(method); ok { // don't remove receiver
+			ports = ports[1:]
 		}
-		for i, out := range outs {
-			if out.port == p {
-				sig.Params = append(sig.Params[:i], sig.Params[i+1:]...)
-				n.RemoveChild(out)
-				break
-			}
-		}
+		vars = &sig.Params
 	} else {
-		for i, in := range n.ins {
-			if in.port == p {
-				sig.Results = append(sig.Results[:i], sig.Results[i+1:]...)
-				n.RemoveChild(in)
-				break
+		ports = n.ins
+		vars = &sig.Results
+	}
+	for i, q := range ports {
+		if q == p {
+			SliceRemove(vars, (*vars)[i])
+			f.subPkgRef(p.obj)
+			for _, c := range p.conns {
+				c.blk.removeConnection(c)
 			}
+			n.removePortBase(p)
+			n.TakeKeyboardFocus()
+			break
 		}
 	}
-	f.subPkgRef(p.obj)
-	for _, c := range p.conns {
-		c.blk.removeConnection(c)
-	}
-	n.TakeKeyboardFocus()
 }
 
 func (n *portsNode) KeyPressed(event KeyEvent) {
 	if n.editable && event.Text == "," {
+		f := n.blk.func_()
+		sig := f.obj.GetType().(*types.Signature)
 		var p *port
+		var vars *[]*types.Var
 		v := &types.Var{}
 		if n.out {
-			p = n.newInput(v).port
+			p = n.newInput(v)
+			vars = &sig.Results
 		} else {
-			p = n.newOutput(v).port
+			p = n.newOutput(v)
+			vars = &sig.Params
 		}
 		p.valView.Show()
 		p.valView.edit(func() {
 			if v.Type != nil {
-				f := n.blk.func_()
-				sig := f.obj.GetType().(*types.Signature)
-				if n.out {
-					sig.Results = append(sig.Results, v)
-				} else {
-					sig.Params = append(sig.Params, v)
-				}
+				*vars = append(*vars, v)
 				f.addPkgRef(p.obj)
 				p.TakeKeyboardFocus()
 			} else {
-				n.RemoveChild(p.Self)
+				n.removePortBase(p)
 				n.TakeKeyboardFocus()
 			}
 		})

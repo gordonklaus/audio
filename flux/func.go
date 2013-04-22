@@ -82,8 +82,8 @@ func (n *funcNode) subPkgRef(x interface{}) {
 
 func (n funcNode) block() *block { return nil }
 func (n funcNode) setBlock(b *block) {}
-func (n funcNode) inputs() []*input { return nil }
-func (n funcNode) outputs() []*output { return nil }
+func (n funcNode) inputs() []*port { return nil }
+func (n funcNode) outputs() []*port { return nil }
 func (n funcNode) inConns() []*connection { return nil }
 func (n funcNode) outConns() []*connection { return nil }
 

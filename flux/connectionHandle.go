@@ -104,7 +104,7 @@ func (h connectionHandle) Paint() {
 
 type connectionSourceHandle struct {
 	*connectionHandle
-	savedConnection *output
+	savedConnection *port
 }
 
 func newConnectionSourceHandle(conn *connection) *connectionSourceHandle {
@@ -116,12 +116,12 @@ func newConnectionSourceHandle(conn *connection) *connectionSourceHandle {
 func (h *connectionSourceHandle) saveConnection() { h.savedConnection = h.conn.src }
 func (h *connectionSourceHandle) restoreSavedConnection() { h.conn.setSrc(h.savedConnection) }
 
-func (h connectionSourceHandle) updateConnection(p Point) {
+func (h connectionSourceHandle) updateConnection(pt Point) {
 	b := h.conn.blk.outermost()
-	if output, ok := b.ViewAt(h.MapTo(p, b)).(*output); ok && h.conn.dst.canConnect(output) {
-		h.conn.setSrc(output)
+	if p, ok := b.ViewAt(h.MapTo(pt, b)).(*port); ok && h.conn.dst.canConnect(p) {
+		h.conn.setSrc(p)
 	} else {
-		h.conn.dstPt = h.MapTo(p, h.conn.blk)
+		h.conn.dstPt = h.MapTo(pt, h.conn.blk)
 		h.conn.setDst(nil)
 	}
 }
@@ -136,7 +136,7 @@ func (h *connectionSourceHandle) moveToNearestConnectablePort(dirKey int) {
 	}
 	
 	v := nearestView(b, ports, h.conn.srcPt, dirKey)
-	if p, ok := v.(*output); ok {
+	if p, ok := v.(*port); ok {
 		h.conn.setSrc(p)
 	}
 }
@@ -159,7 +159,7 @@ func (h *connectionSourceHandle) KeyPressed(event KeyEvent) {
 
 type connectionDestinationHandle struct {
 	*connectionHandle
-	savedConnection *input
+	savedConnection *port
 }
 
 func newConnectionDestinationHandle(conn *connection) *connectionDestinationHandle {
@@ -171,12 +171,12 @@ func newConnectionDestinationHandle(conn *connection) *connectionDestinationHand
 func (h *connectionDestinationHandle) saveConnection() { h.savedConnection = h.conn.dst }
 func (h *connectionDestinationHandle) restoreSavedConnection() { h.conn.setDst(h.savedConnection) }
 
-func (h connectionDestinationHandle) updateConnection(p Point) {
+func (h connectionDestinationHandle) updateConnection(pt Point) {
 	b := h.conn.blk.outermost()
-	if input, ok := b.ViewAt(h.MapTo(p, b)).(*input); ok && input.canConnect(h.conn.src) {
-		h.conn.setDst(input)
+	if p, ok := b.ViewAt(h.MapTo(pt, b)).(*port); ok && p.canConnect(h.conn.src) {
+		h.conn.setDst(p)
 	} else {
-		h.conn.srcPt = h.MapTo(p, h.conn.blk)
+		h.conn.srcPt = h.MapTo(pt, h.conn.blk)
 		h.conn.setSrc(nil)
 	}
 }
@@ -191,7 +191,7 @@ func (h *connectionDestinationHandle) moveToNearestConnectablePort(dirKey int) {
 	}
 	
 	v := nearestView(b, ports, h.conn.dstPt, dirKey)
-	if p, ok := v.(*input); ok {
+	if p, ok := v.(*port); ok {
 		h.conn.setDst(p)
 	}
 }

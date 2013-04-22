@@ -9,8 +9,8 @@ type connection struct {
 	*ViewBase
 	AggregateMouseHandler
 	blk *block
-	src *output
-	dst *input
+	src *port
+	dst *port
 	feedback bool
 	
 	srcHandle *connectionSourceHandle
@@ -37,7 +37,7 @@ func newConnection() *connection {
 func (c connection) connected() bool { return c.src != nil && c.dst != nil }
 func (c *connection) disconnect() { c.setSrc(nil); c.setDst(nil) }
 
-func (c *connection) setSrc(src *output) {
+func (c *connection) setSrc(src *port) {
 	if c.src != nil { c.src.disconnect(c) }
 	c.src = src
 	if src != nil { src.connect(c) }
@@ -46,7 +46,7 @@ func (c *connection) setSrc(src *output) {
 	c.reform()
 }
 
-func (c *connection) setDst(dst *input) {
+func (c *connection) setDst(dst *port) {
 	if c.dst != nil { c.dst.disconnect(c) }
 	c.dst = dst
 	if dst != nil { dst.connect(c) }

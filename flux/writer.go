@@ -74,7 +74,7 @@ func saveFunc(f funcNode) {
 	
 	var recv *ast.FieldList
 	t := w.typ(f.obj.GetType()).(*ast.FuncType)
-	vars := map[*input]*ast.Ident{}
+	vars := map[*port]*ast.Ident{}
 	i := 0
 	if m, ok := f.obj.(method); ok {
 		recv = &ast.FieldList{List:[]*ast.Field{&ast.Field{Type:w.typ(m.Type.Recv.Type)}}}
@@ -173,14 +173,14 @@ func (w *writer) imports() {
 	w.file.Decls = append(w.file.Decls, d)
 }
 
-func (w *writer) block(b *block, vars map[*input]*ast.Ident) (s []ast.Stmt) {
+func (w *writer) block(b *block, vars map[*port]*ast.Ident) (s []ast.Stmt) {
 	order, ok := b.nodeOrder()
 	if !ok {
 		fmt.Println("cyclic!")
 		return
 	}
 	
-	vars, varsCopy := map[*input]*ast.Ident{}, vars
+	vars, varsCopy := map[*port]*ast.Ident{}, vars
 	for k, v := range varsCopy { vars[k] = v }
 	
 	for c := range b.conns {
@@ -331,7 +331,7 @@ func (w *writer) block(b *block, vars map[*input]*ast.Ident) (s []ast.Stmt) {
 	return
 }
 
-func (w *writer) results(n node, vars map[*input]*ast.Ident) (results []ast.Expr, ass *ast.AssignStmt) {
+func (w *writer) results(n node, vars map[*port]*ast.Ident) (results []ast.Expr, ass *ast.AssignStmt) {
 	any := false
 	for _, p := range n.outputs() {
 		id := id("_")

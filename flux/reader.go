@@ -13,7 +13,7 @@ func loadFunc(f *funcNode) bool {
 	if file == nil {
 		return false
 	}
-	r := &reader{f.obj.GetPkg(), map[string]*types.Package{}, map[string][]*output{}, map[string]types.Type{}}
+	r := &reader{f.obj.GetPkg(), map[string]*types.Package{}, map[string][]*port{}, map[string]types.Type{}}
 	for _, i := range file.Imports {
 		path, _ := strconv.Unquote(i.Path.Value)
 		pkg := r.pkg.Imports[path]
@@ -44,7 +44,7 @@ func loadFunc(f *funcNode) bool {
 type reader struct {
 	pkg *types.Package
 	pkgNames map[string]*types.Package
-	vars map[string][]*output // there is a bug here; names can be reused between disjoint blocks; vars should be passed as a param, as in writer
+	vars map[string][]*port // there is a bug here; names can be reused between disjoint blocks; vars should be passed as a param, as in writer
 	varTypes map[string]types.Type
 }
 
@@ -217,7 +217,7 @@ func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n *callNode) {
 	return
 }
 
-func (r *reader) connect(name string, in *input) {
+func (r *reader) connect(name string, in *port) {
 	for _, out := range r.vars[name] {
 		c := newConnection()
 		c.setSrc(out)
@@ -225,7 +225,7 @@ func (r *reader) connect(name string, in *input) {
 	}
 }
 
-func (r *reader) addVar(name string, out *output) {
+func (r *reader) addVar(name string, out *port) {
 	if name != "" && name != "_" {
 		r.vars[name] = append(r.vars[name], out)
 		r.varTypes[name] = out.obj.GetType()
