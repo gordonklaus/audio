@@ -5,7 +5,10 @@ import (
 	."code.google.com/p/gordon-go/util"
 	"code.google.com/p/go.exp/go/types"
 	"go/ast"
-	."math"
+	"go/token"
+	"math"
+	"strconv"
+	"strings"
 )
 
 type node interface {
@@ -93,17 +96,17 @@ func (n *nodeBase) removePortBase(p *port) { // intentionally named to not imple
 func (n *nodeBase) reform() {
 	numIn := float64(len(n.ins))
 	numOut := float64(len(n.outs))
-	rx, ry := 2.0 * portSize, (Max(numIn, numOut) + 1) * portSize / 2
+	rx, ry := 2.0 * portSize, (math.Max(numIn, numOut) + 1) * portSize / 2
 	
 	rect := ZR
 	for i, p := range n.ins {
 		y := -portSize * (float64(i) - (numIn - 1) / 2)
-		p.MoveCenter(Pt(-rx * Sqrt(ry * ry - y * y) / ry, y))
+		p.MoveCenter(Pt(-rx * math.Sqrt(ry * ry - y * y) / ry, y))
 		rect = rect.Union(p.MapRectToParent(p.Rect()))
 	}
 	for i, p := range n.outs {
 		y := -portSize * (float64(i) - (numOut - 1) / 2)
-		p.MoveCenter(Pt(rx * Sqrt(ry * ry - y * y) / ry, y))
+		p.MoveCenter(Pt(rx * math.Sqrt(ry * ry - y * y) / ry, y))
 		rect = rect.Union(p.MapRectToParent(p.Rect()))
 	}
 
@@ -189,8 +192,6 @@ func newNode(obj types.Object) node {
 		case "loop":
 			return newLoopNode()
 		}
-	// case StringType:
-	// 	return NewBasicLiteralNode(i)
 	case *types.Func, method:
 		return newCallNode(obj)
 	}
@@ -216,11 +217,54 @@ func newCallNode(obj types.Object) *callNode {
 	return n
 }
 
-type constantNode struct { *nodeBase }
-func newStringConstantNode() *constantNode {
-	n := &constantNode{}
+type basicLiteralNode struct {
+	*nodeBase
+	kind token.Token
+}
+func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
+	n := &basicLiteralNode{kind: kind}
 	n.nodeBase = newNodeBase(n)
 	n.newOutput(&types.Var{})
+	switch kind {
+	case token.INT, token.FLOAT:
+		n.text.SetValidator(func(s *string) bool {
+			*s = strings.TrimLeft(*s, "0")
+			if *s == "" || *s == "-" {
+				*s = "0"
+			}
+			if (*s)[0] == '.' {
+				*s = "0" + *s
+			}
+			if l := len(*s); (*s)[l - 1] == '-' {
+				if (*s)[0] == '-' {
+					*s = (*s)[1:l - 1]
+				} else {
+					*s = "-" + (*s)[:l - 1]
+				}
+			}
+			if _, err := strconv.ParseInt(*s, 10, 256); err == nil {
+				n.kind = token.INT
+			} else {
+				if _, err := strconv.ParseFloat(*s, 4096); err == nil {
+					n.kind = token.FLOAT
+				} else {
+					return false
+				}
+			}
+			return true
+		})
+	case token.IMAG:
+		// TODO
+	case token.STRING:
+	case token.CHAR:
+		n.text.SetValidator(func(s *string) bool {
+			if *s == "" {
+				return false
+			}
+			*s = (*s)[len(*s) - 1:]
+			return true
+		})
+	}
 	return n
 }
 

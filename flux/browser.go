@@ -2,7 +2,6 @@ package main
 
 import (
 	."code.google.com/p/gordon-go/gui"
-	."code.google.com/p/gordon-go/util"
 	"code.google.com/p/go.exp/go/types"
 	"fmt"
 	"go/ast"
@@ -21,7 +20,8 @@ type browser struct {
 	currentPkg *types.Package
 	imports []*types.Package
 	finished bool
-	accepted, canceled *Signal
+	accepted func(types.Object)
+	canceled func()
 	
 	path []types.Object
 	indices []int
@@ -42,7 +42,7 @@ const (
 )
 
 func newBrowser(mode browserMode, currentPkg *types.Package, imports []*types.Package) *browser {
-	b := &browser{mode:mode, currentPkg:currentPkg, imports:imports, accepted:NewSignal(), canceled:NewSignal()}
+	b := &browser{mode:mode, currentPkg:currentPkg, imports:imports, accepted:func(types.Object){}, canceled:func(){}}
 	b.ViewBase = NewView(b)
 	
 	b.text = newNodeNameText(b)
@@ -61,7 +61,7 @@ func newBrowser(mode browserMode, currentPkg *types.Package, imports []*types.Pa
 func (b *browser) cancel() {
 	if !b.finished {
 		b.finished = true
-		b.canceled.Emit()
+		b.canceled()
 	}
 }
 
@@ -439,21 +439,24 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 	case KeyEnter:
 		cur := b.currentObj()
+		if cur == nil {
+			return
+		}
 		if pkg, ok := cur.(buildPackage); ok && event.Shift {
 			t := b.pkgNameText
 			t.Show()
-			t.Accept.ConnectSingleShot(func(...interface{}) {
-				if n := t.GetText(); n != pkg.Name {
-					pkg.Name = n
+			t.Accept = func(s string) {
+				if s != pkg.Name {
+					pkg.Name = s
 					savePackageName(pkg.Package)
 				}
 				b.text.SetText("")
 				b.text.TakeKeyboardFocus()
-			})
-			t.Reject.ConnectSingleShot(func(...interface{}) {
+			}
+			t.Reject = func() {
 				b.text.SetText(b.text.GetText())
 				b.text.TakeKeyboardFocus()
-			})
+			}
 			t.TakeKeyboardFocus()
 			return
 		}
@@ -500,7 +503,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		b.newObj = nil
 		if _, ok := obj.(buildPackage); !ok {
 			b.finished = true
-			b.accepted.Emit(obj)
+			b.accepted(obj)
 			return
 		}
 		fallthrough

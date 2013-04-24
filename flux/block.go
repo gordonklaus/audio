@@ -4,6 +4,7 @@ import (
 	."code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
 	"code.google.com/p/go.exp/go/types"
+	"go/token"
 	"math"
 	"math/rand"
 )
@@ -420,23 +421,34 @@ func (b *block) KeyPressed(event KeyEvent) {
 				browser := newBrowser(browse, f.pkg(), f.imports())
 				b.AddChild(browser)
 				browser.Move(b.Center())
-				browser.accepted.Connect(func(obj ...interface{}) {
+				browser.accepted = func(obj types.Object) {
 					browser.Close()
-					n := newNode(obj[0].(types.Object))
+					n := newNode(obj)
 					b.addNode(n)
 					n.MoveCenter(b.Center())
 					n.TakeKeyboardFocus()
-				})
-				browser.canceled.Connect(func(...interface{}) {
+				}
+				browser.canceled = func() {
 					browser.Close()
 					b.TakeKeyboardFocus()
-				})
+				}
 				browser.text.KeyPressed(event)
 				browser.text.TakeKeyboardFocus()
-			case "\"":
-				n := newStringConstantNode()
+			case "\"", "'", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
+				text := event.Text
+				kind := token.INT
+				switch event.Text {
+				case "\"": kind, text = token.STRING, ""
+				case "'":  kind = token.CHAR
+				}
+				n := newBasicLiteralNode(kind)
 				b.addNode(n)
 				n.MoveCenter(b.Center())
+				n.text.SetText(text)
+				n.text.Reject = func() {
+					b.removeNode(n)
+					b.TakeKeyboardFocus()
+				}
 				n.text.TakeKeyboardFocus()
 			case "{":
 				n := newCompositeLiteralNode()

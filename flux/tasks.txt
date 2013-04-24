@@ -1,5 +1,6 @@
 TODO
 
+- bug:  importing via GcImport causes incomplete imported packages to be added to pkgs map
 - consider the matter of addressability and copying.  currently, there is one variable per output, plus one variable for each connection that exits a block.  there should be a clear rule for when a copy is made so that it is obvious which connections refer to the same value.
 - fix bug in indexNode and loopNode:  crash when changing/deleting input connection (something to do with outputs changing)?  might have to do with trying to connect the input to the 2nd inputsNode output, which disappears before the connection is made.
 - fix typeView bug(s):
@@ -10,7 +11,6 @@ TODO
 - prefix names with pkg name in browser and typeView
 - handle funcs with an unconnected input whose type must be named to make a zero value (i.e., is ArrayType or StructType):  import package or, if it is an unexported type, complain and don't write files.
 - stabilize order of imports (alphabetical).    Also nodes? pro: deterministic build, stable files; con: hides bugs  (option:  deterministic in .flux files, random in .go)
-- prefix all names with "pkg." in .flux files, including names in current package.  then, .flux files don't change when moved between packages.  downside:  we would have to strip these prefixes when writing decl sources in importer.go
 - color conns by type.  hash type name, interpret as color.  or, use multiple colors to describe the whole type tree (outlined, woven, etc).
 - improve valueView editing; currently, name and type can't be edited separately.  solution:  allow to focus name text.
 - fix connection drawing during mouse editing

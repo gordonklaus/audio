@@ -22,8 +22,7 @@ func newFluxWindow() *fluxWindow {
 	w.browser = newBrowser(fluxSourceOnly, nil, nil)
 	w.AddChild(w.browser)
 	w.Resize(w.Size().XY())
-	w.browser.accepted.Connect(func(o ...interface{}) {
-		obj := o[0].(types.Object)
+	w.browser.accepted = func(obj types.Object) {
 		switch obj := obj.(type) {
 		case *types.TypeName:
 			typ := obj.Type.(*types.NamedType)
@@ -61,7 +60,7 @@ func newFluxWindow() *fluxWindow {
 			n.Move(w.Center())
 			n.TakeKeyboardFocus()
 		}
-	})
+	}
 	w.browser.text.TakeKeyboardFocus()
 	return w
 }

@@ -44,10 +44,10 @@ func newValueView(val types.Object) *typeView {
 	v.nameText = NewText(val.GetName())
 	v.nameText.SetTextColor(getTextColor(val, .7))
 	v.nameText.SetBackgroundColor(Color{0, 0, 0, .3})
-	v.nameText.TextChanged.Connect(func(...interface{}) {
-		*name = v.nameText.GetText()
+	v.nameText.TextChanged = func(text string) {
+		*name = text
 		v.reform()
-	})
+	}
 	v.AddChild(v.nameText)
 	v.reform()
 	return v
@@ -133,8 +133,8 @@ func (v *typeView) reform() {
 
 func (v *typeView) edit(done func()) {
 	if v.nameText != nil {
-		v.nameText.Accept.ConnectSingleShot(func(...interface{}) { v.editType(done) })
-		v.nameText.Reject.ConnectSingleShot(func(...interface{}) { done() })
+		v.nameText.Accept = func(string) { v.editType(done) }
+		v.nameText.Reject = done
 		v.nameText.TakeKeyboardFocus()
 		return
 	}
@@ -155,20 +155,20 @@ l:		for v := View(v); v != nil; v = v.Parent() {
 		b := newBrowser(typesOnly, pkg, imports)
 		v.AddChild(b)
 		b.Move(v.Center())
-		b.accepted.Connect(func(obj ...interface{}) {
+		b.accepted = func(obj types.Object) {
 			b.Close()
-			n := obj[0].(*types.TypeName)
+			n := obj.(*types.TypeName)
 			if n.Type != nil {
 				v.setType(n.Type)
 			} else {
 				v.setType(newProtoType(n))
 			}
 			v.editType(done)
-		})
-		b.canceled.Connect(func(...interface{}) {
+		}
+		b.canceled = func() {
 			b.Close()
 			done()
-		})
+		}
 		b.text.TakeKeyboardFocus()
 		return
 	}

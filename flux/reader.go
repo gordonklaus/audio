@@ -54,16 +54,6 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 		case *ast.AssignStmt:
 			if s.Tok == token.DEFINE {
 				switch x := s.Rhs[0].(type) {
-				case *ast.BasicLit:
-					switch x.Kind {
-					case token.INT, token.FLOAT, token.IMAG, token.CHAR:
-					case token.STRING:
-						n := newStringConstantNode()
-						b.addNode(n)
-						text, _ := strconv.Unquote(x.Value)
-						n.text.SetText(text)
-						r.addVar(name(s.Lhs[0]), n.outs[0])
-					}
 				case *ast.CompositeLit:
 					// this only handles named types; when will go/types do it all for me?
 					var t types.Type
@@ -130,19 +120,37 @@ elts:				for _, elt := range x.Elts {
 				}
 			}
 		case *ast.DeclStmt:
-			v := s.Decl.(*ast.GenDecl).Specs[0].(*ast.ValueSpec)
-			// this only handles named types; when will go/types do it all for me?
-			var t types.Type
-			switch x := v.Type.(type) {
-			case *ast.Ident:
-				t = r.pkg.Scope.Lookup(x.Name).(*types.TypeName).Type
-			case *ast.SelectorExpr:
-				t = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name).(*types.TypeName).Type
-			}
-			if t == nil {
-				fmt.Println("DeclStmt: not fully implemented: ", v.Type)
-			} else {
-				r.varTypes[v.Names[0].Name] = t
+			decl := s.Decl.(*ast.GenDecl)
+			v := decl.Specs[0].(*ast.ValueSpec)
+			switch decl.Tok {
+			case token.VAR:
+				// this only handles named types; when will go/types do it all for me?
+				var t types.Type
+				switch x := v.Type.(type) {
+				case *ast.Ident:
+					t = r.pkg.Scope.Lookup(x.Name).(*types.TypeName).Type
+				case *ast.SelectorExpr:
+					t = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name).(*types.TypeName).Type
+				}
+				if t == nil {
+					fmt.Println("DeclStmt: not fully implemented: ", v.Type)
+				} else {
+					r.varTypes[v.Names[0].Name] = t
+				}
+			case token.CONST:
+				lit := v.Values[0].(*ast.BasicLit)
+				n := newBasicLiteralNode(lit.Kind)
+				b.addNode(n)
+				switch lit.Kind {
+				case token.INT, token.FLOAT:
+					n.text.SetText(lit.Value)
+				case token.IMAG:
+					// TODO
+				case token.STRING, token.CHAR:
+					text, _ := strconv.Unquote(lit.Value)
+					n.text.SetText(text)
+				}
+				r.addVar(name(v.Names[0]), n.outs[0])
 			}
 		case *ast.ForStmt:
 			n := newLoopNode()

@@ -242,13 +242,22 @@ func (w *writer) block(b *block, vars map[*port]*ast.Ident) (s []ast.Stmt) {
 						Rhs: []ast.Expr{i},
 					})
 				}
-			case *constantNode:
+			case *basicLiteralNode:
 				if len(results) > 0 {
-					s = append(s, &ast.AssignStmt{
-						Tok: token.DEFINE,
-						Lhs: results,
-						Rhs: []ast.Expr{&ast.BasicLit{Kind:token.STRING, Value:strconv.Quote(n.text.GetText())}},
-					})
+					val := n.text.GetText()
+					switch n.kind {
+					case token.STRING:
+						val = strconv.Quote(val)
+					case token.CHAR:
+						val = strconv.QuoteRune([]rune(val)[0])
+					}
+					s = append(s, &ast.DeclStmt{Decl:&ast.GenDecl{
+						Tok: token.CONST,
+						Specs: []ast.Spec{&ast.ValueSpec{
+							Names: []*ast.Ident{results[0].(*ast.Ident)},
+							Values: []ast.Expr{&ast.BasicLit{Kind: n.kind, Value: val}},
+						}},
+					}})
 				}
 			}
 			if assignExisting != nil {

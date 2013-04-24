@@ -4,7 +4,6 @@ import (
 	gl "github.com/chsc/gogl/gl21"
 	"code.google.com/p/gordon-go/ftgl"
 	"code.google.com/p/gordon-go/gui/rsrc"
-	."code.google.com/p/gordon-go/util"
 )
 
 var font ftgl.Font
@@ -37,7 +36,8 @@ type TextBase struct {
 	backgroundColor Color
 	editable bool
 	validator func(*string)bool
-	Accept, Reject, TextChanged *Signal
+	Accept, TextChanged func(string)
+	Reject func()
 }
 
 func NewText(text string) *TextBase { return NewTextBase(nil, text) }
@@ -48,7 +48,7 @@ func NewTextBase(self Text, text string) *TextBase {
 	t.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(t)}
 	t.textColor = Color{1, 1, 1, 1}
 	t.backgroundColor = Color{0, 0, 0, 1}
-	t.Accept, t.Reject, t.TextChanged = NewSignal(), NewSignal(), NewSignal()
+	t.Accept, t.Reject, t.TextChanged = func(string){}, func(){}, func(string){}
 	t.SetText(text)
 	t.Self = self
 	t.ViewBase.Self = self
@@ -59,7 +59,7 @@ func (t TextBase) GetText() string { return t.text }
 func (t *TextBase) SetText(text string) {
 	t.text = text
 	t.Resize(2*t.frameSize + font.Advance(t.text), 2*t.frameSize - font.Descender() + font.Ascender())
-	t.TextChanged.Emit(text)
+	t.TextChanged(text)
 }
 
 func (t TextBase) GetTextColor() Color { return t.textColor }
@@ -106,12 +106,15 @@ func (t *TextBase) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case KeyBackspace:
 		if len(t.text) > 0 {
-			t.Self.SetText(t.text[:len(t.text) - 1])
+			text := t.text[:len(t.text) - 1]
+			if t.validator == nil || t.validator(&text) {
+				t.Self.SetText(text)
+			}
 		}
 	case KeyEnter:
-		t.Accept.Emit()
+		t.Accept(t.text)
 	case KeyEscape:
-		t.Reject.Emit()
+		t.Reject()
 	}
 }
 
