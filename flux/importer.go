@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-var pkgs = map[string]*types.Package{"unsafe":types.Unsafe}
+var pkgs = map[string]*types.Package{"unsafe": types.Unsafe, "C": &types.Package{Name: "C", Path: "C", Scope: &types.Scope{}}}
 
 var fluxObjs = map[types.Object]*ast.File{}
 

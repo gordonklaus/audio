@@ -1,6 +1,5 @@
 TODO
 
-- bug:  importing via GcImport causes incomplete imported packages to be added to pkgs map
 - consider the matter of addressability and copying.  currently, there is one variable per output, plus one variable for each connection that exits a block.  there should be a clear rule for when a copy is made so that it is obvious which connections refer to the same value.
 - fix bug in indexNode and loopNode:  crash when changing/deleting input connection (something to do with outputs changing)?  might have to do with trying to connect the input to the 2nd inputsNode output, which disappears before the connection is made.
 - fix typeView bug(s):
