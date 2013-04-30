@@ -67,7 +67,7 @@ func newNodeBase(self node) *nodeBase {
 	return n
 }
 
-func (n *nodeBase) newInput(v types.Object) *port {
+func (n *nodeBase) newInput(v *types.Var) *port {
 	p := newInput(n.self, v)
 	n.AddChild(p)
 	n.ins = append(n.ins, p)
@@ -75,7 +75,7 @@ func (n *nodeBase) newInput(v types.Object) *port {
 	return p
 }
 
-func (n *nodeBase) newOutput(v types.Object) *port {
+func (n *nodeBase) newOutput(v *types.Var) *port {
 	p := newOutput(n.self, v)
 	n.AddChild(p)
 	n.outs = append(n.outs, p)
@@ -224,9 +224,14 @@ type basicLiteralNode struct {
 func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 	n := &basicLiteralNode{kind: kind}
 	n.nodeBase = newNodeBase(n)
-	n.newOutput(&types.Var{})
+	out := n.newOutput(&types.Var{}).valView
 	switch kind {
 	case token.INT, token.FLOAT:
+		if kind == token.INT {
+			out.setType(types.Typ[types.UntypedInt])
+		} else {
+			out.setType(types.Typ[types.UntypedFloat])
+		}
 		n.text.SetValidator(func(s *string) bool {
 			*s = strings.TrimLeft(*s, "0")
 			if *s == "" || *s == "-" {
@@ -242,11 +247,13 @@ func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 					*s = "-" + (*s)[:l - 1]
 				}
 			}
-			if _, err := strconv.ParseInt(*s, 10, 256); err == nil {
+			if _, err := strconv.ParseInt(*s, 10, 64); err == nil {
 				n.kind = token.INT
+				out.setType(types.Typ[types.UntypedInt])
 			} else {
 				if _, err := strconv.ParseFloat(*s, 4096); err == nil {
 					n.kind = token.FLOAT
+					out.setType(types.Typ[types.UntypedFloat])
 				} else {
 					return false
 				}
@@ -256,7 +263,9 @@ func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 	case token.IMAG:
 		// TODO
 	case token.STRING:
+		out.setType(types.Typ[types.UntypedString])
 	case token.CHAR:
+		out.setType(types.Typ[types.UntypedRune])
 		n.text.SetValidator(func(s *string) bool {
 			if *s == "" {
 				return false
@@ -299,12 +308,12 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 		case *types.NamedType:
 			for _, f := range t.Underlying.(*types.Struct).Fields {
 				if t.Obj.Pkg == n.blk.func_().pkg() || fieldIsExported(f) {
-					n.newInput(field{nil, f})
+					n.newInput(&types.Var{Pkg: f.Pkg , Name: f.Name, Type: f.Type})
 				}
 			}
 		case *types.Struct:
 			for _, f := range t.Fields {
-				n.newInput(field{nil, f})
+				n.newInput(&types.Var{Pkg: f.Pkg , Name: f.Name, Type: f.Type})
 			}
 		case *types.Slice:
 			// TODO: variable number of inputs? (same can be achieved using append.)  variable number of index/value input pairs?

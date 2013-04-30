@@ -35,7 +35,18 @@ func newConnection() *connection {
 }
 
 func (c connection) connected() bool { return c.src != nil && c.dst != nil }
-func (c *connection) disconnect() { c.setSrc(nil); c.setDst(nil) }
+func (c *connection) disconnect() {
+	if c.src != nil {
+		c.src.disconnect(c)
+		c.src.connsChanged()
+		c.src = nil
+	}
+	if c.dst != nil {
+		c.dst.disconnect(c)
+		c.dst.connsChanged()
+		c.dst = nil
+	}
+}
 
 func (c *connection) setSrc(src *port) {
 	if c.src != nil { c.src.disconnect(c) }

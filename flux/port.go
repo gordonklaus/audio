@@ -9,7 +9,7 @@ type port struct {
 	*ViewBase
 	out bool
 	node node
-	obj types.Object
+	obj *types.Var
 	valView *typeView
 	conns []*connection
 	focused bool
@@ -18,17 +18,17 @@ type port struct {
 
 const portSize = 11
 
-func newInput(n node, v types.Object) *port {
+func newInput(n node, v *types.Var) *port {
 	p := newPort(false, n, v)
 	p.valView.Move(Pt(-p.valView.Width() - 12, -p.valView.Height() / 2))
 	return p
 }
-func newOutput(n node, v types.Object) *port {
+func newOutput(n node, v *types.Var) *port {
 	p := newPort(true, n, v)
 	p.valView.Move(Pt(12, -p.valView.Height() / 2))
 	return p
 }
-func newPort(out bool, n node, v types.Object) *port {
+func newPort(out bool, n node, v *types.Var) *port {
 	p := &port{out:out, node:n, obj:v}
 	p.ViewBase = NewView(p)
 	p.valView = newValueView(v)

@@ -20,13 +20,7 @@ func newLoopNode() *loopNode {
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.input = newInput(n, &types.Var{})
-	n.input.connsChanged = func() {
-		if conns := n.input.conns; len(conns) > 0 {
-			if o := conns[0].src; o != nil { n.updateInputType(o.obj.GetType()) }
-		} else {
-			n.updateInputType(nil)
-		}
-	}
+	n.input.connsChanged = func() { n.updateInputType() }
 	n.AddChild(n.input)
 	n.loopblk = newBlock(n)
 	n.inputsNode = newInputsNode()
@@ -35,7 +29,7 @@ func newLoopNode() *loopNode {
 	n.AddChild(n.loopblk)
 	
 	n.input.MoveCenter(Pt(-2*portSize, 0))
-	n.updateInputType(nil)
+	n.updateInputType()
 	return n
 }
 
@@ -50,11 +44,39 @@ func (n loopNode) outConns() []*connection {
 	return n.loopblk.outConns()
 }
 
-func (n *loopNode) updateInputType(t types.Type) {
+func (n *loopNode) updateInputType() {
+	var t, key, elt types.Type
+	key = types.Typ[types.Int]
+	if len(n.input.conns) > 0 {
+		if p := n.input.conns[0].src; p != nil {
+			t = p.obj.Type
+			switch t := t.(type) {
+			case *types.Basic, *types.NamedType:
+				u := t
+				if n, ok := u.(*types.NamedType); ok {
+					u = n.Underlying
+				}
+				b := u.(*types.Basic)
+				if b.Info & types.IsString != 0 {
+					elt = types.Typ[types.Rune]
+				} else if b.Kind != types.UntypedInt {
+					key = b
+				}
+			case *types.Array: elt = t.Elt
+			case *types.Slice: elt = t.Elt
+			case *types.Map:   key, elt = t.Key, t.Elt
+			case *types.Chan:  key = t.Elt
+			}
+		}
+	}
+	
 	in := n.inputsNode
 	switch t.(type) {
-	case nil, *types.Basic, *types.NamedType, *types.Chan:
+	default:
 		if len(in.outs) == 2 {
+			for _, c := range in.outs[1].conns {
+				c.blk.removeConnection(c)
+			}
 			in.RemoveChild(in.outs[1])
 			in.outs = in.outs[:1]
 		}
@@ -63,14 +85,11 @@ func (n *loopNode) updateInputType(t types.Type) {
 			in.newOutput(&types.Var{})
 		}
 	}
-	switch t.(type) {
-	case nil:
-	case *types.Basic:
-	case *types.NamedType:
-	case *types.Array:
-	case *types.Slice:
-	case *types.Map:
-	case *types.Chan:
+	
+	n.input.valView.setType(t)
+	in.outs[0].valView.setType(key)
+	if len(in.outs) == 2 {
+		in.outs[1].valView.setType(elt)
 	}
 }
 

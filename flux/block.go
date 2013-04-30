@@ -194,7 +194,7 @@ func (b *block) update() (updated bool) {
 		connContractCoef = .25
 		connExpandCoef = 2
 		topSpeed = 200
-		speedCompress = 5
+		speedCompress = 1
 	)
 	
 	for n1 := range b.nodes {

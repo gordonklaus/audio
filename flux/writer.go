@@ -296,14 +296,14 @@ func (w *writer) block(b *block, vars map[*port]*ast.Ident) (s []ast.Stmt) {
 		case *loopNode:
 			body := &ast.BlockStmt{}
 			results, assignExisting := w.results(n.inputsNode, vars)
-			if conns := n.input.conns; len(conns) > 0 {
-				switch conns[0].src.obj.GetType().(type) {
+			if t := n.input.obj.Type; t != nil {
+				switch t.(type) {
 				case *types.Basic, *types.NamedType:
 					if len(results) == 0 {
 						results = []ast.Expr{w.id("")}
 					}
 					s = append(s, &ast.ForStmt{
-						Init: &ast.AssignStmt{Tok: token.DEFINE, Lhs: results, Rhs: []ast.Expr{&ast.BasicLit{Kind: token.INT, Value: "0"}}},
+						Init: &ast.AssignStmt{Tok: token.DEFINE, Lhs: results, Rhs: []ast.Expr{&ast.CallExpr{Fun: w.typ(t), Args: []ast.Expr{&ast.BasicLit{Kind: token.INT, Value: "0"}}}}},
 						Cond: &ast.BinaryExpr{Op: token.LSS, X: results[0], Y: vars[n.input]},
 						Post: &ast.IncDecStmt{Tok: token.INC, X: results[0]},
 						Body: body,
