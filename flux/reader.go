@@ -4,16 +4,19 @@ import (
 	"code.google.com/p/go.exp/go/types"
 	"fmt"
 	"go/ast"
+	"go/parser"
 	"go/token"
 	"strconv"
+	"strings"
 )
 
 func loadFunc(f *funcNode) bool {
-	file := fluxObjs[f.obj]
-	if file == nil {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, fluxPath(f.obj), nil, parser.ParseComments)
+	if err != nil {
 		return false
 	}
-	r := &reader{f.obj.GetPkg(), map[string]*types.Package{}, map[string][]*port{}, map[string]types.Type{}}
+	r := &reader{f.obj.GetPkg(), map[string]*types.Package{}, map[string][]*port{}, map[string]types.Type{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
 	for _, i := range file.Imports {
 		path, _ := strconv.Unquote(i.Path.Value)
 		pkg := r.pkg.Imports[path]
@@ -44,8 +47,10 @@ func loadFunc(f *funcNode) bool {
 type reader struct {
 	pkg *types.Package
 	pkgNames map[string]*types.Package
-	vars map[string][]*port // there is a bug here; names can be reused between disjoint blocks; vars should be passed as a param, as in writer
+	vars map[string][]*port // there is a bug here; names can be reused between disjoint blocks; vars should be passed as a param and copied, as in writer
 	varTypes map[string]types.Type
+	cmap ast.CommentMap
+	seqNodes map[int]node
 }
 
 func (r *reader) readBlock(b *block, s []ast.Stmt) {
@@ -64,7 +69,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 						t = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name).(*types.TypeName).Type
 					}
 					if t == nil {
-						fmt.Println("CompositeLit: not fully implemented: ", x.Type)
+						fmt.Printf("CompositeLit: not fully implemented: %#v\n", x.Type)
 						break
 					}
 					n := newCompositeLiteralNode()
@@ -88,6 +93,7 @@ elts:				for _, elt := range x.Elts {
 					for i, lhs := range s.Lhs {
 						r.addVar(name(lhs), n.outs[i])
 					}
+					r.seq(n, s)
 				case *ast.IndexExpr:
 					n := newIndexNode(false)
 					b.addNode(n)
@@ -133,7 +139,7 @@ elts:				for _, elt := range x.Elts {
 					t = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name).(*types.TypeName).Type
 				}
 				if t == nil {
-					fmt.Println("DeclStmt: not fully implemented: ", v.Type)
+					fmt.Printf("DeclStmt: not fully implemented: %#v\n", v.Type)
 				} else {
 					r.varTypes[v.Names[0].Name] = t
 				}
@@ -182,7 +188,7 @@ elts:				for _, elt := range x.Elts {
 		case *ast.ExprStmt:
 			switch x := s.X.(type) {
 			case *ast.CallExpr:
-				r.newCallNode(b, x)
+				r.seq(r.newCallNode(b, x), s)
 			}
 		}
 	}
@@ -236,7 +242,25 @@ func (r *reader) connect(name string, in *port) {
 func (r *reader) addVar(name string, out *port) {
 	if name != "" && name != "_" {
 		r.vars[name] = append(r.vars[name], out)
-		r.varTypes[name] = out.obj.GetType()
+		r.varTypes[name] = out.obj.Type
+	}
+}
+
+func (r *reader) seq(n node, an ast.Node) {
+	if c, ok := r.cmap[an]; ok {
+		txt := c[0].Text()
+		s := strings.Split(txt[:len(txt)-1], ";")
+		seqIn := seqIn(n)
+		for _, s := range strings.Split(s[0], ",") {
+			if id, err := strconv.Atoi(s); err == nil {
+				c := newConnection()
+				c.setSrc(seqOut(r.seqNodes[id]))
+				c.setDst(seqIn)
+			}
+		}
+		if id, err := strconv.Atoi(s[1]); err == nil {
+			r.seqNodes[id] = n
+		}
 	}
 }
 

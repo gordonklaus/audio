@@ -135,6 +135,8 @@ func (c *connection) KeyPressed(event KeyEvent) {
 		c.src.TakeKeyboardFocus()
 	case KeyRight:
 		c.dst.TakeKeyboardFocus()
+	case KeyDown, KeyUp:
+		c.blk.outermost().focusNearestView(c, event.Key)
 	case KeyBackspace:
 		c.src.TakeKeyboardFocus()
 		c.blk.removeConnection(c)

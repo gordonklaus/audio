@@ -335,8 +335,9 @@ func (b *block) focusNearestView(v View, dirKey int) {
 	views := []View{}
 	for _, n := range b.allNodes() {
 		views = append(views, n)
-		for _, p := range n.inputs() { views = append(views, p) }
-		for _, p := range n.outputs() { views = append(views, p) }
+		for _, p := range append(n.inputs(), n.outputs()...) {
+			views = append(views, p)
+		}
 	}
 	for _, c := range b.allConns() {
 		views = append(views, c)

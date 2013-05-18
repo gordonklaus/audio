@@ -18,16 +18,8 @@ type port struct {
 
 const portSize = 11
 
-func newInput(n node, v *types.Var) *port {
-	p := newPort(false, n, v)
-	p.valView.Move(Pt(-p.valView.Width() - 12, -p.valView.Height() / 2))
-	return p
-}
-func newOutput(n node, v *types.Var) *port {
-	p := newPort(true, n, v)
-	p.valView.Move(Pt(12, -p.valView.Height() / 2))
-	return p
-}
+func newInput(n node, v *types.Var) *port { return newPort(false, n, v) }
+func newOutput(n node, v *types.Var) *port { return newPort(true, n, v) }
 func newPort(out bool, n node, v *types.Var) *port {
 	p := &port{out:out, node:n, obj:v}
 	p.ViewBase = NewView(p)
@@ -37,7 +29,17 @@ func newPort(out bool, n node, v *types.Var) *port {
 	p.AddChild(p.valView)
 	p.Resize(portSize, portSize)
 	p.Pan(Pt(portSize, portSize).Div(-2))
+	p.setType(*p.valView.typ)
 	return p
+}
+
+func (p *port) setType(t types.Type) {
+	p.valView.setType(t)
+	if p.out {
+		p.valView.Move(Pt(12, -p.valView.Height() / 2))
+	} else {
+		p.valView.Move(Pt(-p.valView.Width() - 12, -p.valView.Height() / 2))
+	}
 }
 
 func (p port) canConnect(q *port) bool {

@@ -136,10 +136,8 @@ func (b browser) filteredObjs() (objs []types.Object) {
 	add := func(obj types.Object) {
 		switch b.mode {
 		case fluxSourceOnly:
-			if _, ok := obj.(buildPackage); !ok {
-				if _, ok := fluxObjs[obj]; !ok {
-					return
-				}
+			if _, ok := obj.(buildPackage); !ok && !fluxObjs[obj] {
+				return
 			}
 		case typesOnly:
 			switch obj.(type) {

@@ -86,11 +86,12 @@ func (n *loopNode) updateInputType() {
 		}
 	}
 	
-	n.input.valView.setType(t)
-	in.outs[0].valView.setType(key)
+	n.input.setType(t)
+	in.outs[0].setType(key)
 	if len(in.outs) == 2 {
-		in.outs[1].valView.setType(elt)
+		in.outs[1].setType(elt)
 	}
+	in.reform()
 }
 
 func (n *loopNode) update() bool {

@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"go/ast"
 	"go/build"
-	"go/format"
 	"go/parser"
 	"go/token"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 func savePackageName(p *build.Package) {
@@ -44,204 +44,174 @@ func savePackageName(p *build.Package) {
 
 func saveType(t *types.NamedType) {
 	w := newWriter(t.Obj)
-	defer w.write()
+	defer w.close()
 	
 	u := t.Underlying
 	walkType(u, func(tt *types.NamedType) {
 		if p := tt.Obj.Pkg; p != t.Obj.Pkg {
-			w.pkgIds[p] = w.id(p.Name)
+			w.pkgNames[p] = w.name(p.Name)
 		}
 	})
 	w.imports()
 	
-	w.file.Decls = append(w.file.Decls, &ast.GenDecl{
-		Tok: token.TYPE,
-		Specs: []ast.Spec{&ast.TypeSpec{
-			Name: id(t.Obj.Name),
-			Type: w.typ(u),
-		}},
-	})
+	w.write("type %s %s", t.Obj.Name, w.typ(u))
 }
 
 func saveFunc(f funcNode) {
 	w := newWriter(f.obj)
-	defer w.write()
+	defer w.close()
 	
 	for p := range f.pkgRefs {
-		w.pkgIds[p] = w.id(p.Name)
+		w.pkgNames[p] = w.name(p.Name)
 	}
 	w.imports()
 	
-	var recv *ast.FieldList
-	t := w.typ(f.obj.GetType()).(*ast.FuncType)
-	vars := map[*port]*ast.Ident{}
-	i := 0
-	if m, ok := f.obj.(method); ok {
-		recv = &ast.FieldList{List:[]*ast.Field{&ast.Field{Type:w.typ(m.Type.Recv.Type)}}}
-		i = -1
-	}
-	for _, p := range f.inputsNode.outputs() {
-		name := w.id(p.obj.GetName())
+	w.write("func ")
+	vars := map[*port]string{}
+	params := f.inputsNode.outs
+	if _, ok := f.obj.(method); ok {
+		p := params[0]
+		params = params[1:]
+		name := w.name(p.obj.Name)
 		if len(p.conns) > 0 {
 			vars[p.conns[0].dst] = name
 		}
-		if i < 0 {
-			recv.List[0].Names = []*ast.Ident{name}
-		} else {
-			t.Params.List[i].Names[0] = name
+		w.write("(%s %s) ", name, w.typ(p.obj.Type))
+	}
+	w.write("%s(", f.obj.GetName())
+	for i, p := range params {
+		name := w.name(p.obj.Name)
+		if len(p.conns) > 0 {
+			vars[p.conns[0].dst] = name
 		}
-		i++
+		if i > 0 {
+			w.write(", ")
+		}
+		w.write("%s %s", name, w.typ(p.obj.Type))
 	}
-	for i, p := range f.outputsNode.inputs() {
-		name := w.id(p.obj.GetName())
+	w.write(") (")
+	for i, p := range f.outputsNode.ins {
+		name := w.name(p.obj.Name)
 		vars[p] = name
-		t.Results.List[i].Names[0] = name
+		if i > 0 {
+			w.write(", ")
+		}
+		w.write("%s %s", name, w.typ(p.obj.Type))
 	}
-	stmts := w.block(f.funcblk, vars)
-	if t.Results.NumFields() > 0 {
-		stmts = append(stmts, &ast.ReturnStmt{})
+	w.write(") {\n")
+	w.block(f.funcblk, vars)
+	if len(f.outputsNode.ins) > 0 {
+		w.src.WriteString("\treturn\n")
 	}
-	
-	w.file.Decls = append(w.file.Decls, &ast.FuncDecl{
-		Name: id(f.obj.GetName()),
-		Recv: recv,
-		Type: t,
-		Body: &ast.BlockStmt{List:stmts},
-	})
+	w.src.WriteString("}")
 }
 
 type writer struct {
-	file *ast.File
-	pkgIds map[*types.Package]*ast.Ident
+	src *os.File
+	pkgNames map[*types.Package]string
 	names map[string]int
-	write func()
+	seqID int
+	seqIDs map[node]int
+	nindent int
 }
 
 func newWriter(obj types.Object) *writer {
 	pkg := obj.GetPkg()
-	w := &writer{&ast.File{}, map[*types.Package]*ast.Ident{}, map[string]int{}, nil}
-	w.file.Name = id(pkg.Name)
+	src, err := os.Create(fluxPath(obj))
+	if err != nil {
+		panic(err)
+	}
+	w := &writer{src, map[*types.Package]string{}, map[string]int{}, 0, map[node]int{}, 0}
+	fluxObjs[obj] = true
+	
+	w.write("package %s\n\n", pkg.Name)
 	for _, obj := range append(types.Universe.Entries, pkg.Scope.Entries...) {
-		w.id(obj.GetName())
+		w.name(obj.GetName())
 	}
-	
-	w.write = func() {
-		bp, err := build.Import(pkg.Path, "", build.FindOnly)
-		if err != nil {
-			panic(err)
-		}
-		
-		name := obj.GetName()
-		if m, ok := obj.(method); ok {
-			t := m.Type.Recv.Type
-			if p, ok := t.(*types.Pointer); ok {
-				t = p.Base
-			}
-			name = t.(*types.NamedType).Obj.Name + "." + name
-		}
-		src, err := os.Create(filepath.Join(bp.Dir, name + ".flux.go"))
-		if err != nil {
-			panic(err)
-		}
-		
-		if err := format.Node(src, token.NewFileSet(), w.file); err != nil {
-			panic(err)
-		}
-		fluxObjs[obj] = w.file
-	}
-	
 	return w
 }
 
-func (w *writer) imports() {
-	if len(w.pkgIds) == 0 {
-		return
-	}
-	s := []ast.Spec{}
-	for p, n := range w.pkgIds {
-		i := &ast.ImportSpec{Path:&ast.BasicLit{Kind:token.STRING, Value:strconv.Quote(p.Path)}}
-		if n.Name != p.Name {
-			i.Name = n
-		}
-		s = append(s, i)
-		w.file.Imports = append(w.file.Imports, i)
-	}
-	d := &ast.GenDecl{Tok:token.IMPORT, Specs:s}
-	if len(s) > 1 {
-		d.Lparen = 1
-	}
-	w.file.Decls = append(w.file.Decls, d)
+func (w *writer) write(format string, a ...interface{}) {	
+	fmt.Fprintf(w.src, format, a...)
 }
 
-func (w *writer) block(b *block, vars map[*port]*ast.Ident) (s []ast.Stmt) {
+func (w *writer) indent(format string, a ...interface{}) {
+	w.write(strings.Repeat("\t", w.nindent) + format, a...)
+}
+
+func (w *writer) close() {	
+	w.src.Close()
+}
+
+func (w *writer) imports() {
+	if len(w.pkgNames) == 0 {
+		return
+	}
+	w.write("import (\n")
+	for p, id := range w.pkgNames {
+		w.write("\t")
+		if id != p.Name {
+			w.write(id + " ")
+		}
+		w.write(strconv.Quote(p.Path) + "\n")
+	}
+	w.write(")\n\n")
+}
+
+func (w *writer) block(b *block, vars map[*port]string) {
 	order, ok := b.nodeOrder()
 	if !ok {
 		fmt.Println("cyclic!")
 		return
 	}
 	
-	vars, varsCopy := map[*port]*ast.Ident{}, vars
+	vars, varsCopy := map[*port]string{}, vars
 	for k, v := range varsCopy { vars[k] = v }
+	
+	w.nindent++
 	
 	for c := range b.conns {
 		if _, ok := vars[c.dst]; !ok && c.src.node.block() != b {
-			name := w.id("v")
-			s = append(s, &ast.DeclStmt{Decl:&ast.GenDecl{
-				Tok: token.VAR,
-				Specs: []ast.Spec{&ast.ValueSpec{
-					Names: []*ast.Ident{name},
-					Type: w.typ(c.dst.obj.GetType())},
-				},
-			}})
+			name := w.name("v")
+			w.indent("var %s %s\n", name, w.typ(c.dst.obj.Type))
 			vars[c.dst] = name
 		}
 	}
 	for _, n := range order {
 		switch n := n.(type) {
 		default:
-			args := make([]ast.Expr, len(n.inputs()))
-			for i, in := range n.inputs() {
+			args := []string{}
+			for _, in := range n.inputs() {
+				if in.obj.Type == nil { continue }
 				if len(in.conns) > 0 {
-					args[i] = vars[in.conns[0].dst]
+					args = append(args, vars[in])
 				} else {
-					args[i] = w.zero(in.obj.GetType())
+					args = append(args, w.zero(in.obj.Type))
 				}
 			}
-			results, assignExisting := w.results(n, vars)
+			results, existing := w.results(n, vars)
 			switch n := n.(type) {
 			case *callNode:
-				var f ast.Expr
+				f := ""
 				if m, ok := n.obj.(method); ok {
-					f = &ast.SelectorExpr{X:args[0], Sel:id(m.Name)}
+					f = args[0] + "." + m.Name
 					args = args[1:]
 				} else {
-					f = w.qualifiedId(n.obj)
+					f = w.qualifiedName(n.obj)
 				}
-				c := &ast.CallExpr{Fun:f, Args:args}
+				w.indent("")
 				if len(results) > 0 {
-					s = append(s, &ast.AssignStmt{
-						Tok: token.DEFINE,
-						Lhs: results,
-						Rhs: []ast.Expr{c},
-					})
-				} else {
-					s = append(s, &ast.ExprStmt{X:c})
+					w.write(strings.Join(results, ", ") + " := ")
 				}
+				w.write("%s(%s)", f, strings.Join(args, ", "))
+				w.seq(n)
 			case *indexNode:
-				i := &ast.IndexExpr{X:args[0], Index:args[1]}
 				if n.set {
-					s = append(s, &ast.AssignStmt{
-						Tok: token.ASSIGN,
-						Lhs: []ast.Expr{i},
-						Rhs: []ast.Expr{args[2]},
-					})
+					w.indent("%s[%s] = %s", args[0], args[1], args[2])
 				} else if len(results) > 0 {
-					s = append(s, &ast.AssignStmt{
-						Tok: token.DEFINE,
-						Lhs: results,
-						Rhs: []ast.Expr{i},
-					})
+					w.indent("%s := %s[%s]", strings.Join(results, ", "), args[0], args[1])
 				}
+				w.seq(n)
 			case *basicLiteralNode:
 				if len(results) > 0 {
 					val := n.text.GetText()
@@ -251,115 +221,100 @@ func (w *writer) block(b *block, vars map[*port]*ast.Ident) (s []ast.Stmt) {
 					case token.CHAR:
 						val = strconv.QuoteRune([]rune(val)[0])
 					}
-					s = append(s, &ast.DeclStmt{Decl:&ast.GenDecl{
-						Tok: token.CONST,
-						Specs: []ast.Spec{&ast.ValueSpec{
-							Names: []*ast.Ident{results[0].(*ast.Ident)},
-							Values: []ast.Expr{&ast.BasicLit{Kind: n.kind, Value: val}},
-						}},
-					}})
+					w.indent("const %s = %s\n", results[0], val)
 				}
 			}
-			if assignExisting != nil {
-				s = append(s, assignExisting)
-			}
+			w.assignExisting(existing)
 		case *compositeLiteralNode:
-			results, assignExisting := w.results(n, vars)
+			results, existing := w.results(n, vars)
 			if len(results) > 0 {
-				cl := &ast.CompositeLit{Type: w.typ(*n.typ.typ)}
+				w.indent("%s := %s{", results[0], w.typ(*n.typ.typ))
+				first := true
 				for _, in := range n.inputs() {
 					if len(in.conns) > 0 {
-						cl.Elts = append(cl.Elts, &ast.KeyValueExpr{Key: id(in.obj.GetName()), Value: vars[in.conns[0].dst]})
+						if !first {
+							w.write(", ")
+						}
+						first = false
+						w.write("%s: %s", in.obj.Name, vars[in])
 					}
 				}
-				s = append(s, &ast.AssignStmt{
-					Tok: token.DEFINE,
-					Lhs: results,
-					Rhs: []ast.Expr{cl},
-				})
-				if assignExisting != nil {
-					s = append(s, assignExisting)
-				}
+				w.write("}\n")
+				w.assignExisting(existing)
 			}
 		case *portsNode:
 		case *ifNode:
-			cond := id("false")
+			w.indent("if ")
 			if len(n.input.conns) > 0 {
-				cond = vars[n.input]
+				w.write(vars[n.input])
+			} else {
+				w.write("false")
 			}
-			is := &ast.IfStmt{Cond:cond, Body:&ast.BlockStmt{}}
-			is.Body.List = w.block(n.trueblk, vars)
+			w.write(" {\n")
+			w.block(n.trueblk, vars)
 			if len(n.falseblk.nodes) > 0 {
-				is.Else = &ast.BlockStmt{List:w.block(n.falseblk, vars)}
+				w.indent("} else {\n")
+				w.block(n.falseblk, vars)
 			}
-			s = append(s, is)
+			w.indent("}\n")
 		case *loopNode:
-			body := &ast.BlockStmt{}
-			results, assignExisting := w.results(n.inputsNode, vars)
+			w.indent("for")
+			results, existing := w.results(n.inputsNode, vars)
 			if t := n.input.obj.Type; t != nil {
 				switch t.(type) {
 				case *types.Basic, *types.NamedType:
-					if len(results) == 0 {
-						results = []ast.Expr{w.id("")}
-					}
-					s = append(s, &ast.ForStmt{
-						Init: &ast.AssignStmt{Tok: token.DEFINE, Lhs: results, Rhs: []ast.Expr{&ast.CallExpr{Fun: w.typ(t), Args: []ast.Expr{&ast.BasicLit{Kind: token.INT, Value: "0"}}}}},
-						Cond: &ast.BinaryExpr{Op: token.LSS, X: results[0], Y: vars[n.input]},
-						Post: &ast.IncDecStmt{Tok: token.INC, X: results[0]},
-						Body: body,
-					})
-				case *types.Array, *types.Slice, *types.Map, *types.Chan:
-					rs := &ast.RangeStmt{X: vars[n.input], Body: body}
-					if len(results) == 0 {
-						rs.Key = id("_")
-						rs.Tok = token.ASSIGN
+					i := ""
+					if len(results) > 0 {
+						i = results[0]
 					} else {
-						rs.Key = results[0]
-						if len(results) == 2 {
-							rs.Value = results[1]
-						}
-						rs.Tok = token.DEFINE
+						i = w.name("i")
 					}
-					s = append(s, rs)
+					w.write(" %s := %s(0); %s < %s; %s++", i, w.typ(t), i, vars[n.input], i)
+				case *types.Array, *types.Slice, *types.Map, *types.Chan:
+					if len(results) == 0 {
+						w.write(" _ =")
+					} else {
+						w.write(results[0])
+						if len(results) == 2 {
+							w.write(", " + results[1])
+						}
+						w.write(" :=")
+					}
+					w.write(" range " + vars[n.input])
 				}
 			} else if len(results) > 0 {
-				s = append(s, &ast.ForStmt{
-					Init: &ast.AssignStmt{Tok: token.DEFINE, Lhs: results, Rhs: []ast.Expr{&ast.BasicLit{Kind: token.INT, Value: "0"}}},
-					Post: &ast.IncDecStmt{Tok: token.INC, X: results[0]},
-					Body: body,
-				})
-			} else {
-				s = append(s, &ast.ForStmt{Body: body})
+				w.write(" %s := 0;; %s++", results[0], results[0])
 			}
-			if assignExisting != nil {
-				body.List = []ast.Stmt{assignExisting}
-			}
-			body.List = append(body.List, w.block(n.loopblk, vars)...)
+			w.write(" {\n")
+			w.nindent++
+			w.assignExisting(existing)
+			w.nindent--
+			w.block(n.loopblk, vars)
+			w.indent("}\n")
 		}
 	}
-	return
+	
+	w.nindent--
 }
 
-func (w *writer) results(n node, vars map[*port]*ast.Ident) (results []ast.Expr, ass *ast.AssignStmt) {
+func (w *writer) results(n node, vars map[*port]string) (results []string, existing map[string]string) {
+	existing = map[string]string{}
 	any := false
 	for _, p := range n.outputs() {
-		id := id("_")
+		if p.obj.Type == nil { continue }
+		name := "_"
 		if len(p.conns) > 0 {
 			any = true
-			id = w.id(p.obj.GetName())
+			name = w.name(p.obj.GetName())
 			for _, c := range p.conns {
-				if existing, ok := vars[c.dst]; ok {
-					if ass == nil {
-						ass = &ast.AssignStmt{Tok:token.ASSIGN}
-					}
-					ass.Lhs = append(ass.Lhs, existing)
-					ass.Rhs = append(ass.Rhs, id)
+				if v, ok := vars[c.dst]; ok {
+					existing[v] = name
 				} else {
-					vars[c.dst] = id
+					vars[c.dst] = name
 				}
 			}
 		}
-		results = append(results, id)
+		results = append(results, name)
 	}
 	if !any {
 		return nil, nil
@@ -367,90 +322,159 @@ func (w *writer) results(n node, vars map[*port]*ast.Ident) (results []ast.Expr,
 	return
 }
 
-func (w writer) id(s string) *ast.Ident {
+func (w *writer) seq(n node) {
+	seqIn, seqOut := seqIn(n), seqOut(n)
+	in := seqIn != nil && len(seqIn.conns) > 0
+	out := seqOut != nil && len(seqOut.conns) > 0
+	if in || out {
+		w.write(" // ")
+		if in {
+			for i, c := range seqIn.conns {
+				if i > 0 {
+					w.write(",")
+				}
+				w.write(strconv.Itoa(w.seqIDs[c.src.node]))
+			}
+		}
+		w.write(";")
+		if out {
+			seqID := w.seqID
+			w.seqID++
+			w.seqIDs[n] = seqID
+			w.write(strconv.Itoa(seqID))
+		}
+	}
+	w.write("\n")
+}
+
+func (w *writer) assignExisting(m map[string]string) {
+	if len(m) > 0 {
+		var existingNames, sourceNames []string
+		for v1, v2 := range m {
+			existingNames = append(existingNames, v1)
+			sourceNames = append(sourceNames, v2)
+		}
+		w.indent("%s = %s\n", strings.Join(existingNames, ", "), strings.Join(sourceNames, ", "))
+	}
+}
+
+func (w writer) name(s string) string {
 	if s == "" || s == "_" { s = "x" }
 	if i, ok := w.names[s]; ok {
 		w.names[s]++
-		return w.id(s + strconv.Itoa(i))
+		return w.name(s + strconv.Itoa(i))
 	}
 	w.names[s] = 2
-	return id(s)
+	return s
 }
 
-func (w writer) qualifiedId(obj types.Object) ast.Expr {
-	i := id(obj.GetName())
-	if n, ok := w.pkgIds[obj.GetPkg()]; ok {
-		return &ast.SelectorExpr{X:n, Sel:i}
+func (w writer) qualifiedName(obj types.Object) string {
+	n := obj.GetName()
+	if p, ok := w.pkgNames[obj.GetPkg()]; ok {
+		return p + "." + n
 	}
-	return i
+	return n
 }
 
-func (w writer) typ(t types.Type) ast.Expr {
+func (w writer) typ(t types.Type) string {
 	switch t := t.(type) {
 	case *types.Basic:
-		return id(t.Name)
+		return t.Name
 	case *types.NamedType:
-		return w.qualifiedId(t.Obj)
+		return w.qualifiedName(t.Obj)
 	case *types.Pointer:
-		return &ast.StarExpr{X:w.typ(t.Base)}
+		return "*" + w.typ(t.Base)
 	case *types.Array:
-		return &ast.ArrayType{Len:&ast.BasicLit{Kind:token.INT, Value:strconv.FormatInt(t.Len, 10)}, Elt:w.typ(t.Elt)}
+		return fmt.Sprintf("[%d]%s", t.Len, w.typ(t.Elt))
 	case *types.Slice:
-		return &ast.ArrayType{Elt:w.typ(t.Elt)}
+		return "[]" + w.typ(t.Elt)
 	case *types.Map:
-		return &ast.MapType{Key:w.typ(t.Key), Value:w.typ(t.Elt)}
+		return fmt.Sprintf("map[%s]%s", w.typ(t.Key), w.typ(t.Elt))
 	case *types.Chan:
-		return &ast.ChanType{Dir:t.Dir, Value:w.typ(t.Elt)}
+		s := ""
+		switch t.Dir {
+		case ast.SEND:
+			s = "chan<- "
+		case ast.RECV:
+			s = "<-chan "
+		default:
+			s = "chan "
+		}
+		return s + w.typ(t.Elt)
 	case *types.Signature:
-		var p, r ast.FieldList
-		for _, v := range t.Params {
-			p.List = append(p.List, w.field(v.Name, v.Type))
-		}
-		for _, v := range t.Results {
-			r.List = append(r.List, w.field(v.Name, v.Type))
-		}
-		return &ast.FuncType{Params:&p, Results:&r}
+		return "func" + w.signature(t)
 	case *types.Interface:
-		var f []*ast.Field
-		for _, m := range t.Methods {
-			f = append(f, w.field(m.Name, m.Type))
+		s := "interface{"
+		for i, m := range t.Methods {
+			if i > 0 {
+				s += "; "
+			}
+			s += m.Name + w.signature(m.Type)
 		}
-		return &ast.InterfaceType{Methods:&ast.FieldList{Opening:1, List:f, Closing:1}}
+		return s + "}"
 	case *types.Struct:
-		var f []*ast.Field
-		for _, x := range t.Fields {
-			f = append(f, w.field(x.Name, x.Type))
+		s := "struct{"
+		for i, f := range t.Fields {
+			if i > 0 {
+				s += "; "
+			}
+			if f.Name != "" {
+				s += f.Name + " "
+			}
+			s += w.typ(f.Type)
 		}
-		return &ast.StructType{Fields:&ast.FieldList{Opening:1, List:f, Closing:1}}
+		return s + "}"
 	}
 	panic(fmt.Sprintf("unexpected type %#v\n", t))
 }
 
-func (w writer) field(n string, t types.Type) *ast.Field {
-	return &ast.Field{Names:[]*ast.Ident{id(n)}, Type:w.typ(t)}
+func (w writer) signature(f *types.Signature) string {
+	s := w.params(f.Params)
+	if len(f.Results) > 0 {
+		s += " "
+		if len(f.Results) == 1 && f.Results[0].Name == "" {
+			return s + w.typ(f.Results[0].Type)
+		}
+		return s + w.params(f.Results)
+	}
+	return s
 }
 
-func (w writer) zero(t types.Type) ast.Expr {
+func (w writer) params(params []*types.Var) string {
+	s := "("
+	for i, p := range params {
+		if i > 0 {
+			s += ", "
+		}
+		name := p.Name
+		if name == "" { name = "_" }
+		s += name + " "
+		s += w.typ(p.Type)
+	}
+	return s + ")"
+}
+
+func (w writer) zero(t types.Type) string {
 	switch t := t.(type) {
 	case *types.Basic:
 		switch {
 		case t.Info & types.IsBoolean != 0:
-			return id("false")
+			return "false"
 		case t.Info & types.IsNumeric != 0:
-			return &ast.BasicLit{Kind:token.INT, Value:"0"}
+			return "0"
 		case t.Info & types.IsString != 0:
-			return &ast.BasicLit{Kind:token.STRING, Value:`""`}
+			return `""`
 		default:
-			return id("nil")
+			return "nil"
 		}
 	case *types.Pointer, *types.Slice, *types.Map, *types.Chan, *types.Signature, *types.Interface:
-		return id("nil")
+		return "nil"
 	case *types.Array, *types.Struct:
-		return &ast.CompositeLit{Type:w.typ(t)}
+		return w.typ(t) + "{}"
 	case *types.NamedType:
 		switch t.Underlying.(type) {
 		case *types.Array, *types.Struct:
-			return &ast.CompositeLit{Type:w.typ(t)}
+			return w.typ(t) + "{}"
 		}
 		return w.zero(t.Underlying)
 	}
@@ -484,6 +508,20 @@ func walkType(t types.Type, op func(*types.NamedType)) {
 	}
 }
 
-func id(s string) *ast.Ident {
-	return ast.NewIdent(s)
+func fluxPath(obj types.Object) string {
+	pkg := obj.GetPkg()
+	bp, err := build.Import(pkg.Path, "", build.FindOnly)
+	if err != nil {
+		panic(err)
+	}
+	
+	name := obj.GetName()
+	if m, ok := obj.(method); ok {
+		t := m.Type.Recv.Type
+		if p, ok := t.(*types.Pointer); ok {
+			t = p.Base
+		}
+		name = t.(*types.NamedType).Obj.Name + "." + name
+	}
+	return filepath.Join(bp.Dir, name + ".flux.go")
 }

@@ -58,6 +58,8 @@ func (v *typeView) setType(t types.Type) {
 	s := ""
 	v.childTypes.left, v.childTypes.right = nil, nil
 	switch t := t.(type) {
+	case generic:
+		s = "<T>"
 	case *types.Basic:
 		s = t.Name
 	case *types.NamedType:
@@ -362,3 +364,5 @@ func (v typeView) Paint() {
 	SetLineWidth(1)
 	DrawRect(v.Rect())
 }
+
+type generic struct { types.Type }

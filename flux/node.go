@@ -94,19 +94,31 @@ func (n *nodeBase) removePortBase(p *port) { // intentionally named to not imple
 }
 
 func (n *nodeBase) reform() {
-	numIn := float64(len(n.ins))
-	numOut := float64(len(n.outs))
+	var ins, outs []*port
+	for _, p := range n.ins {
+		if p.obj.Type != nil {
+			ins = append(ins, p)
+		}
+	}
+	for _, p := range n.outs {
+		if p.obj.Type != nil {
+			outs = append(outs, p)
+		}
+	}
+	
+	numIn := float64(len(ins))
+	numOut := float64(len(outs))
 	rx, ry := 2.0 * portSize, (math.Max(numIn, numOut) + 1) * portSize / 2
 	
 	rect := ZR
-	for i, p := range n.ins {
+	for i, p := range ins {
 		y := -portSize * (float64(i) - (numIn - 1) / 2)
 		p.MoveCenter(Pt(-rx * math.Sqrt(ry * ry - y * y) / ry, y))
 		rect = rect.Union(p.MapRectToParent(p.Rect()))
 	}
-	for i, p := range n.outs {
+	for i, p := range outs {
 		y := -portSize * (float64(i) - (numOut - 1) / 2)
-		p.MoveCenter(Pt(rx * math.Sqrt(ry * ry - y * y) / ry, y))
+		p.MoveCenter(Pt(16 + rx * math.Sqrt(ry * ry - y * y) / ry, y))
 		rect = rect.Union(p.MapRectToParent(p.Rect()))
 	}
 
@@ -169,9 +181,10 @@ func (n nodeBase) Paint() {
 		pt := p.MapToParent(p.Center())
 		DrawCubic([4]Point{ZP, Pt(pt.X / 2, 0), Pt(pt.X / 2, pt.Y), pt}, int(pt.Len() / 2))
 	}
+	DrawLine(ZP, Pt(16, 0))
 	for _, p := range n.outs {
 		pt := p.MapToParent(p.Center())
-		DrawCubic([4]Point{ZP, Pt(pt.X / 2, 0), Pt(pt.X / 2, pt.Y), pt}, int(pt.Len() / 2))
+		DrawCubic([4]Point{Pt(16, 0), Pt(16 + (pt.X - 16) / 2, 0), Pt(16 + (pt.X - 16) / 2, pt.Y), pt}, int(pt.Len() / 2))
 	}
 	if len(n.ins) == 0 || len(n.outs) == 0 {
 		SetPointSize(7)
@@ -198,6 +211,24 @@ func newNode(obj types.Object) node {
 	return nil
 }
 
+func seqIn(n node) *port {
+	for _, in := range n.inputs() {
+		if in.obj.Type == nil {
+			return in
+		}
+	}
+	return nil
+}
+
+func seqOut(n node) *port {
+	for _, out := range n.outputs() {
+		if out.obj.Type == nil {
+			return out
+		}
+	}
+	return nil
+}
+
 type callNode struct {
 	*nodeBase
 	obj types.Object
@@ -213,6 +244,10 @@ func newCallNode(obj types.Object) *callNode {
 		for _, v := range t.Results { n.newOutput(v) }
 	default: // builtin -- handled specially elsewhere?
 	}
+	seqIn := n.newInput(&types.Var{Name: "seq"})
+	seqIn.MoveCenter(Pt(0, -11))
+	seqOut := n.newOutput(&types.Var{Name: "seq"})
+	seqOut.MoveCenter(Pt(16, -11))
 	
 	return n
 }
@@ -224,7 +259,7 @@ type basicLiteralNode struct {
 func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 	n := &basicLiteralNode{kind: kind}
 	n.nodeBase = newNodeBase(n)
-	out := n.newOutput(&types.Var{}).valView
+	out := n.newOutput(&types.Var{Type: types.Typ[types.Invalid]})
 	switch kind {
 	case token.INT, token.FLOAT:
 		if kind == token.INT {
@@ -302,6 +337,7 @@ func (n *compositeLiteralNode) editType() {
 }
 func (n *compositeLiteralNode) setType(t types.Type) {
 	n.typ.setType(t)
+	n.outs[0].setType(t)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
 		switch t := t.(type) {

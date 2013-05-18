@@ -12,7 +12,7 @@ import (
 
 var pkgs = map[string]*types.Package{"unsafe": types.Unsafe, "C": &types.Package{Name: "C", Path: "C", Scope: &types.Scope{}}}
 
-var fluxObjs = map[types.Object]*ast.File{}
+var fluxObjs = map[types.Object]bool{}
 
 func getPackage(path string) (*types.Package, error) {
 	if pkg, ok := pkgs[path]; ok {
@@ -24,7 +24,7 @@ func getPackage(path string) (*types.Package, error) {
 		return nil, err
 	}
 	
-	var fluxFiles []*ast.File
+	var fluxFiles []string
 	
 	files := []*ast.File{}
 	fset := token.NewFileSet()
@@ -35,7 +35,7 @@ func getPackage(path string) (*types.Package, error) {
 		}
 		files = append(files, file)
 		if strings.HasSuffix(fileName, ".flux.go") {
-			fluxFiles = append(fluxFiles, file)
+			fluxFiles = append(fluxFiles, fileName[:len(fileName)-8])
 		}
 	}
 	ctx := types.Context{Import:srcImport}
@@ -51,28 +51,13 @@ func getPackage(path string) (*types.Package, error) {
 	pkgs[path] = pkg
 	
 	for _, file := range fluxFiles {
-		for _, d := range file.Decls {
-			// go/types doesn't set the Objects yet, so we have to look them up
-			switch d := d.(type) {
-			case *ast.FuncDecl:
-				if d.Recv != nil {
-					t := d.Recv.List[0].Type
-					if p, ok := t.(*ast.StarExpr); ok {
-						t = p.X
-					}
-					for _, m := range pkg.Scope.Lookup(t.(*ast.Ident).Name).GetType().(*types.NamedType).Methods {
-						if m.Name == d.Name.Name {
-							fluxObjs[method{nil, m}] = file
-						}
-					}
-				} else {
-					fluxObjs[pkg.Scope.Lookup(d.Name.Name)] = file
-				}
-			case *ast.GenDecl:
-				if len(d.Specs) > 0 {
-					if s, ok := d.Specs[0].(*ast.TypeSpec); ok {
-						fluxObjs[pkg.Scope.Lookup(s.Name.Name)] = file
-					}
+		n := strings.Split(file, ".")
+		if len(n) == 1 {
+			fluxObjs[pkg.Scope.Lookup(n[0])] = true
+		} else {
+			for _, m := range pkg.Scope.Lookup(n[0]).GetType().(*types.NamedType).Methods {
+				if m.Name == n[1] {
+					fluxObjs[method{nil, m}] = true
 				}
 			}
 		}

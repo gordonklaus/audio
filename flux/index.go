@@ -13,19 +13,20 @@ type indexNode struct {
 func newIndexNode(set bool) *indexNode {
 	n := &indexNode{set:set}
 	n.nodeBase = newNodeBase(n)
+	up := n.updateInputType
 	n.x = n.newInput(&types.Var{})
-	f := func() { n.updateInputType() }
-	n.x.connsChanged = f
+	n.x.connsChanged = up
 	n.key = n.newInput(&types.Var{})
-	n.key.connsChanged = f
+	n.key.connsChanged = up
 	if set {
 		n.inVal = n.newInput(&types.Var{})
-		n.inVal.connsChanged = f
+		n.inVal.connsChanged = up
 		n.text.SetText("[]=")
 	} else {
 		n.outVal = n.newOutput(&types.Var{})
 		n.text.SetText("[]")
 	}
+	up()
 	return n
 }
 
@@ -56,9 +57,9 @@ func (n *indexNode) updateInputType() {
 			}
 		}
 	}
-	if t == nil && key != nil && elt != nil {
-		t = &types.Map{Key: key, Elt: elt}
-	}
+	if   t == nil {   t = generic{} }
+	if key == nil { key = generic{} }
+	if elt == nil { elt = generic{} }
 	
 	if !n.set {
 		switch t.(type) {
@@ -78,11 +79,12 @@ func (n *indexNode) updateInputType() {
 		}
 	}
 	
-	n.x.valView.setType(t)
-	n.key.valView.setType(key)
+	n.x.setType(t)
+	n.key.setType(key)
 	if n.set {
-		n.inVal.valView.setType(elt)
+		n.inVal.setType(elt)
 	} else {
-		n.outVal.valView.setType(elt)
+		n.outVal.setType(elt)
 	}
+	n.reform()
 }
