@@ -92,6 +92,7 @@ func (n *loopNode) updateInputType() {
 		in.outs[1].setType(elt)
 	}
 	in.reform()
+	in.reposition()
 }
 
 func (n *loopNode) update() bool {

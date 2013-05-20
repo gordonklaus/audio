@@ -502,6 +502,16 @@ func newPortsNode(out bool) *portsNode {
 	return n
 }
 
+func (n *portsNode) reposition() {
+	b := n.blk
+	y := b.Center().Y
+	if n.out {
+		n.MoveOrigin(Pt(b.Rect().Max.X, y))
+	} else {
+		n.MoveOrigin(Pt(b.Rect().Min.X, y))
+	}
+}
+
 func (n *portsNode) removePort(p *port) {
 	f := n.blk.func_()
 	sig := f.obj.GetType().(*types.Signature)
@@ -529,6 +539,7 @@ func (n *portsNode) removePort(p *port) {
 			break
 		}
 	}
+	n.reposition()
 }
 
 func (n *portsNode) KeyPressed(event KeyEvent) {
@@ -545,6 +556,7 @@ func (n *portsNode) KeyPressed(event KeyEvent) {
 			p = n.newOutput(v)
 			vars = &sig.Params
 		}
+		n.reposition()
 		p.valView.Show()
 		p.valView.edit(func() {
 			if v.Type != nil {
@@ -553,6 +565,7 @@ func (n *portsNode) KeyPressed(event KeyEvent) {
 				p.TakeKeyboardFocus()
 			} else {
 				n.removePortBase(p)
+				n.reposition()
 				n.TakeKeyboardFocus()
 			}
 		})

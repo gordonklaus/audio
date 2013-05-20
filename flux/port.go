@@ -67,8 +67,14 @@ func (p *port) KeyPressed(event KeyEvent) {
 		p.node.TakeKeyboardFocus()
 		return
 	}
-	if p.out && event.Key == KeyRight && len(p.conns) > 0 || !p.out && event.Key == KeyLeft && len(p.conns) > 0 {
-		p.conns[0].TakeKeyboardFocus()
+	if p.obj.Type != seqType &&
+	  (p.out && event.Key == KeyRight && len(p.conns) > 0 ||
+	   !p.out && event.Key == KeyLeft && len(p.conns) > 0) {
+		p.conns[len(p.conns) - 1].TakeKeyboardFocus()
+		return
+	}
+	if p.obj.Type == seqType && event.Key == KeyDown && len(p.conns) > 0 {
+		p.conns[len(p.conns) - 1].TakeKeyboardFocus()
 		return
 	}
 	

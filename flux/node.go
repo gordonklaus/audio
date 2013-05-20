@@ -96,12 +96,12 @@ func (n *nodeBase) removePortBase(p *port) { // intentionally named to not imple
 func (n *nodeBase) reform() {
 	var ins, outs []*port
 	for _, p := range n.ins {
-		if p.obj.Type != nil {
+		if p.obj.Type != seqType {
 			ins = append(ins, p)
 		}
 	}
 	for _, p := range n.outs {
-		if p.obj.Type != nil {
+		if p.obj.Type != seqType {
 			outs = append(outs, p)
 		}
 	}
@@ -113,12 +113,12 @@ func (n *nodeBase) reform() {
 	rect := ZR
 	for i, p := range ins {
 		y := -portSize * (float64(i) - (numIn - 1) / 2)
-		p.MoveCenter(Pt(-rx * math.Sqrt(ry * ry - y * y) / ry, y))
+		p.MoveCenter(Pt(-8 - rx * math.Sqrt(ry * ry - y * y) / ry, y))
 		rect = rect.Union(p.MapRectToParent(p.Rect()))
 	}
 	for i, p := range outs {
 		y := -portSize * (float64(i) - (numOut - 1) / 2)
-		p.MoveCenter(Pt(16 + rx * math.Sqrt(ry * ry - y * y) / ry, y))
+		p.MoveCenter(Pt(8 + rx * math.Sqrt(ry * ry - y * y) / ry, y))
 		rect = rect.Union(p.MapRectToParent(p.Rect()))
 	}
 
@@ -166,7 +166,19 @@ func (n *nodeBase) LostKeyboardFocus() { n.focused = false; n.Repaint() }
 
 func (n *nodeBase) KeyPressed(event KeyEvent) {
 	switch event.Key {
-	case KeyLeft, KeyRight, KeyUp, KeyDown:
+	case KeyLeft:
+		if p := seqIn(n); p != nil {
+			p.TakeKeyboardFocus()
+		} else {
+			n.blk.outermost().focusNearestView(n, event.Key)
+		}
+	case KeyRight:
+		if p := seqOut(n); p != nil {
+			p.TakeKeyboardFocus()
+		} else {
+			n.blk.outermost().focusNearestView(n, event.Key)
+		}
+	case KeyUp, KeyDown:
 		n.blk.outermost().focusNearestView(n, event.Key)
 	case KeyEscape:
 		n.blk.TakeKeyboardFocus()
@@ -176,19 +188,26 @@ func (n *nodeBase) KeyPressed(event KeyEvent) {
 }
 
 func (n nodeBase) Paint() {
+	const DX = 8.0
 	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
-	for _, p := range n.ins {
+	for _, p := range append(n.ins, n.outs...) {
 		pt := p.MapToParent(p.Center())
-		DrawCubic([4]Point{ZP, Pt(pt.X / 2, 0), Pt(pt.X / 2, pt.Y), pt}, int(pt.Len() / 2))
+		dx := -DX
+		if p.out {
+			dx = DX
+		}
+		x := (pt.X - dx) / 2 + dx
+		DrawCubic([4]Point{Pt(dx, 0), Pt(x, 0), Pt(x, pt.Y), pt}, int(pt.Len() / 2))
 	}
-	DrawLine(ZP, Pt(16, 0))
-	for _, p := range n.outs {
-		pt := p.MapToParent(p.Center())
-		DrawCubic([4]Point{Pt(16, 0), Pt(16 + (pt.X - 16) / 2, 0), Pt(16 + (pt.X - 16) / 2, pt.Y), pt}, int(pt.Len() / 2))
+	in, out := len(n.ins) > 0, len(n.outs) > 0
+	if in {
+		DrawLine(Pt(-DX, 0), ZP)
 	}
-	if len(n.ins) == 0 || len(n.outs) == 0 {
-		SetPointSize(7)
-		DrawPoint(ZP)
+	if out {
+		DrawLine(ZP, Pt(DX, 0))
+	}
+	if !in || !out {
+		DrawLine(Pt(0, -3), Pt(0, 3))
 	}
 }
 
@@ -211,9 +230,11 @@ func newNode(obj types.Object) node {
 	return nil
 }
 
+var seqType = struct { types.Type }{}
+
 func seqIn(n node) *port {
 	for _, in := range n.inputs() {
-		if in.obj.Type == nil {
+		if in.obj.Type == seqType {
 			return in
 		}
 	}
@@ -222,7 +243,7 @@ func seqIn(n node) *port {
 
 func seqOut(n node) *port {
 	for _, out := range n.outputs() {
-		if out.obj.Type == nil {
+		if out.obj.Type == seqType {
 			return out
 		}
 	}
@@ -244,10 +265,10 @@ func newCallNode(obj types.Object) *callNode {
 		for _, v := range t.Results { n.newOutput(v) }
 	default: // builtin -- handled specially elsewhere?
 	}
-	seqIn := n.newInput(&types.Var{Name: "seq"})
-	seqIn.MoveCenter(Pt(0, -11))
-	seqOut := n.newOutput(&types.Var{Name: "seq"})
-	seqOut.MoveCenter(Pt(16, -11))
+	seqIn := n.newInput(&types.Var{Name: "seq", Type: seqType})
+	seqIn.MoveCenter(Pt(-8, 0))
+	seqOut := n.newOutput(&types.Var{Name: "seq", Type: seqType})
+	seqOut.MoveCenter(Pt(8, 0))
 	
 	return n
 }
@@ -259,7 +280,7 @@ type basicLiteralNode struct {
 func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 	n := &basicLiteralNode{kind: kind}
 	n.nodeBase = newNodeBase(n)
-	out := n.newOutput(&types.Var{Type: types.Typ[types.Invalid]})
+	out := n.newOutput(&types.Var{})
 	switch kind {
 	case token.INT, token.FLOAT:
 		if kind == token.INT {

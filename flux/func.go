@@ -106,13 +106,11 @@ func (n *funcNode) animate() {
 }
 
 func (n *funcNode) update() bool {
-	b := n.funcblk
-	if !b.update() {
+	if !n.funcblk.update() {
 		return false
 	}
-	y := b.Center().Y
-	n.inputsNode.MoveOrigin(Pt(b.Rect().Min.X, y))
-	n.outputsNode.MoveOrigin(Pt(b.Rect().Max.X, y))
+	n.inputsNode.reposition()
+	n.outputsNode.reposition()
 	ResizeToFit(n, 0)
 	return true
 }

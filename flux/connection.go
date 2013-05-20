@@ -158,14 +158,19 @@ func (c *connection) KeyPressed(event KeyEvent) {
 func (c connection) Paint() {
 	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[c.focused])
 	start, end := c.MapFromParent(c.srcPt), c.MapFromParent(c.dstPt)
-	d := end.Sub(start)
-	mid := start.Add(d.Div(2))
-	if c.feedback { mid.Y = Max(start.Y, end.Y) + 128 }
-	dx := Abs(d.X / 3)
-	p1 := start.Add(Pt(dx, 0))
-	p2 := mid
-	p3 := end.Sub(Pt(dx, 0))
-	pts := []Point{start, p1, p2, p3, end}
+	var pts []Point
+	if c.src != nil && c.src.obj.Type == seqType || c.dst != nil && c.dst.obj.Type == seqType {
+		pts = []Point{start, Pt(start.X, start.Y - 40), Pt(end.X, end.Y - 40), end}
+	} else {
+		d := end.Sub(start)
+		mid := start.Add(d.Div(2))
+		if c.feedback { mid.Y = Max(start.Y, end.Y) + 128 }
+		dx := Abs(d.X / 3)
+		p1 := start.Add(Pt(dx, 0))
+		p2 := mid
+		p3 := end.Sub(Pt(dx, 0))
+		pts = []Point{start, p1, p2, p3, end}
+	}
 	len := 0.0
 	for i := range pts {
 		if i > 0 {

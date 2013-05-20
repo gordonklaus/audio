@@ -301,7 +301,7 @@ func (w *writer) results(n node, vars map[*port]string) (results []string, exist
 	existing = map[string]string{}
 	any := false
 	for _, p := range n.outputs() {
-		if p.obj.Type == nil { continue }
+		if p.obj.Type == seqType { continue }
 		name := "_"
 		if len(p.conns) > 0 {
 			any = true
