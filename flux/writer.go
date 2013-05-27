@@ -182,7 +182,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 		default:
 			args := []string{}
 			for _, in := range n.inputs() {
-				if in.obj.Type == nil { continue }
+				if in.obj.Type == seqType { continue }
 				if len(in.conns) > 0 {
 					args = append(args, vars[in])
 				} else {
