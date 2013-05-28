@@ -60,34 +60,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 			if s.Tok == token.DEFINE {
 				switch x := s.Rhs[0].(type) {
 				case *ast.CompositeLit:
-					// this only handles named types; when will go/types do it all for me?
-					var t types.Type
-					switch x := x.Type.(type) {
-					case *ast.Ident:
-						t = r.pkg.Scope.Lookup(x.Name).(*types.TypeName).Type
-					case *ast.SelectorExpr:
-						t = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name).(*types.TypeName).Type
-					}
-					if t == nil {
-						fmt.Printf("CompositeLit: not fully implemented: %#v\n", x.Type)
-						break
-					}
-					n := newCompositeLiteralNode()
-					b.addNode(n)
-					n.setType(t)
-elts:				for _, elt := range x.Elts {
-						elt := elt.(*ast.KeyValueExpr)
-						field := name(elt.Key)
-						val := name(elt.Value)
-						for _, in := range n.ins {
-							if in.obj.GetName() == field {
-								r.connect(val, in)
-								continue elts
-							}
-						}
-						panic("no field matching " + field)
-					}
-					r.addVar(name(s.Lhs[0]), n.outs[0])
+					r.newCompositeLiteralNode(b, s, x, false)
 				case *ast.CallExpr:
 					n := r.newCallNode(b, x)
 					for i, lhs := range s.Lhs {
@@ -102,6 +75,11 @@ elts:				for _, elt := range x.Elts {
 					r.addVar(name(s.Lhs[0]), n.outVal)
 					if len(s.Lhs) == 2 {
 						r.addVar(name(s.Lhs[1]), n.ok)
+					}
+				case *ast.UnaryExpr:
+					switch x.Op {
+					case token.AND:
+						r.newCompositeLiteralNode(b, s, x.X.(*ast.CompositeLit), true)
 					}
 				}
 			} else {
@@ -205,10 +183,7 @@ func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n *callNode) {
 		if pkg, ok := r.pkgNames[n1]; ok {
 			n = newCallNode(pkg.Scope.Lookup(n2))
 		} else {
-			recv := r.varTypes[n1]
-			if p, ok := recv.(*types.Pointer); ok {
-				recv = p.Base
-			}
+			recv, _ := indirect(r.varTypes[n1])
 			for _, m := range recv.(*types.NamedType).Methods {
 				if m.Name == n2 {
 					n = newCallNode(method{nil, m})
@@ -229,6 +204,41 @@ func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n *callNode) {
 		}
 	}
 	return
+}
+
+func (r *reader) newCompositeLiteralNode(b *block, s *ast.AssignStmt, x *ast.CompositeLit, ptr bool) {
+	// this only handles named types; when will go/types do it all for me?
+	var t types.Type
+	switch x := x.Type.(type) {
+	case *ast.Ident:
+		t = r.pkg.Scope.Lookup(x.Name).(*types.TypeName).Type
+	case *ast.SelectorExpr:
+		t = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name).(*types.TypeName).Type
+	}
+	if t == nil {
+		fmt.Printf("CompositeLit: not fully implemented: %#v\n", x.Type)
+		return
+	}
+	if ptr {
+		t = &types.Pointer{Base: t}
+	}
+	n := newCompositeLiteralNode()
+	b.addNode(n)
+	n.setType(t)
+elts:
+	for _, elt := range x.Elts {
+		elt := elt.(*ast.KeyValueExpr)
+		field := name(elt.Key)
+		val := name(elt.Value)
+		for _, in := range n.ins {
+			if in.obj.GetName() == field {
+				r.connect(val, in)
+				continue elts
+			}
+		}
+		panic("no field matching " + field)
+	}
+	r.addVar(name(s.Lhs[0]), n.outs[0])
 }
 
 func (r *reader) connect(name string, in *port) {

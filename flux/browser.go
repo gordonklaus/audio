@@ -36,9 +36,11 @@ type browser struct {
 
 type browserMode int
 const (
-	browse = iota
+	browse browserMode = iota
 	fluxSourceOnly
 	typesOnly
+	compositeOrPtrType
+	compositeType
 )
 
 func newBrowser(mode browserMode, currentPkg *types.Package, imports []*types.Package) *browser {
@@ -134,20 +136,40 @@ var buildPackages = map[string]buildPackage{}
 
 func (b browser) filteredObjs() (objs []types.Object) {
 	add := func(obj types.Object) {
-		switch b.mode {
-		case fluxSourceOnly:
-			if _, ok := obj.(buildPackage); !ok && !fluxObjs[obj] {
-				return
-			}
-		case typesOnly:
-			switch obj.(type) {
-				default:
+		if _, ok := obj.(buildPackage); !ok {
+			switch b.mode {
+			case fluxSourceOnly:
+				if !fluxObjs[obj] {
 					return
-				case buildPackage, *types.TypeName:
+				}
+			case typesOnly:
+				if _, ok := obj.(*types.TypeName); !ok {
+					return
+				}
+			case compositeOrPtrType, compositeType:
+				switch obj {
+				default:
+					obj, ok := obj.(*types.TypeName)
+					if !ok {
+						return
+					}
+					t, ok := obj.Type.(*types.NamedType)
+					if !ok {
+						return
+					}
+					switch t.Underlying.(type) {
+					default:
+						return
+					case *types.Array, *types.Slice, *types.Map, *types.Struct:
+					}
+				case protoPointer:
+					if b.mode == compositeType {
+						return
+					}
+				case protoArray, protoSlice, protoMap, protoStruct:
+				}
 			}
-		}
-		if b.currentPkg != nil {
-			if _, ok := obj.(buildPackage); !ok {
+			if b.currentPkg != nil {
 				if p := obj.GetPkg(); p != nil && p != b.currentPkg && !ast.IsExported(obj.GetName()) {
 					return
 				}

@@ -228,7 +228,12 @@ func (w *writer) block(b *block, vars map[*port]string) {
 		case *compositeLiteralNode:
 			results, existing := w.results(n, vars)
 			if len(results) > 0 {
-				w.indent("%s := %s{", results[0], w.typ(*n.typ.typ))
+				w.indent("%s := ", results[0])
+				t, isPtr := indirect(*n.typ.typ)
+				if isPtr {
+					w.write("&")
+				}
+				w.write("%s{", w.typ(t))
 				first := true
 				for _, in := range n.inputs() {
 					if len(in.conns) > 0 {
@@ -517,10 +522,7 @@ func fluxPath(obj types.Object) string {
 	
 	name := obj.GetName()
 	if m, ok := obj.(method); ok {
-		t := m.Type.Recv.Type
-		if p, ok := t.(*types.Pointer); ok {
-			t = p.Base
-		}
+		t, _ := indirect(m.Type.Recv.Type)
 		name = t.(*types.NamedType).Obj.Name + "." + name
 	}
 	return filepath.Join(bp.Dir, name + ".flux.go")

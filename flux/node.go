@@ -343,11 +343,12 @@ func newCompositeLiteralNode() *compositeLiteralNode {
 	v := &types.Var{}
 	n.newOutput(v)
 	n.typ = newTypeView(&v.Type)
+	n.typ.mode = compositeOrPtrType
 	n.AddChild(n.typ)
 	return n
 }
 func (n *compositeLiteralNode) editType() {
-	n.typ.edit(func() {
+	n.typ.editType(func() {
 		if t := *n.typ.typ; t != nil {
 			n.setType(t)
 		} else {
@@ -361,7 +362,7 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 	n.outs[0].setType(t)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
-		switch t := t.(type) {
+		switch t, _ = indirect(t); t := t.(type) {
 		case *types.NamedType:
 			for _, f := range t.Underlying.(*types.Struct).Fields {
 				if t.Obj.Pkg == n.blk.func_().pkg() || fieldIsExported(f) {
@@ -386,9 +387,7 @@ func fieldIsExported(f *types.Field) bool {
 	name := f.Name
 	if name == "" {
 		t := f.Type
-		if pt, ok := t.(*types.Pointer); ok { 
-			t = pt.Base
-		}
+		t, _ = indirect(t)
 		name = t.(*types.NamedType).Obj.Name
 	}
 	return ast.IsExported(name)

@@ -10,6 +10,7 @@ import (
 type typeView struct {
 	*ViewBase
 	typ *types.Type
+	mode browserMode
 	text Text
 	childTypes struct{left, right []*typeView}
 	focused bool
@@ -20,9 +21,8 @@ type typeView struct {
 }
 
 func newTypeView(t *types.Type) *typeView {
-	v := &typeView{}
+	v := &typeView{typ: t, mode: typesOnly}
 	v.ViewBase = NewView(v)
-	v.typ = t
 	v.text = NewText("")
 	v.text.SetTextColor(getTextColor(&types.TypeName{}, .7))
 	v.text.SetBackgroundColor(Color{0, 0, 0, .3})
@@ -98,6 +98,10 @@ func (v *typeView) setType(t types.Type) {
 	for _, c := range append(v.childTypes.left, v.childTypes.right...) { v.AddChild(c) }
 	if v.nameText != nil { v.AddChild(v.nameText) }
 	
+	if _, ok := t.(*types.Pointer); ok && v.mode == compositeOrPtrType {
+		v.childTypes.right[0].mode = compositeType
+	}
+	
 	v.reform()
 }
 
@@ -154,7 +158,7 @@ l:		for v := View(v); v != nil; v = v.Parent() {
 				break l
 			}
 		}
-		b := newBrowser(typesOnly, pkg, imports)
+		b := newBrowser(v.mode, pkg, imports)
 		v.AddChild(b)
 		b.Move(v.Center())
 		b.accepted = func(obj types.Object) {
@@ -178,7 +182,7 @@ l:		for v := View(v); v != nil; v = v.Parent() {
 	switch t := (*v.typ).(type) {
 	case *types.Pointer, *types.Array, *types.Slice, *types.Chan:
 		if elt := v.childTypes.right[0]; *elt.typ == nil {
-			elt.edit(func() {
+			elt.editType(func() {
 				if *elt.typ == nil { v.setType(nil) }
 				v.editType(done)
 			})
@@ -189,13 +193,13 @@ l:		for v := View(v); v != nil; v = v.Parent() {
 		val := v.childTypes.right[0]
 		switch types.Type(nil) {
 		case *key.typ:
-			key.edit(func() {
+			key.editType(func() {
 				if *key.typ == nil { v.setType(nil) }
 				v.editType(done)
 			})
 			return
 		case *val.typ:
-			val.edit(func() {
+			val.editType(func() {
 				if *val.typ == nil { key.setType(nil) }
 				v.editType(done)
 			})
@@ -365,4 +369,12 @@ func (v typeView) Paint() {
 	DrawRect(v.Rect())
 }
 
+
 type generic struct { types.Type }
+
+func indirect(t types.Type) (types.Type, bool) {
+	if p, ok := t.(*types.Pointer); ok {
+		return p.Base, true
+	}
+	return t, false
+}
