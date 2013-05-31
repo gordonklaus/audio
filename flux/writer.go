@@ -223,6 +223,14 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					}
 					w.indent("const %s = %s\n", results[0], val)
 				}
+			case *valueNode:
+				if n.set {
+					w.indent("%s = %s", w.qualifiedName(n.obj), args[0])
+					w.seq(n)
+				} else {
+					w.indent("%s := %s", results[0], w.qualifiedName(n.obj))
+					w.seq(n)
+				}
 			}
 			w.assignExisting(existing)
 		case *compositeLiteralNode:

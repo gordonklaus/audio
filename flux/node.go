@@ -215,17 +215,13 @@ func newNode(obj types.Object) node {
 	switch obj := obj.(type) {
 	case special:
 		switch obj.name {
-		case "[]":
-			return newIndexNode(false)
-		case "[]=":
-			return newIndexNode(true)
-		case "if":
-			return newIfNode()
-		case "loop":
-			return newLoopNode()
+		case "[]":                        return newIndexNode(false)
+		case "[]=":                       return newIndexNode(true)
+		case "if":                        return newIfNode()
+		case "loop":                      return newLoopNode()
 		}
-	case *types.Func, method:
-		return newCallNode(obj)
+	case *types.Func, method:             return newCallNode(obj)
+	case *types.Var, *types.Const, field: return newValueNode(obj, false)
 	}
 	return nil
 }

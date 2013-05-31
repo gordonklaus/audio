@@ -59,6 +59,8 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 		case *ast.AssignStmt:
 			if s.Tok == token.DEFINE {
 				switch x := s.Rhs[0].(type) {
+				case *ast.Ident, *ast.SelectorExpr:
+					r.newValueNode(b, x, s.Lhs[0], false)
 				case *ast.CompositeLit:
 					r.newCompositeLiteralNode(b, s, x, false)
 				case *ast.CallExpr:
@@ -91,14 +93,14 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 					if i, ok := s.Rhs[0].(*ast.Ident); ok {
 						r.connect(i.Name, n.inVal)
 					}
-				} else {
+				} else if !r.newValueNode(b, s.Lhs[0], s.Rhs[0], true) {
 					for i := range s.Lhs {
 						lh := name(s.Lhs[i])
 						rh := name(s.Rhs[i])
 						r.vars[lh] = append(r.vars[lh], r.vars[rh]...)
-						// the static type of lhs and rhs are not necessarily the same.
+						// the types of lhs and rhs are not necessarily the same.
 						// varType is set under DeclStmt.
-						// until go/types is complete, setting varType here, which will work in most cases but fail in a few
+						// until go/types is complete, also setting varType here, which will work in most cases but fail in a few
 						r.varTypes[lh] = r.varTypes[rh]
 					}
 				}
@@ -112,9 +114,9 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 				var t types.Type
 				switch x := v.Type.(type) {
 				case *ast.Ident:
-					t = r.pkg.Scope.Lookup(x.Name).(*types.TypeName).Type
+					t = r.pkg.Scope.Lookup(x.Name).GetType()
 				case *ast.SelectorExpr:
-					t = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name).(*types.TypeName).Type
+					t = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name).GetType()
 				}
 				if t == nil {
 					fmt.Printf("DeclStmt: not fully implemented: %#v\n", v.Type)
@@ -170,6 +172,23 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 			}
 		}
 	}
+}
+
+func (r *reader) newValueNode(b *block, x, y ast.Expr, set bool) bool {
+	var obj types.Object
+	switch x := x.(type) {
+	case *ast.Ident:        obj = r.pkg.Scope.Lookup(x.Name)
+	case *ast.SelectorExpr: obj = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name)
+	default:                return false
+	}
+	n := newValueNode(obj, set)
+	b.addNode(n)
+	if set {
+		r.connect(name(y), n.in)
+	} else {
+		r.addVar(name(y), n.out)
+	}
+	return true
 }
 
 func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n *callNode) {

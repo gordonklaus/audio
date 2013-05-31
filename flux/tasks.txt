@@ -1,5 +1,7 @@
 TODO
 
+- go/types has parameter and result names like name·1, which is invalid in Go source.  fix go/types or strip these chars.
+- allow to build types when using browser in block.  if a composite type (or pointer to one) is built, make a compositeLiteralNode; otherwise make a conversionNode; and allow toggling between compositeLiteral and conversionNode by hitting a key ('\'?) when node is focused.
 - consider the matter of addressability and copying.  currently, there is one variable per input, plus one variable for each connection that exits a block.  there should be a clear rule for when a copy is made so that it is obvious which connections refer to the same value.
 - fix bug in indexNode and loopNode:  crash when changing/deleting input connection (something to do with outputs changing)?  might have to do with trying to connect the input to the 2nd inputsNode output, which disappears before the connection is made.
 - fix typeView bug(s):
