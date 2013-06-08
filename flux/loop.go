@@ -20,7 +20,7 @@ func newLoopNode() *loopNode {
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.input = newInput(n, &types.Var{})
-	n.input.connsChanged = func() { n.updateInputType() }
+	n.input.connsChanged = n.updateInputType
 	n.AddChild(n.input)
 	n.loopblk = newBlock(n)
 	n.inputsNode = newInputsNode()

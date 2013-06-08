@@ -9,6 +9,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 type node interface {
@@ -94,17 +95,7 @@ func (n *nodeBase) removePortBase(p *port) { // intentionally named to not imple
 }
 
 func (n *nodeBase) reform() {
-	var ins, outs []*port
-	for _, p := range n.ins {
-		if p.obj.Type != seqType {
-			ins = append(ins, p)
-		}
-	}
-	for _, p := range n.outs {
-		if p.obj.Type != seqType {
-			outs = append(outs, p)
-		}
-	}
+	ins, outs := ins(n), outs(n)
 	
 	numIn := float64(len(ins))
 	numOut := float64(len(outs))
@@ -220,7 +211,11 @@ func newNode(obj types.Object) node {
 		case "if":                        return newIfNode()
 		case "loop":                      return newLoopNode()
 		}
-	case *types.Func, method:             return newCallNode(obj)
+	case *types.Func, method:
+		switch unicode.IsLetter([]rune(obj.GetName())[0]) {
+		case true:                        return newCallNode(obj)
+		case false:                       return newOperatorNode(obj)
+		}
 	case *types.Var, *types.Const, field: return newValueNode(obj, false)
 	}
 	return nil
@@ -246,12 +241,30 @@ func seqOut(n node) *port {
 	return nil
 }
 
+func ins(n node) (p []*port) {
+	for _, in := range n.inputs() {
+		if in.obj.Type != seqType {
+			p = append(p, in)
+		}
+	}
+	return
+}
+
+func outs(n node) (p []*port) {
+	for _, out := range n.outputs() {
+		if out.obj.Type != seqType {
+			p = append(p, out)
+		}
+	}
+	return
+}
+
 type callNode struct {
 	*nodeBase
 	obj types.Object
 }
 func newCallNode(obj types.Object) *callNode {
-	n := &callNode{obj:obj}
+	n := &callNode{obj: obj}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText(obj.GetName())
 	switch t := obj.GetType().(type) {

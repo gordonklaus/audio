@@ -181,8 +181,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 		switch n := n.(type) {
 		default:
 			args := []string{}
-			for _, in := range n.inputs() {
-				if in.obj.Type == seqType { continue }
+			for _, in := range ins(n) {
 				if len(in.conns) > 0 {
 					args = append(args, vars[in])
 				} else {
@@ -205,6 +204,11 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				}
 				w.write("%s(%s)", f, strings.Join(args, ", "))
 				w.seq(n)
+			case *operatorNode:
+				if len(results) > 0 {
+					// TODO: handle constant expressions
+					w.indent("%s := %s %s %s\n", results[0], args[0], n.op, args[1])
+				}
 			case *indexNode:
 				if n.set {
 					w.indent("%s[%s] = %s", args[0], args[1], args[2])
@@ -226,11 +230,15 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			case *valueNode:
 				if n.set {
 					w.indent("%s = %s", w.qualifiedName(n.obj), args[0])
-					w.seq(n)
 				} else {
-					w.indent("%s := %s", results[0], w.qualifiedName(n.obj))
-					w.seq(n)
+					switch n.obj.(type) {
+					case *types.Var:
+						w.indent("%s := %s", results[0], w.qualifiedName(n.obj))
+					case *types.Const:
+						w.indent("const %s = %s", results[0], w.qualifiedName(n.obj))
+					}
 				}
+				w.seq(n)
 			}
 			w.assignExisting(existing)
 		case *compositeLiteralNode:
@@ -287,7 +295,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					if len(results) == 0 {
 						w.write(" _ =")
 					} else {
-						w.write(results[0])
+						w.write(" " + results[0])
 						if len(results) == 2 {
 							w.write(", " + results[1])
 						}
@@ -313,8 +321,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 func (w *writer) results(n node, vars map[*port]string) (results []string, existing map[string]string) {
 	existing = map[string]string{}
 	any := false
-	for _, p := range n.outputs() {
-		if p.obj.Type == seqType { continue }
+	for _, p := range outs(n) {
 		name := "_"
 		if len(p.conns) > 0 {
 			any = true

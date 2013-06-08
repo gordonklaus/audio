@@ -83,6 +83,12 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 					case token.AND:
 						r.newCompositeLiteralNode(b, s, x.X.(*ast.CompositeLit), true)
 					}
+				case *ast.BinaryExpr:
+					n := newOperatorNode(findOp(x.Op.String()))
+					b.addNode(n)
+					r.connect(name(x.X), n.ins[0])
+					r.connect(name(x.Y), n.ins[1])
+					r.addVar(name(s.Lhs[0]), n.outs[0])
 				}
 			} else {
 				if x, ok := s.Lhs[0].(*ast.IndexExpr); ok {
@@ -124,19 +130,23 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 					r.varTypes[v.Names[0].Name] = t
 				}
 			case token.CONST:
-				lit := v.Values[0].(*ast.BasicLit)
-				n := newBasicLiteralNode(lit.Kind)
-				b.addNode(n)
-				switch lit.Kind {
-				case token.INT, token.FLOAT:
-					n.text.SetText(lit.Value)
-				case token.IMAG:
-					// TODO
-				case token.STRING, token.CHAR:
-					text, _ := strconv.Unquote(lit.Value)
-					n.text.SetText(text)
+				switch x := v.Values[0].(type) {
+				case *ast.BasicLit:
+					n := newBasicLiteralNode(x.Kind)
+					b.addNode(n)
+					switch x.Kind {
+					case token.INT, token.FLOAT:
+						n.text.SetText(x.Value)
+					case token.IMAG:
+						// TODO
+					case token.STRING, token.CHAR:
+						text, _ := strconv.Unquote(x.Value)
+						n.text.SetText(text)
+					}
+					r.addVar(name(v.Names[0]), n.outs[0])
+				case *ast.Ident, *ast.SelectorExpr:
+					r.newValueNode(b, x, v.Names[0], false)
 				}
-				r.addVar(name(v.Names[0]), n.outs[0])
 			}
 		case *ast.ForStmt:
 			n := newLoopNode()

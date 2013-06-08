@@ -43,17 +43,17 @@ func (p *port) setType(t types.Type) {
 }
 
 func (p port) canConnect(q *port) bool {
+	pSeq, qSeq := p.obj.Type == seqType, q.obj.Type == seqType
+	if pSeq && !qSeq || !pSeq && qSeq { return false }
 	return p.out != q.out
 }
 func (p *port) connect(c *connection) {
 	p.conns = append(p.conns, c)
-	p.connsChanged()
 }
 func (p *port) disconnect(c *connection) {
 	for i, c2 := range p.conns {
 		if c2 == c {
 			p.conns = append(p.conns[:i], p.conns[i+1:]...)
-			p.connsChanged()
 			return
 		}
 	}

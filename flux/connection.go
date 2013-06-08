@@ -49,19 +49,35 @@ func (c *connection) disconnect() {
 }
 
 func (c *connection) setSrc(src *port) {
-	if c.src != nil { c.src.disconnect(c) }
+	if c.src != nil {
+		c.src.disconnect(c)
+		c.src.connsChanged()
+	}
 	c.src = src
-	if src != nil { src.connect(c) }
-	if c.dst != nil { c.dst.connsChanged() }
+	if src != nil {
+		src.connect(c)
+		if c.dst != nil {
+			c.src.connsChanged()
+			c.dst.connsChanged()
+		}
+	}
 	c.reblock()
 	c.reform()
 }
 
 func (c *connection) setDst(dst *port) {
-	if c.dst != nil { c.dst.disconnect(c) }
+	if c.dst != nil {
+		c.dst.disconnect(c)
+		c.dst.connsChanged()
+	}
 	c.dst = dst
-	if dst != nil { dst.connect(c) }
-	if c.src != nil { c.src.connsChanged() }
+	if dst != nil {
+		dst.connect(c)
+		if c.src != nil {
+			c.src.connsChanged()
+			c.dst.connsChanged()
+		}
+	}
 	c.reblock()
 	c.reform()
 }

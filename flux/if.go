@@ -63,8 +63,12 @@ func (n *ifNode) LostKeyboardFocus() { n.focused = false; n.Repaint() }
 
 func (n *ifNode) KeyPressed(event KeyEvent) {
 	switch event.Key {
-	case KeyLeft, KeyRight, KeyUp, KeyDown:
+	case KeyLeft, KeyRight:
 		n.blk.outermost().focusNearestView(n, event.Key)
+	case KeyUp:
+		n.trueblk.TakeKeyboardFocus()
+	case KeyDown:
+		n.falseblk.TakeKeyboardFocus()
 	case KeyEscape:
 		n.blk.TakeKeyboardFocus()
 	default:
