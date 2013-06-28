@@ -71,3 +71,7 @@ func DrawBezier(ctrlPts []Point, steps int) {
 	MapGrid1d(Int(steps), 0, 1)
 	EvalMesh1(LINE, 0, Int(steps))
 }
+
+func Rotate(rot float64) {
+	Rotated(Double(rot * 360), 0, 0, 1)
+}

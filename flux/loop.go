@@ -102,7 +102,7 @@ func (n *loopNode) update() bool {
 	}
 	y2 := b.Size().Y / 2
 	b.Move(Pt(0, -y2))
-	n.inputsNode.MoveOrigin(b.Rect().Min.Add(Pt(0, y2)))
+	n.inputsNode.reposition()
 	ResizeToFit(n, 0)
 	return true
 }

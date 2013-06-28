@@ -27,7 +27,7 @@ func newIfNode() *ifNode {
 	n.AddChild(n.trueblk)
 
 	n.input.MoveCenter(Pt(-2*portSize, 0))
-	n.trueblk.Move(Pt(portSize, 4))
+	n.update()
 	return n
 }
 
@@ -48,7 +48,8 @@ func (n *ifNode) update() bool {
 	if !n.falseblk.update() && !n.trueblk.update() {
 		return false
 	}
-	n.falseblk.Move(Pt(portSize, -4 - n.falseblk.Height()))
+	n.falseblk.Move(Pt(-blockRadius, -4 - n.falseblk.Height()))
+	n.trueblk.Move(Pt(-blockRadius, 4))
 	ResizeToFit(n, 0)
 	return true
 }
@@ -79,8 +80,5 @@ func (n *ifNode) KeyPressed(event KeyEvent) {
 func (n ifNode) Paint() {
 	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
 	DrawLine(ZP, n.input.MapToParent(n.input.Center()))
-	top, bottom := 4 + n.trueblk.Size().Y / 2, -4 - n.falseblk.Size().Y / 2
-	DrawLine(Pt(0, top), Pt(0, bottom))
-	DrawLine(Pt(0, top), Pt(portSize, top))
-	DrawLine(Pt(0, bottom), Pt(portSize, bottom))
+	DrawLine(Pt(0, -4), Pt(0, 4))
 }

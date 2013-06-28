@@ -2,7 +2,7 @@ package main
 
 import (
 	."code.google.com/p/gordon-go/gui"
-	."math"
+	"math"
 )
 
 type connection struct {
@@ -20,8 +20,6 @@ type connection struct {
 	srcPt Point
 	dstPt Point
 }
-
-const connectionThickness = 7
 
 func newConnection() *connection {
 	c := &connection{}
@@ -117,7 +115,12 @@ func (c *connection) reform() {
 		c.dstPt = c.srcPt.Add(unconnectedOffset)
 	}
 	
-	rect := Rectangle{c.srcPt, c.dstPt}.Canon().Inset(-connectionThickness / 2)
+	var rect Rectangle
+	if c.src != nil && c.src.obj.Type == seqType || c.dst != nil && c.dst.obj.Type == seqType {
+		rect = Rect(c.srcPt.X, math.Min(c.srcPt.Y, c.dstPt.Y) - 25, c.dstPt.X, math.Max(c.srcPt.Y, c.dstPt.Y))
+	} else {
+		rect = Rectangle{c.srcPt, c.dstPt}.Canon()
+	}
 	c.Move(rect.Min)
 	c.Resize(rect.Dx(), rect.Dy())
 	
@@ -180,8 +183,8 @@ func (c connection) Paint() {
 	} else {
 		d := end.Sub(start)
 		mid := start.Add(d.Div(2))
-		if c.feedback { mid.Y = Max(start.Y, end.Y) + 128 }
-		dx := Abs(d.X / 3)
+		if c.feedback { mid.Y = math.Max(start.Y, end.Y) + 128 }
+		dx := math.Abs(d.X / 3)
 		p1 := start.Add(Pt(dx, 0))
 		p2 := mid
 		p3 := end.Sub(Pt(dx, 0))

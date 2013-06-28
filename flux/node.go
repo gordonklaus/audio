@@ -41,6 +41,10 @@ func (t *nodeText) KeyPressed(event KeyEvent) {
 	}
 	t.node.reform()
 }
+func (t nodeText) Paint() {
+	Rotate(1.0/12) // this should go in ViewBase; but is good enough for now
+	t.TextBase.Paint()
+}
 
 type nodeBase struct {
 	*ViewBase
@@ -113,7 +117,6 @@ func (n *nodeBase) reform() {
 		rect = rect.Union(p.MapRectToParent(p.Rect()))
 	}
 
-	n.text.MoveCenter(Pt(0, rect.Max.Y + n.text.Height() / 2))
 	n.Pan(rect.Min)
 	n.Resize(rect.Dx(), rect.Dy())
 }

@@ -9,6 +9,8 @@ import (
 	"math/rand"
 )
 
+const blockRadius = 16
+
 type block struct {
 	*ViewBase
 	node node
@@ -208,9 +210,12 @@ func (b *block) update() (updated bool) {
 			if d > 0 { continue }
 			v[n1] = v[n1].Add(dir.Mul(-nodeSepCoef * d / dir.Len()))
 		}
+conns:
 		for c := range b.conns {
 			src, dst := c.src, c.dst
-			if src == nil || src.node == n1 || dst == nil || dst.node == n1 { continue }
+			if src == nil || dst == nil { continue }
+			for n := src.node; n.block() != nil; n = n.block().node { if n == n1 { continue conns } }
+			for n := dst.node; n.block() != nil; n = n.block().node { if n == n1 { continue conns } }
 			x := src.MapTo(src.Center(), b)
 			y := dst.MapTo(dst.Center(), b)
 			p := n1.MapToParent(n1.Center())
@@ -269,7 +274,6 @@ func (b *block) update() (updated bool) {
 	meanVel := ZP
 	nVel := 0.0
 	for n := range b.nodes {
-		if _, ok := n.(*portsNode); ok { continue }
 		meanVel = meanVel.Add(v[n])
 		nVel++
 	}
@@ -279,7 +283,6 @@ func (b *block) update() (updated bool) {
 		meanVel = meanVel.Div(nVel)
 		meanSpeed := 0.0
 		for n := range b.nodes {
-			if _, ok := n.(*portsNode); ok { continue }
 			meanSpeed += v[n].Sub(meanVel).Len()
 		}
 		meanSpeed /= nVel
@@ -294,22 +297,28 @@ func (b *block) update() (updated bool) {
 	
 	rect := ZR
 	for n := range b.nodes {
-		if _, ok := n.(*portsNode); ok { continue }
 		r := n.MapRectToParent(n.Rect())
-		r.Min.X -= 48
-		r.Max.X += 48
+		if n, ok := n.(*portsNode); ok {
+			// portsNodes are later reposition()ed to the boundary; thus we must adjust for the margin (blockRadius)
+			if n.out {
+				r = r.Sub(Pt(blockRadius, 0))
+			} else {
+				r = r.Add(Pt(blockRadius, 0))
+			}
+		}
 		if rect == ZR {
 			rect = r
 		} else {
 			rect = rect.Union(r)
 		}
 	}
-	if rect == ZR {
-		rect = Rect(0, 0, 48, 32)
+	for c := range b.conns {
+		rect = rect.Union(c.MapRectToParent(c.Rect()))
 	}
-	s := rect.Size().Mul((math.Sqrt2 - 1) / 2)
-	rect.Min = rect.Min.Sub(s)
-	rect.Max = rect.Max.Add(s)
+	if rect == ZR {
+		rect = Rect(0, 0, 16, 0)
+	}
+	rect = rect.Inset(-blockRadius)
 	if b.Rect() == rect { return }
 	b.Resize(rect.Dx(), rect.Dy())
 	b.Pan(rect.Min)
@@ -474,16 +483,21 @@ func (b block) Paint() {
 		SetColor(Color{.5, .5, .5, 1})
 	}
 	{
-		x := Pt(b.Rect().Dx() / 2, 0)
-		y := Pt(0, b.Rect().Dy() / 2)
-		c := b.Rect().Center()
-		r, t, l, b := c.Add(x), c.Add(y), c.Sub(x), c.Sub(y)
-		tr, tl, bl, br := c.Add(x).Add(y), c.Sub(x).Add(y), c.Sub(x).Sub(y), c.Add(x).Sub(y)
-		steps := int(x.X + y.Y)
-		DrawQuadratic([3]Point{r, tr, t}, steps)
-		DrawQuadratic([3]Point{t, tl, l}, steps)
-		DrawQuadratic([3]Point{l, bl, b}, steps)
-		DrawQuadratic([3]Point{b, br, r}, steps)
+		rect := b.Rect()
+		l, r, b, t := rect.Min.X, rect.Max.X, rect.Min.Y, rect.Max.Y
+		lb, bl := Pt(l, b + blockRadius), Pt(l + blockRadius, b)
+		rb, br := Pt(r, b + blockRadius), Pt(r - blockRadius, b)
+		rt, tr := Pt(r, t - blockRadius), Pt(r - blockRadius, t)
+		lt, tl := Pt(l, t - blockRadius), Pt(l + blockRadius, t)
+		steps := int(math.Trunc(2 * math.Pi * blockRadius))
+		DrawLine(bl, br)
+		DrawQuadratic([3]Point{br, Pt(r, b), rb}, steps)
+		DrawLine(rb, rt)
+		DrawQuadratic([3]Point{rt, Pt(r, t), tr}, steps)
+		DrawLine(tr, tl)
+		DrawQuadratic([3]Point{tl, Pt(l, t), lt}, steps)
+		DrawLine(lt, lb)
+		DrawQuadratic([3]Point{lb, Pt(l, b), bl}, steps)
 	}
 }
 
