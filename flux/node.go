@@ -374,16 +374,18 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 	n.outs[0].setType(t)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
-		switch t, _ = indirect(t); t := t.(type) {
-		case *types.NamedType:
-			for _, f := range t.Underlying.(*types.Struct).Fields {
-				if t.Obj.Pkg == n.blk.func_().pkg() || fieldIsExported(f) {
-					n.newInput(&types.Var{Pkg: f.Pkg , Name: f.Name, Type: f.Type})
-				}
-			}
+		t, _ = indirect(t)
+		local := true
+		if nt, ok := t.(*types.NamedType); ok {
+			t = nt.Underlying
+			local = nt.Obj.Pkg == n.blk.func_().pkg()
+		}
+		switch t := t.(type) {
 		case *types.Struct:
 			for _, f := range t.Fields {
-				n.newInput(&types.Var{Pkg: f.Pkg , Name: f.Name, Type: f.Type})
+				if local || fieldIsExported(f) {
+					n.newInput(&types.Var{Pkg: f.Pkg , Name: f.Name, Type: f.Type})
+				}
 			}
 		case *types.Slice:
 			// TODO: variable number of inputs? (same can be achieved using append.)  variable number of index/value input pairs?

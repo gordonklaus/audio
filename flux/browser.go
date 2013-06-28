@@ -462,7 +462,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 	case KeyEnter:
 		cur := b.currentObj()
-		if cur == nil {
+		if cur == nil && b.newObj == nil {
 			return
 		}
 		if pkg, ok := cur.(buildPackage); ok && event.Shift {

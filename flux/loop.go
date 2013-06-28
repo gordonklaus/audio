@@ -50,17 +50,15 @@ func (n *loopNode) updateInputType() {
 	if len(n.input.conns) > 0 {
 		if p := n.input.conns[0].src; p != nil {
 			t = p.obj.Type
+			if n, ok := t.(*types.NamedType); ok {
+				t = n.Underlying
+			}
 			switch t := t.(type) {
-			case *types.Basic, *types.NamedType:
-				u := t
-				if n, ok := u.(*types.NamedType); ok {
-					u = n.Underlying
-				}
-				b := u.(*types.Basic)
-				if b.Info & types.IsString != 0 {
+			case *types.Basic:
+				if t.Info & types.IsString != 0 {
 					elt = types.Typ[types.Rune]
-				} else if b.Kind != types.UntypedInt {
-					key = b
+				} else if t.Kind != types.UntypedInt {
+					key = t
 				}
 			case *types.Array: elt = t.Elt
 			case *types.Slice: elt = t.Elt
