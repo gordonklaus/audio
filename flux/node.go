@@ -9,7 +9,6 @@ import (
 	"math"
 	"strconv"
 	"strings"
-	"unicode"
 )
 
 type node interface {
@@ -205,25 +204,6 @@ func (n nodeBase) Paint() {
 	}
 }
 
-func newNode(obj types.Object) node {
-	switch obj := obj.(type) {
-	case special:
-		switch obj.name {
-		case "[]":                        return newIndexNode(false)
-		case "[]=":                       return newIndexNode(true)
-		case "if":                        return newIfNode()
-		case "loop":                      return newLoopNode()
-		}
-	case *types.Func, method:
-		switch unicode.IsLetter([]rune(obj.GetName())[0]) {
-		case true:                        return newCallNode(obj)
-		case false:                       return newOperatorNode(obj)
-		}
-	case *types.Var, *types.Const, field: return newValueNode(obj, false)
-	}
-	return nil
-}
-
 var seqType = struct { types.Type }{}
 
 func seqIn(n node) *port {
@@ -266,23 +246,25 @@ type callNode struct {
 	*nodeBase
 	obj types.Object
 }
-func newCallNode(obj types.Object) *callNode {
-	n := &callNode{obj: obj}
-	n.nodeBase = newNodeBase(n)
-	n.text.SetText(obj.GetName())
-	switch t := obj.GetType().(type) {
-	case *types.Signature:
+func newCallNode(obj types.Object) node {
+	if t, ok := obj.GetType().(*types.Signature); ok {
+		n := &callNode{obj: obj}
+		n.nodeBase = newNodeBase(n)
+		n.text.SetText(obj.GetName())
 		if t.Recv != nil { n.newInput(t.Recv) }
 		for _, v := range t.Params { n.newInput(v) }
 		for _, v := range t.Results { n.newOutput(v) }
-	default: // builtin -- handled specially elsewhere?
+		seqIn := n.newInput(&types.Var{Name: "seq", Type: seqType})
+		seqIn.MoveCenter(Pt(-8, 0))
+		seqOut := n.newOutput(&types.Var{Name: "seq", Type: seqType})
+		seqOut.MoveCenter(Pt(8, 0))
+		return n
 	}
-	seqIn := n.newInput(&types.Var{Name: "seq", Type: seqType})
-	seqIn.MoveCenter(Pt(-8, 0))
-	seqOut := n.newOutput(&types.Var{Name: "seq", Type: seqType})
-	seqOut.MoveCenter(Pt(8, 0))
-	
-	return n
+
+	switch obj.GetName() {
+	case "make": return newMakeNode()
+	default: panic("unknown builtin: " + obj.GetName())
+	}
 }
 
 type basicLiteralNode struct {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"code.google.com/p/go.exp/go/types"
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -34,12 +33,13 @@ func loadFunc(f *funcNode) bool {
 		r.addVar(v.Name, f.inputsNode.newOutput(v))
 		f.addPkgRef(v)
 	}
-	if d, ok := file.Decls[len(file.Decls)-1].(*ast.FuncDecl); ok {
-		r.readBlock(f.funcblk, d.Body.List)
+	for _, v := range t.Results {
+		r.vars[v.Name] = nil
+		f.addPkgRef(v)
 	}
+	r.readBlock(f.funcblk, file.Decls[len(file.Decls)-1].(*ast.FuncDecl).Body.List)
 	for _, v := range t.Results {
 		r.connect(v.Name, f.outputsNode.newInput(v))
-		f.addPkgRef(v)
 	}
 	return true
 }
@@ -66,7 +66,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 				case *ast.CallExpr:
 					n := r.newCallNode(b, x)
 					for i, lhs := range s.Lhs {
-						r.addVar(name(lhs), n.outs[i])
+						r.addVar(name(lhs), n.outputs()[i])
 					}
 					r.seq(n, s)
 				case *ast.IndexExpr:
@@ -99,36 +99,28 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 					if i, ok := s.Rhs[0].(*ast.Ident); ok {
 						r.connect(i.Name, n.inVal)
 					}
-				} else if !r.newValueNode(b, s.Lhs[0], s.Rhs[0], true) {
-					for i := range s.Lhs {
-						lh := name(s.Lhs[i])
-						rh := name(s.Rhs[i])
-						r.vars[lh] = append(r.vars[lh], r.vars[rh]...)
-						// the types of lhs and rhs are not necessarily the same.
-						// varType is set under DeclStmt.
-						// until go/types is complete, also setting varType here, which will work in most cases but fail in a few
-						r.varTypes[lh] = r.varTypes[rh]
+					break
+				}
+				if id, ok := s.Lhs[0].(*ast.Ident); ok {
+					if _, ok := r.vars[id.Name]; ok {
+						for i := range s.Lhs {
+							lh := name(s.Lhs[i])
+							rh := name(s.Rhs[i])
+							r.vars[lh] = append(r.vars[lh], r.vars[rh]...)
+						}
+						break
 					}
 				}
+				r.newValueNode(b, s.Lhs[0], s.Rhs[0], true)
 			}
 		case *ast.DeclStmt:
 			decl := s.Decl.(*ast.GenDecl)
 			v := decl.Specs[0].(*ast.ValueSpec)
 			switch decl.Tok {
 			case token.VAR:
-				// this only handles named types; when will go/types do it all for me?
-				var t types.Type
-				switch x := v.Type.(type) {
-				case *ast.Ident:
-					t = r.pkg.Scope.Lookup(x.Name).GetType()
-				case *ast.SelectorExpr:
-					t = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name).GetType()
-				}
-				if t == nil {
-					fmt.Printf("DeclStmt: not fully implemented: %#v\n", v.Type)
-				} else {
-					r.varTypes[v.Names[0].Name] = t
-				}
+				name := v.Names[0].Name
+				r.vars[name] = nil
+				r.varTypes[name] = r.typ(v.Type)
 			case token.CONST:
 				switch x := v.Values[0].(type) {
 				case *ast.BasicLit:
@@ -184,70 +176,40 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 	}
 }
 
-func (r *reader) newValueNode(b *block, x, y ast.Expr, set bool) bool {
-	var obj types.Object
-	switch x := x.(type) {
-	case *ast.Ident:        obj = r.pkg.Scope.Lookup(x.Name)
-	case *ast.SelectorExpr: obj = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name)
-	default:                return false
-	}
-	n := newValueNode(obj, set)
+func (r *reader) newValueNode(b *block, x, y ast.Expr, set bool) {
+	n := newValueNode(r.obj(x), set)
 	b.addNode(n)
 	if set {
 		r.connect(name(y), n.in)
 	} else {
 		r.addVar(name(y), n.out)
 	}
-	return true
 }
 
-func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n *callNode) {
-	var recvExpr ast.Expr
-	switch f := x.Fun.(type) {
-	case *ast.Ident:
-		n = newCallNode(r.pkg.Scope.Lookup(f.Name))
-	case *ast.SelectorExpr:
-		n1 := name(f.X)
-		n2 := f.Sel.Name
-		if pkg, ok := r.pkgNames[n1]; ok {
-			n = newCallNode(pkg.Scope.Lookup(n2))
-		} else {
-			recv, _ := indirect(r.varTypes[n1])
-			for _, m := range recv.(*types.NamedType).Methods {
-				if m.Name == n2 {
-					n = newCallNode(method{nil, m})
-					break
-				}
-			}
-			recvExpr = f.X
-		}
-	}
+func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n node) {
+	obj := r.obj(x.Fun)
+	n = newCallNode(obj)
 	b.addNode(n)
 	args := x.Args
-	if recvExpr != nil {
-		args = append([]ast.Expr{recvExpr}, args...)
+	if _, ok := obj.(method); ok {
+		recv := x.Fun.(*ast.SelectorExpr).X
+		args = append([]ast.Expr{recv}, args...)
+	}
+	switch n := n.(type) {
+	case *makeNode:
+		n.setType(r.typ(args[0]))
+		args = args[1:]
 	}
 	for i, arg := range args {
 		if arg, ok := arg.(*ast.Ident); ok {
-			r.connect(arg.Name, n.ins[i])
+			r.connect(arg.Name, n.inputs()[i])
 		}
 	}
 	return
 }
 
 func (r *reader) newCompositeLiteralNode(b *block, s *ast.AssignStmt, x *ast.CompositeLit, ptr bool) {
-	// this only handles named types; when will go/types do it all for me?
-	var t types.Type
-	switch x := x.Type.(type) {
-	case *ast.Ident:
-		t = r.pkg.Scope.Lookup(x.Name).(*types.TypeName).Type
-	case *ast.SelectorExpr:
-		t = r.pkgNames[name(x.X)].Scope.Lookup(x.Sel.Name).(*types.TypeName).Type
-	}
-	if t == nil {
-		fmt.Printf("CompositeLit: not fully implemented: %#v\n", x.Type)
-		return
-	}
+	t := r.typ(x.Type)
 	if ptr {
 		t = &types.Pointer{Base: t}
 	}
@@ -268,6 +230,42 @@ elts:
 		panic("no field matching " + field)
 	}
 	r.addVar(name(s.Lhs[0]), n.outs[0])
+}
+
+func (r *reader) obj(x ast.Expr) types.Object {
+	// TODO: shouldn't go/types be able to do this for me?
+	switch x := x.(type) {
+	case *ast.Ident:
+		for s := r.pkg.Scope; s != nil; s = s.Outer {
+			 if obj := s.Lookup(x.Name); obj != nil {
+				 return obj
+			 }
+		 }
+	case *ast.SelectorExpr:
+		// TODO: val.Field, Type.Method, and pkg.Type.Method
+		n1 := name(x.X)
+		n2 := x.Sel.Name
+		if pkg, ok := r.pkgNames[n1]; ok {
+			return pkg.Scope.Lookup(n2)
+		}
+		// TODO: use types.LookupFieldOrMethod()
+		recv, _ := indirect(r.varTypes[n1])
+		for _, m := range recv.(*types.NamedType).Methods {
+			if m.Name == n2 {
+				return method{nil, m}
+			}
+		}
+	}
+	return nil
+}
+
+func (r *reader) typ(x ast.Expr) types.Type {
+	// TODO: replace with types.EvalNode()
+	switch x := x.(type) {
+	case *ast.Ident, *ast.SelectorExpr:
+		return r.obj(x).GetType()
+	}
+	panic("not yet implemented")
 }
 
 func (r *reader) connect(name string, in *port) {

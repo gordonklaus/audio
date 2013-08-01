@@ -204,6 +204,13 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				}
 				w.write("%s(%s)", f, strings.Join(args, ", "))
 				w.seq(n)
+			case *makeNode:
+				if len(results) > 0 {
+					if len(args) == 2 && len(n.ins[1].conns) == 0 { // array capacity input unconnected
+						args = args[:1]
+					}
+					w.indent("%s := make(%s, %s)\n", results[0], w.typ(*n.typ.typ), strings.Join(args, ", "))
+				}
 			case *operatorNode:
 				if len(results) > 0 {
 					// TODO: handle constant expressions

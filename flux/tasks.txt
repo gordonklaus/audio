@@ -10,6 +10,10 @@ TODO
 - in browser, by default don't show non-Go dirs; toggle visibility with a key
 - browser bug:  right arrow two levels deep, left arrow to root, scroll up or down several items; everything disappears
 - prefix names with pkg name in browser and typeView
+- manage code flux:  names, signatures, types, etc.
+  - update objects currently being edited
+  - update known clients upon change (e.g., update callers when func sig changes)
+  - handle changes during import and read.  (strip all func bodies in importer)
 - handle funcs with an unconnected input whose type must be named to make a zero value (i.e., is ArrayType or StructType):  import package or, if it is an unexported type, complain and don't write files.
 - stabilize file format so that textual diffs only show relevant changes:
   - order of imports (alphabetical).
@@ -23,6 +27,7 @@ TODO
 - handle constant expressions:
   - write result to constant (not variable), or type may not propagate correctly
   - a node in a const expr should be collapsable to its value; in particular, this will be nice in typeView for array length
+- multiple panes for editing multiple funcs, types, etc.  panes arranged as Voronoi diagram, each pane with a center point and a relative size
 
 before releasing:
 - handle all errors

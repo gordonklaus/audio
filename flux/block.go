@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"math"
 	"math/rand"
+	"unicode"
 )
 
 const blockRadius = 16
@@ -433,10 +434,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 				browser.Move(b.Center())
 				browser.accepted = func(obj types.Object) {
 					browser.Close()
-					n := newNode(obj)
-					b.addNode(n)
-					n.MoveCenter(b.Center())
-					n.TakeKeyboardFocus()
+					newNode(b, obj)
 				}
 				browser.canceled = func() {
 					browser.Close()
@@ -471,6 +469,33 @@ func (b *block) KeyPressed(event KeyEvent) {
 		} else {
 			b.ViewBase.KeyPressed(event)
 		}
+	}
+}
+
+func newNode(b *block, obj types.Object) {
+	var n node
+	switch obj := obj.(type) {
+	case special:
+		switch obj.name {
+		case "[]":                        n = newIndexNode(false)
+		case "[]=":                       n = newIndexNode(true)
+		case "if":                        n = newIfNode()
+		case "loop":                      n = newLoopNode()
+		}
+	case *types.Func, method:
+		switch unicode.IsLetter([]rune(obj.GetName())[0]) {
+		case true:                        n = newCallNode(obj)
+		case false:                       n = newOperatorNode(obj)
+		}
+	case *types.Var, *types.Const, field: n = newValueNode(obj, false)
+	default:                              panic("bad obj")
+	}
+	b.addNode(n)
+	n.MoveCenter(b.Center())
+	if nn, ok := n.(interface{editType()}); ok {
+		nn.editType()
+	} else {
+		n.TakeKeyboardFocus()
 	}
 }
 

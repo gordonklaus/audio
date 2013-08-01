@@ -41,6 +41,7 @@ const (
 	typesOnly
 	compositeOrPtrType
 	compositeType
+	makeableType
 )
 
 func newBrowser(mode browserMode, currentPkg *types.Package, imports []*types.Package) *browser {
@@ -167,6 +168,24 @@ func (b browser) filteredObjs() (objs []types.Object) {
 						return
 					}
 				case protoArray, protoSlice, protoMap, protoStruct:
+				}
+			case makeableType:
+				switch obj {
+				default:
+					obj, ok := obj.(*types.TypeName)
+					if !ok {
+						return
+					}
+					t, ok := obj.Type.(*types.NamedType)
+					if !ok {
+						return
+					}
+					switch t.Underlying.(type) {
+					default:
+						return
+					case *types.Slice, *types.Map, *types.Chan:
+					}
+				case protoSlice, protoMap, protoChan:
 				}
 			}
 			if b.currentPkg != nil {
