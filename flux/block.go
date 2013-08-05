@@ -480,6 +480,7 @@ func newNode(b *block, obj types.Object) {
 		case "[]":                        n = newIndexNode(false)
 		case "[]=":                       n = newIndexNode(true)
 		case "if":                        n = newIfNode()
+		case "indirect":                  n = newValueNode(nil, true, false)
 		case "loop":                      n = newLoopNode()
 		}
 	case *types.Func, method:
@@ -487,7 +488,7 @@ func newNode(b *block, obj types.Object) {
 		case true:                        n = newCallNode(obj)
 		case false:                       n = newOperatorNode(obj)
 		}
-	case *types.Var, *types.Const, field: n = newValueNode(obj, false)
+	case *types.Var, *types.Const, field: n = newValueNode(obj, false, false)
 	default:                              panic("bad obj")
 	}
 	b.addNode(n)

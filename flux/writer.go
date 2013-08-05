@@ -235,14 +235,24 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.indent("const %s = %s\n", results[0], val)
 				}
 			case *valueNode:
+				val := ""
+				if n.obj != nil {
+					val = w.qualifiedName(n.obj)
+				} else {
+					val = args[0]
+					args = args[1:]
+				}
+				if n.indirect {
+					val = "*" + val
+				}
 				if n.set {
-					w.indent("%s = %s", w.qualifiedName(n.obj), args[0])
+					w.indent("%s = %s", val, args[0])
 				} else {
 					switch n.obj.(type) {
 					case *types.Var:
-						w.indent("%s := %s", results[0], w.qualifiedName(n.obj))
+						w.indent("%s := %s", results[0], val)
 					case *types.Const:
-						w.indent("const %s = %s", results[0], w.qualifiedName(n.obj))
+						w.indent("const %s = %s", results[0], val)
 					}
 				}
 				w.seq(n)

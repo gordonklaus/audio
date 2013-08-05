@@ -372,8 +372,15 @@ func (v typeView) Paint() {
 
 type generic struct { types.Type }
 
+func underlying(t types.Type) types.Type {
+	if nt, ok := t.(*types.NamedType); ok {
+		return nt.Underlying
+	}
+	return t
+}
+
 func indirect(t types.Type) (types.Type, bool) {
-	if p, ok := t.(*types.Pointer); ok {
+	if p, ok := underlying(t).(*types.Pointer); ok {
 		return p.Base, true
 	}
 	return t, false

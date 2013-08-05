@@ -379,11 +379,11 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 	}
 }
 
+// TODO: go/types will do this for me
 func fieldIsExported(f *types.Field) bool {
 	name := f.Name
 	if name == "" {
-		t := f.Type
-		t, _ = indirect(t)
+		t, _ := indirect(f.Type)
 		name = t.(*types.NamedType).Obj.Name
 	}
 	return ast.IsExported(name)

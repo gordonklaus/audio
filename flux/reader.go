@@ -59,7 +59,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 		case *ast.AssignStmt:
 			if s.Tok == token.DEFINE {
 				switch x := s.Rhs[0].(type) {
-				case *ast.Ident, *ast.SelectorExpr:
+				case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
 					r.newValueNode(b, x, s.Lhs[0], false)
 				case *ast.CompositeLit:
 					r.newCompositeLiteralNode(b, s, x, false)
@@ -177,8 +177,16 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 }
 
 func (r *reader) newValueNode(b *block, x, y ast.Expr, set bool) {
-	n := newValueNode(r.obj(x), set)
+	indirect := false
+	if s, ok := x.(*ast.StarExpr); ok {
+		x = s.X
+		indirect = true
+	}
+	n := newValueNode(r.obj(x), indirect, set)
 	b.addNode(n)
+	if n.val != nil {
+		r.connect(name(x), n.val)
+	}
 	if set {
 		r.connect(name(y), n.in)
 	} else {
