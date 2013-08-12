@@ -73,16 +73,16 @@ func saveFunc(f funcNode) {
 		p := params[0]
 		params = params[1:]
 		name := w.name(p.obj.Name)
-		if len(p.conns) > 0 {
-			vars[p.conns[0].dst] = name
+		for _, c := range p.conns {
+			vars[c.dst] = name
 		}
 		w.write("(%s %s) ", name, w.typ(p.obj.Type))
 	}
 	w.write("%s(", f.obj.GetName())
 	for i, p := range params {
 		name := w.name(p.obj.Name)
-		if len(p.conns) > 0 {
-			vars[p.conns[0].dst] = name
+		for _, c := range p.conns {
+			vars[c.dst] = name
 		}
 		if i > 0 {
 			w.write(", ")
@@ -238,6 +238,10 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				val := ""
 				if n.obj != nil {
 					val = w.qualifiedName(n.obj)
+					if _, ok := n.obj.(field); ok {
+						val = args[0] + "." + val
+						args = args[1:]
+					}
 				} else {
 					val = args[0]
 					args = args[1:]
@@ -249,7 +253,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.indent("%s = %s", val, args[0])
 				} else {
 					switch n.obj.(type) {
-					case *types.Var:
+					case *types.Var, field:
 						w.indent("%s := %s", results[0], val)
 					case *types.Const:
 						w.indent("const %s = %s", results[0], val)

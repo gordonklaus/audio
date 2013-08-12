@@ -185,7 +185,11 @@ func (r *reader) newValueNode(b *block, x, y ast.Expr, set bool) {
 	n := newValueNode(r.obj(x), indirect, set)
 	b.addNode(n)
 	if n.val != nil {
-		r.connect(name(x), n.val)
+		if s, ok := x.(*ast.SelectorExpr); ok {
+			r.connect(name(s.X), n.val)
+		} else {
+			r.connect(name(x), n.val)
+		}
 	}
 	if set {
 		r.connect(name(y), n.in)
@@ -250,17 +254,25 @@ func (r *reader) obj(x ast.Expr) types.Object {
 			 }
 		 }
 	case *ast.SelectorExpr:
-		// TODO: val.Field, Type.Method, and pkg.Type.Method
+		// TODO: Type.Method and pkg.Type.Method
 		n1 := name(x.X)
 		n2 := x.Sel.Name
 		if pkg, ok := r.pkgNames[n1]; ok {
 			return pkg.Scope.Lookup(n2)
 		}
 		// TODO: use types.LookupFieldOrMethod()
-		recv, _ := indirect(r.varTypes[n1])
-		for _, m := range recv.(*types.NamedType).Methods {
+		t, _ := indirect(r.varTypes[n1])
+		recv := t.(*types.NamedType)
+		for _, m := range recv.Methods {
 			if m.Name == n2 {
 				return method{nil, m}
+			}
+		}
+		if st, ok := recv.Underlying.(*types.Struct); ok {
+			for _, f := range st.Fields {
+				if f.Name == n2 {
+					return field{nil, f, recv}
+				}
 			}
 		}
 	}

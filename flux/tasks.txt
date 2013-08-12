@@ -50,3 +50,6 @@ http://martinfowler.com/bliki/ProjectionalEditing.html
 http://concrete-editor.org/#documentation
 http://audicle.cs.princeton.edu/
 http://sbel.wisc.edu/Courses/ME964/Literature/knuthProgramming1974.pdf
+Leslie Lamport:
+ - PHIL: A Semantic Structural Graphical Editor  (with Joseph Goguen); SRI International Technical Report (August 1983).  No electronic version available.   http://research.microsoft.com/en-us/um/people/lamport/pubs/pubs.html#phil
+ - Document Production: Visual or Logical?  Notices of the American Mathematical Society (June 1987), 621-624.  http://research.microsoft.com/en-us/um/people/lamport/pubs/document-production.pdf

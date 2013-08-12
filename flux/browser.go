@@ -84,7 +84,7 @@ func (m method) GetName() string { return m.Name }
 func (m method) GetType() types.Type { return m.Type }
 func (m method) GetPkg() *types.Package { return m.Pkg }
 
-type field struct { types.Object; *types.Field }
+type field struct { types.Object; *types.Field; recv *types.NamedType }
 func (f field) GetName() string { return f.Name }
 func (f field) GetType() types.Type { return f.Type }
 func (f field) GetPkg() *types.Package { return f.Pkg }
@@ -255,18 +255,20 @@ func (b browser) filteredObjs() (objs []types.Object) {
 			}
 			addPkgs(obj.Dir)
 		case *types.TypeName:
-			if obj, ok := obj.Type.(*types.NamedType); ok {
-				for _, obj := range obj.Methods {
-					add(method{nil, obj})
+			// TODO: use types.NewMethodSet to get the entire method set
+			// TODO: shouldn't go/types also have a NewFieldSet?
+			if nt, ok := obj.Type.(*types.NamedType); ok {
+				for _, m := range nt.Methods {
+					add(method{nil, m})
 				}
-				switch obj := obj.Underlying.(type) {
+				switch ut := nt.Underlying.(type) {
 				case *types.Struct:
-					for _, obj := range obj.Fields {
-						add(field{nil, obj})
+					for _, f := range ut.Fields {
+						add(field{nil, f, nt})
 					}
 				case *types.Interface:
-					for _, obj := range obj.Methods {
-						add(method{nil, obj})
+					for _, m := range ut.Methods {
+						add(method{nil, m})
 					}
 				}
 			}

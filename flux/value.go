@@ -24,7 +24,10 @@ func newValueNode(obj types.Object, indirect, set bool) *valueNode {
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	n.text.MoveCenter(Pt(0, n.text.Height() / 2))
 	n.AddChild(n.text)
-	if obj == nil {
+	if f, ok := obj.(field); ok {
+		n.val = newInput(n, &types.Var{Name: "x", Type: f.recv})
+		n.AddChild(n.val)
+	} else if obj == nil {
 		n.val = newInput(n, &types.Var{Name: "value"})
 		n.AddChild(n.val)
 		n.val.connsChanged = n.reform
@@ -37,6 +40,9 @@ func (n *valueNode) reform() {
 	text := "indirect"
 	if n.obj != nil {
 		text = n.obj.GetName()
+		if _, ok := n.obj.(field); ok {
+			text = "." + text
+		}
 		if n.indirect {
 			text = "*" + text
 		}
@@ -56,6 +62,9 @@ func (n *valueNode) reform() {
 			}
 		}
 		if n.out != nil {
+			for _, c := range n.out.conns {
+				c.blk.removeConnection(c)
+			}
 			n.RemoveChild(n.out)
 			n.out = nil
 		}
@@ -69,6 +78,9 @@ func (n *valueNode) reform() {
 			}
 		}
 		if n.in != nil {
+			for _, c := range n.in.conns {
+				c.blk.removeConnection(c)
+			}
 			n.RemoveChild(n.in)
 			n.in = nil
 		}

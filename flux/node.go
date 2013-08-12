@@ -250,8 +250,12 @@ func newCallNode(obj types.Object) node {
 	if t, ok := obj.GetType().(*types.Signature); ok {
 		n := &callNode{obj: obj}
 		n.nodeBase = newNodeBase(n)
-		n.text.SetText(obj.GetName())
-		if t.Recv != nil { n.newInput(t.Recv) }
+		name := obj.GetName()
+		if t.Recv != nil {
+			n.newInput(t.Recv)
+			name = "." + name
+		}
+		n.text.SetText(name)
 		for _, v := range t.Params { n.newInput(v) }
 		for _, v := range t.Results { n.newOutput(v) }
 		seqIn := n.newInput(&types.Var{Name: "seq", Type: seqType})

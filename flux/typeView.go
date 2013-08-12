@@ -82,7 +82,7 @@ func (v *typeView) setType(t types.Type) {
 		v.childTypes.right = []*typeView{newTypeView(&t.Elt)}
 	case *types.Struct:
 		s = "struct"
-		for _, f := range t.Fields { v.childTypes.right = append(v.childTypes.right, newValueView(field{nil, f})) }
+		for _, f := range t.Fields { v.childTypes.right = append(v.childTypes.right, newValueView(field{nil, f, nil})) }
 	case *types.Signature:
 		s = "func"
 		for _, val := range t.Params { v.childTypes.left = append(v.childTypes.left, newValueView(val)) }
