@@ -58,6 +58,11 @@ func newFluxWindow() *fluxWindow {
 			w.browser.Hide()
 			w.AddChild(n)
 			n.Move(w.Center())
+			n.done = func() {
+				w.browser.Show()
+				w.browser.text.SetText("")
+				w.browser.text.TakeKeyboardFocus()
+			}
 			n.TakeKeyboardFocus()
 		}
 	}

@@ -1,5 +1,8 @@
 TODO
 
+- allow var.field expressions in valueNode, where var is a package-scope variable (see the next item).
+- implement address expressions in valueNode.  otherwise there is no way to get &localVar.field &pkg.var or &pkg.var.field.
+- make connectionBundles to reduce wire clutter?  each port has at most one connectionBundle that branches off connections near each port it connects to.  or don't add a new object, just draw connections coincident that originate at the same port.  especially bundle coincident connections that cross block boundaries.
 - go/types has parameter and result names like name·1, which is invalid in Go source.  fix go/types or strip these chars.
 - allow to build types when using browser in block.  if a composite type (or pointer to one) is built, make a compositeLiteralNode; otherwise make a conversionNode; and allow toggling between compositeLiteral and conversionNode by hitting a key ('\'?) when node is focused.
 - consider the matter of addressability and copying.  currently, there is one variable per input, plus one variable for each connection that exits a block.  there should be a clear rule for when a copy is made so that it is obvious which connections refer to the same value.

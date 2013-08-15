@@ -73,7 +73,9 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 					n := newIndexNode(false)
 					b.addNode(n)
 					r.connect(name(x.X), n.x)
-					r.connect(name(x.Index), n.key)
+					if arg, ok := x.Index.(*ast.Ident); ok {
+						r.connect(arg.Name, n.key)
+					}
 					r.addVar(name(s.Lhs[0]), n.outVal)
 					if len(s.Lhs) == 2 {
 						r.addVar(name(s.Lhs[1]), n.ok)
@@ -284,6 +286,10 @@ func (r *reader) typ(x ast.Expr) types.Type {
 	switch x := x.(type) {
 	case *ast.Ident, *ast.SelectorExpr:
 		return r.obj(x).GetType()
+	case *ast.ArrayType:
+		if x.Len == nil {
+			return &types.Slice{r.typ(x.Elt)}
+		}
 	}
 	panic("not yet implemented")
 }

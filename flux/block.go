@@ -46,7 +46,9 @@ func (b *block) addNode(n node) {
 		n.setBlock(b)
 		switch n := n.(type) {
 		case *callNode:
-			b.func_().addPkgRef(n.obj)
+			if _, ok := n.obj.(method); !ok {
+				b.func_().addPkgRef(n.obj)
+			}
 		}
 	}
 }
@@ -211,36 +213,53 @@ func (b *block) update() (updated bool) {
 			if d > 0 { continue }
 			v[n1] = v[n1].Add(dir.Mul(-nodeSepCoef * d / dir.Len()))
 		}
+		for b := b; b != nil; b = b.outer() {
 conns:
-		for c := range b.conns {
-			src, dst := c.src, c.dst
-			if src == nil || dst == nil { continue }
-			for n := src.node; n.block() != nil; n = n.block().node { if n == n1 { continue conns } }
-			for n := dst.node; n.block() != nil; n = n.block().node { if n == n1 { continue conns } }
-			x := src.MapTo(src.Center(), b)
-			y := dst.MapTo(dst.Center(), b)
-			p := n1.MapToParent(n1.Center())
-			xy := y.Sub(x)
-			xp := p.Sub(x)
-			proj := ZP
-			switch t := xp.Dot(xy) / xy.Dot(xy); {
-			case t <= 0:  proj = x
-			default:      proj = x.Add(xy.Mul(t))
-			case t >= 1:  proj = y
+			for c := range b.conns {
+				if c.src == nil || c.dst == nil { continue }
+				for n := c.src.node; n.block() != nil; n = n.block().node { if n == n1 { continue conns } }
+				for n := c.dst.node; n.block() != nil; n = n.block().node { if n == n1 { continue conns } }
+				x := c.srcPt
+				y := c.dstPt
+				p := n1.MapToParent(n1.Center())
+				dir := p.Sub(PointToLine(p, x, y))
+				if dir == ZP {
+					dir = Pt(rand.NormFloat64(), rand.NormFloat64())
+				}
+				d := dir.Len() - n1.Size().Len() / 2 - nodeConnSep
+				if d > 0 { continue }
+				delta := dir.Mul(-nodeConnSepCoef * d / dir.Len())
+				v[n1] = v[n1].Add(delta)
+				v[c.src.node] = v[c.src.node].Sub(delta)
+				v[c.dst.node] = v[c.dst.node].Sub(delta)
 			}
-			dir := p.Sub(proj)
-			if dir == ZP {
-				dir = Pt(rand.NormFloat64(), rand.NormFloat64())
-			}
-			d := dir.Len() - n1.Size().Len() / 2 - nodeConnSep
-			if d > 0 { continue }
-			v[n1] = v[n1].Add(dir.Mul(-nodeConnSepCoef * d / dir.Len()))
 		}
 	}
 	for c := range b.conns {
-		src, dst := c.src, c.dst
-		if src == nil || dst == nil { continue }
-		d := dst.MapTo(dst.Center(), b).Sub(src.MapTo(src.Center(), b))
+		if c.src == nil || c.dst == nil { continue }
+		for b := b; b != nil; b = b.outer() {
+			for c2 := range b.conns {
+				if c2.src == nil || c2.dst == nil { continue }
+	   			if c == c2 || c.src.node == c2.src.node || c.dst.node == c2.dst.node { continue }
+				p1, p2 := LineToLine(c.srcPt, c.dstPt, c2.srcPt, c2.dstPt)
+				d := p1.Sub(p2)
+				if l := d.Len(); l == 0 {
+					d = c.MapToParent(c.Center()).Sub(c2.MapToParent(c2.Center()))
+					d = d.Mul(16 / d.Len())
+					v[c.src.node] = v[c.src.node].Add(d)
+					v[c.dst.node] = v[c.dst.node].Add(d)
+					v[c2.src.node] = v[c2.src.node].Sub(d)
+					v[c2.dst.node] = v[c2.dst.node].Sub(d)
+				} else if l < 32 {
+					d = d.Mul((32 - l) / l)
+					v[c.src.node] = v[c.src.node].Add(d)
+					v[c.dst.node] = v[c.dst.node].Add(d)
+					v[c2.src.node] = v[c2.src.node].Sub(d)
+					v[c2.dst.node] = v[c2.dst.node].Sub(d)
+				}
+			}
+		}
+		d := c.dstPt.Sub(c.srcPt)
 		l := d.Len()
 		var offset, rot float64 = connLen, 0
 		if c.feedback {
@@ -255,8 +274,8 @@ conns:
 		angle := math.Mod(d.Angle() / 2 / math.Pi + rot + .5, 1) - .5
 		u := Pt(d.Y, -d.X).Mul(connAngleCoef * 2 * angle).Add(d.Mul(l))
 		
-		srcNode := src.node; for srcNode.block() != b { srcNode = srcNode.block().node }
-		dstNode := dst.node; for dstNode.block() != b { dstNode = dstNode.block().node }
+		srcNode := c.src.node; for srcNode.block() != b { srcNode = srcNode.block().node }
+		dstNode := c.dst.node; for dstNode.block() != b { dstNode = dstNode.block().node }
 		v[srcNode] = v[srcNode].Sub(u)
 		v[dstNode] = v[dstNode].Add(u)
 	}
@@ -423,6 +442,8 @@ func (b *block) KeyPressed(event KeyEvent) {
 			}
 		} else if outer := b.outer(); outer != nil {
 			outer.TakeKeyboardFocus()
+		} else {
+			b.func_().Close()
 		}
 	default:
 		if !(event.Ctrl || event.Alt || event.Super) {

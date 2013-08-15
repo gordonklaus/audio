@@ -251,3 +251,53 @@ func Rect(x0, y0, x1, y1 float64) Rectangle {
 	}
 	return Rectangle{Point{x0, y0}, Point{x1, y1}}
 }
+
+
+// PointToLine returns the Point on line segment (x, y) that is nearest to p.
+func PointToLine(p, x, y Point) Point {
+	xy := y.Sub(x)
+	xp := p.Sub(x)
+	t := xp.Dot(xy) / xy.Dot(xy)
+	switch {
+	case t < 0: return x
+	default:    return x.Add(xy.Mul(t))
+	case t > 1: return y
+	}
+}
+
+// LineToLine returns the Points z and z2 on line segments (p, p2) and (q, q2), respectively,
+// such that the distance from z to z2 is minimized.
+func LineToLine(p, p2, q, q2 Point) (z, z2 Point) {
+	r := p2.Sub(p)
+	s := q2.Sub(q)
+	rs := r.Cross(s)
+	qpr := q.Sub(p).Cross(r)
+	if rs == 0 {
+		if qpr == 0 {
+			// collinear
+		} else {
+			// parallel
+		}
+		return ZP, Pt(10000, 10000)
+	}
+	
+	if u := qpr / rs; u >= 0 && u <= 1 {
+		// intersecting
+		z = q.Add(s.Mul(u))
+		return z, z
+	}
+	
+	min := MaxFloat64
+	for i, P := range []struct{p, x, y Point}{{p, q, q2}, {p2, q, q2}, {q, p, p2}, {q2, p, p2}} {
+		q := PointToLine(P.p, P.x, P.y)
+		if len := P.p.Sub(q).Len(); len < min {
+			min = len
+			if i < 2 {
+				z, z2 = P.p, q
+			} else {
+				z, z2 = q, P.p
+			}
+		}
+	}
+	return
+}

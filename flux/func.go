@@ -14,7 +14,8 @@ type funcNode struct {
 	pkgRefs map[*types.Package]int
 	inputsNode, outputsNode *portsNode
 	funcblk *block
-	awaken chan bool
+	awaken, stop chan bool
+	done func()
 }
 
 func newFuncNode(obj types.Object) *funcNode {
@@ -31,6 +32,7 @@ func newFuncNode(obj types.Object) *funcNode {
 	n.funcblk.addNode(n.outputsNode)
 	n.AddChild(n.funcblk)
 	n.awaken = make(chan bool, 1)
+	n.stop = make(chan bool, 1)
 	
 	if !loadFunc(n) {
 		if m, ok := obj.(method); ok {
@@ -40,6 +42,17 @@ func newFuncNode(obj types.Object) *funcNode {
 	}
 	
 	return n
+}
+
+func (n *funcNode) Close() {
+	saveFunc(*n)
+	n.stop <- true
+	select {
+	case n.awaken <- true:
+	default:
+	}
+	n.ViewBase.Close()
+	n.done()
 }
 
 func (n funcNode) pkg() *types.Package {
@@ -97,10 +110,15 @@ func (n *funcNode) animate() {
 		n.Do(func() {
 			updated <- n.update()
 		})
-		if <-updated {
-			<-next
-		} else {
-			<-n.awaken
+		select {
+		case ok := <-updated:
+			if ok {
+				<-next
+			} else {
+				<-n.awaken
+			}
+		case <-n.stop:
+			return
 		}
 	}
 }

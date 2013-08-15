@@ -68,37 +68,45 @@ func saveFunc(f funcNode) {
 	
 	w.write("func ")
 	vars := map[*port]string{}
+	
+	// name the results first so we can tell if a param connects directly to a result
+	for _, p := range f.outputsNode.ins {
+		vars[p] = w.name(p.obj.Name)
+	}
+	existing := map[string]string{}
+	name := func(p *port) string {
+		name := w.name(p.obj.Name)
+		for _, c := range p.conns {
+			if v, ok := vars[c.dst]; ok {
+				existing[v] = name
+			} else {
+				vars[c.dst] = name
+			}
+		}
+		return name
+	}
 	params := f.inputsNode.outs
 	if _, ok := f.obj.(method); ok {
 		p := params[0]
 		params = params[1:]
-		name := w.name(p.obj.Name)
-		for _, c := range p.conns {
-			vars[c.dst] = name
-		}
-		w.write("(%s %s) ", name, w.typ(p.obj.Type))
+		w.write("(%s %s) ", name(p), w.typ(p.obj.Type))
 	}
 	w.write("%s(", f.obj.GetName())
 	for i, p := range params {
-		name := w.name(p.obj.Name)
-		for _, c := range p.conns {
-			vars[c.dst] = name
-		}
 		if i > 0 {
 			w.write(", ")
 		}
-		w.write("%s %s", name, w.typ(p.obj.Type))
+		w.write("%s %s", name(p), w.typ(p.obj.Type))
 	}
 	w.write(") (")
 	for i, p := range f.outputsNode.ins {
-		name := w.name(p.obj.Name)
-		vars[p] = name
 		if i > 0 {
 			w.write(", ")
 		}
-		w.write("%s %s", name, w.typ(p.obj.Type))
+		w.write("%s %s", vars[p], w.typ(p.obj.Type))
 	}
 	w.write(") {\n")
+	w.assignExisting(existing)
 	w.block(f.funcblk, vars)
 	if len(f.outputsNode.ins) > 0 {
 		w.src.WriteString("\treturn\n")
@@ -237,10 +245,11 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			case *valueNode:
 				val := ""
 				if n.obj != nil {
-					val = w.qualifiedName(n.obj)
 					if _, ok := n.obj.(field); ok {
-						val = args[0] + "." + val
+						val = args[0] + "." + n.obj.GetName()
 						args = args[1:]
+					} else {
+						val = w.qualifiedName(n.obj)
 					}
 				} else {
 					val = args[0]
