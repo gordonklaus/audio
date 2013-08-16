@@ -91,6 +91,13 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 					r.connect(name(x.X), n.ins[0])
 					r.connect(name(x.Y), n.ins[1])
 					r.addVar(name(s.Lhs[0]), n.outs[0])
+				case *ast.TypeAssertExpr:
+					n := newTypeAssertNode()
+					b.addNode(n)
+					n.setType(r.typ(x.Type))
+					r.connect(name(x.X), n.ins[0])
+					r.addVar(name(s.Lhs[0]), n.outs[0])
+					r.addVar(name(s.Lhs[1]), n.outs[1])
 				}
 			} else {
 				if x, ok := s.Lhs[0].(*ast.IndexExpr); ok {
@@ -268,6 +275,13 @@ func (r *reader) obj(x ast.Expr) types.Object {
 		for _, m := range recv.Methods {
 			if m.Name == n2 {
 				return method{nil, m}
+			}
+		}
+		if it, ok := recv.Underlying.(*types.Interface); ok {
+			for _, m := range it.Methods {
+				if m.Name == n2 {
+					return method{nil, m}
+				}
 			}
 		}
 		if st, ok := recv.Underlying.(*types.Struct); ok {

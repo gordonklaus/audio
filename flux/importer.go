@@ -47,6 +47,20 @@ func getPackage(path string) (*types.Package, error) {
 			return nil, origErr
 		}
 	}
+	// go/types forgot to set the receiver on interface methods
+	for _, obj := range pkg.Scope.Entries {
+		if t, ok := obj.(*types.TypeName); ok {
+			if it, ok := t.Type.(*types.NamedType).Underlying.(*types.Interface); ok {
+				for _, m := range it.Methods {
+					if m.Type.Recv == nil {
+						m.Type.Recv = &types.Var{Type: t.Type}
+					} else {
+						panic("expected nil Recv; go/types is fixed!")
+					}
+				}
+			}
+		}
+	}
 	pkg.Path = buildPkg.ImportPath
 	pkgs[path] = pkg
 	

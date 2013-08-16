@@ -219,7 +219,9 @@ func (b browser) filteredObjs() (objs []types.Object) {
 
 	if len(b.path) == 0 {
 		if b.mode == browse {
-			objs = []types.Object{special{name:"[]"}, special{name:"[]="}, special{name:"defer"}, special{name:"go"}, special{name:"if"}, special{name:"indirect"}, special{name:"loop"}}
+			for _, name := range []string{"[]", "[]=", "if", "indirect", "loop", "typeAssert"} {
+				objs = append(objs, special{name: name})
+			}
 		}
 		pkgs := b.imports
 		if b.currentPkg != nil { pkgs = append(pkgs, b.currentPkg) }

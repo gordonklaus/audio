@@ -269,6 +269,10 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					}
 				}
 				w.seq(n)
+			case *typeAssertNode:
+				if len(n.ins[0].conns) > 0 && len(results) > 0 {
+					w.indent("%s := %s.(%s)\n", strings.Join(results, ", "), args[0], w.typ(*n.typ.typ))
+				}
 			}
 			w.assignExisting(existing)
 		case *compositeLiteralNode:

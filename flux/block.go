@@ -503,6 +503,7 @@ func newNode(b *block, obj types.Object) {
 		case "if":                        n = newIfNode()
 		case "indirect":                  n = newValueNode(nil, true, false)
 		case "loop":                      n = newLoopNode()
+		case "typeAssert":                n = newTypeAssertNode()
 		}
 	case *types.Func, method:
 		switch unicode.IsLetter([]rune(obj.GetName())[0]) {
