@@ -80,6 +80,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 					if len(s.Lhs) == 2 {
 						r.addVar(name(s.Lhs[1]), n.ok)
 					}
+					r.seq(n, s)
 				case *ast.UnaryExpr:
 					switch x.Op {
 					case token.AND:
@@ -108,6 +109,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 					if i, ok := s.Rhs[0].(*ast.Ident); ok {
 						r.connect(i.Name, n.inVal)
 					}
+					r.seq(n, s)
 					break
 				}
 				if id, ok := s.Lhs[0].(*ast.Ident); ok {
