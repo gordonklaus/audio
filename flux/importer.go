@@ -54,8 +54,6 @@ func getPackage(path string) (*types.Package, error) {
 				for _, m := range it.Methods {
 					if m.Type.Recv == nil {
 						m.Type.Recv = &types.Var{Type: t.Type}
-					} else {
-						panic("expected nil Recv; go/types is fixed!")
 					}
 				}
 			}
@@ -66,6 +64,9 @@ func getPackage(path string) (*types.Package, error) {
 	
 	for _, file := range fluxFiles {
 		n := strings.Split(file, ".")
+		for i := range n {
+			n[i] = strings.TrimRight(n[i], "-")
+		}
 		if len(n) == 1 {
 			fluxObjs[pkg.Scope.Lookup(n[0])] = true
 		} else {

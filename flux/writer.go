@@ -570,9 +570,16 @@ func fluxPath(obj types.Object) string {
 	}
 	
 	name := obj.GetName()
+	if !ast.IsExported(name) { // unexported names are suffixed with "-" to avoid possible conflicts on case-insensitive systems
+		name += "-"
+	}
 	if m, ok := obj.(method); ok {
 		t, _ := indirect(m.Type.Recv.Type)
-		name = t.(*types.NamedType).Obj.Name + "." + name
+		typeName := t.(*types.NamedType).Obj.Name
+		if !ast.IsExported(typeName) {
+			typeName += "-"
+		}
+		name = typeName + "." + name
 	}
 	return filepath.Join(bp.Dir, name + ".flux.go")
 }
