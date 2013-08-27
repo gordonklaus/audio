@@ -212,6 +212,10 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				}
 				w.write("%s(%s)", f, strings.Join(args, ", "))
 				w.seq(n)
+			case *lenNode:
+				if len(results) > 0 && len(n.ins[0].conns) > 0 {
+					w.indent("%s := len(%s)\n", results[0], args[0])
+				}
 			case *makeNode:
 				if len(results) > 0 {
 					if len(args) == 2 && len(n.ins[1].conns) == 0 { // array capacity input unconnected

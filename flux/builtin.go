@@ -48,3 +48,17 @@ func (n *makeNode) setType(t types.Type) {
 		n.TakeKeyboardFocus()
 	}
 }
+
+
+type lenNode struct {
+	*nodeBase
+}
+
+func newLenNode() *lenNode {
+	n := &lenNode{}
+	n.nodeBase = newNodeBase(n)
+	n.text.SetText("len")
+	n.newInput(&types.Var{Type: generic{}})
+	n.newOutput(&types.Var{Type: types.Typ[types.Int]})
+	return n
+}

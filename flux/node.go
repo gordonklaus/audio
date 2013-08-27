@@ -266,6 +266,7 @@ func newCallNode(obj types.Object) node {
 	}
 
 	switch obj.GetName() {
+	case "len": return newLenNode()
 	case "make": return newMakeNode()
 	default: panic("unknown builtin: " + obj.GetName())
 	}
