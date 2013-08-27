@@ -2,6 +2,7 @@ package main
 
 import (
 	"code.google.com/p/go.exp/go/types"
+	"fmt"
 	"go/ast"
 	"go/build"
 	"go/parser"
@@ -41,9 +42,15 @@ func getPackage(path string) (*types.Package, error) {
 	ctx := types.Context{Import:srcImport}
 	pkg, err := ctx.Check(fset, files)
 	if err != nil {
+		fmt.Printf("Error typechecking package %s:\n%v\n", path, err)
+		// types.Check doesn't handle cgo packages, so we fall back to GcImport here.
+		// TODO:  Is there any other reason to do GcImport if the source doesn't check?
+		// If not, we should only do GcImport specifically if there are only cgo related
+		// errors, otherwise we risk importing a stale binary.
 		origErr := err
 		pkg, err = types.GcImport(pkgs, path)
 		if err != nil {
+			fmt.Printf("Error GcImporting package %s:\n%v.\n", path, err)
 			return nil, origErr
 		}
 	}

@@ -87,10 +87,14 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 						r.newCompositeLiteralNode(b, s, x.X.(*ast.CompositeLit), true)
 					}
 				case *ast.BinaryExpr:
-					n := newOperatorNode(findOp(x.Op.String()))
+					n := newOperatorNode(&types.Func{Name: x.Op.String()})
 					b.addNode(n)
-					r.connect(name(x.X), n.ins[0])
-					r.connect(name(x.Y), n.ins[1])
+					if arg, ok := x.X.(*ast.Ident); ok {
+						r.connect(arg.Name, n.ins[0])
+					}
+					if arg, ok := x.Y.(*ast.Ident); ok {
+						r.connect(arg.Name, n.ins[1])
+					}
 					r.addVar(name(s.Lhs[0]), n.outs[0])
 				case *ast.TypeAssertExpr:
 					n := newTypeAssertNode()
@@ -306,6 +310,12 @@ func (r *reader) typ(x ast.Expr) types.Type {
 		if x.Len == nil {
 			return &types.Slice{r.typ(x.Elt)}
 		}
+	case *ast.MapType:
+		return &types.Map{r.typ(x.Key), r.typ(x.Value)}
+	case *ast.StructType:
+		return &types.Struct{}
+	case *ast.InterfaceType:
+		return &types.Interface{}
 	}
 	panic("not yet implemented")
 }

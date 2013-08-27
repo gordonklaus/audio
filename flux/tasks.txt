@@ -1,5 +1,6 @@
 TODO
 
+- bug:  a connection from inside a conditional block out to a node's inport modifies the variable associated with that inport; but that variable may be used elsewhere also -- other inports will receive the modified value even if they don't have a connection from the conditional block.  solution: each inport gets its own variable.  (this was observed when the variable originated as a func param; but does it work this way in general?)
 - allow var.field expressions in valueNode, where var is a package-scope variable (see the next item).
 - implement address expressions in valueNode.  otherwise there is no way to get &localVar.field &pkg.var or &pkg.var.field.
 - make connectionBundles to reduce wire clutter?  each port has at most one connectionBundle that branches off connections near each port it connects to.  or don't add a new object, just draw connections coincident that originate at the same port.  especially bundle coincident connections that cross block boundaries.

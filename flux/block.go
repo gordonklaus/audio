@@ -210,7 +210,7 @@ func (b *block) update() (updated bool) {
 				dir = Pt(rand.NormFloat64(), rand.NormFloat64())
 			}
 			d := dir.Len() - n1.Size().Add(n2.Size()).Len() / 2 - nodeSep
-			if d > 0 { continue }
+			if d >= 0 { continue }
 			v[n1] = v[n1].Add(dir.Mul(-nodeSepCoef * d / dir.Len()))
 		}
 		for b := b; b != nil; b = b.outer() {
@@ -245,6 +245,7 @@ conns:
 				d := p1.Sub(p2)
 				if l := d.Len(); l == 0 {
 					d = c.MapToParent(c.Center()).Sub(c2.MapToParent(c2.Center()))
+					if d.Len() == 0 { continue }
 					d = d.Mul(16 / d.Len())
 					v[c.src.node] = v[c.src.node].Add(d)
 					v[c.dst.node] = v[c.dst.node].Add(d)
@@ -288,7 +289,9 @@ conns:
 	for n := range b.nodes {
 		v[n] = v[n].Add(center.Sub(n.Position().Mul(nodeCenterCoef)))
 		l := v[n].Len()
-		v[n] = v[n].Mul(math.Tanh(speedCompress * l / topSpeed) * topSpeed / l)
+		if l > 0 {
+			v[n] = v[n].Mul(math.Tanh(speedCompress * l / topSpeed) * topSpeed / l)
+		}
 	}
 	
 	meanVel := ZP

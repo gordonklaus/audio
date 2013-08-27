@@ -104,21 +104,20 @@ const fps = 60
 
 func (n *funcNode) animate() {
 	updated := make(chan bool)
-	// TODO:  end me
 	for {
 		next := time.After(time.Second / fps)
 		n.Do(func() {
 			updated <- n.update()
 		})
+		if <-updated {
+			<-next
+		} else {
+			<-n.awaken
+		}
 		select {
-		case ok := <-updated:
-			if ok {
-				<-next
-			} else {
-				<-n.awaken
-			}
 		case <-n.stop:
 			return
+		default:
 		}
 	}
 }
