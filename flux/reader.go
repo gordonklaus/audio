@@ -26,20 +26,22 @@ func loadFunc(f *funcNode) bool {
 		r.pkgNames[name] = pkg
 	}
 	t := f.obj.GetType().(*types.Signature)
-	if t.Recv != nil {
-		r.addVar(t.Recv.Name, f.inputsNode.newOutput(t.Recv))
+	decl := file.Decls[len(file.Decls)-1].(*ast.FuncDecl) // get param and result var names from the source, as the obj names might not match
+	if decl.Recv != nil {
+		r.addVar(decl.Recv.List[0].Names[0].Name, f.inputsNode.newOutput(t.Recv))
 	}
-	for _, v := range t.Params {
-		r.addVar(v.Name, f.inputsNode.newOutput(v))
+	for i, p := range decl.Type.Params.List {
+		v := t.Params[i]
+		r.addVar(p.Names[0].Name, f.inputsNode.newOutput(v))
 		f.addPkgRef(v)
 	}
-	for _, v := range t.Results {
-		r.vars[v.Name] = nil
-		f.addPkgRef(v)
+	for i, p := range decl.Type.Results.List {
+		r.vars[p.Names[0].Name] = nil
+		f.addPkgRef(t.Results[i])
 	}
-	r.readBlock(f.funcblk, file.Decls[len(file.Decls)-1].(*ast.FuncDecl).Body.List)
-	for _, v := range t.Results {
-		r.connect(v.Name, f.outputsNode.newInput(v))
+	r.readBlock(f.funcblk, decl.Body.List)
+	for i, p := range decl.Type.Results.List {
+		r.connect(p.Names[0].Name, f.outputsNode.newInput(t.Results[i]))
 	}
 	return true
 }
