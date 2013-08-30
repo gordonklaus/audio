@@ -147,16 +147,19 @@ func (v *typeView) edit(done func()) {
 	v.editType(done)
 }
 func (v *typeView) editType(done func()) {
-	if *v.typ == nil {
+	switch t := (*v.typ).(type) {
+	case nil:
 		var pkg *types.Package
 		var imports []*types.Package
-l:		for v := View(v); v != nil; v = v.Parent() {
-			switch v := v.(type) {
-			case node:
-				f := v.block().func_()
+		for v := View(v); v != nil; v = v.Parent() {
+			if n, ok := v.(node); ok {
+				f := n.block().func_()
 				pkg, imports = f.pkg(), f.imports()
-				break l
+				break
 			}
+		}
+		if pkg == nil {
+			// TODO: get pkg and imports for the type being edited
 		}
 		b := newBrowser(v.mode, pkg, imports)
 		v.AddChild(b)
@@ -176,17 +179,16 @@ l:		for v := View(v); v != nil; v = v.Parent() {
 			done()
 		}
 		b.text.TakeKeyboardFocus()
-		return
-	}
-	
-	switch t := (*v.typ).(type) {
+	case *types.Basic, *types.NamedType:
+		done()
 	case *types.Pointer, *types.Array, *types.Slice, *types.Chan:
 		if elt := v.childTypes.right[0]; *elt.typ == nil {
 			elt.editType(func() {
 				if *elt.typ == nil { v.setType(nil) }
 				v.editType(done)
 			})
-			return
+		} else {
+			done()
 		}
 	case *types.Map:
 		key := v.childTypes.left[0]
@@ -197,77 +199,128 @@ l:		for v := View(v); v != nil; v = v.Parent() {
 				if *key.typ == nil { v.setType(nil) }
 				v.editType(done)
 			})
-			return
 		case *val.typ:
 			val.editType(func() {
 				if *val.typ == nil { key.setType(nil) }
 				v.editType(done)
 			})
-			return
+		default:
+			done()
 		}
-	// next three cases assume the type is brand-new, and thus empty (otherwise we need special handling of protoTypes above)
 	case *types.Struct:
 		v.addFields(&t.Fields, &v.childTypes.right, done)
-		return
 	case *types.Signature:
 		v.addVars(&t.Params, &v.childTypes.left, func() {
 			v.addVars(&t.Results, &v.childTypes.right, done)
 		})
-		return
 	case *types.Interface:
 		v.addMethods(&t.Methods, &v.childTypes.right, done)
-		return
 	}
-	
-	done()
 }
 
-func (v *typeView) addFields(f *[]*types.Field, childTypes *[]*typeView, done func()) {
-	*f = append(*f, &types.Field{})
+func (v *typeView) insertField(f *[]*types.Field, childTypes *[]*typeView, before bool, i int, success, fail func()) {
+	if !before {
+		i++
+	}
+	*f = append((*f)[:i], append([]*types.Field{{}}, (*f)[i:]...)...)
 	v.setType(*v.typ)
-	i := len(*f) - 1
 	t := (*childTypes)[i]
 	t.edit(func() {
 		if *t.typ == nil {
-			*f = (*f)[:i]
+			*f = append((*f)[:i], (*f)[i+1:]...)
 			v.setType(*v.typ)
-			done()
+			if fail != nil {
+				fail()
+			} else {
+				if !before {
+					i--
+				}
+				(*childTypes)[i].TakeKeyboardFocus()
+			}
 		} else {
-			v.addFields(f, childTypes, done)
+			if success != nil {
+				success()
+			} else {
+				t.TakeKeyboardFocus()
+			}
+		}
+	})
+}
+
+func (v *typeView) addFields(f *[]*types.Field, childTypes *[]*typeView, done func()) {
+	v.insertField(f, childTypes, true, len(*f), func() {
+		v.addFields(f, childTypes, done)
+	}, done)
+}
+
+func (v *typeView) insertVar(vs *[]*types.Var, childTypes *[]*typeView, before bool, i int, success, fail func()) {
+	if !before {
+		i++
+	}
+	*vs = append((*vs)[:i], append([]*types.Var{{}}, (*vs)[i:]...)...)
+	v.setType(*v.typ)
+	t := (*childTypes)[i]
+	t.edit(func() {
+		if *t.typ == nil {
+			*vs = append((*vs)[:i], (*vs)[i+1:]...)
+			v.setType(*v.typ)
+			if fail != nil {
+				fail()
+			} else {
+				if !before {
+					i--
+				}
+				(*childTypes)[i].TakeKeyboardFocus()
+			}
+		} else {
+			if success != nil {
+				success()
+			} else {
+				t.TakeKeyboardFocus()
+			}
 		}
 	})
 }
 
 func (v *typeView) addVars(vs *[]*types.Var, childTypes *[]*typeView, done func()) {
-	*vs = append(*vs, &types.Var{})
+	v.insertVar(vs, childTypes, true, len(*vs), func() {
+		v.addVars(vs, childTypes, done)
+	}, done)
+}
+
+func (v *typeView) insertMethod(m *[]*types.Method, childTypes *[]*typeView, before bool, i int, success, fail func()) {
+	if !before {
+		i++
+	}
+	*m = append((*m)[:i], append([]*types.Method{{Type: &types.Signature{}}}, (*m)[i:]...)...)
 	v.setType(*v.typ)
-	i := len(*vs) - 1
 	t := (*childTypes)[i]
 	t.edit(func() {
-		if *t.typ == nil {
-			*vs = (*vs)[:i]
+		if *t.typ == nil || len(t.nameText.GetText()) == 0 {
+			*m = append((*m)[:i], (*m)[i+1:]...)
 			v.setType(*v.typ)
-			done()
+			if fail != nil {
+				fail()
+			} else {
+				if !before {
+					i--
+				}
+				(*childTypes)[i].TakeKeyboardFocus()
+			}
 		} else {
-			v.addVars(vs, childTypes, done)
+			if success != nil {
+				success()
+			} else {
+				t.TakeKeyboardFocus()
+			}
 		}
 	})
 }
 
 func (v *typeView) addMethods(m *[]*types.Method, childTypes *[]*typeView, done func()) {
-	*m = append(*m, &types.Method{Type:&types.Signature{}})
-	v.setType(*v.typ)
-	i := len(*m) - 1
-	t := (*childTypes)[i]
-	t.edit(func() {
-		if *t.typ == nil || len(t.nameText.GetText()) == 0 {
-			*m = (*m)[:i]
-			v.setType(*v.typ)
-			done()
-		} else {
-			v.addMethods(m, childTypes, done)
-		}
-	})
+	v.insertMethod(m, childTypes, true, len(*m), func() {
+		v.addMethods(m, childTypes, done)
+	}, done)
 }
 
 func (v *typeView) focusNearest(child *typeView, dirKey int) {
@@ -291,7 +344,7 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 			p.focusNearest(v, event.Key)
 		}
 	case KeyEnter:
-		done := func() { v.TakeKeyboardFocus() }
+		done := v.TakeKeyboardFocus
 		switch t := (*v.typ).(type) {
 		case *types.Pointer, *types.Array, *types.Slice, *types.Chan:
 			v.childTypes.right[0].TakeKeyboardFocus()
@@ -339,7 +392,7 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 		} else {
 			v.Parent().TakeKeyboardFocus()
 		}
-	case KeyBackspace, KeyDelete:
+	case KeyBackspace:
 		if p, ok := v.Parent().(*typeView); ok {
 			if _, ok := (*p.typ).(*types.Interface); ok {
 				break
@@ -360,6 +413,106 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 			}
 			v.TakeKeyboardFocus()
 		})
+	case KeyComma:
+		if p, ok := v.Parent().(*typeView); ok {
+			switch t := (*p.typ).(type) {
+			case *types.Struct:
+				for i, c := range p.childTypes.right {
+					if c == v {
+						p.insertField(&t.Fields, &p.childTypes.right, event.Shift, i, nil, nil)
+						break
+					}
+				}
+			case *types.Signature:
+				for i, c := range p.childTypes.left {
+					if c == v {
+						p.insertVar(&t.Params, &p.childTypes.left, event.Shift, i, nil, nil)
+						break
+					}
+				}
+				for i, c := range p.childTypes.right {
+					if c == v {
+						p.insertVar(&t.Results, &p.childTypes.right, event.Shift, i, nil, nil)
+						break
+					}
+				}
+			case *types.Interface:
+				for i, c := range p.childTypes.right {
+					if c == v {
+						p.insertMethod(&t.Methods, &p.childTypes.right, event.Shift, i, nil, nil)
+						break
+					}
+				}
+			}
+		}
+	case KeyDelete:
+		if p, ok := v.Parent().(*typeView); ok {
+			switch t := (*p.typ).(type) {
+			case *types.Struct:
+				for i, c := range p.childTypes.right {
+					if c == v {
+						t.Fields = append(t.Fields[:i], t.Fields[i+1:]...)
+						p.setType(*p.typ)
+						if len := len(t.Fields); len > 0 {
+							if i == len {
+								i--
+							}
+							p.childTypes.right[i].TakeKeyboardFocus()
+						} else {
+							p.TakeKeyboardFocus()
+						}
+						break
+					}
+				}
+			case *types.Signature:
+				for i, c := range p.childTypes.left {
+					if c == v {
+						t.Params = append(t.Params[:i], t.Params[i+1:]...)
+						p.setType(*p.typ)
+						if len := len(t.Params); len > 0 {
+							if i == len {
+								i--
+							}
+							p.childTypes.left[i].TakeKeyboardFocus()
+						} else {
+							p.TakeKeyboardFocus()
+						}
+						break
+					}
+				}
+				for i, c := range p.childTypes.right {
+					if c == v {
+						t.Results = append(t.Results[:i], t.Results[i+1:]...)
+						p.setType(*p.typ)
+						if len := len(t.Results); len > 0 {
+							if i == len {
+								i--
+							}
+							p.childTypes.right[i].TakeKeyboardFocus()
+						} else {
+							p.TakeKeyboardFocus()
+						}
+						break
+					}
+				}
+			case *types.Interface:
+				for i, c := range p.childTypes.right {
+					if c == v {
+						t.Methods = append(t.Methods[:i], t.Methods[i+1:]...)
+						p.setType(*p.typ)
+						if len := len(t.Methods); len > 0 {
+							if i == len {
+								i--
+							}
+							p.childTypes.right[i].TakeKeyboardFocus()
+						} else {
+							p.TakeKeyboardFocus()
+						}
+						break
+					}
+				}
+			}
+		}
 	}
 }
 
