@@ -476,7 +476,7 @@ func (w writer) typ(t types.Type) string {
 			if i > 0 {
 				s += "; "
 			}
-			if f.Name != "" {
+			if !f.IsAnonymous && f.Name != "" {
 				s += f.Name + " "
 			}
 			s += w.typ(f.Type)

@@ -594,8 +594,8 @@ func (n *portsNode) removePort(p *port) {
 	}
 	for i, q := range ports {
 		if q == p {
-			SliceRemove(vars, (*vars)[i])
-			f.subPkgRef(p.obj)
+			f.subPkgRef((*vars)[i].Type)
+			*vars = append((*vars)[:i], (*vars)[i+1:]...)
 			for _, c := range p.conns {
 				c.blk.removeConnection(c)
 			}
@@ -626,7 +626,7 @@ func (n *portsNode) KeyPressed(event KeyEvent) {
 		p.valView.edit(func() {
 			if v.Type != nil {
 				*vars = append(*vars, v)
-				f.addPkgRef(p.obj)
+				f.addPkgRef(v.Type)
 				p.TakeKeyboardFocus()
 			} else {
 				n.removePortBase(p)

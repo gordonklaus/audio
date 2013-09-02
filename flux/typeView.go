@@ -33,15 +33,21 @@ func newTypeView(t *types.Type) *typeView {
 
 func newValueView(val types.Object) *typeView {
 	var t *types.Type
-	var name *string
+	name := new(string)
 	switch val := val.(type) {
-	case *types.Var: t, name = &val.Type, &val.Name
-	case method:     m := types.Type(val.Type)
-	                 t, name = &m, &val.Name
-	case field:      t, name = &val.Type, &val.Name
+	case *types.Var:
+		t, name = &val.Type, &val.Name
+	case method:
+		m := types.Type(val.Type)
+	    t, name = &m, &val.Name
+	case field:
+		t = &val.Type
+		if !val.IsAnonymous {
+			name = &val.Name
+		}
 	}
 	v := newTypeView(t)
-	v.nameText = NewText(val.GetName())
+	v.nameText = NewText(*name)
 	v.nameText.SetTextColor(getTextColor(val, .7))
 	v.nameText.SetBackgroundColor(Color{0, 0, 0, .3})
 	v.nameText.TextChanged = func(text string) {
