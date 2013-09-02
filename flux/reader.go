@@ -33,11 +33,11 @@ func loadFunc(f *funcNode) bool {
 	for i, p := range decl.Type.Params.List {
 		v := t.Params[i]
 		r.addVar(p.Names[0].Name, f.inputsNode.newOutput(v))
-		f.addPkgRef(v)
+		f.addPkgRef(v.Type)
 	}
 	for i, p := range decl.Type.Results.List {
 		r.vars[p.Names[0].Name] = nil
-		f.addPkgRef(t.Results[i])
+		f.addPkgRef(t.Results[i].Type)
 	}
 	r.readBlock(f.funcblk, decl.Body.List)
 	for i, p := range decl.Type.Results.List {
