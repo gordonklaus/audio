@@ -49,7 +49,9 @@ func saveType(t *types.NamedType) {
 	u := t.Underlying
 	walkType(u, func(tt *types.NamedType) {
 		if p := tt.Obj.Pkg; p != t.Obj.Pkg {
-			w.pkgNames[p] = w.name(p.Name)
+			if _, ok := w.pkgNames[p]; !ok {
+				w.pkgNames[p] = w.name(p.Name)
+			}
 		}
 	})
 	w.imports()
@@ -248,25 +250,28 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				}
 			case *valueNode:
 				val := ""
+				switch {
+				case n.addr:
+					val = "&"
+				case n.indirect:
+					val = "*"
+				}
 				if n.obj != nil {
 					if _, ok := n.obj.(field); ok {
-						val = args[0] + "." + n.obj.GetName()
+						val += args[0] + "." + n.obj.GetName()
 						args = args[1:]
 					} else {
-						val = w.qualifiedName(n.obj)
+						val += w.qualifiedName(n.obj)
 					}
 				} else {
-					val = args[0]
+					val += args[0]
 					args = args[1:]
-				}
-				if n.indirect {
-					val = "*" + val
 				}
 				if n.set {
 					w.indent("%s = %s", val, args[0])
 				} else {
 					switch n.obj.(type) {
-					case *types.Var, field:
+					default:
 						w.indent("%s := %s", results[0], val)
 					case *types.Const:
 						w.indent("const %s = %s", results[0], val)

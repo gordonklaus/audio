@@ -9,15 +9,15 @@ type valueNode struct {
 	*ViewBase
 	AggregateMouseHandler
 	obj types.Object
-	indirect, set bool
+	addr, indirect, set bool
 	blk *block
 	text Text
 	val, in, out *port
 	focused bool
 }
 
-func newValueNode(obj types.Object, indirect, set bool) *valueNode {
-	n := &valueNode{obj: obj, indirect: indirect, set: set}
+func newValueNode(obj types.Object, addr, indirect, set bool) *valueNode {
+	n := &valueNode{obj: obj, addr: addr, indirect: indirect, set: set}
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.text = NewText("")
@@ -37,15 +37,21 @@ func newValueNode(obj types.Object, indirect, set bool) *valueNode {
 }
 
 func (n *valueNode) reform() {
-	text := "indirect"
+	text := ""
 	if n.obj != nil {
-		text = n.obj.GetName()
+		if n.addr {
+			text = "&"
+		} else if n.indirect {
+			text = "*"
+		}
 		if _, ok := n.obj.(field); ok {
-			text = "." + text
+			text += "."
 		}
-		if n.indirect {
-			text = "*" + text
-		}
+		text += n.obj.GetName()
+	} else if n.addr {
+		text = "addr"
+	} else if n.indirect {
+		text = "indirect"
 	}
 	n.text.SetText(text)
 	
@@ -88,19 +94,31 @@ func (n *valueNode) reform() {
 	var t types.Type
 	if n.obj != nil {
 		t = n.obj.GetType()
-		if n.indirect {
+		if n.addr {
+			t = &types.Pointer{Base: t}
+		} else if n.indirect {
 			t, _ = indirect(t)
 		}
 	} else {
-		var p types.Type
+		var valType types.Type
 		if len(n.val.conns) > 0 {
-			p = n.val.conns[0].src.obj.Type
-			t, _ = indirect(p)
+			valType = n.val.conns[0].src.obj.Type
+			t = valType
+			if n.addr {
+				t = &types.Pointer{Base: t}
+			} else if n.indirect {
+				t, _ = indirect(t)
+			}
 		} else if n.set && len(n.in.conns) > 0 {
 			t = n.in.conns[0].src.obj.Type
-			p = &types.Pointer{Base: t}
+			valType = t
+			if n.addr {
+				valType, _ = indirect(valType)
+			} else if n.indirect {
+				valType = &types.Pointer{Base: valType}
+			}
 		}
-		n.val.setType(p)
+		n.val.setType(valType)
 	}
 	if n.set {
 		n.in.setType(t)
@@ -157,22 +175,37 @@ func (n *valueNode) KeyPressed(event KeyEvent) {
 	case KeyEscape:
 		n.blk.TakeKeyboardFocus()
 	default:
-		switch event.Text {
-		case "*":
-			if n.obj != nil {
-				if _, ok := indirect(n.obj.GetType()); ok {
+		if _, ok := n.obj.(*types.Const); ok {
+			n.ViewBase.KeyPressed(event)
+		} else {
+			switch event.Text {
+			case "&":
+				if !n.set {
+					n.addr = !n.addr
+					n.indirect = false
+					n.reform()
+				}
+			case "*":
+				var t types.Type
+				if n.obj != nil {
+					t = n.obj.GetType()
+				} else {
+					t = n.val.obj.Type
+				}
+				if _, ok := indirect(t); ok || t == nil {
+					n.addr = false
 					n.indirect = !n.indirect
 					n.reform()
 				}
+			case "=":
+				if !n.addr {
+					n.set = !n.set
+					n.reform()
+					n.TakeKeyboardFocus()
+				}
+			default:
+				n.ViewBase.KeyPressed(event)
 			}
-		case "=":
-			if _, ok := n.obj.(*types.Const); !ok {
-				n.set = !n.set
-				n.reform()
-				n.TakeKeyboardFocus()
-			}
-		default:
-			n.ViewBase.KeyPressed(event)
 		}
 	}
 }

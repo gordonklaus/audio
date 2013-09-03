@@ -503,8 +503,9 @@ func newNode(b *block, obj types.Object) {
 		switch obj.name {
 		case "[]":                        n = newIndexNode(false)
 		case "[]=":                       n = newIndexNode(true)
+		case "addr":                      n = newValueNode(nil, true, false, false)
 		case "if":                        n = newIfNode()
-		case "indirect":                  n = newValueNode(nil, true, false)
+		case "indirect":                  n = newValueNode(nil, false, true, false)
 		case "loop":                      n = newLoopNode()
 		case "typeAssert":                n = newTypeAssertNode()
 		}
@@ -513,7 +514,7 @@ func newNode(b *block, obj types.Object) {
 		case true:                        n = newCallNode(obj)
 		case false:                       n = newOperatorNode(obj)
 		}
-	case *types.Var, *types.Const, field: n = newValueNode(obj, false, false)
+	case *types.Var, *types.Const, field: n = newValueNode(obj, false, false, false)
 	default:                              panic("bad obj")
 	}
 	b.addNode(n)

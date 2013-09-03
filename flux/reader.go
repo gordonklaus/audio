@@ -86,7 +86,12 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 				case *ast.UnaryExpr:
 					switch x.Op {
 					case token.AND:
-						r.newCompositeLiteralNode(b, s, x.X.(*ast.CompositeLit), true)
+						switch y := x.X.(type) {
+						case *ast.CompositeLit:
+							r.newCompositeLiteralNode(b, s, y, true)
+						default:
+							r.newValueNode(b, x, s.Lhs[0], false)
+						}
 					}
 				case *ast.BinaryExpr:
 					n := newOperatorNode(&types.Func{Name: x.Op.String()})
@@ -194,12 +199,16 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 }
 
 func (r *reader) newValueNode(b *block, x, y ast.Expr, set bool) {
-	indirect := false
-	if s, ok := x.(*ast.StarExpr); ok {
-		x = s.X
+	var addr, indirect bool
+	switch x2 := x.(type) {
+	case *ast.UnaryExpr:
+		x = x2.X
+		addr = true
+	case *ast.StarExpr:
+		x = x2.X
 		indirect = true
 	}
-	n := newValueNode(r.obj(x), indirect, set)
+	n := newValueNode(r.obj(x), addr, indirect, set)
 	b.addNode(n)
 	if n.val != nil {
 		if s, ok := x.(*ast.SelectorExpr); ok {
