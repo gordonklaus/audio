@@ -87,7 +87,17 @@ func (n *nodeBase) newOutput(v *types.Var) *port {
 	return p
 }
 
+func (n *nodeBase) addSeqPorts() {
+	seqIn := n.newInput(&types.Var{Name: "seq", Type: seqType})
+	seqIn.MoveCenter(Pt(-8, 0))
+	seqOut := n.newOutput(&types.Var{Name: "seq", Type: seqType})
+	seqOut.MoveCenter(Pt(8, 0))
+}
+
 func (n *nodeBase) removePortBase(p *port) { // intentionally named to not implement interface{removePort(*port)}
+	for _, c := range p.conns {
+		c.blk.removeConnection(c)
+	}
 	if p.out {
 		SliceRemove(&n.outs, p)
 	} else {
@@ -258,14 +268,12 @@ func newCallNode(obj types.Object) node {
 		n.text.SetText(name)
 		for _, v := range t.Params { n.newInput(v) }
 		for _, v := range t.Results { n.newOutput(v) }
-		seqIn := n.newInput(&types.Var{Name: "seq", Type: seqType})
-		seqIn.MoveCenter(Pt(-8, 0))
-		seqOut := n.newOutput(&types.Var{Name: "seq", Type: seqType})
-		seqOut.MoveCenter(Pt(8, 0))
+		n.addSeqPorts()
 		return n
 	}
 
 	switch obj.GetName() {
+	case "delete": return newDeleteNode()
 	case "len": return newLenNode()
 	case "make": return newMakeNode()
 	default: panic("unknown builtin: " + obj.GetName())

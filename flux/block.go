@@ -597,9 +597,6 @@ func (n *portsNode) removePort(p *port) {
 		if q == p {
 			f.subPkgRef((*vars)[i].Type)
 			*vars = append((*vars)[:i], (*vars)[i+1:]...)
-			for _, c := range p.conns {
-				c.blk.removeConnection(c)
-			}
 			n.removePortBase(p)
 			n.TakeKeyboardFocus()
 			break

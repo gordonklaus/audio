@@ -1,7 +1,6 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
 	"code.google.com/p/go.exp/go/types"
 )
 
@@ -27,10 +26,7 @@ func newIndexNode(set bool) *indexNode {
 		n.outVal = n.newOutput(&types.Var{})
 		n.text.SetText("[]")
 	}
-	seqIn := n.newInput(&types.Var{Name: "seq", Type: seqType})
-	seqIn.MoveCenter(Pt(-8, 0))
-	seqOut := n.newOutput(&types.Var{Name: "seq", Type: seqType})
-	seqOut.MoveCenter(Pt(8, 0))
+	n.addSeqPorts()
 	up()
 	return n
 }

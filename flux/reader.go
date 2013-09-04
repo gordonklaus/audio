@@ -210,17 +210,17 @@ func (r *reader) newValueNode(b *block, x, y ast.Expr, set bool) {
 	}
 	n := newValueNode(r.obj(x), addr, indirect, set)
 	b.addNode(n)
-	if n.val != nil {
+	if n.x != nil {
 		if s, ok := x.(*ast.SelectorExpr); ok {
-			r.connect(name(s.X), n.val)
+			r.connect(name(s.X), n.x)
 		} else {
-			r.connect(name(x), n.val)
+			r.connect(name(x), n.x)
 		}
 	}
 	if set {
-		r.connect(name(y), n.in)
+		r.connect(name(y), n.y)
 	} else {
-		r.addVar(name(y), n.out)
+		r.addVar(name(y), n.y)
 	}
 }
 

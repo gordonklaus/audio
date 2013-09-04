@@ -5,6 +5,54 @@ import (
 	."code.google.com/p/gordon-go/gui"
 )
 
+type deleteNode struct {
+	*nodeBase
+}
+
+func newDeleteNode() *deleteNode {
+	n := &deleteNode{}
+	n.nodeBase = newNodeBase(n)
+	n.text.SetText("delete")
+	m := n.newInput(&types.Var{Name: "map", Type: generic{}})
+	key := n.newInput(&types.Var{Name: "key", Type: generic{}})
+	m.connsChanged = func() {
+		if len(m.conns) > 0 {
+			if t, ok := m.conns[0].src.obj.Type.(*types.Map); ok {
+				m.setType(t)
+				key.setType(t.Key)
+			}
+		} else {
+			m.setType(generic{})
+			key.setType(generic{})
+		}
+	}
+	n.addSeqPorts()
+	return n
+}
+
+
+type lenNode struct {
+	*nodeBase
+}
+
+func newLenNode() *lenNode {
+	n := &lenNode{}
+	n.nodeBase = newNodeBase(n)
+	n.text.SetText("len")
+	in := n.newInput(&types.Var{Type: generic{}})
+	n.newOutput(&types.Var{Type: types.Typ[types.Int]})
+	in.connsChanged = func() {
+		if len(in.conns) > 0 {
+			in.setType(in.conns[0].src.obj.Type)
+		} else {
+			in.setType(generic{})
+		}
+	}
+	n.addSeqPorts()
+	return n
+}
+
+
 type makeNode struct {
 	*nodeBase
 	typ *typeView
@@ -47,18 +95,4 @@ func (n *makeNode) setType(t types.Type) {
 		n.typ.MoveCenter(Pt(0, n.Rect().Max.Y + n.typ.Height() / 2))
 		n.TakeKeyboardFocus()
 	}
-}
-
-
-type lenNode struct {
-	*nodeBase
-}
-
-func newLenNode() *lenNode {
-	n := &lenNode{}
-	n.nodeBase = newNodeBase(n)
-	n.text.SetText("len")
-	n.newInput(&types.Var{Type: generic{}})
-	n.newOutput(&types.Var{Type: types.Typ[types.Int]})
-	return n
 }

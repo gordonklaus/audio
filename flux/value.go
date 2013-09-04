@@ -6,218 +6,127 @@ import (
 )
 
 type valueNode struct {
-	*ViewBase
-	AggregateMouseHandler
+	*nodeBase
 	obj types.Object
 	addr, indirect, set bool
-	blk *block
-	text Text
-	val, in, out *port
-	focused bool
+	x *port // the value to be read from or written to (input)
+	y *port // the result of the read (output) or the argument to write (input)
 }
 
 func newValueNode(obj types.Object, addr, indirect, set bool) *valueNode {
 	n := &valueNode{obj: obj, addr: addr, indirect: indirect, set: set}
-	n.ViewBase = NewView(n)
-	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
-	n.text = NewText("")
-	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
-	n.text.MoveCenter(Pt(0, n.text.Height() / 2))
-	n.AddChild(n.text)
+	n.nodeBase = newNodeBase(n)
 	if f, ok := obj.(field); ok {
-		n.val = newInput(n, &types.Var{Name: "x", Type: f.recv})
-		n.AddChild(n.val)
+		n.x = n.newInput(&types.Var{Name: "x", Type: f.recv})
 	} else if obj == nil {
-		n.val = newInput(n, &types.Var{Name: "value"})
-		n.AddChild(n.val)
-		n.val.connsChanged = n.reform
+		n.x = n.newInput(&types.Var{Name: "x"})
+		n.x.connsChanged = n.reform
 	}
+	if set {
+		n.y = n.newInput(&types.Var{})
+	} else {
+		n.y = n.newOutput(&types.Var{})
+	}
+	n.addSeqPorts()
 	n.reform()
 	return n
 }
 
 func (n *valueNode) reform() {
 	text := ""
-	if n.obj != nil {
-		if n.addr {
-			text = "&"
-		} else if n.indirect {
-			text = "*"
-		}
-		if _, ok := n.obj.(field); ok {
-			text += "."
-		}
-		text += n.obj.GetName()
-	} else if n.addr {
-		text = "addr"
+	if n.addr {
+		text = "&"
 	} else if n.indirect {
-		text = "indirect"
+		text = "*"
+	}
+	if _, ok := n.obj.(field); ok {
+		text += "."
+	}
+	if n.obj != nil {
+		text += n.obj.GetName()
+	} else {
+		text += "x"
 	}
 	n.text.SetText(text)
 	
 	if n.set {
-		if n.in == nil {
-			n.in = newInput(n, &types.Var{})
-			n.AddChild(n.in)
-			if n.val == nil {
-				n.in.MoveCenter(Pt(-8 - 2*portSize, 0))
-			} else {
-				n.in.connsChanged = n.reform
-				n.in.MoveCenter(Pt(-8 - 2*portSize, -portSize / 2))
-				n.val.MoveCenter(Pt(-8 - 2*portSize, portSize / 2))
+		if n.y.out {
+			n.removePortBase(n.y)
+			n.y = n.newInput(&types.Var{})
+			if n.x != nil {
+				n.y.connsChanged = n.reform
 			}
-		}
-		if n.out != nil {
-			for _, c := range n.out.conns {
-				c.blk.removeConnection(c)
-			}
-			n.RemoveChild(n.out)
-			n.out = nil
 		}
 	} else {
-		if n.out == nil {
-			n.out = newOutput(n, &types.Var{})
-			n.AddChild(n.out)
-			n.out.MoveCenter(Pt(8 + 2*portSize, 0))
-			if n.val != nil {
-				n.val.MoveCenter(Pt(-8 - 2*portSize, 0))
-			}
-		}
-		if n.in != nil {
-			for _, c := range n.in.conns {
-				c.blk.removeConnection(c)
-			}
-			n.RemoveChild(n.in)
-			n.in = nil
+		if !n.y.out {
+			n.y.connsChanged = func(){}
+			n.removePortBase(n.y)
+			n.y = n.newOutput(&types.Var{})
 		}
 	}
-	var t types.Type
+	var yt types.Type
 	if n.obj != nil {
-		t = n.obj.GetType()
+		yt = n.obj.GetType()
 		if n.addr {
-			t = &types.Pointer{Base: t}
+			yt = &types.Pointer{Base: yt}
 		} else if n.indirect {
-			t, _ = indirect(t)
+			yt, _ = indirect(yt)
 		}
 	} else {
-		var valType types.Type
-		if len(n.val.conns) > 0 {
-			valType = n.val.conns[0].src.obj.Type
-			t = valType
+		var xt types.Type
+		if len(n.x.conns) > 0 {
+			xt = n.x.conns[0].src.obj.Type
+			yt = xt
 			if n.addr {
-				t = &types.Pointer{Base: t}
+				yt = &types.Pointer{Base: yt}
 			} else if n.indirect {
-				t, _ = indirect(t)
+				yt, _ = indirect(yt)
 			}
-		} else if n.set && len(n.in.conns) > 0 {
-			t = n.in.conns[0].src.obj.Type
-			valType = t
+		} else if n.set && len(n.y.conns) > 0 {
+			yt = n.y.conns[0].src.obj.Type
+			xt = yt
 			if n.addr {
-				valType, _ = indirect(valType)
+				xt, _ = indirect(xt)
 			} else if n.indirect {
-				valType = &types.Pointer{Base: valType}
+				xt = &types.Pointer{Base: xt}
 			}
 		}
-		n.val.setType(valType)
+		n.x.setType(xt)
 	}
-	if n.set {
-		n.in.setType(t)
-	} else {
-		n.out.setType(t)
-	}
-	ResizeToFit(n, 0)
+	n.y.setType(yt)
 }
-
-func (n valueNode) block() *block { return n.blk }
-func (n *valueNode) setBlock(b *block) { n.blk = b }
-func (n valueNode) inputs() (p []*port) {
-	if n.val != nil {
-		p = []*port{n.val}
-	}
-	if n.set {
-		p = append(p, n.in)
-	}
-	return
-}
-func (n valueNode) outputs() []*port {
-	if n.set {
-		return nil
-	}
-	return []*port{n.out}
-}
-func (n valueNode) inConns() (c []*connection) {
-	for _, p := range n.inputs() {
-		c = append(c, p.conns...)
-	}
-	return
-}
-func (n valueNode) outConns() []*connection {
-	if n.set {
-		return nil
-	}
-	return n.out.conns
-}
-
-func (n *valueNode) Move(p Point) {
-	n.ViewBase.Move(p)
-	for _, c := range append(n.inConns(), n.outConns()...) {
-		c.reform()
-	}
-}
-
-func (n *valueNode) TookKeyboardFocus() { n.focused = true; n.Repaint() }
-func (n *valueNode) LostKeyboardFocus() { n.focused = false; n.Repaint() }
 
 func (n *valueNode) KeyPressed(event KeyEvent) {
-	switch event.Key {
-	case KeyLeft, KeyRight, KeyUp, KeyDown:
-		n.blk.outermost().focusNearestView(n, event.Key)
-	case KeyEscape:
-		n.blk.TakeKeyboardFocus()
-	default:
-		if _, ok := n.obj.(*types.Const); ok {
-			n.ViewBase.KeyPressed(event)
-		} else {
-			switch event.Text {
-			case "&":
-				if !n.set {
-					n.addr = !n.addr
-					n.indirect = false
-					n.reform()
-				}
-			case "*":
-				var t types.Type
-				if n.obj != nil {
-					t = n.obj.GetType()
-				} else {
-					t = n.val.obj.Type
-				}
-				if _, ok := indirect(t); ok || t == nil {
-					n.addr = false
-					n.indirect = !n.indirect
-					n.reform()
-				}
-			case "=":
-				if !n.addr {
-					n.set = !n.set
-					n.reform()
-					n.TakeKeyboardFocus()
-				}
-			default:
-				n.ViewBase.KeyPressed(event)
-			}
-		}
-	}
-}
-
-func (n valueNode) Paint() {
-	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
-	if n.val != nil {
-		DrawLine(n.val.MapToParent(n.val.Center()), ZP)
-	}
-	if n.set {
-		DrawLine(n.in.MapToParent(n.in.Center()), ZP)
+	if _, ok := n.obj.(*types.Const); ok {
+		n.nodeBase.KeyPressed(event)
 	} else {
-		DrawLine(ZP, n.out.MapToParent(n.out.Center()))
+		switch event.Text {
+		case "&":
+			if !n.set {
+				n.addr = !n.addr
+				n.indirect = false
+				n.reform()
+			}
+		case "*":
+			var t types.Type
+			if n.obj != nil {
+				t = n.obj.GetType()
+			} else {
+				t = n.x.obj.Type
+			}
+			if _, ok := indirect(t); ok || t == nil {
+				n.addr = false
+				n.indirect = !n.indirect
+				n.reform()
+			}
+		case "=":
+			if !n.addr {
+				n.set = !n.set
+				n.reform()
+				n.TakeKeyboardFocus()
+			}
+		default:
+			n.nodeBase.KeyPressed(event)
+		}
 	}
 }
