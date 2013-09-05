@@ -188,14 +188,18 @@ func (v ViewBase) MapFromParent(point Point) Point {
 	return point.Sub(v.Position()).Add(v.Rect().Min)
 }
 func (v ViewBase) MapFrom(point Point, parent View) Point {
-	if v.Self == parent { return point }
+	if v.Self == parent || v.parent == nil {
+		return point
+	}
 	return v.MapFromParent(v.parent.MapFrom(point, parent))
 }
 func (v ViewBase) MapToParent(point Point) Point {
 	return point.Sub(v.Rect().Min).Add(v.Position())
 }
 func (v ViewBase) MapTo(point Point, parent View) Point {
-	if v.Self == parent { return point }
+	if v.Self == parent || v.parent == nil {
+		return point
+	}
 	return v.parent.MapTo(v.MapToParent(point), parent)
 }
 

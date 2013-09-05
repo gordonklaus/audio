@@ -10,6 +10,7 @@ type loopNode struct {
 	AggregateMouseHandler
 	blk *block
 	input *port
+	seqIn, seqOut *port
 	inputsNode *portsNode
 	loopblk *block
 	focused bool
@@ -21,6 +22,7 @@ func newLoopNode() *loopNode {
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.input = newInput(n, &types.Var{})
 	n.input.connsChanged = n.updateInputType
+	n.input.MoveCenter(Pt(-2*portSize, 0))
 	n.AddChild(n.input)
 	n.loopblk = newBlock(n)
 	n.inputsNode = newInputsNode()
@@ -28,20 +30,25 @@ func newLoopNode() *loopNode {
 	n.loopblk.addNode(n.inputsNode)
 	n.AddChild(n.loopblk)
 	
-	n.input.MoveCenter(Pt(-2*portSize, 0))
+	n.seqIn = newInput(n, &types.Var{Name: "seq", Type: seqType})
+	n.seqIn.MoveCenter(ZP)
+	n.AddChild(n.seqIn)
+	n.seqOut = newOutput(n, &types.Var{Name: "seq", Type: seqType})
+	n.AddChild(n.seqOut)
+	
 	n.updateInputType()
 	return n
 }
 
 func (n loopNode) block() *block { return n.blk }
 func (n *loopNode) setBlock(b *block) { n.blk = b }
-func (n loopNode) inputs() []*port { return []*port{n.input} }
-func (n loopNode) outputs() []*port { return nil }
+func (n loopNode) inputs() []*port { return []*port{n.seqIn, n.input} }
+func (n loopNode) outputs() []*port { return []*port{n.seqOut} }
 func (n loopNode) inConns() []*connection {
-	return append(n.input.conns, n.loopblk.inConns()...)
+	return append(n.seqIn.conns, append(n.input.conns, n.loopblk.inConns()...)...)
 }
 func (n loopNode) outConns() []*connection {
-	return n.loopblk.outConns()
+	return append(n.seqOut.conns, n.loopblk.outConns()...)
 }
 
 func (n *loopNode) updateInputType() {
@@ -101,13 +108,16 @@ func (n *loopNode) update() bool {
 	y2 := b.Size().Y / 2
 	b.Move(Pt(0, -y2))
 	n.inputsNode.reposition()
+	n.seqOut.MoveCenter(Pt(b.Size().X, 0))
 	ResizeToFit(n, 0)
 	return true
 }
 
 func (n *loopNode) Move(p Point) {
 	n.ViewBase.Move(p)
-	for _, c := range n.input.conns { c.reform() }
+	for _, c := range append(n.inConns(), n.outConns()...) {
+		c.reform()
+	}
 }
 
 func (n *loopNode) TookKeyboardFocus() { n.focused = true; n.Repaint() }

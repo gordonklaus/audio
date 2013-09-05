@@ -234,7 +234,11 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			case *operatorNode:
 				if len(results) > 0 {
 					// TODO: handle constant expressions
-					w.indent("%s := %s %s %s\n", results[0], args[0], n.op, args[1])
+					if n.op == "!" {
+						w.indent("%s := !%s\n", results[0], args[0])
+					} else {
+						w.indent("%s := %s %s %s\n", results[0], args[0], n.op, args[1])
+					}
 				}
 			case *indexNode:
 				if n.set {
@@ -326,7 +330,8 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				w.indent("} else {\n")
 				w.block(n.falseblk, vars)
 			}
-			w.indent("}\n")
+			w.indent("}")
+			w.seq(n)
 		case *loopNode:
 			w.indent("for")
 			results, existing := w.results(n.inputsNode, vars)
@@ -360,7 +365,8 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			w.assignExisting(existing)
 			w.nindent--
 			w.block(n.loopblk, vars)
-			w.indent("}\n")
+			w.indent("}")
+			w.seq(n)
 		}
 	}
 	

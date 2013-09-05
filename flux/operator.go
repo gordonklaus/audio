@@ -19,7 +19,10 @@ func newOperatorNode(obj types.Object) *operatorNode {
 	n.newOutput(&types.Var{})
 	
 	switch n.op {
-	case "+", "-", "*", "/", "%", "&", "|", "^", "&^", "&&", "||", "!":
+	case "!":
+		n.removePortBase(n.ins[1])
+		fallthrough
+	case "+", "-", "*", "/", "%", "&", "|", "^", "&^", "&&", "||":
 		f := func() {
 			t := types.Type(generic{})
 			for _, p := range ins(n) {

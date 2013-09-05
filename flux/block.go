@@ -181,7 +181,7 @@ func (b *block) stopEditing() {
 func (b *block) update() (updated bool) {
 	for n := range b.nodes {
 		if n, ok := n.(interface { update() bool }); ok {
-			updated = updated || n.update()
+			updated = n.update() || updated
 		}
 	}
 	

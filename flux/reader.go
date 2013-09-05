@@ -62,7 +62,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 			if s.Tok == token.DEFINE {
 				switch x := s.Rhs[0].(type) {
 				case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
-					r.newValueNode(b, x, s.Lhs[0], false)
+					r.newValueNode(b, x, s.Lhs[0], false, s)
 				case *ast.CompositeLit:
 					r.newCompositeLiteralNode(b, s, x, false)
 				case *ast.CallExpr:
@@ -90,8 +90,15 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 						case *ast.CompositeLit:
 							r.newCompositeLiteralNode(b, s, y, true)
 						default:
-							r.newValueNode(b, x, s.Lhs[0], false)
+							r.newValueNode(b, x, s.Lhs[0], false, s)
 						}
+					case token.NOT:
+						n := newOperatorNode(&types.Func{Name: x.Op.String()})
+						b.addNode(n)
+						if arg, ok := x.X.(*ast.Ident); ok {
+							r.connect(arg.Name, n.ins[0])
+						}
+						r.addVar(name(s.Lhs[0]), n.outs[0])
 					}
 				case *ast.BinaryExpr:
 					n := newOperatorNode(&types.Func{Name: x.Op.String()})
@@ -133,7 +140,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 						break
 					}
 				}
-				r.newValueNode(b, s.Lhs[0], s.Rhs[0], true)
+				r.newValueNode(b, s.Lhs[0], s.Rhs[0], true, s)
 			}
 		case *ast.DeclStmt:
 			decl := s.Decl.(*ast.GenDecl)
@@ -159,7 +166,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 					}
 					r.addVar(name(v.Names[0]), n.outs[0])
 				case *ast.Ident, *ast.SelectorExpr:
-					r.newValueNode(b, x, v.Names[0], false)
+					r.newValueNode(b, x, v.Names[0], false, s)
 				}
 			}
 		case *ast.ForStmt:
@@ -172,6 +179,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 				r.addVar(name(s.Init.(*ast.AssignStmt).Lhs[0]), n.inputsNode.outs[0])
 			}
 			r.readBlock(n.loopblk, s.Body.List)
+			r.seq(n, s)
 		case *ast.IfStmt:
 			n := newIfNode()
 			b.addNode(n)
@@ -180,6 +188,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 			if s.Else != nil {
 				r.readBlock(n.falseblk, s.Else.(*ast.BlockStmt).List)
 			}
+			r.seq(n, s)
 		case *ast.RangeStmt:
 			n := newLoopNode()
 			b.addNode(n)
@@ -189,6 +198,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 				r.addVar(name(s.Value), n.inputsNode.outs[1])
 			}
 			r.readBlock(n.loopblk, s.Body.List)
+			r.seq(n, s)
 		case *ast.ExprStmt:
 			switch x := s.X.(type) {
 			case *ast.CallExpr:
@@ -198,7 +208,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 	}
 }
 
-func (r *reader) newValueNode(b *block, x, y ast.Expr, set bool) {
+func (r *reader) newValueNode(b *block, x, y ast.Expr, set bool, an ast.Node) {
 	var addr, indirect bool
 	switch x2 := x.(type) {
 	case *ast.UnaryExpr:
@@ -222,6 +232,7 @@ func (r *reader) newValueNode(b *block, x, y ast.Expr, set bool) {
 	} else {
 		r.addVar(name(y), n.y)
 	}
+	r.seq(n, an)
 }
 
 func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n node) {

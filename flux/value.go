@@ -27,7 +27,9 @@ func newValueNode(obj types.Object, addr, indirect, set bool) *valueNode {
 	} else {
 		n.y = n.newOutput(&types.Var{})
 	}
-	n.addSeqPorts()
+	if _, ok := n.obj.(*types.Const); !ok {
+		n.addSeqPorts()
+	}
 	n.reform()
 	return n
 }
