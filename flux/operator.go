@@ -24,13 +24,7 @@ func newOperatorNode(obj types.Object) *operatorNode {
 		fallthrough
 	case "+", "-", "*", "/", "%", "&", "|", "^", "&^", "&&", "||":
 		f := func() {
-			t := types.Type(generic{})
-			for _, p := range ins(n) {
-				if len(p.conns) > 0 {
-					t = p.conns[0].src.obj.Type
-					break
-				}
-			}
+			t := combineInputTypes(ins(n))
 			for _, p := range ins(n) {
 				p.setType(t)
 			}
@@ -42,15 +36,9 @@ func newOperatorNode(obj types.Object) *operatorNode {
 		f()
 	case "<<", ">>":
 		
-	case "==", "!=":
+	case "==", "!=", "<", "<=", ">", ">=":
 		f := func() {
-			t := types.Type(generic{})
-			for _, p := range ins(n) {
-				if len(p.conns) > 0 {
-					t = p.conns[0].src.obj.Type
-					break
-				}
-			}
+			t := combineInputTypes(ins(n))
 			for _, p := range ins(n) {
 				p.setType(t)
 			}
@@ -60,8 +48,30 @@ func newOperatorNode(obj types.Object) *operatorNode {
 		}
 		f()
 		n.outs[0].setType(types.Typ[types.UntypedBool])
-	case "<", "<=", ">", ">=":
-		
 	}
 	return n
+}
+
+func combineInputTypes(p []*port) (t types.Type) {
+	for _, p := range p {
+		if len(p.conns) > 0 {
+			t2 := p.conns[0].src.obj.Type
+			switch {
+			case t == nil:
+				t = t2
+			case isUntyped(t) && isUntyped(t2):
+				// TODO: combine untypeds
+			case isUntyped(t):
+				t = t2
+			case isUntyped(t2):
+			default:
+			}
+		}
+	}
+	return
+}
+
+func isUntyped(t types.Type) bool {
+	b, ok := t.(*types.Basic)
+	return ok && b.Info & types.IsUntyped != 0
 }

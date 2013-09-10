@@ -194,7 +194,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			for _, in := range ins(n) {
 				if len(in.conns) > 0 {
 					args = append(args, vars[in])
-				} else {
+				} else if in.obj.Type != nil {
 					args = append(args, w.zero(in.obj.Type))
 				}
 			}
@@ -232,13 +232,19 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.indent("%s := make(%s, %s)\n", results[0], w.typ(*n.typ.typ), strings.Join(args, ", "))
 				}
 			case *operatorNode:
-				if len(results) > 0 {
+				c := 0
+				for _, p := range n.ins {
+					c += len(p.conns)
+				}
+				if c > 0 && len(results) > 0 {
 					// TODO: handle constant expressions
 					if n.op == "!" {
 						w.indent("%s := !%s\n", results[0], args[0])
 					} else {
 						w.indent("%s := %s %s %s\n", results[0], args[0], n.op, args[1])
 					}
+				} else {
+					existing = nil
 				}
 			case *indexNode:
 				if n.set {
@@ -259,35 +265,37 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.indent("const %s = %s\n", results[0], val)
 				}
 			case *valueNode:
-				val := ""
-				switch {
-				case n.addr:
-					val = "&"
-				case n.indirect:
-					val = "*"
-				}
-				if n.obj != nil {
-					if _, ok := n.obj.(field); ok {
-						val += args[0] + "." + n.obj.GetName()
-						args = args[1:]
+				if n.set || len(results) > 0 {
+					val := ""
+					switch {
+					case n.addr:
+						val = "&"
+					case n.indirect:
+						val = "*"
+					}
+					if n.obj != nil {
+						if _, ok := n.obj.(field); ok {
+							val += args[0] + "." + n.obj.GetName()
+							args = args[1:]
+						} else {
+							val += w.qualifiedName(n.obj)
+						}
 					} else {
-						val += w.qualifiedName(n.obj)
+						val += args[0]
+						args = args[1:]
 					}
-				} else {
-					val += args[0]
-					args = args[1:]
-				}
-				if n.set {
-					w.indent("%s = %s", val, args[0])
-				} else {
-					switch n.obj.(type) {
-					default:
-						w.indent("%s := %s", results[0], val)
-					case *types.Const:
-						w.indent("const %s = %s", results[0], val)
+					if n.set {
+						w.indent("%s = %s", val, args[0])
+					} else {
+						switch n.obj.(type) {
+						default:
+							w.indent("%s := %s", results[0], val)
+						case *types.Const:
+							w.indent("const %s = %s", results[0], val)
+						}
 					}
+					w.seq(n)
 				}
-				w.seq(n)
 			case *typeAssertNode:
 				if len(n.ins[0].conns) > 0 && len(results) > 0 {
 					w.indent("%s := %s.(%s)\n", strings.Join(results, ", "), args[0], w.typ(*n.typ.typ))

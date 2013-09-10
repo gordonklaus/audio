@@ -328,6 +328,8 @@ func (r *reader) typ(x ast.Expr) types.Type {
 	switch x := x.(type) {
 	case *ast.Ident, *ast.SelectorExpr:
 		return r.obj(x).GetType()
+	case *ast.StarExpr:
+		return &types.Pointer{r.typ(x.X)}
 	case *ast.ArrayType:
 		if x.Len == nil {
 			return &types.Slice{r.typ(x.Elt)}

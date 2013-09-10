@@ -233,7 +233,7 @@ func (b browser) filteredObjs() (objs []types.Object) {
 		for _, obj := range types.Universe.Entries {
 			add(obj)
 		}
-		for _, s := range ([]string{"+", "-", "*", "/", "%", "&", "|", "^", "&^", "&&", "||", "!", "==", "!="}) {
+		for _, s := range ([]string{"+", "-", "*", "/", "%", "&", "|", "^", "&^", "&&", "||", "!", "==", "!=", "<", "<=", ">", ">="}) {
 			add(&types.Func{Name: s})
 		}
 		for _, t := range []*types.TypeName{protoPointer, protoArray, protoSlice, protoMap, protoChan, protoFunc, protoInterface, protoStruct} {
