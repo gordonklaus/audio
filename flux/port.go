@@ -44,12 +44,51 @@ func (p *port) setType(t types.Type) {
 
 func (p port) canConnect(q *port) bool {
 	pSeq, qSeq := p.obj.Type == seqType, q.obj.Type == seqType
-	if pSeq && !qSeq || !pSeq && qSeq { return false }
-	return p.out != q.out
+	if pSeq && !qSeq || !pSeq && qSeq {
+		return false
+	}
+	if p.out == q.out {
+		return false
+	}
+	
+	src, dst := q.node, p.node
+	if p.out {
+		src, dst = dst, src
+	}
+	return !precedes(dst, src)
 }
+
+func precedes(start, end node) bool {
+loop:
+	for n1 := start; n1.block() != nil; n1 = n1.block().node {
+		for n2 := end; n2.block() != nil; n2 = n2.block().node {
+			if n1.block() == n2.block() {
+				start, end = n1, n2
+				break loop
+			}
+		}
+	}
+	
+	if start == end {
+		return true
+	}
+	
+	for _, c := range start.outConns() {
+		if c.dst == nil {
+			continue
+		}
+		if precedes(c.dst.node, end) {
+			return true
+		}
+	}
+	
+	return false
+}
+
 func (p *port) connect(c *connection) {
 	p.conns = append(p.conns, c)
 }
+
 func (p *port) disconnect(c *connection) {
 	for i, c2 := range p.conns {
 		if c2 == c {
