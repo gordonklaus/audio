@@ -19,6 +19,7 @@ type block struct {
 	conns map[*connection]bool
 	focused, editing bool
 	editingNode node
+	vel map[node]Point
 }
 
 func newBlock(n node) *block {
@@ -27,6 +28,7 @@ func newBlock(n node) *block {
 	b.node = n
 	b.nodes = map[node]bool{}
 	b.conns = map[*connection]bool{}
+	b.vel = map[node]Point{}
 	return b
 }
 
@@ -56,6 +58,7 @@ func (b *block) addNode(n node) {
 func (b *block) removeNode(n node) {
 	b.RemoveChild(n)
 	delete(b.nodes, n)
+	delete(b.vel, n)
 	switch n := n.(type) {
 	case *callNode:
 		b.func_().subPkgRef(n.obj)
@@ -178,6 +181,8 @@ func (b *block) stopEditing() {
 	b.editingNode = nil
 }
 
+// TODO: consider not repositioning portsNodes, as doing so may contribute to poor convergence and poor measure of meanSpeed
+// TODO: consider using an EA to lay out nodes
 func (b *block) update() (updated bool) {
 	for n := range b.nodes {
 		if n, ok := n.(interface { update() bool }); ok {
@@ -185,22 +190,28 @@ func (b *block) update() (updated bool) {
 		}
 	}
 	
-	v := map[node]Point{}
-	
 	const (
-		nodeCenterCoef = .25
-		nodeSep = 32
-		nodeSepCoef = 2
-		nodeConnSep = 32
-		nodeConnSepCoef = 2
-		connLen = 64
-		connLenFB = 256
-		connAngleCoef = 16
-		connContractCoef = .25
-		connExpandCoef = 2
+		nodeCenterCoef = .5
+		nodeSep = 16
+		nodeSepCoef = 4
+		nodeConnSep = 8
+		nodeConnSepCoef = 1
+		connLen = 32
+		connLenFB = -256
+		connLenCoef = .33
+		connConnSep = 4
+		connConnSepCoef = 1
 		topSpeed = 200
 		speedCompress = 1
+		dragCoef = .85
 	)
+	
+	addVel := func(n node, dv Point) {
+		n.block().vel[n] = n.block().vel[n].Add(dv)
+	}
+	subVel := func(n node, dv Point) {
+		n.block().vel[n] = n.block().vel[n].Sub(dv)
+	}
 	
 	for n1 := range b.nodes {
 		for n2 := range b.nodes {
@@ -211,7 +222,7 @@ func (b *block) update() (updated bool) {
 			}
 			d := dir.Len() - n1.Size().Add(n2.Size()).Len() / 2 - nodeSep
 			if d >= 0 { continue }
-			v[n1] = v[n1].Add(dir.Mul(-nodeSepCoef * d / dir.Len()))
+			addVel(n1, dir.Mul(-nodeSepCoef * d / dir.Len()))
 		}
 		for b := b; b != nil; b = b.outer() {
 conns:
@@ -229,56 +240,55 @@ conns:
 				d := dir.Len() - n1.Size().Len() / 2 - nodeConnSep
 				if d > 0 { continue }
 				delta := dir.Mul(-nodeConnSepCoef * d / dir.Len())
-				v[n1] = v[n1].Add(delta)
-				v[c.src.node] = v[c.src.node].Sub(delta)
-				v[c.dst.node] = v[c.dst.node].Sub(delta)
+				addVel(n1, delta)
+				subVel(c.src.node, delta)
+				subVel(c.dst.node, delta)
 			}
 		}
 	}
 	for c := range b.conns {
 		if c.src == nil || c.dst == nil { continue }
-		for b := b; b != nil; b = b.outer() {
-			for c2 := range b.conns {
-				if c2.src == nil || c2.dst == nil { continue }
-	   			if c == c2 || c.src.node == c2.src.node || c.dst.node == c2.dst.node { continue }
-				p1, p2 := LineToLine(c.srcPt, c.dstPt, c2.srcPt, c2.dstPt)
-				d := p1.Sub(p2)
-				if l := d.Len(); l == 0 {
-					d = c.MapToParent(c.Center()).Sub(c2.MapToParent(c2.Center()))
-					if d.Len() == 0 { continue }
-					d = d.Mul(16 / d.Len())
-					v[c.src.node] = v[c.src.node].Add(d)
-					v[c.dst.node] = v[c.dst.node].Add(d)
-					v[c2.src.node] = v[c2.src.node].Sub(d)
-					v[c2.dst.node] = v[c2.dst.node].Sub(d)
-				} else if l < 32 {
-					d = d.Mul((32 - l) / l)
-					v[c.src.node] = v[c.src.node].Add(d)
-					v[c.dst.node] = v[c.dst.node].Add(d)
-					v[c2.src.node] = v[c2.src.node].Sub(d)
-					v[c2.dst.node] = v[c2.dst.node].Sub(d)
-				}
-			}
-		}
+		// for b := b; b != nil; b = b.outer() {
+		// 	for c2 := range b.conns {
+		// 		if c == c2 ||
+		// 		   c2.src == nil || c2.dst == nil ||
+		// 		   c.src.node == c2.src.node || c.dst.node == c2.dst.node || c.src.node == c2.dst.node || c.dst.node == c2.src.node {
+		// 			continue
+		// 		}
+		// 		p1, p2 := LineToLine(c.srcPt, c.dstPt, c2.srcPt, c2.dstPt)
+		// 		d := p1.Sub(p2)
+		// 		if l := d.Len(); l == 0 {
+		// 			d = c.MapToParent(c.Center()).Sub(c2.MapToParent(c2.Center()))
+		// 			if d.Len() == 0 { continue }
+		// 			d = d.Mul(connConnSepCoef / d.Len())
+		// 			addVel(c.src.node, d)
+		// 			addVel(c.dst.node, d)
+		// 			subVel(c2.src.node, d)
+		// 			subVel(c2.dst.node, d)
+		// 		} else if l < connConnSep {
+		// 			d = d.Mul((connConnSep - l) / l)
+		// 			addVel(c.src.node, d)
+		// 			addVel(c.dst.node, d)
+		// 			subVel(c2.src.node, d)
+		// 			subVel(c2.dst.node, d)
+		// 		}
+		// 	}
+		// }
 		d := c.dstPt.Sub(c.srcPt)
-		l := d.Len()
-		var offset, rot float64 = connLen, 0
+		connLen := float64(connLen)
 		if c.feedback {
-			offset, rot = connLenFB, .5
+			connLen = connLenFB
 		}
-		l = (offset - l) / l
-		if l < 0 {
-			l *= connContractCoef
-		} else {
-			l *= connExpandCoef
+		d.X -= connLen + math.Abs(d.Y) / 2 // the nonlinearity abs(d.Y) can contribute to oscillations
+		if d.X < 0 {
+			d.X *= -d.X
 		}
-		angle := math.Mod(d.Angle() / 2 / math.Pi + rot + .5, 1) - .5
-		u := Pt(d.Y, -d.X).Mul(connAngleCoef * 2 * angle).Add(d.Mul(l))
+		d = d.Mul(connLenCoef)
 		
 		srcNode := c.src.node; for srcNode.block() != b { srcNode = srcNode.block().node }
 		dstNode := c.dst.node; for dstNode.block() != b { dstNode = dstNode.block().node }
-		v[srcNode] = v[srcNode].Sub(u)
-		v[dstNode] = v[dstNode].Add(u)
+		addVel(srcNode, d)
+		subVel(dstNode, d)
 	}
 	
 	center := ZP
@@ -287,17 +297,19 @@ conns:
 	}
 	center = center.Div(float64(len(b.nodes)))
 	for n := range b.nodes {
-		v[n] = v[n].Add(center.Sub(n.Position().Mul(nodeCenterCoef)))
-		l := v[n].Len()
+		addVel(n, center.Sub(n.Position().Mul(nodeCenterCoef)))
+		l := b.vel[n].Len()
 		if l > 0 {
-			v[n] = v[n].Mul(math.Tanh(speedCompress * l / topSpeed) * topSpeed / l)
+			b.vel[n] = b.vel[n].Mul(math.Tanh(speedCompress * l / topSpeed) * topSpeed / l)
 		}
 	}
 	
 	meanVel := ZP
 	nVel := 0.0
 	for n := range b.nodes {
-		meanVel = meanVel.Add(v[n])
+		if _, ok := n.(*portsNode); ok { continue }
+		b.vel[n] = b.vel[n].Mul(dragCoef)
+		meanVel = meanVel.Add(b.vel[n])
 		nVel++
 	}
 	// if there is only one (non-port) node then it is definitely stationary
@@ -306,15 +318,23 @@ conns:
 		meanVel = meanVel.Div(nVel)
 		meanSpeed := 0.0
 		for n := range b.nodes {
-			meanSpeed += v[n].Sub(meanVel).Len()
+			if _, ok := n.(*portsNode); ok { continue }
+			subVel(n, meanVel)
+			meanSpeed += b.vel[n].Len()
 		}
 		meanSpeed /= nVel
 		if meanSpeed < .01 {
+			// NOTE:  meanSpeed is not reliable (probably due to portsNode interactions), which is why we also check rect below
+			b.vel = map[node]Point{}
 			return
+		} else {
+			updated = true
 		}
 		
+		dt := math.Min(1.0 / fps, 100 / meanSpeed) // slow down time at high speeds to avoid oscillation
 		for n := range b.nodes {
-			n.Move(n.Position().Add(v[n].Mul(2.0 / fps)).Sub(center))
+			b.vel[n] = b.vel[n].Mul(.5 + rand.Float64()) // a little noise to break up small oscillations
+			n.Move(n.Position().Add(b.vel[n].Mul(dt)).Sub(center))
 		}
 	}
 	
@@ -342,7 +362,10 @@ conns:
 		rect = Rect(0, 0, 16, 0)
 	}
 	rect = rect.Inset(-blockRadius)
-	if b.Rect() == rect { return }
+	if b.Rect().Size().Sub(rect.Size()).Len() < .01 {
+		b.vel = map[node]Point{}
+		return
+	}
 	b.Resize(rect.Dx(), rect.Dy())
 	b.Pan(rect.Min)
 	

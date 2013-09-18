@@ -4,7 +4,6 @@ import (
 	"code.google.com/p/gordon-go/gui"
 	."code.google.com/p/gordon-go/util"
 	"code.google.com/p/go.exp/go/types"
-	"fmt"
 )
 
 func main() {
@@ -74,9 +73,4 @@ func newFluxWindow() *fluxWindow {
 func (w *fluxWindow) Resize(width, height float64) {
 	w.Window.Resize(width, height)
 	w.browser.Move(w.Center())
-}
-
-
-func println(format string, args ...interface{}) {
-	fmt.Printf(format + "\n", args...)
 }
