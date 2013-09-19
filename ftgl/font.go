@@ -1,54 +1,61 @@
 package ftgl
 
 // #cgo pkg-config: ftgl
-// #include "FTGL/ftgl.h"
+// #include "ftgl.h"
+// #include <stdlib.h>
 import "C"
 
 import "unsafe"
 
 type Font struct {
-	font *C.FTGLfont
+	f unsafe.Pointer
 }
 
-func CreateTextureFont(filePath string) Font {
+func NewTextureFont(filePath string) Font {
 	s := C.CString(filePath)
 	defer C.free(unsafe.Pointer(s))
-	font := C.ftglCreateTextureFont(s)
-	if font == nil { panic("couldn't create font") }
-	return Font{font}
+	f := C.NewTextureFont(s)
+	if f == nil {
+		panic("couldn't create f")
+	}
+	return Font{f}
 }
 
 // the caller must ensure that buffer is not collected before the Font is done being used
-func CreateTextureFontFromBuffer(buffer []byte) Font {
-	font := C.ftglCreateTextureFontFromBuffer((*C.uchar)(&buffer[0]), C.size_t(len(buffer)))
-	if font == nil { panic("couldn't create font") }
-	return Font{font}
+func NewTextureFontFromBuffer(buffer []byte) Font {
+	f := C.NewTextureFontFromBuffer((*C.uchar)(&buffer[0]), C.size_t(len(buffer)))
+	if f == nil {
+		panic("unable create font")
+	}
+	return Font{f}
 }
 
-func (font Font) SetFaceSize(size, res uint) bool {
-	return C.ftglSetFontFaceSize(font.font, C.uint(size), C.uint(res)) == 1
+func (f Font) SetFaceSize(size, res uint) {
+	if C.Font_SetFaceSize(f.f, C.uint(size), C.uint(res)) != 1 {
+		panic("unable to set face size")
+	}
 }
 
-func (font Font) Ascender() float64 {
-	return float64(C.ftglGetFontAscender(font.font))
+func (f Font) Ascender() float64 {
+	return float64(C.Font_Ascender(f.f))
 }
 
-func (font Font) Descender() float64 {
-	return float64(C.ftglGetFontDescender(font.font))
+func (f Font) Descender() float64 {
+	return float64(C.Font_Descender(f.f))
 }
 
-func (font Font) LineHeight() float64 {
-	return float64(C.ftglGetFontLineHeight(font.font))
+func (f Font) LineHeight() float64 {
+	return float64(C.Font_LineHeight(f.f))
 }
 
-func (font Font) Advance(text string) float64 {
+func (f Font) Advance(text string) float64 {
 	s := C.CString(text)
 	defer C.free(unsafe.Pointer(s))
-	return float64(C.ftglGetFontAdvance(font.font, s))
+	return float64(C.Font_Advance(f.f, s))
 }
 
-func (font Font) Render(text string) {
+func (f Font) Render(text string) {
 	s := C.CString(text)
 	defer C.free(unsafe.Pointer(s))
-	C.ftglRenderFont(font.font, s, C.FTGL_RENDER_ALL)
+	C.Font_Render(f.f, s)
 }

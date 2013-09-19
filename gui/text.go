@@ -8,7 +8,7 @@ import (
 
 var font ftgl.Font
 func initFont() {
-	font = ftgl.CreateTextureFontFromBuffer(rsrc.FreeSerif_otf)
+	font = ftgl.NewTextureFontFromBuffer(rsrc.FreeSerif_otf)
 	font.SetFaceSize(18, 1)
 }
 
