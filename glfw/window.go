@@ -1,6 +1,6 @@
 package glfw
 
-//#include <GL/glfw3.h>
+//#include <GLFW/glfw3.h>
 import "C"
 
 import (
@@ -9,12 +9,13 @@ import (
 
 type Window struct {
 	w *C.GLFWwindow
-	onClose CloseFunc
-	onResize ResizeFunc
-	onKey KeyFunc
-	onChar CharFunc
-	onMouseMove MouseMoveFunc
-	onMouseButton MouseButtonFunc
+	closeCB CloseFunc
+	resizeCB ResizeFunc
+	framebufferResizeCB ResizeFunc
+	keyCB KeyFunc
+	charCB CharFunc
+	mouseMoveCB MouseMoveFunc
+	mouseButtonCB MouseButtonFunc
 }
 
 func NewWindow(width, height int, title string) *Window {
@@ -22,7 +23,7 @@ func NewWindow(width, height int, title string) *Window {
 	if win == nil {
 		panic("GLFW:  Failed to create window.")
 	}
-	w := &Window{w:win}
+	w := &Window{w: win}
 	C.glfwSetWindowUserPointer(win, unsafe.Pointer(w))
 	return w
 }
@@ -34,6 +35,12 @@ func (w *Window) Destroy() {
 func (w *Window) Size() (width, height int) {
 	var wid, hei C.int
 	C.glfwGetWindowSize(w.w, &wid, &hei)
+	return int(wid), int(hei)
+}
+
+func (w *Window) FramebufferSize() (width, height int) {
+	var wid, hei C.int
+	C.glfwGetFramebufferSize(w.w, &wid, &hei)
 	return int(wid), int(hei)
 }
 

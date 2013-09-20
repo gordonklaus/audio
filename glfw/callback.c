@@ -1,46 +1,81 @@
-#include <GL/glfw3.h>
-
 #include "callback.h"
 #include "_cgo_export.h"
 
+void errorCallback(int error, const char* description) {
+	errorCB(error, (char*)description);
+}
 void setErrorCallback() {
-	glfwSetErrorCallback((GLFWerrorfun)&errorCB);
+	glfwSetErrorCallback(&errorCallback);
 }
 void clearErrorCallback() {
 	glfwSetErrorCallback(0);
 }
+
+void closeCallback(GLFWwindow* w) {
+	closeCB(w);
+}
 void setCloseCallback(GLFWwindow* w) {
-	glfwSetWindowCloseCallback(w, (GLFWwindowclosefun)&closeCB);
+	glfwSetWindowCloseCallback(w, &closeCallback);
 }
 void clearCloseCallback(GLFWwindow* w) {
 	glfwSetWindowCloseCallback(w, 0);
 }
+
+void resizeCallback(GLFWwindow* w, int width, int height) {
+	resizeCB(w, width, height);
+}
 void setResizeCallback(GLFWwindow* w) {
-	glfwSetWindowSizeCallback(w, (GLFWwindowsizefun)&resizeCB);
+	glfwSetWindowSizeCallback(w, &resizeCallback);
 }
 void clearResizeCallback(GLFWwindow* w) {
 	glfwSetWindowSizeCallback(w, 0);
 }
+
+void framebufferResizeCallback(GLFWwindow* w, int width, int height) {
+	framebufferResizeCB(w, width, height);
+}
+void setFramebufferResizeCallback(GLFWwindow* w) {
+	glfwSetFramebufferSizeCallback(w, &framebufferResizeCallback);
+}
+void clearFramebufferResizeCallback(GLFWwindow* w) {
+	glfwSetFramebufferSizeCallback(w, 0);
+}
+
+void keyCallback(GLFWwindow* w, int key, int scancode, int action, int mods) {
+	keyCB(w, key, scancode, action, mods);
+}
 void setKeyCallback(GLFWwindow* w) {
-	glfwSetKeyCallback(w, (GLFWkeyfun)&keyCB);
+	glfwSetKeyCallback(w, &keyCallback);
 }
 void clearKeyCallback(GLFWwindow* w) {
 	glfwSetKeyCallback(w, 0);
 }
+
+void charCallback(GLFWwindow* w, unsigned int character) {
+	charCB(w, character);
+}
 void setCharCallback(GLFWwindow* w) {
-	glfwSetCharCallback(w, (GLFWcharfun)&charCB);
+	glfwSetCharCallback(w, &charCallback);
 }
 void clearCharCallback(GLFWwindow* w) {
 	glfwSetCharCallback(w, 0);
 }
+
+void mouseMoveCallback(GLFWwindow* w, double x, double y) {
+	mouseMoveCB(w, x, y);
+}
 void setMouseMoveCallback(GLFWwindow* w) {
-	glfwSetCursorPosCallback(w, (GLFWcursorposfun)&mouseMoveCB);
+	glfwSetCursorPosCallback(w, &mouseMoveCallback);
 }
 void clearMouseMoveCallback(GLFWwindow* w) {
 	glfwSetCursorPosCallback(w, 0);
 }
+
+void mouseButtonCallback(GLFWwindow* w, int button, int action, int mods) {
+	mouseButtonCB(w, button, action, mods);
+}
 void setMouseButtonCallback(GLFWwindow* w) {
-	glfwSetMouseButtonCallback(w, (GLFWmousebuttonfun)&mouseButtonCB);
+	glfwSetMouseButtonCallback(w, &mouseButtonCallback);
 }
 void clearMouseButtonCallback(GLFWwindow* w) {
 	glfwSetMouseButtonCallback(w, 0);

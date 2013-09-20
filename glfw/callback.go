@@ -1,6 +1,5 @@
 package glfw
 
-//#include <GL/glfw3.h>
 //#include "callback.h"
 import "C"
 
@@ -10,12 +9,19 @@ import (
 )
 
 type ErrorFunc func(err error)
-type CloseFunc func() bool
+type CloseFunc func()
 type ResizeFunc func(width, height int)
-type KeyFunc func(key, action int)
+type KeyFunc func(key, scancode, action, mods int)
 type CharFunc func(char rune)
-type MouseMoveFunc func(x, y int)
-type MouseButtonFunc func(button, action int)
+type MouseMoveFunc func(x, y float64)
+type MouseButtonFunc func(button, action, mods int)
+
+const (
+	ModShift = 1
+	ModControl = 2
+	ModAlt = 4
+	ModSuper = 8
+)
 
 var errorCallback ErrorFunc
 
@@ -27,48 +33,63 @@ func OnError(f ErrorFunc) {
 		C.clearErrorCallback()
 	}
 }
+
 func (w *Window) OnClose(f CloseFunc) {
-	w.onClose = f
+	w.closeCB = f
 	if f != nil {
 		C.setCloseCallback(w.w)
 	} else {
 		C.clearCloseCallback(w.w)
 	}
 }
+
 func (w *Window) OnResize(f ResizeFunc) {
-	w.onResize = f
+	w.resizeCB = f
 	if f != nil {
 		C.setResizeCallback(w.w)
 	} else {
 		C.clearResizeCallback(w.w)
 	}
 }
+
+func (w *Window) OnFramebufferResize(f ResizeFunc) {
+	w.framebufferResizeCB = f
+	if f != nil {
+		C.setFramebufferResizeCallback(w.w)
+	} else {
+		C.clearFramebufferResizeCallback(w.w)
+	}
+}
+
 func (w *Window) OnKey(f KeyFunc) {
-	w.onKey = f
+	w.keyCB = f
 	if f != nil {
 		C.setKeyCallback(w.w)
 	} else {
 		C.clearKeyCallback(w.w)
 	}
 }
+
 func (w *Window) OnChar(f CharFunc) {
-	w.onChar = f
+	w.charCB = f
 	if f != nil {
 		C.setCharCallback(w.w)
 	} else {
 		C.clearCharCallback(w.w)
 	}
 }
+
 func (w *Window) OnMouseMove(f MouseMoveFunc) {
-	w.onMouseMove = f
+	w.mouseMoveCB = f
 	if f != nil {
 		C.setMouseMoveCallback(w.w)
 	} else {
 		C.clearMouseMoveCallback(w.w)
 	}
 }
+
 func (w *Window) OnMouseButton(f MouseButtonFunc) {
-	w.onMouseButton = f
+	w.mouseButtonCB = f
 	if f != nil {
 		C.setMouseButtonCallback(w.w)
 	} else {
@@ -80,36 +101,42 @@ func (w *Window) OnMouseButton(f MouseButtonFunc) {
 func errorCB(err C.int, desc *C.char) {
 	errorCallback(errors.New(C.GoString(desc)))
 }
+
 //export closeCB
-func closeCB(win unsafe.Pointer) C.int {
-	w := (*Window)(C.glfwGetWindowUserPointer((*C.GLFWwindow)(win)))
-	if w.onClose() {
-		return C.GL_TRUE
-	}
-	return C.GL_FALSE
+func closeCB(w unsafe.Pointer) {
+	win(w).closeCB()
 }
+
 //export resizeCB
-func resizeCB(win unsafe.Pointer, width, height C.int) {
-	w := (*Window)(C.glfwGetWindowUserPointer((*C.GLFWwindow)(win)))
-	w.onResize(int(width), int(height))
+func resizeCB(w unsafe.Pointer, width, height C.int) {
+	win(w).resizeCB(int(width), int(height))
 }
+
+//export framebufferResizeCB
+func framebufferResizeCB(w unsafe.Pointer, width, height C.int) {
+	win(w).framebufferResizeCB(int(width), int(height))
+}
+
 //export keyCB
-func keyCB(win unsafe.Pointer, key, action C.int) {
-	w := (*Window)(C.glfwGetWindowUserPointer((*C.GLFWwindow)(win)))
-	w.onKey(int(key), int(action))
+func keyCB(w unsafe.Pointer, key, scancode, action, mods C.int) {
+	win(w).keyCB(int(key), int(scancode), int(action), int(mods))
 }
+
 //export charCB
-func charCB(win unsafe.Pointer, char C.int) {
-	w := (*Window)(C.glfwGetWindowUserPointer((*C.GLFWwindow)(win)))
-	w.onChar(rune(char))
+func charCB(w unsafe.Pointer, char C.uint) {
+	win(w).charCB(rune(char))
 }
+
 //export mouseMoveCB
-func mouseMoveCB(win unsafe.Pointer, x, y C.int) {
-	w := (*Window)(C.glfwGetWindowUserPointer((*C.GLFWwindow)(win)))
-	w.onMouseMove(int(x), int(y))
+func mouseMoveCB(w unsafe.Pointer, x, y C.double) {
+	win(w).mouseMoveCB(float64(x), float64(y))
 }
+
 //export mouseButtonCB
-func mouseButtonCB(win unsafe.Pointer, button, action C.int) {
-	w := (*Window)(C.glfwGetWindowUserPointer((*C.GLFWwindow)(win)))
-	w.onMouseButton(int(button), int(action))
+func mouseButtonCB(w unsafe.Pointer, button, action, mods C.int) {
+	win(w).mouseButtonCB(int(button), int(action), int(mods))
+}
+
+func win(w unsafe.Pointer) *Window {
+	return (*Window)(C.glfwGetWindowUserPointer((*C.GLFWwindow)(w)))
 }

@@ -24,9 +24,8 @@ var (
 	
 	// Currently, messages on this channel are not processed until
 	// WaitEvents returns, which is an indefinite amount of time (if
-	// usually small).  A solution might be found in this feature
-	// request:  http://sourceforge.net/p/glfw/feature-requests/27/
-	windowControl = make(chan interface{})
+	// usually small).
+	closeWindow = make(chan *Window)
 )
 
 func Run() {
@@ -35,12 +34,8 @@ func Run() {
 		glfw.WaitEvents()
 F:		for {
 			select {
-			case c := <-windowControl:
-				switch c := c.(type) {
-				case Close:
-					c.w.w.Destroy()
-					delete(windows, c.w)
-				}
+			case w := <-closeWindow:
+				delete(windows, w)
 			default:
 				break F
 			}

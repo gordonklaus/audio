@@ -38,10 +38,18 @@ func NewWindow(self View) *Window {
 	w.paint = make(chan Paint, 1)
 	w.do = make(chan func())
 	
+	// glfw should fire initial resize events to avoid this duplication (https://github.com/glfw/glfw/issues/62)
+	width, height := w.w.Size()
+	gl.MatrixMode(gl.PROJECTION)
+	gl.LoadIdentity()
+	gl.Ortho(0, gl.Double(width), 0, gl.Double(height), -1, 1)
+	w.Resize(float64(width), float64(height))
+	width, height = w.w.FramebufferSize()
+	gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
+	
 	windows[w] = true
 	w.run()
-	width, height := w.w.Size()
-	w.Resize(float64(width), float64(height))
+	
 	w.Self = self
 	return w
 }
@@ -73,28 +81,25 @@ type MouseButton struct {
 }
 
 func (w *Window) run() {
-	w.w.OnClose(func() bool {
+	w.w.OnClose(func() {
 		w.control <- Close{w}
-		return false
 	})
 	w.w.OnResize(func(width, height int) {
 		w.control <- Resize{float64(width), float64(height)}
 	})
+	w.w.OnFramebufferResize(func(width, height int) {
+		gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
+	})
 	
 	keyEvent := KeyEvent{}
-	w.w.OnKey(func(key, action int) {
+	w.w.OnKey(func(key, scancode, action, mods int) {
 		keyEvent.Key = key
 		keyEvent.Action = action
-		if key >= KeyEscape {
-			keyEvent.Text = ""
-			switch key {
-			case KeyLeftShift, KeyRightShift: keyEvent.Shift = action == Press
-			case KeyLeftControl, KeyRightControl: keyEvent.Ctrl = action == Press
-			case KeyLeftAlt, KeyRightAlt: keyEvent.Alt = action == Press
-			case KeyLeftSuper, KeyRightSuper: keyEvent.Super = action == Press
-			}
-			w.key <- keyEvent
-		} else if action == Release {
+		keyEvent.Shift = mods & glfw.ModShift != 0
+		keyEvent.Ctrl = mods & glfw.ModControl != 0
+		keyEvent.Alt = mods & glfw.ModAlt != 0
+		keyEvent.Super = mods & glfw.ModSuper != 0
+		if key >= KeyEscape || action == Release {
 			keyEvent.Text = ""
 			w.key <- keyEvent
 		}
@@ -107,11 +112,11 @@ func (w *Window) run() {
 	})
 	
 	var pos Point
-	w.w.OnMouseMove(func(x, y int) {
-		pos = Pt(float64(x), w.Height() - float64(y))
+	w.w.OnMouseMove(func(x, y float64) {
+		pos = Pt(x, w.Height() - y)
 		w.mouse <- MouseMove{pos}
 	})
-	w.w.OnMouseButton(func(button, action int) {
+	w.w.OnMouseButton(func(button, action, mods int) {
 		w.mouse <- MouseButton{pos, button, action}
 	})
 	
@@ -135,9 +140,12 @@ func (w *Window) run() {
 			case c := <-w.control:
 				switch c := c.(type) {
 				case Close:
-					windowControl <- c
+					closeWindow <- c.w
 					return
 				case Resize:
+					gl.MatrixMode(gl.PROJECTION)
+					gl.LoadIdentity()
+					gl.Ortho(0, gl.Double(c.w), 0, gl.Double(c.h), -1, 1)
 					w.Self.Resize(c.w, c.h)
 					if w.centralView != nil { w.centralView.Resize(c.w, c.h) }
 				}
@@ -203,14 +211,6 @@ func (w *Window) Repaint() {
 }
 
 func (w Window) repaint() {
-	gl.MatrixMode(gl.PROJECTION)
-	gl.LoadIdentity()
-	width, height := w.Width(), w.Height()
-	gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
-	wid, hei := gl.Double(width)/2, gl.Double(height)/2
-	gl.Ortho(-wid, wid, -hei, hei, -1, 1)
-	gl.Translated(-wid, -hei, 0)
-
 	gl.MatrixMode(gl.MODELVIEW)
 	gl.LoadIdentity()
 	
