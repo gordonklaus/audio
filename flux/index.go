@@ -6,12 +6,13 @@ import (
 
 type indexNode struct {
 	*nodeBase
-	set bool
+	set           bool
 	x, key, inVal *port
-	outVal, ok *port
+	outVal, ok    *port
 }
+
 func newIndexNode(set bool) *indexNode {
-	n := &indexNode{set:set}
+	n := &indexNode{set: set}
 	n.nodeBase = newNodeBase(n)
 	up := n.updateInputType
 	n.x = n.newInput(&types.Var{})
@@ -41,9 +42,12 @@ func (n *indexNode) updateInputType() {
 			}
 			key = types.Typ[types.Int]
 			switch t := t.(type) {
-			case *types.Array: elt = t.Elt
-			case *types.Slice: elt = t.Elt
-			case *types.Map:   key, elt = t.Key, t.Elt
+			case *types.Array:
+				elt = t.Elt
+			case *types.Slice:
+				elt = t.Elt
+			case *types.Map:
+				key, elt = t.Key, t.Elt
 			}
 		}
 	} else {
@@ -58,10 +62,16 @@ func (n *indexNode) updateInputType() {
 			}
 		}
 	}
-	if   t == nil {   t = generic{} }
-	if key == nil { key = generic{} }
-	if elt == nil { elt = generic{} }
-	
+	if t == nil {
+		t = generic{}
+	}
+	if key == nil {
+		key = generic{}
+	}
+	if elt == nil {
+		elt = generic{}
+	}
+
 	if !n.set {
 		switch t.(type) {
 		default:
@@ -79,7 +89,7 @@ func (n *indexNode) updateInputType() {
 			}
 		}
 	}
-	
+
 	n.x.setType(t)
 	n.key.setType(key)
 	if n.set {

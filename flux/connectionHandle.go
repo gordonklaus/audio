@@ -1,13 +1,13 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
+	. "code.google.com/p/gordon-go/gui"
 )
 
 type connectionHandle struct {
 	*ViewBase
-	spec connectionHandleSpecializer
-	conn *connection
+	spec             connectionHandleSpecializer
+	conn             *connection
 	focused, editing bool
 }
 
@@ -88,10 +88,14 @@ func (h *connectionHandle) MousePressed(button int, p Point) {
 	h.spec.updateConnection(p)
 }
 func (h *connectionHandle) MouseDragged(button int, p Point) {
-	if h.editing { h.spec.updateConnection(p) }
+	if h.editing {
+		h.spec.updateConnection(p)
+	}
 }
 func (h *connectionHandle) MouseReleased(button int, p Point) {
-	if h.editing { h.spec.updateConnection(p) }
+	if h.editing {
+		h.spec.updateConnection(p)
+	}
 	h.stopEditing()
 }
 
@@ -100,7 +104,6 @@ func (h connectionHandle) Paint() {
 	// SetPointSize(connectionHandleSize)
 	// DrawPoint(h.Center())
 }
-
 
 type connectionSourceHandle struct {
 	*connectionHandle
@@ -113,12 +116,12 @@ func newConnectionSourceHandle(conn *connection) *connectionSourceHandle {
 	return h
 }
 
-func (h *connectionSourceHandle) saveConnection() { h.savedConnection = h.conn.src }
+func (h *connectionSourceHandle) saveConnection()         { h.savedConnection = h.conn.src }
 func (h *connectionSourceHandle) restoreSavedConnection() { h.conn.setSrc(h.savedConnection) }
 
 func (h connectionSourceHandle) updateConnection(pt Point) {
 	b := h.conn.blk.outermost()
-	if p, ok := ViewAt(b, h.MapTo(pt, b)).(*port); ok &&  h.conn.dst != nil && h.conn.dst.canConnect(p) {
+	if p, ok := ViewAt(b, h.MapTo(pt, b)).(*port); ok && h.conn.dst != nil && h.conn.dst.canConnect(p) {
 		h.conn.setSrc(p)
 	} else {
 		h.conn.dstPt = h.MapTo(pt, h.conn.blk)
@@ -131,10 +134,12 @@ func (h *connectionSourceHandle) moveToNearestConnectablePort(dirKey int) {
 	ports := []View{}
 	for _, n := range b.allNodes() {
 		for _, p := range n.outputs() {
-			if h.conn.dst.canConnect(p) { ports = append(ports, p) }
+			if h.conn.dst.canConnect(p) {
+				ports = append(ports, p)
+			}
 		}
 	}
-	
+
 	v := nearestView(b, ports, h.conn.blk.MapTo(h.conn.srcPt, b), dirKey)
 	if p, ok := v.(*port); ok {
 		h.conn.setSrc(p)
@@ -146,7 +151,7 @@ func (h *connectionSourceHandle) KeyPressed(event KeyEvent) {
 		h.connectionHandle.KeyPressed(event)
 		return
 	}
-	
+
 	if event.Key == KeyDown && h.conn.src != nil {
 		h.conn.src.TakeKeyboardFocus()
 	} else if event.Key == KeyUp {
@@ -155,7 +160,6 @@ func (h *connectionSourceHandle) KeyPressed(event KeyEvent) {
 		h.connectionHandle.KeyPressed(event)
 	}
 }
-
 
 type connectionDestinationHandle struct {
 	*connectionHandle
@@ -168,7 +172,7 @@ func newConnectionDestinationHandle(conn *connection) *connectionDestinationHand
 	return h
 }
 
-func (h *connectionDestinationHandle) saveConnection() { h.savedConnection = h.conn.dst }
+func (h *connectionDestinationHandle) saveConnection()         { h.savedConnection = h.conn.dst }
 func (h *connectionDestinationHandle) restoreSavedConnection() { h.conn.setDst(h.savedConnection) }
 
 func (h connectionDestinationHandle) updateConnection(pt Point) {
@@ -186,10 +190,12 @@ func (h *connectionDestinationHandle) moveToNearestConnectablePort(dirKey int) {
 	ports := []View{}
 	for _, n := range b.allNodes() {
 		for _, p := range n.inputs() {
-			if p.canConnect(h.conn.src) { ports = append(ports, p) }
+			if p.canConnect(h.conn.src) {
+				ports = append(ports, p)
+			}
 		}
 	}
-	
+
 	v := nearestView(b, ports, h.conn.blk.MapTo(h.conn.dstPt, b), dirKey)
 	if p, ok := v.(*port); ok {
 		h.conn.setDst(p)
@@ -201,7 +207,7 @@ func (h *connectionDestinationHandle) KeyPressed(event KeyEvent) {
 		h.connectionHandle.KeyPressed(event)
 		return
 	}
-	
+
 	if event.Key == KeyDown {
 		h.conn.srcHandle.TakeKeyboardFocus()
 	} else if event.Key == KeyUp && h.conn.dst != nil {

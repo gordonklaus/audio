@@ -1,20 +1,21 @@
 package util
 
 import (
+	. "fmt"
+	. "reflect"
 	"sort"
-	."reflect"
-	."fmt"
 )
 
 // data and SortBy taken from go/doc
 type data struct {
-	n int
+	n    int
 	less func(i, j int) bool
 	swap func(i, j int)
 }
-func (d *data) Len() int { return d.n }
+
+func (d *data) Len() int           { return d.n }
 func (d *data) Less(i, j int) bool { return d.less(i, j) }
-func (d *data) Swap(i, j int) { d.swap(i, j) }
+func (d *data) Swap(i, j int)      { d.swap(i, j) }
 
 func SortBy(n int, less func(i, j int) bool, swap func(i, j int)) {
 	sort.Sort(&data{n, less, swap})
@@ -22,9 +23,11 @@ func SortBy(n int, less func(i, j int) bool, swap func(i, j int)) {
 
 func Sort(slice interface{}, key interface{}) {
 	s, k := ValueOf(slice), ValueOf(key)
-	if s.Kind() != Slice && s.Kind() != Array { panic(Sprintf("Can't sort '%#v'.", slice)) }
+	if s.Kind() != Slice && s.Kind() != Array {
+		panic(Sprintf("Can't sort '%#v'.", slice))
+	}
 	elemType := s.Type().Elem()
-	
+
 	var less func(i, j int) bool
 	switch k.Kind() {
 	case String:
@@ -51,8 +54,10 @@ func Sort(slice interface{}, key interface{}) {
 	case Func:
 		less = func(i, j int) bool { return k.Call([]Value{s.Index(i), s.Index(j)})[0].Bool() }
 	}
-	if less == nil { panic(Sprintf("Can't sort using key '%#v'.", key)) }
-	
+	if less == nil {
+		panic(Sprintf("Can't sort using key '%#v'.", key))
+	}
+
 	tmp := New(elemType).Elem()
 	SortBy(s.Len(), less, func(i, j int) {
 		tmp.Set(s.Index(i))

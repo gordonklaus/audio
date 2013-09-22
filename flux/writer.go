@@ -34,18 +34,18 @@ func savePackageName(p *build.Package) {
 			panic(err)
 		}
 	}
-	
+
 	if pkg, ok := pkgs[p.ImportPath]; ok {
 		pkg.Name = p.Name
 	}
-	
+
 	// TODO: update all uses?  could get messy with name conflicts.  not that everything has work perfectly.
 }
 
 func saveType(t *types.NamedType) {
 	w := newWriter(t.Obj)
 	defer w.close()
-	
+
 	u := t.Underlying
 	walkType(u, func(tt *types.NamedType) {
 		if p := tt.Obj.Pkg; p != t.Obj.Pkg {
@@ -55,22 +55,22 @@ func saveType(t *types.NamedType) {
 		}
 	})
 	w.imports()
-	
+
 	w.write("type %s %s", t.Obj.Name, w.typ(u))
 }
 
 func saveFunc(f funcNode) {
 	w := newWriter(f.obj)
 	defer w.close()
-	
+
 	for p := range f.pkgRefs {
 		w.pkgNames[p] = w.name(p.Name)
 	}
 	w.imports()
-	
+
 	w.write("func ")
 	vars := map[*port]string{}
-	
+
 	// name the results first so we can tell if a param connects directly to a result
 	for _, p := range f.outputsNode.ins {
 		vars[p] = w.name(p.obj.Name)
@@ -117,12 +117,12 @@ func saveFunc(f funcNode) {
 }
 
 type writer struct {
-	src *os.File
+	src      *os.File
 	pkgNames map[*types.Package]string
-	names map[string]int
-	seqID int
-	seqIDs map[node]int
-	nindent int
+	names    map[string]int
+	seqID    int
+	seqIDs   map[node]int
+	nindent  int
 }
 
 func newWriter(obj types.Object) *writer {
@@ -133,7 +133,7 @@ func newWriter(obj types.Object) *writer {
 	}
 	w := &writer{src, map[*types.Package]string{}, map[string]int{}, 0, map[node]int{}, 0}
 	fluxObjs[obj] = true
-	
+
 	w.write("package %s\n\n", pkg.Name)
 	for _, obj := range append(types.Universe.Entries, pkg.Scope.Entries...) {
 		w.name(obj.GetName())
@@ -141,15 +141,15 @@ func newWriter(obj types.Object) *writer {
 	return w
 }
 
-func (w *writer) write(format string, a ...interface{}) {	
+func (w *writer) write(format string, a ...interface{}) {
 	fmt.Fprintf(w.src, format, a...)
 }
 
 func (w *writer) indent(format string, a ...interface{}) {
-	w.write(strings.Repeat("\t", w.nindent) + format, a...)
+	w.write(strings.Repeat("\t", w.nindent)+format, a...)
 }
 
-func (w *writer) close() {	
+func (w *writer) close() {
 	w.src.Close()
 }
 
@@ -174,12 +174,14 @@ func (w *writer) block(b *block, vars map[*port]string) {
 		fmt.Println("cyclic!")
 		return
 	}
-	
+
 	vars, varsCopy := map[*port]string{}, vars
-	for k, v := range varsCopy { vars[k] = v }
-	
+	for k, v := range varsCopy {
+		vars[k] = v
+	}
+
 	w.nindent++
-	
+
 	for c := range b.conns {
 		if _, ok := vars[c.dst]; !ok && c.src.node.block() != b {
 			name := w.name("v")
@@ -377,7 +379,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			w.seq(n)
 		}
 	}
-	
+
 	w.nindent--
 }
 
@@ -442,7 +444,9 @@ func (w *writer) assignExisting(m map[string]string) {
 }
 
 func (w writer) name(s string) string {
-	if s == "" || s == "_" { s = "x" }
+	if s == "" || s == "_" {
+		s = "x"
+	}
 	if i, ok := w.names[s]; ok {
 		w.names[s]++
 		return w.name(s + strconv.Itoa(i))
@@ -530,7 +534,9 @@ func (w writer) params(params []*types.Var) string {
 			s += ", "
 		}
 		name := p.Name
-		if name == "" { name = "_" }
+		if name == "" {
+			name = "_"
+		}
 		s += name + " "
 		s += w.typ(p.Type)
 	}
@@ -541,11 +547,11 @@ func (w writer) zero(t types.Type) string {
 	switch t := t.(type) {
 	case *types.Basic:
 		switch {
-		case t.Info & types.IsBoolean != 0:
+		case t.Info&types.IsBoolean != 0:
 			return "false"
-		case t.Info & types.IsNumeric != 0:
+		case t.Info&types.IsNumeric != 0:
 			return "0"
-		case t.Info & types.IsString != 0:
+		case t.Info&types.IsString != 0:
 			return `""`
 		default:
 			return "nil"
@@ -581,11 +587,17 @@ func walkType(t types.Type, op func(*types.NamedType)) {
 	case *types.Chan:
 		walkType(t.Elt, op)
 	case *types.Signature:
-		for _, v := range append(t.Params, t.Results...) { walkType(v.Type, op) }
+		for _, v := range append(t.Params, t.Results...) {
+			walkType(v.Type, op)
+		}
 	case *types.Interface:
-		for _, m := range t.Methods { walkType(m.Type, op) }
+		for _, m := range t.Methods {
+			walkType(m.Type, op)
+		}
 	case *types.Struct:
-		for _, v := range t.Fields { walkType(v.Type, op) }
+		for _, v := range t.Fields {
+			walkType(v.Type, op)
+		}
 	default:
 		panic(fmt.Sprintf("unexpected type %#v\n", t))
 	}
@@ -597,7 +609,7 @@ func fluxPath(obj types.Object) string {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	name := obj.GetName()
 	if !ast.IsExported(name) { // unexported names are suffixed with "-" to avoid possible conflicts on case-insensitive systems
 		name += "-"
@@ -610,5 +622,5 @@ func fluxPath(obj types.Object) string {
 		}
 		name = typeName + "." + name
 	}
-	return filepath.Join(bp.Dir, name + ".flux.go")
+	return filepath.Join(bp.Dir, name+".flux.go")
 }

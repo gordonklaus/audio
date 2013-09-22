@@ -8,14 +8,14 @@ import (
 )
 
 type Window struct {
-	w *C.GLFWwindow
-	closeCB CloseFunc
-	resizeCB ResizeFunc
+	w                   *C.GLFWwindow
+	closeCB             CloseFunc
+	resizeCB            ResizeFunc
 	framebufferResizeCB ResizeFunc
-	keyCB KeyFunc
-	charCB CharFunc
-	mouseMoveCB MouseMoveFunc
-	mouseButtonCB MouseButtonFunc
+	keyCB               KeyFunc
+	charCB              CharFunc
+	mouseMoveCB         MouseMoveFunc
+	mouseButtonCB       MouseButtonFunc
 }
 
 func NewWindow(width, height int, title string) *Window {

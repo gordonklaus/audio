@@ -1,9 +1,9 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
-	."code.google.com/p/gordon-go/util"
 	"code.google.com/p/go.exp/go/types"
+	. "code.google.com/p/gordon-go/gui"
+	. "code.google.com/p/gordon-go/util"
 	"go/token"
 	"math"
 	"math/rand"
@@ -14,12 +14,12 @@ const blockRadius = 16
 
 type block struct {
 	*ViewBase
-	node node
-	nodes map[node]bool
-	conns map[*connection]bool
+	node             node
+	nodes            map[node]bool
+	conns            map[*connection]bool
 	focused, editing bool
-	editingNode node
-	vel map[node]Point
+	editingNode      node
+	vel              map[node]Point
 }
 
 func newBlock(n node) *block {
@@ -135,37 +135,51 @@ func (b *block) nodeOrder() (order []node, ok bool) {
 	visited := Set{}
 	var insertInOrder func(n node, visitedThisCall Set) bool
 	insertInOrder = func(n node, visitedThisCall Set) bool {
-		if visitedThisCall[n] { return false }
+		if visitedThisCall[n] {
+			return false
+		}
 		visitedThisCall[n] = true
-		
+
 		if !visited[n] {
 			visited[n] = true
-conns:		for _, c := range n.inConns() {
+		conns:
+			for _, c := range n.inConns() {
 				if b.conns[c] {
 					src := c.src.node
 					for !b.nodes[src] {
 						src = src.block().node
-						if src == nil { continue conns }
+						if src == nil {
+							continue conns
+						}
 					}
-					if !insertInOrder(src, visitedThisCall.Copy()) { return false }
+					if !insertInOrder(src, visitedThisCall.Copy()) {
+						return false
+					}
 				}
 			}
 			order = append(order, n)
 		}
 		return true
 	}
-	
+
 	endNodes := []node{}
-nx:	for n := range b.nodes {
+nx:
+	for n := range b.nodes {
 		for _, c := range n.outConns() {
-			if c.blk == b { continue nx }
+			if c.blk == b {
+				continue nx
+			}
 		}
 		endNodes = append(endNodes, n)
 	}
-	if len(endNodes) == 0 && len(b.nodes) > 0 { return }
-	
+	if len(endNodes) == 0 && len(b.nodes) > 0 {
+		return
+	}
+
 	for _, n := range endNodes {
-		if !insertInOrder(n, Set{}) { return }
+		if !insertInOrder(n, Set{}) {
+			return
+		}
 	}
 	ok = true
 	return
@@ -185,51 +199,67 @@ func (b *block) stopEditing() {
 // TODO: consider using an EA to lay out nodes
 func (b *block) update() (updated bool) {
 	for n := range b.nodes {
-		if n, ok := n.(interface { update() bool }); ok {
+		if n, ok := n.(interface {
+			update() bool
+		}); ok {
 			updated = n.update() || updated
 		}
 	}
-	
+
 	const (
-		nodeCenterCoef = .5
-		nodeSep = 16
-		nodeSepCoef = 4
-		nodeConnSep = 8
+		nodeCenterCoef  = .5
+		nodeSep         = 16
+		nodeSepCoef     = 4
+		nodeConnSep     = 8
 		nodeConnSepCoef = 1
-		connLen = 32
-		connLenFB = -256
-		connLenCoef = .33
-		connConnSep = 4
+		connLen         = 32
+		connLenFB       = -256
+		connLenCoef     = .33
+		connConnSep     = 4
 		connConnSepCoef = 1
-		topSpeed = 200
-		speedCompress = 1
-		dragCoef = .85
+		topSpeed        = 200
+		speedCompress   = 1
+		dragCoef        = .85
 	)
-	
+
 	addVel := func(n node, dv Point) {
 		n.block().vel[n] = n.block().vel[n].Add(dv)
 	}
 	subVel := func(n node, dv Point) {
 		n.block().vel[n] = n.block().vel[n].Sub(dv)
 	}
-	
+
 	for n1 := range b.nodes {
 		for n2 := range b.nodes {
-			if n2 == n1 { continue }
+			if n2 == n1 {
+				continue
+			}
 			dir := n1.MapToParent(n1.Center()).Sub(n2.MapToParent(n2.Center()))
 			if dir == ZP {
 				dir = Pt(rand.NormFloat64(), rand.NormFloat64())
 			}
-			d := dir.Len() - n1.Size().Add(n2.Size()).Len() / 2 - nodeSep
-			if d >= 0 { continue }
-			addVel(n1, dir.Mul(-nodeSepCoef * d / dir.Len()))
+			d := dir.Len() - n1.Size().Add(n2.Size()).Len()/2 - nodeSep
+			if d >= 0 {
+				continue
+			}
+			addVel(n1, dir.Mul(-nodeSepCoef*d/dir.Len()))
 		}
 		for b := b; b != nil; b = b.outer() {
-conns:
+		conns:
 			for c := range b.conns {
-				if c.src == nil || c.dst == nil { continue }
-				for n := c.src.node; n.block() != nil; n = n.block().node { if n == n1 { continue conns } }
-				for n := c.dst.node; n.block() != nil; n = n.block().node { if n == n1 { continue conns } }
+				if c.src == nil || c.dst == nil {
+					continue
+				}
+				for n := c.src.node; n.block() != nil; n = n.block().node {
+					if n == n1 {
+						continue conns
+					}
+				}
+				for n := c.dst.node; n.block() != nil; n = n.block().node {
+					if n == n1 {
+						continue conns
+					}
+				}
 				x := c.srcPt
 				y := c.dstPt
 				p := n1.MapToParent(n1.Center())
@@ -237,8 +267,10 @@ conns:
 				if dir == ZP {
 					dir = Pt(rand.NormFloat64(), rand.NormFloat64())
 				}
-				d := dir.Len() - n1.Size().Len() / 2 - nodeConnSep
-				if d > 0 { continue }
+				d := dir.Len() - n1.Size().Len()/2 - nodeConnSep
+				if d > 0 {
+					continue
+				}
 				delta := dir.Mul(-nodeConnSepCoef * d / dir.Len())
 				addVel(n1, delta)
 				subVel(c.src.node, delta)
@@ -247,7 +279,9 @@ conns:
 		}
 	}
 	for c := range b.conns {
-		if c.src == nil || c.dst == nil { continue }
+		if c.src == nil || c.dst == nil {
+			continue
+		}
 		// for b := b; b != nil; b = b.outer() {
 		// 	for c2 := range b.conns {
 		// 		if c == c2 ||
@@ -279,18 +313,24 @@ conns:
 		if c.feedback {
 			connLen = connLenFB
 		}
-		d.X -= connLen + math.Abs(d.Y) / 2 // the nonlinearity abs(d.Y) can contribute to oscillations
+		d.X -= connLen + math.Abs(d.Y)/2 // the nonlinearity abs(d.Y) can contribute to oscillations
 		if d.X < 0 {
 			d.X *= -d.X
 		}
 		d = d.Mul(connLenCoef)
-		
-		srcNode := c.src.node; for srcNode.block() != b { srcNode = srcNode.block().node }
-		dstNode := c.dst.node; for dstNode.block() != b { dstNode = dstNode.block().node }
+
+		srcNode := c.src.node
+		for srcNode.block() != b {
+			srcNode = srcNode.block().node
+		}
+		dstNode := c.dst.node
+		for dstNode.block() != b {
+			dstNode = dstNode.block().node
+		}
 		addVel(srcNode, d)
 		subVel(dstNode, d)
 	}
-	
+
 	center := ZP
 	for n := range b.nodes {
 		center = center.Add(n.Position())
@@ -300,14 +340,16 @@ conns:
 		addVel(n, center.Sub(n.Position().Mul(nodeCenterCoef)))
 		l := b.vel[n].Len()
 		if l > 0 {
-			b.vel[n] = b.vel[n].Mul(math.Tanh(speedCompress * l / topSpeed) * topSpeed / l)
+			b.vel[n] = b.vel[n].Mul(math.Tanh(speedCompress*l/topSpeed) * topSpeed / l)
 		}
 	}
-	
+
 	meanVel := ZP
 	nVel := 0.0
 	for n := range b.nodes {
-		if _, ok := n.(*portsNode); ok { continue }
+		if _, ok := n.(*portsNode); ok {
+			continue
+		}
 		b.vel[n] = b.vel[n].Mul(dragCoef)
 		meanVel = meanVel.Add(b.vel[n])
 		nVel++
@@ -318,7 +360,9 @@ conns:
 		meanVel = meanVel.Div(nVel)
 		meanSpeed := 0.0
 		for n := range b.nodes {
-			if _, ok := n.(*portsNode); ok { continue }
+			if _, ok := n.(*portsNode); ok {
+				continue
+			}
 			subVel(n, meanVel)
 			meanSpeed += b.vel[n].Len()
 		}
@@ -330,14 +374,14 @@ conns:
 		} else {
 			updated = true
 		}
-		
-		dt := math.Min(1.0 / fps, 100 / meanSpeed) // slow down time at high speeds to avoid oscillation
+
+		dt := math.Min(1.0/fps, 100/meanSpeed) // slow down time at high speeds to avoid oscillation
 		for n := range b.nodes {
 			b.vel[n] = b.vel[n].Mul(.5 + rand.Float64()) // a little noise to break up small oscillations
 			n.Move(n.Position().Add(b.vel[n].Mul(dt)).Sub(center))
 		}
 	}
-	
+
 	rect := ZR
 	for n := range b.nodes {
 		r := n.MapRectToParent(n.Rect())
@@ -368,17 +412,17 @@ conns:
 	}
 	b.Resize(rect.Dx(), rect.Dy())
 	b.Pan(rect.Min)
-	
+
 	return true
 }
 
 func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) {
-	dir := map[int]Point{KeyLeft:{-1, 0}, KeyRight:{1, 0}, KeyUp:{0, 1}, KeyDown:{0, -1}}[dirKey]
+	dir := map[int]Point{KeyLeft: {-1, 0}, KeyRight: {1, 0}, KeyUp: {0, 1}, KeyDown: {0, -1}}[dirKey]
 	best := 0.0
 	for _, v := range views {
 		d := v.MapTo(v.Center(), parent).Sub(p)
-		score := (dir.X * d.X + dir.Y * d.Y) / (d.X * d.X + d.Y * d.Y)
-		if (score > best) {
+		score := (dir.X*d.X + dir.Y*d.Y) / (d.X*d.X + d.Y*d.Y)
+		if score > best {
 			best = score
 			nearest = v
 		}
@@ -398,7 +442,9 @@ func (b *block) focusNearestView(v View, dirKey int) {
 		views = append(views, c)
 	}
 	nearest := nearestView(b, views, v.MapTo(v.Center(), b), dirKey)
-	if nearest != nil { nearest.TakeKeyboardFocus() }
+	if nearest != nil {
+		nearest.TakeKeyboardFocus()
+	}
 }
 
 func (b *block) TookKeyboardFocus() { b.focused = true; b.Repaint() }
@@ -410,9 +456,16 @@ func (b *block) KeyPressed(event KeyEvent) {
 		outermost := b.outermost()
 		if b.editing {
 			var v View = b.editingNode
-			if v == nil { v = b }
-			views := []View{}; for _, n := range outermost.allNodes() { views = append(views, n) }
-			if n := nearestView(b, views, v.MapTo(v.Center(), outermost), event.Key); n != nil { b.editingNode = n.(node) }
+			if v == nil {
+				v = b
+			}
+			views := []View{}
+			for _, n := range outermost.allNodes() {
+				views = append(views, n)
+			}
+			if n := nearestView(b, views, v.MapTo(v.Center(), outermost), event.Key); n != nil {
+				b.editingNode = n.(node)
+			}
 		} else {
 			outermost.focusNearestView(b, event.Key)
 		}
@@ -448,10 +501,10 @@ func (b *block) KeyPressed(event KeyEvent) {
 			foc := View(b)
 			in, out := v.inConns(), v.outConns()
 			if len(in) > 0 {
-				foc = in[len(in) - 1].src.node
+				foc = in[len(in)-1].src.node
 			}
 			if (len(in) == 0 || event.Key == KeyDelete) && len(out) > 0 {
-				foc = out[len(out) - 1].dst.node
+				foc = out[len(out)-1].dst.node
 			}
 			for _, c := range append(in, out...) {
 				c.blk.removeConnection(c)
@@ -493,8 +546,10 @@ func (b *block) KeyPressed(event KeyEvent) {
 				text := event.Text
 				kind := token.INT
 				switch event.Text {
-				case "\"": kind, text = token.STRING, ""
-				case "'":  kind = token.CHAR
+				case "\"":
+					kind, text = token.STRING, ""
+				case "'":
+					kind = token.CHAR
 				}
 				n := newBasicLiteralNode(kind)
 				b.addNode(n)
@@ -524,25 +579,37 @@ func newNode(b *block, obj types.Object) {
 	switch obj := obj.(type) {
 	case special:
 		switch obj.name {
-		case "[]":                        n = newIndexNode(false)
-		case "[]=":                       n = newIndexNode(true)
-		case "addr":                      n = newValueNode(nil, true, false, false)
-		case "if":                        n = newIfNode()
-		case "indirect":                  n = newValueNode(nil, false, true, false)
-		case "loop":                      n = newLoopNode()
-		case "typeAssert":                n = newTypeAssertNode()
+		case "[]":
+			n = newIndexNode(false)
+		case "[]=":
+			n = newIndexNode(true)
+		case "addr":
+			n = newValueNode(nil, true, false, false)
+		case "if":
+			n = newIfNode()
+		case "indirect":
+			n = newValueNode(nil, false, true, false)
+		case "loop":
+			n = newLoopNode()
+		case "typeAssert":
+			n = newTypeAssertNode()
 		}
 	case *types.Func, method:
-		switch unicode.IsLetter([]rune(obj.GetName())[0]) {
-		case true:                        n = newCallNode(obj)
-		case false:                       n = newOperatorNode(obj)
+		if unicode.IsLetter([]rune(obj.GetName())[0]) {
+			n = newCallNode(obj)
+		} else {
+			n = newOperatorNode(obj)
 		}
-	case *types.Var, *types.Const, field: n = newValueNode(obj, false, false, false)
-	default:                              panic("bad obj")
+	case *types.Var, *types.Const, field:
+		n = newValueNode(obj, false, false, false)
+	default:
+		panic("bad obj")
 	}
 	b.addNode(n)
 	n.MoveCenter(b.Center())
-	if nn, ok := n.(interface{editType()}); ok {
+	if nn, ok := n.(interface {
+		editType()
+	}); ok {
 		nn.editType()
 	} else {
 		n.TakeKeyboardFocus()
@@ -560,10 +627,10 @@ func (b block) Paint() {
 	{
 		rect := b.Rect()
 		l, r, b, t := rect.Min.X, rect.Max.X, rect.Min.Y, rect.Max.Y
-		lb, bl := Pt(l, b + blockRadius), Pt(l + blockRadius, b)
-		rb, br := Pt(r, b + blockRadius), Pt(r - blockRadius, b)
-		rt, tr := Pt(r, t - blockRadius), Pt(r - blockRadius, t)
-		lt, tl := Pt(l, t - blockRadius), Pt(l + blockRadius, t)
+		lb, bl := Pt(l, b+blockRadius), Pt(l+blockRadius, b)
+		rb, br := Pt(r, b+blockRadius), Pt(r-blockRadius, b)
+		rt, tr := Pt(r, t-blockRadius), Pt(r-blockRadius, t)
+		lt, tl := Pt(l, t-blockRadius), Pt(l+blockRadius, t)
 		steps := int(math.Trunc(2 * math.Pi * blockRadius))
 		DrawLine(bl, br)
 		DrawQuadratic([3]Point{br, Pt(r, b), rb}, steps)
@@ -576,17 +643,16 @@ func (b block) Paint() {
 	}
 }
 
-
 type portsNode struct {
 	*nodeBase
-	out bool
+	out      bool
 	editable bool
 }
 
-func newInputsNode() *portsNode { return newPortsNode(false) }
+func newInputsNode() *portsNode  { return newPortsNode(false) }
 func newOutputsNode() *portsNode { return newPortsNode(true) }
 func newPortsNode(out bool) *portsNode {
-	n := &portsNode{out:out}
+	n := &portsNode{out: out}
 	n.nodeBase = newNodeBase(n)
 	return n
 }

@@ -1,31 +1,31 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
 	"code.google.com/p/go.exp/go/types"
+	. "code.google.com/p/gordon-go/gui"
 )
 
 type port struct {
 	*ViewBase
-	out bool
-	node node
-	obj *types.Var
-	valView *typeView
-	conns []*connection
-	focused bool
+	out          bool
+	node         node
+	obj          *types.Var
+	valView      *typeView
+	conns        []*connection
+	focused      bool
 	connsChanged func()
 }
 
 const portSize = 11
 
-func newInput(n node, v *types.Var) *port { return newPort(false, n, v) }
+func newInput(n node, v *types.Var) *port  { return newPort(false, n, v) }
 func newOutput(n node, v *types.Var) *port { return newPort(true, n, v) }
 func newPort(out bool, n node, v *types.Var) *port {
-	p := &port{out:out, node:n, obj:v}
+	p := &port{out: out, node: n, obj: v}
 	p.ViewBase = NewView(p)
 	p.valView = newValueView(v)
 	p.valView.Hide()
-	p.connsChanged = func(){}
+	p.connsChanged = func() {}
 	p.AddChild(p.valView)
 	p.Resize(portSize, portSize)
 	p.Pan(Pt(portSize, portSize).Div(-2))
@@ -36,9 +36,9 @@ func newPort(out bool, n node, v *types.Var) *port {
 func (p *port) setType(t types.Type) {
 	p.valView.setType(t)
 	if p.out {
-		p.valView.Move(Pt(12, -p.valView.Height() / 2))
+		p.valView.Move(Pt(12, -p.valView.Height()/2))
 	} else {
-		p.valView.Move(Pt(-p.valView.Width() - 12, -p.valView.Height() / 2))
+		p.valView.Move(Pt(-p.valView.Width()-12, -p.valView.Height()/2))
 	}
 }
 
@@ -50,7 +50,7 @@ func (p port) canConnect(q *port) bool {
 	if p.out == q.out {
 		return false
 	}
-	
+
 	src, dst := q.node, p.node
 	if p.out {
 		src, dst = dst, src
@@ -68,11 +68,11 @@ loop:
 			}
 		}
 	}
-	
+
 	if start == end {
 		return true
 	}
-	
+
 	for _, c := range start.outConns() {
 		if c.dst == nil {
 			continue
@@ -81,7 +81,7 @@ loop:
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -107,16 +107,16 @@ func (p *port) KeyPressed(event KeyEvent) {
 		return
 	}
 	if p.obj.Type != seqType &&
-	  (p.out && event.Key == KeyRight && len(p.conns) > 0 ||
-	   !p.out && event.Key == KeyLeft && len(p.conns) > 0) {
-		p.conns[len(p.conns) - 1].TakeKeyboardFocus()
+		(p.out && event.Key == KeyRight && len(p.conns) > 0 ||
+			!p.out && event.Key == KeyLeft && len(p.conns) > 0) {
+		p.conns[len(p.conns)-1].TakeKeyboardFocus()
 		return
 	}
 	if p.obj.Type == seqType && event.Key == KeyDown && len(p.conns) > 0 {
-		p.conns[len(p.conns) - 1].TakeKeyboardFocus()
+		p.conns[len(p.conns)-1].TakeKeyboardFocus()
 		return
 	}
-	
+
 	switch event.Key {
 	case KeyEnter:
 		c := newConnection()
@@ -130,13 +130,15 @@ func (p *port) KeyPressed(event KeyEvent) {
 		p.node.block().outermost().focusNearestView(p, event.Key)
 	case KeyBackspace, KeyDelete:
 		if p.out && event.Key == KeyBackspace || !p.out && event.Key == KeyDelete {
-			if n, ok := p.node.(interface{removePort(*port)}); ok {
+			if n, ok := p.node.(interface {
+				removePort(*port)
+			}); ok {
 				n.removePort(p)
 			} else {
 				p.node.TakeKeyboardFocus()
 			}
 		} else if len(p.conns) > 0 {
-			p.conns[len(p.conns) - 1].TakeKeyboardFocus()
+			p.conns[len(p.conns)-1].TakeKeyboardFocus()
 		}
 	case KeyEscape:
 		p.node.TakeKeyboardFocus()
@@ -157,7 +159,7 @@ func (p *port) MousePressed(button int, pt Point) {
 	}
 	c.startEditing()
 }
-func (p port) MouseDragged(button int, pt Point) {}
+func (p port) MouseDragged(button int, pt Point)  {}
 func (p port) MouseReleased(button int, pt Point) {}
 
 func (p port) Paint() {

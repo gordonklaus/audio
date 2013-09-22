@@ -13,11 +13,11 @@ func newOperatorNode(obj types.Object) *operatorNode {
 	n := &operatorNode{op: obj.GetName()}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText(n.op)
-	
+
 	n.newInput(&types.Var{})
 	n.newInput(&types.Var{})
 	n.newOutput(&types.Var{})
-	
+
 	switch n.op {
 	case "!":
 		n.removePortBase(n.ins[1])
@@ -35,7 +35,7 @@ func newOperatorNode(obj types.Object) *operatorNode {
 		}
 		f()
 	case "<<", ">>":
-		
+
 	case "==", "!=", "<", "<=", ">", ">=":
 		f := func() {
 			t := combineInputTypes(ins(n))
@@ -73,5 +73,5 @@ func combineInputTypes(p []*port) (t types.Type) {
 
 func isUntyped(t types.Type) bool {
 	b, ok := t.(*types.Basic)
-	return ok && b.Info & types.IsUntyped != 0
+	return ok && b.Info&types.IsUntyped != 0
 }

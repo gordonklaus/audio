@@ -1,19 +1,19 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
 	"code.google.com/p/go.exp/go/types"
+	. "code.google.com/p/gordon-go/gui"
 )
 
 type ifNode struct {
 	*ViewBase
 	AggregateMouseHandler
-	blk *block
-	input *port
+	blk           *block
+	input         *port
 	seqIn, seqOut *port
-	falseblk *block
-	trueblk *block
-	focused bool
+	falseblk      *block
+	trueblk       *block
+	focused       bool
 }
 
 func newIfNode() *ifNode {
@@ -26,7 +26,7 @@ func newIfNode() *ifNode {
 	n.AddChild(n.input)
 	n.AddChild(n.falseblk)
 	n.AddChild(n.trueblk)
-	
+
 	n.seqIn = newInput(n, &types.Var{Name: "seq", Type: seqType})
 	n.seqIn.MoveCenter(Pt(-portSize, 0))
 	n.AddChild(n.seqIn)
@@ -39,10 +39,10 @@ func newIfNode() *ifNode {
 	return n
 }
 
-func (n ifNode) block() *block { return n.blk }
+func (n ifNode) block() *block      { return n.blk }
 func (n *ifNode) setBlock(b *block) { n.blk = b }
-func (n ifNode) inputs() []*port { return []*port{n.seqIn, n.input} }
-func (n ifNode) outputs() []*port { return []*port{n.seqOut} }
+func (n ifNode) inputs() []*port    { return []*port{n.seqIn, n.input} }
+func (n ifNode) outputs() []*port   { return []*port{n.seqOut} }
 
 func (n ifNode) inConns() []*connection {
 	return append(append(append(n.input.conns, n.seqIn.conns...), n.falseblk.inConns()...), n.trueblk.inConns()...)
@@ -57,7 +57,7 @@ func (n *ifNode) update() bool {
 	if f && t {
 		return false
 	}
-	n.falseblk.Move(Pt(-blockRadius, -4 - n.falseblk.Height()))
+	n.falseblk.Move(Pt(-blockRadius, -4-n.falseblk.Height()))
 	n.trueblk.Move(Pt(-blockRadius, 4))
 	ResizeToFit(n, 0)
 	return true
@@ -89,7 +89,7 @@ func (n *ifNode) KeyPressed(event KeyEvent) {
 }
 
 func (n ifNode) Paint() {
-	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
+	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
 	DrawLine(n.input.MapToParent(n.input.Center()), n.seqOut.MapToParent(n.seqOut.Center()))
 	DrawLine(Pt(0, -4), Pt(0, 4))
 }

@@ -1,8 +1,8 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
 	"code.google.com/p/go.exp/go/types"
+	. "code.google.com/p/gordon-go/gui"
 	"fmt"
 	"time"
 )
@@ -10,16 +10,16 @@ import (
 type funcNode struct {
 	*ViewBase
 	AggregateMouseHandler
-	obj types.Object
-	pkgRefs map[*types.Package]int
+	obj                     types.Object
+	pkgRefs                 map[*types.Package]int
 	inputsNode, outputsNode *portsNode
-	funcblk *block
-	awaken, stop chan bool
-	done func()
+	funcblk                 *block
+	awaken, stop            chan bool
+	done                    func()
 }
 
 func newFuncNode(obj types.Object) *funcNode {
-	n := &funcNode{obj:obj}
+	n := &funcNode{obj: obj}
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.pkgRefs = map[*types.Package]int{}
@@ -33,14 +33,14 @@ func newFuncNode(obj types.Object) *funcNode {
 	n.AddChild(n.funcblk)
 	n.awaken = make(chan bool, 1)
 	n.stop = make(chan bool, 1)
-	
+
 	if !loadFunc(n) {
 		if m, ok := obj.(method); ok {
 			n.inputsNode.newOutput(m.Type.Recv)
 		}
 		saveFunc(*n)
 	}
-	
+
 	return n
 }
 
@@ -93,11 +93,11 @@ func (n *funcNode) subPkgRef(x interface{}) {
 	}
 }
 
-func (n funcNode) block() *block { return nil }
-func (n funcNode) setBlock(b *block) {}
-func (n funcNode) inputs() []*port { return nil }
-func (n funcNode) outputs() []*port { return nil }
-func (n funcNode) inConns() []*connection { return nil }
+func (n funcNode) block() *block           { return nil }
+func (n funcNode) setBlock(b *block)       {}
+func (n funcNode) inputs() []*port         { return nil }
+func (n funcNode) outputs() []*port        { return nil }
+func (n funcNode) inConns() []*connection  { return nil }
 func (n funcNode) outConns() []*connection { return nil }
 
 const fps = 60

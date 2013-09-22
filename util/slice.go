@@ -1,6 +1,6 @@
 package util
 
-import ."reflect"
+import . "reflect"
 
 func SliceContains(slice interface{}, value interface{}) bool {
 	s := ValueOf(slice)
@@ -23,7 +23,7 @@ func SliceRemove(slicePtr interface{}, value interface{}) {
 	s := ValueOf(slicePtr).Elem()
 	for i := 0; i < s.Len(); i++ {
 		if DeepEqual(s.Index(i).Interface(), value) {
-			s.Set(AppendSlice(s.Slice(0, i), s.Slice(i + 1, s.Len())))
+			s.Set(AppendSlice(s.Slice(0, i), s.Slice(i+1, s.Len())))
 			return
 		}
 	}

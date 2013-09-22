@@ -1,16 +1,16 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
 	"code.google.com/p/go.exp/go/types"
+	. "code.google.com/p/gordon-go/gui"
 )
 
 type valueNode struct {
 	*nodeBase
-	obj types.Object
+	obj                 types.Object
 	addr, indirect, set bool
-	x *port // the value to be read from or written to (input)
-	y *port // the result of the read (output) or the argument to write (input)
+	x                   *port // the value to be read from or written to (input)
+	y                   *port // the result of the read (output) or the argument to write (input)
 }
 
 func newValueNode(obj types.Object, addr, indirect, set bool) *valueNode {
@@ -50,7 +50,7 @@ func (n *valueNode) reform() {
 		text += "x"
 	}
 	n.text.SetText(text)
-	
+
 	if n.set {
 		if n.y.out {
 			n.removePortBase(n.y)
@@ -61,7 +61,7 @@ func (n *valueNode) reform() {
 		}
 	} else {
 		if !n.y.out {
-			n.y.connsChanged = func(){}
+			n.y.connsChanged = func() {}
 			n.removePortBase(n.y)
 			n.y = n.newOutput(&types.Var{})
 		}

@@ -17,10 +17,10 @@ type MouseMoveFunc func(x, y float64)
 type MouseButtonFunc func(button, action, mods int)
 
 const (
-	ModShift = 1
+	ModShift   = 1
 	ModControl = 2
-	ModAlt = 4
-	ModSuper = 8
+	ModAlt     = 4
+	ModSuper   = 8
 )
 
 var errorCallback ErrorFunc

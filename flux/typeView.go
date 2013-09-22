@@ -1,21 +1,21 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
 	"code.google.com/p/go.exp/go/types"
+	. "code.google.com/p/gordon-go/gui"
 	"fmt"
 	"math"
 )
 
 type typeView struct {
 	*ViewBase
-	typ *types.Type
-	mode browserMode
-	text Text
-	childTypes struct{left, right []*typeView}
-	focused bool
-	done func()
-	
+	typ        *types.Type
+	mode       browserMode
+	text       Text
+	childTypes struct{ left, right []*typeView }
+	focused    bool
+	done       func()
+
 	// typeView is also used as a valueView, in which case this is non-nil
 	nameText *TextBase
 }
@@ -39,7 +39,7 @@ func newValueView(val types.Object) *typeView {
 		t, name = &val.Type, &val.Name
 	case method:
 		m := types.Type(val.Type)
-	    t, name = &m, &val.Name
+		t, name = &m, &val.Name
 	case field:
 		t = &val.Type
 		if !val.IsAnonymous {
@@ -88,55 +88,84 @@ func (v *typeView) setType(t types.Type) {
 		v.childTypes.right = []*typeView{newTypeView(&t.Elt)}
 	case *types.Struct:
 		s = "struct"
-		for _, f := range t.Fields { v.childTypes.right = append(v.childTypes.right, newValueView(field{nil, f, nil})) }
+		for _, f := range t.Fields {
+			v.childTypes.right = append(v.childTypes.right, newValueView(field{nil, f, nil}))
+		}
 	case *types.Signature:
 		s = "func"
-		for _, val := range t.Params { v.childTypes.left = append(v.childTypes.left, newValueView(val)) }
-		for _, val := range t.Results { v.childTypes.right = append(v.childTypes.right, newValueView(val)) }
+		for _, val := range t.Params {
+			v.childTypes.left = append(v.childTypes.left, newValueView(val))
+		}
+		for _, val := range t.Results {
+			v.childTypes.right = append(v.childTypes.right, newValueView(val))
+		}
 	case *types.Interface:
 		s = "interface"
-		for _, m := range t.Methods { v.childTypes.right = append(v.childTypes.right, newValueView(method{nil, m})) }
+		for _, m := range t.Methods {
+			v.childTypes.right = append(v.childTypes.right, newValueView(method{nil, m}))
+		}
 	}
 	v.text.SetText(s)
-	
-	for len(v.Children()) > 0 { v.RemoveChild(v.Children()[0]) }
+
+	for len(v.Children()) > 0 {
+		v.RemoveChild(v.Children()[0])
+	}
 	v.AddChild(v.text)
-	for _, c := range append(v.childTypes.left, v.childTypes.right...) { v.AddChild(c) }
-	if v.nameText != nil { v.AddChild(v.nameText) }
-	
+	for _, c := range append(v.childTypes.left, v.childTypes.right...) {
+		v.AddChild(c)
+	}
+	if v.nameText != nil {
+		v.AddChild(v.nameText)
+	}
+
 	if _, ok := t.(*types.Pointer); ok && v.mode == compositeOrPtrType {
 		v.childTypes.right[0].mode = compositeType
 	}
-	
+
 	v.reform()
 }
 
-func (v *typeView) reform() {	
+func (v *typeView) reform() {
 	const spacing = 2
 	maxWidth := float64(0)
-	h1 := float64(0); for i, c := range v.childTypes.left { h1 += c.Height(); if i > 0 { h1 += spacing }; if w := c.Width(); w > maxWidth { maxWidth = w } }
-	h2 := float64(0); for i, c := range v.childTypes.right { h2 += c.Height(); if i > 0 { h2 += spacing } }
+	h1 := float64(0)
+	for i, c := range v.childTypes.left {
+		h1 += c.Height()
+		if i > 0 {
+			h1 += spacing
+		}
+		if w := c.Width(); w > maxWidth {
+			maxWidth = w
+		}
+	}
+	h2 := float64(0)
+	for i, c := range v.childTypes.right {
+		h2 += c.Height()
+		if i > 0 {
+			h2 += spacing
+		}
+	}
 	x := 0.0
 	if v.nameText != nil {
-		v.nameText.Move(Pt(0, (math.Max(h1, h2) - v.nameText.Height()) / 2))
+		v.nameText.Move(Pt(0, (math.Max(h1, h2)-v.nameText.Height())/2))
 		x += v.nameText.Width() + spacing
 	}
-	y := math.Max(0, h2 - h1) / 2
+	y := math.Max(0, h2-h1) / 2
 	for i := len(v.childTypes.left) - 1; i >= 0; i-- {
 		c := v.childTypes.left[i]
-		c.Move(Pt(x + maxWidth - c.Width(), y))
+		c.Move(Pt(x+maxWidth-c.Width(), y))
 		y += c.Height() + spacing
 	}
 	x += maxWidth + spacing
-	v.text.Move(Pt(x, (math.Max(h1, h2) - v.text.Height()) / 2))
+	v.text.Move(Pt(x, (math.Max(h1, h2)-v.text.Height())/2))
 	x += v.text.Width() + spacing
-	y = math.Max(0, h1 - h2) / 2
+	y = math.Max(0, h1-h2) / 2
 	for i := len(v.childTypes.right) - 1; i >= 0; i-- {
 		c := v.childTypes.right[i]
 		c.Move(Pt(x, y))
 		y += c.Height() + spacing
 	}
-	
+
 	ResizeToFit(v, 2)
 	if p, ok := v.Parent().(*typeView); ok {
 		p.reform()
@@ -190,7 +219,9 @@ func (v *typeView) editType(done func()) {
 	case *types.Pointer, *types.Array, *types.Slice, *types.Chan:
 		if elt := v.childTypes.right[0]; *elt.typ == nil {
 			elt.editType(func() {
-				if *elt.typ == nil { v.setType(nil) }
+				if *elt.typ == nil {
+					v.setType(nil)
+				}
 				v.editType(done)
 			})
 		} else {
@@ -202,12 +233,16 @@ func (v *typeView) editType(done func()) {
 		switch types.Type(nil) {
 		case *key.typ:
 			key.editType(func() {
-				if *key.typ == nil { v.setType(nil) }
+				if *key.typ == nil {
+					v.setType(nil)
+				}
 				v.editType(done)
 			})
 		case *val.typ:
 			val.editType(func() {
-				if *val.typ == nil { key.setType(nil) }
+				if *val.typ == nil {
+					key.setType(nil)
+				}
 				v.editType(done)
 			})
 		default:
@@ -523,13 +558,12 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 }
 
 func (v typeView) Paint() {
-	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[v.focused])
+	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[v.focused])
 	SetLineWidth(1)
 	DrawRect(v.Rect())
 }
 
-
-type generic struct { types.Type }
+type generic struct{ types.Type }
 
 func underlying(t types.Type) types.Type {
 	if nt, ok := t.(*types.NamedType); ok {

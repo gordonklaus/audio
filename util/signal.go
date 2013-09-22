@@ -29,10 +29,9 @@ func (s *Signal) Emit(args ...interface{}) {
 	}
 }
 
-
 type SignalConnection struct {
-	signal *Signal
-	active bool
+	signal   *Signal
+	active   bool
 	callback func(...interface{})
 }
 
@@ -46,5 +45,5 @@ func (c *SignalConnection) Disconnect() {
 	}
 }
 
-func (c *SignalConnection) Block() { c.active = false }
+func (c *SignalConnection) Block()   { c.active = false }
 func (c *SignalConnection) Unblock() { c.active = true }

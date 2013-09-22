@@ -47,11 +47,11 @@ func loadFunc(f *funcNode) bool {
 }
 
 type reader struct {
-	pkg *types.Package
+	pkg      *types.Package
 	pkgNames map[string]*types.Package
-	vars map[string][]*port // there is a bug here; names can be reused between disjoint blocks; vars should be passed as a param and copied, as in writer
+	vars     map[string][]*port // there is a bug here; names can be reused between disjoint blocks; vars should be passed as a param and copied, as in writer
 	varTypes map[string]types.Type
-	cmap ast.CommentMap
+	cmap     ast.CommentMap
 	seqNodes map[int]node
 }
 
@@ -286,10 +286,10 @@ func (r *reader) obj(x ast.Expr) types.Object {
 	switch x := x.(type) {
 	case *ast.Ident:
 		for s := r.pkg.Scope; s != nil; s = s.Outer {
-			 if obj := s.Lookup(x.Name); obj != nil {
-				 return obj
-			 }
-		 }
+			if obj := s.Lookup(x.Name); obj != nil {
+				return obj
+			}
+		}
 	case *ast.SelectorExpr:
 		// TODO: Type.Method and pkg.Type.Method
 		n1 := name(x.X)

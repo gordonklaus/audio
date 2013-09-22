@@ -1,8 +1,8 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
 	"code.google.com/p/go.exp/go/types"
+	. "code.google.com/p/gordon-go/gui"
 )
 
 type typeAssertNode struct {
@@ -39,7 +39,7 @@ func (n *typeAssertNode) setType(t types.Type) {
 	n.outs[0].setType(t)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
-		n.typ.MoveCenter(Pt(0, n.Rect().Max.Y + n.typ.Height() / 2))
+		n.typ.MoveCenter(Pt(0, n.Rect().Max.Y+n.typ.Height()/2))
 		n.TakeKeyboardFocus()
 	}
 }

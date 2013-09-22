@@ -1,9 +1,9 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
-	."code.google.com/p/gordon-go/util"
 	"code.google.com/p/go.exp/go/types"
+	. "code.google.com/p/gordon-go/gui"
+	. "code.google.com/p/gordon-go/util"
 	"go/ast"
 	"go/token"
 	"math"
@@ -26,8 +26,9 @@ type nodeText struct {
 	*TextBase
 	node *nodeBase
 }
+
 func newNodeText(node *nodeBase) *nodeText {
-	t := &nodeText{node:node}
+	t := &nodeText{node: node}
 	t.TextBase = NewTextBase(t, "")
 	return t
 }
@@ -41,7 +42,7 @@ func (t *nodeText) KeyPressed(event KeyEvent) {
 	t.node.reform()
 }
 func (t nodeText) Paint() {
-	Rotate(1.0/12) // this should go in ViewBase; but is good enough for now
+	Rotate(1.0 / 12) // this should go in ViewBase; but is good enough for now
 	t.TextBase.Paint()
 }
 
@@ -49,10 +50,10 @@ type nodeBase struct {
 	*ViewBase
 	self node
 	AggregateMouseHandler
-	blk *block
-	text *nodeText
-	ins []*port
-	outs []*port
+	blk     *block
+	text    *nodeText
+	ins     []*port
+	outs    []*port
 	focused bool
 }
 
@@ -61,7 +62,7 @@ const (
 )
 
 func newNodeBase(self node) *nodeBase {
-	n := &nodeBase{self:self}
+	n := &nodeBase{self: self}
 	n.ViewBase = NewView(n)
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(self), NewViewDragger(self)}
 	n.text = newNodeText(n)
@@ -109,20 +110,20 @@ func (n *nodeBase) removePortBase(p *port) { // intentionally named to not imple
 
 func (n *nodeBase) reform() {
 	ins, outs := ins(n), outs(n)
-	
+
 	numIn := float64(len(ins))
 	numOut := float64(len(outs))
-	rx, ry := 2.0 * portSize, (math.Max(numIn, numOut) + 1) * portSize / 2
-	
+	rx, ry := 2.0*portSize, (math.Max(numIn, numOut)+1)*portSize/2
+
 	rect := ZR
 	for i, p := range ins {
-		y := -portSize * (float64(i) - (numIn - 1) / 2)
-		p.MoveCenter(Pt(-8 - rx * math.Sqrt(ry * ry - y * y) / ry, y))
+		y := -portSize * (float64(i) - (numIn-1)/2)
+		p.MoveCenter(Pt(-8-rx*math.Sqrt(ry*ry-y*y)/ry, y))
 		rect = rect.Union(p.MapRectToParent(p.Rect()))
 	}
 	for i, p := range outs {
-		y := -portSize * (float64(i) - (numOut - 1) / 2)
-		p.MoveCenter(Pt(8 + rx * math.Sqrt(ry * ry - y * y) / ry, y))
+		y := -portSize * (float64(i) - (numOut-1)/2)
+		p.MoveCenter(Pt(8+rx*math.Sqrt(ry*ry-y*y)/ry, y))
 		rect = rect.Union(p.MapRectToParent(p.Rect()))
 	}
 
@@ -130,10 +131,10 @@ func (n *nodeBase) reform() {
 	n.Resize(rect.Dx(), rect.Dy())
 }
 
-func (n nodeBase) block() *block { return n.blk }
+func (n nodeBase) block() *block      { return n.blk }
 func (n *nodeBase) setBlock(b *block) { n.blk = b }
-func (n nodeBase) inputs() []*port { return n.ins }
-func (n nodeBase) outputs() []*port { return n.outs }
+func (n nodeBase) inputs() []*port    { return n.ins }
+func (n nodeBase) outputs() []*port   { return n.outs }
 
 func (n nodeBase) inConns() (conns []*connection) {
 	for _, p := range n.inputs() {
@@ -192,15 +193,15 @@ func (n *nodeBase) KeyPressed(event KeyEvent) {
 
 func (n nodeBase) Paint() {
 	const DX = 8.0
-	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
+	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
 	for _, p := range append(n.ins, n.outs...) {
 		pt := p.MapToParent(p.Center())
 		dx := -DX
 		if p.out {
 			dx = DX
 		}
-		x := (pt.X - dx) / 2 + dx
-		DrawCubic([4]Point{Pt(dx, 0), Pt(x, 0), Pt(x, pt.Y), pt}, int(pt.Len() / 2))
+		x := (pt.X-dx)/2 + dx
+		DrawCubic([4]Point{Pt(dx, 0), Pt(x, 0), Pt(x, pt.Y), pt}, int(pt.Len()/2))
 	}
 	in, out := len(n.ins) > 0, len(n.outs) > 0
 	if in {
@@ -214,7 +215,7 @@ func (n nodeBase) Paint() {
 	}
 }
 
-var seqType = struct { types.Type }{}
+var seqType = struct{ types.Type }{}
 
 func seqIn(n node) *port {
 	for _, in := range n.inputs() {
@@ -256,6 +257,7 @@ type callNode struct {
 	*nodeBase
 	obj types.Object
 }
+
 func newCallNode(obj types.Object) node {
 	if t, ok := obj.GetType().(*types.Signature); ok {
 		n := &callNode{obj: obj}
@@ -266,17 +268,25 @@ func newCallNode(obj types.Object) node {
 			name = "." + name
 		}
 		n.text.SetText(name)
-		for _, v := range t.Params { n.newInput(v) }
-		for _, v := range t.Results { n.newOutput(v) }
+		for _, v := range t.Params {
+			n.newInput(v)
+		}
+		for _, v := range t.Results {
+			n.newOutput(v)
+		}
 		n.addSeqPorts()
 		return n
 	}
 
 	switch obj.GetName() {
-	case "delete": return newDeleteNode()
-	case "len": return newLenNode()
-	case "make": return newMakeNode()
-	default: panic("unknown builtin: " + obj.GetName())
+	case "delete":
+		return newDeleteNode()
+	case "len":
+		return newLenNode()
+	case "make":
+		return newMakeNode()
+	default:
+		panic("unknown builtin: " + obj.GetName())
 	}
 }
 
@@ -284,6 +294,7 @@ type basicLiteralNode struct {
 	*nodeBase
 	kind token.Token
 }
+
 func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 	n := &basicLiteralNode{kind: kind}
 	n.nodeBase = newNodeBase(n)
@@ -303,11 +314,11 @@ func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 			if (*s)[0] == '.' {
 				*s = "0" + *s
 			}
-			if l := len(*s); (*s)[l - 1] == '-' {
+			if l := len(*s); (*s)[l-1] == '-' {
 				if (*s)[0] == '-' {
-					*s = (*s)[1:l - 1]
+					*s = (*s)[1 : l-1]
 				} else {
-					*s = "-" + (*s)[:l - 1]
+					*s = "-" + (*s)[:l-1]
 				}
 			}
 			if _, err := strconv.ParseInt(*s, 10, 64); err == nil {
@@ -333,7 +344,7 @@ func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 			if *s == "" {
 				return false
 			}
-			*s = (*s)[len(*s) - 1:]
+			*s = (*s)[len(*s)-1:]
 			return true
 		})
 	}
@@ -344,6 +355,7 @@ type compositeLiteralNode struct {
 	*nodeBase
 	typ *typeView
 }
+
 func newCompositeLiteralNode() *compositeLiteralNode {
 	n := &compositeLiteralNode{}
 	n.nodeBase = newNodeBase(n)
@@ -379,7 +391,7 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 		case *types.Struct:
 			for _, f := range t.Fields {
 				if local || fieldIsExported(f) {
-					n.newInput(&types.Var{Pkg: f.Pkg , Name: f.Name, Type: f.Type})
+					n.newInput(&types.Var{Pkg: f.Pkg, Name: f.Name, Type: f.Type})
 				}
 			}
 		case *types.Slice:
@@ -387,7 +399,7 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 		case *types.Map:
 			// TODO: variable number of key/value input pairs?
 		}
-		n.typ.MoveCenter(Pt(0, n.Rect().Max.Y + n.typ.Height() / 2))
+		n.typ.MoveCenter(Pt(0, n.Rect().Max.Y+n.typ.Height()/2))
 		n.TakeKeyboardFocus()
 	}
 }

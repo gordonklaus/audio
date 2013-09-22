@@ -2,7 +2,7 @@ package main
 
 import (
 	"code.google.com/p/go.exp/go/types"
-	."code.google.com/p/gordon-go/gui"
+	. "code.google.com/p/gordon-go/gui"
 )
 
 type deleteNode struct {
@@ -30,7 +30,6 @@ func newDeleteNode() *deleteNode {
 	return n
 }
 
-
 type lenNode struct {
 	*nodeBase
 }
@@ -51,7 +50,6 @@ func newLenNode() *lenNode {
 	n.addSeqPorts()
 	return n
 }
-
 
 type makeNode struct {
 	*nodeBase
@@ -92,7 +90,7 @@ func (n *makeNode) setType(t types.Type) {
 		if _, ok := t.(*types.Slice); ok {
 			n.newInput(&types.Var{Name: "cap", Type: types.Typ[types.Int]})
 		}
-		n.typ.MoveCenter(Pt(0, n.Rect().Max.Y + n.typ.Height() / 2))
+		n.typ.MoveCenter(Pt(0, n.Rect().Max.Y+n.typ.Height()/2))
 		n.TakeKeyboardFocus()
 	}
 }

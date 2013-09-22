@@ -1,19 +1,19 @@
 package main
 
 import (
-	."code.google.com/p/gordon-go/gui"
 	"code.google.com/p/go.exp/go/types"
+	. "code.google.com/p/gordon-go/gui"
 )
 
 type loopNode struct {
 	*ViewBase
 	AggregateMouseHandler
-	blk *block
-	input *port
+	blk           *block
+	input         *port
 	seqIn, seqOut *port
-	inputsNode *portsNode
-	loopblk *block
-	focused bool
+	inputsNode    *portsNode
+	loopblk       *block
+	focused       bool
 }
 
 func newLoopNode() *loopNode {
@@ -29,21 +29,21 @@ func newLoopNode() *loopNode {
 	n.inputsNode.newOutput(&types.Var{})
 	n.loopblk.addNode(n.inputsNode)
 	n.AddChild(n.loopblk)
-	
+
 	n.seqIn = newInput(n, &types.Var{Name: "seq", Type: seqType})
 	n.seqIn.MoveCenter(ZP)
 	n.AddChild(n.seqIn)
 	n.seqOut = newOutput(n, &types.Var{Name: "seq", Type: seqType})
 	n.AddChild(n.seqOut)
-	
+
 	n.updateInputType()
 	return n
 }
 
-func (n loopNode) block() *block { return n.blk }
+func (n loopNode) block() *block      { return n.blk }
 func (n *loopNode) setBlock(b *block) { n.blk = b }
-func (n loopNode) inputs() []*port { return []*port{n.seqIn, n.input} }
-func (n loopNode) outputs() []*port { return []*port{n.seqOut} }
+func (n loopNode) inputs() []*port    { return []*port{n.seqIn, n.input} }
+func (n loopNode) outputs() []*port   { return []*port{n.seqOut} }
 func (n loopNode) inConns() []*connection {
 	return append(n.seqIn.conns, append(n.input.conns, n.loopblk.inConns()...)...)
 }
@@ -62,19 +62,23 @@ func (n *loopNode) updateInputType() {
 			}
 			switch t := t.(type) {
 			case *types.Basic:
-				if t.Info & types.IsString != 0 {
+				if t.Info&types.IsString != 0 {
 					elt = types.Typ[types.Rune]
 				} else if t.Kind != types.UntypedInt {
 					key = t
 				}
-			case *types.Array: elt = t.Elt
-			case *types.Slice: elt = t.Elt
-			case *types.Map:   key, elt = t.Key, t.Elt
-			case *types.Chan:  key = t.Elt
+			case *types.Array:
+				elt = t.Elt
+			case *types.Slice:
+				elt = t.Elt
+			case *types.Map:
+				key, elt = t.Key, t.Elt
+			case *types.Chan:
+				key = t.Elt
 			}
 		}
 	}
-	
+
 	in := n.inputsNode
 	switch t.(type) {
 	default:
@@ -90,7 +94,7 @@ func (n *loopNode) updateInputType() {
 			in.newOutput(&types.Var{})
 		}
 	}
-	
+
 	n.input.setType(t)
 	in.outs[0].setType(key)
 	if len(in.outs) == 2 {
@@ -135,6 +139,6 @@ func (n *loopNode) KeyPressed(event KeyEvent) {
 }
 
 func (n loopNode) Paint() {
-	SetColor(map[bool]Color{false:{.5, .5, .5, 1}, true:{.3, .3, .7, 1}}[n.focused])
+	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
 	DrawLine(ZP, Pt(-2*portSize, 0))
 }

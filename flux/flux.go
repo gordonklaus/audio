@@ -1,9 +1,9 @@
 package main
 
 import (
-	"code.google.com/p/gordon-go/gui"
-	."code.google.com/p/gordon-go/util"
 	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/gui"
+	. "code.google.com/p/gordon-go/util"
 )
 
 func main() {

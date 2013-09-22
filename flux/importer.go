@@ -19,14 +19,14 @@ func getPackage(path string) (*types.Package, error) {
 	if pkg, ok := pkgs[path]; ok {
 		return pkg, nil
 	}
-	
+
 	buildPkg, err := build.Import(path, "", 0)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var fluxFiles []string
-	
+
 	files := []*ast.File{}
 	fset := token.NewFileSet()
 	for _, fileName := range append(buildPkg.GoFiles, buildPkg.CgoFiles...) {
@@ -39,7 +39,7 @@ func getPackage(path string) (*types.Package, error) {
 			fluxFiles = append(fluxFiles, fileName[:len(fileName)-8])
 		}
 	}
-	ctx := types.Context{Import:srcImport}
+	ctx := types.Context{Import: srcImport}
 	pkg, err := ctx.Check(fset, files)
 	if err != nil {
 		fmt.Printf("Error typechecking package %s:\n%v\n", path, err)
@@ -68,7 +68,7 @@ func getPackage(path string) (*types.Package, error) {
 	}
 	pkg.Path = buildPkg.ImportPath
 	pkgs[path] = pkg
-	
+
 	for _, file := range fluxFiles {
 		n := strings.Split(file, ".")
 		for i := range n {
@@ -84,7 +84,7 @@ func getPackage(path string) (*types.Package, error) {
 			}
 		}
 	}
-	
+
 	return pkg, nil
 }
 
@@ -92,12 +92,12 @@ func srcImport(imports map[string]*types.Package, path string) (*types.Package, 
 	if pkg, ok := imports[path]; ok {
 		return pkg, nil
 	}
-	
+
 	pkg, err := getPackage(path)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	imports[path] = pkg
 	return pkg, nil
 }
