@@ -118,7 +118,7 @@ func (h *connectionSourceHandle) restoreSavedConnection() { h.conn.setSrc(h.save
 
 func (h connectionSourceHandle) updateConnection(pt Point) {
 	b := h.conn.blk.outermost()
-	if p, ok := b.ViewAt(h.MapTo(pt, b)).(*port); ok &&  h.conn.dst != nil && h.conn.dst.canConnect(p) {
+	if p, ok := ViewAt(b, h.MapTo(pt, b)).(*port); ok &&  h.conn.dst != nil && h.conn.dst.canConnect(p) {
 		h.conn.setSrc(p)
 	} else {
 		h.conn.dstPt = h.MapTo(pt, h.conn.blk)
@@ -173,7 +173,7 @@ func (h *connectionDestinationHandle) restoreSavedConnection() { h.conn.setDst(h
 
 func (h connectionDestinationHandle) updateConnection(pt Point) {
 	b := h.conn.blk.outermost()
-	if p, ok := b.ViewAt(h.MapTo(pt, b)).(*port); ok && h.conn.src != nil && p.canConnect(h.conn.src) {
+	if p, ok := ViewAt(b, h.MapTo(pt, b)).(*port); ok && h.conn.src != nil && p.canConnect(h.conn.src) {
 		h.conn.setDst(p)
 	} else {
 		h.conn.srcPt = h.MapTo(pt, h.conn.blk)

@@ -19,20 +19,19 @@ func (a AggregateMouseHandler) MouseReleased(button int, p Point) {
 }
 
 
-type ClickHandler struct {
-	f func(int, Point)
-}
-func NewClickHandler(f func(int, Point)) *ClickHandler {
-	return &ClickHandler{f}
-}
+type ClickHandler func(int, Point)
 func (c ClickHandler) MousePressed(button int, p Point) {
-	c.f(button, p)
+	c(button, p)
 }
 func (c ClickHandler) MouseDragged(button int, p Point) {}
 func (c ClickHandler) MouseReleased(button int, p Point) {}
 
 
-func NewClickKeyboardFocuser(view View) *ClickHandler {return NewClickHandler(func(int, Point) { view.TakeKeyboardFocus() }) }
+func NewClickKeyboardFocuser(view View) ClickHandler {
+	return func(int, Point) {
+		view.TakeKeyboardFocus()
+	}
+}
 
 
 type ViewDragger struct {

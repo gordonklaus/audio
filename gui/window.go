@@ -16,7 +16,7 @@ type Window struct {
 	control chan interface{}
 	key chan KeyEvent
 	mouse chan interface{}
-	paint chan Paint
+	paint chan paint
 	do chan func()
 }
 
@@ -35,7 +35,7 @@ func NewWindow(self View) *Window {
 	w.control = make(chan interface{})
 	w.key = make(chan KeyEvent, 10)
 	w.mouse = make(chan interface{}, 100)
-	w.paint = make(chan Paint, 1)
+	w.paint = make(chan paint, 1)
 	w.do = make(chan func())
 	
 	// glfw should fire initial resize events to avoid this duplication (https://github.com/glfw/glfw/issues/62)
@@ -64,17 +64,17 @@ func (w *Window) SetCentralView(v View) {
 	}
 }
 
-type Paint struct {}
-type Close struct {
+type paint struct {}
+type close struct {
 	w *Window
 }
-type Resize struct {
+type resize struct {
 	w, h float64
 }
-type MouseMove struct {
+type mouseMove struct {
 	Pos Point
 }
-type MouseButton struct {
+type mouseButton struct {
 	Pos Point
 	Button int
 	Action int
@@ -82,10 +82,10 @@ type MouseButton struct {
 
 func (w *Window) run() {
 	w.w.OnClose(func() {
-		w.control <- Close{w}
+		w.control <- close{w}
 	})
 	w.w.OnResize(func(width, height int) {
-		w.control <- Resize{float64(width), float64(height)}
+		w.control <- resize{float64(width), float64(height)}
 	})
 	w.w.OnFramebufferResize(func(width, height int) {
 		gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
@@ -114,10 +114,10 @@ func (w *Window) run() {
 	var pos Point
 	w.w.OnMouseMove(func(x, y float64) {
 		pos = Pt(x, w.Height() - y)
-		w.mouse <- MouseMove{pos}
+		w.mouse <- mouseMove{pos}
 	})
 	w.w.OnMouseButton(func(button, action, mods int) {
-		w.mouse <- MouseButton{pos, button, action}
+		w.mouse <- mouseButton{pos, button, action}
 	})
 	
 	var wg sync.WaitGroup
@@ -139,10 +139,10 @@ func (w *Window) run() {
 			select {
 			case c := <-w.control:
 				switch c := c.(type) {
-				case Close:
+				case close:
 					closeWindow <- c.w
 					return
-				case Resize:
+				case resize:
 					gl.MatrixMode(gl.PROJECTION)
 					gl.LoadIdentity()
 					gl.Ortho(0, gl.Double(c.w), 0, gl.Double(c.h), -1, 1)
@@ -159,12 +159,12 @@ func (w *Window) run() {
 				}
 			case m := <-w.mouse:
 				switch m := m.(type) {
-				case MouseMove:
+				case mouseMove:
 					for button, v := range w.mouseFocus {
 						pt := v.MapFrom(m.Pos, w.Self)
 						v.MouseDragged(button, pt)
 					}
-				case MouseButton:
+				case mouseButton:
 					if m.Action == Press {
 						v := w.Self.GetMouseFocus(m.Button, m.Pos)
 						if v != nil {
@@ -205,7 +205,7 @@ func (w *Window) SetMouseFocus(focus MouseHandlerView, button int) { w.mouseFocu
 
 func (w *Window) Repaint() {
 	select {
-	case w.paint <- Paint{}:
+	case w.paint <- paint{}:
 	default:
 	}
 }

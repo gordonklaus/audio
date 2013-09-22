@@ -20,7 +20,6 @@ type View interface {
 	Children() []View
 	AddChild(v View)
 	RemoveChild(v View)
-	ViewAt(point Point) View
 	
 	Show()
 	Hide()
@@ -124,16 +123,6 @@ func (v *ViewBase) RemoveChild(child View) {
 	SliceRemove(&v.children, child)
 	child.SetParent(nil)
 	v.Self.Repaint()
-}
-func (v ViewBase) ViewAt(point Point) View {
-	if !point.In(v.Self.Rect()) { return nil }
-	children := v.Self.Children()
-	for i := len(children) - 1; i >= 0; i-- {
-		child := children[i]
-		view := child.ViewAt(child.MapFromParent(point))
-		if view != nil { return view }
-	}
-	return v.Self
 }
 
 func (v *ViewBase) Show() { v.hidden = false; v.Self.Repaint() }
@@ -241,3 +230,19 @@ func (v ViewBase) paintBase() {
 func (v ViewBase) Paint() {}
 
 func (v ViewBase) Do(f func()) { if v.parent != nil { v.parent.Do(f) } }
+
+
+func ViewAt(v View, point Point) View {
+	if !point.In(v.Rect()) {
+		return nil
+	}
+	children := v.Children()
+	for i := len(children) - 1; i >= 0; i-- {
+		child := children[i]
+		view := ViewAt(child, child.MapFromParent(point))
+		if view != nil {
+			return view
+		}
+	}
+	return v
+}
