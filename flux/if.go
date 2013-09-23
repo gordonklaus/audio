@@ -78,11 +78,11 @@ func (n *ifNode) KeyPressed(event KeyEvent) {
 	case KeyLeft, KeyRight:
 		n.blk.outermost().focusNearestView(n, event.Key)
 	case KeyUp:
-		n.trueblk.TakeKeyboardFocus()
+		SetKeyboardFocus(n.trueblk)
 	case KeyDown:
-		n.falseblk.TakeKeyboardFocus()
+		SetKeyboardFocus(n.falseblk)
 	case KeyEscape:
-		n.blk.TakeKeyboardFocus()
+		SetKeyboardFocus(n.blk)
 	default:
 		n.ViewBase.KeyPressed(event)
 	}

@@ -176,7 +176,7 @@ func (v *typeView) edit(done func()) {
 	if v.nameText != nil {
 		v.nameText.Accept = func(string) { v.editType(done) }
 		v.nameText.Reject = done
-		v.nameText.TakeKeyboardFocus()
+		SetKeyboardFocus(v.nameText)
 		return
 	}
 	v.editType(done)
@@ -213,7 +213,7 @@ func (v *typeView) editType(done func()) {
 			Close(b)
 			done()
 		}
-		b.text.TakeKeyboardFocus()
+		SetKeyboardFocus(b.text)
 	case *types.Basic, *types.NamedType:
 		done()
 	case *types.Pointer, *types.Array, *types.Slice, *types.Chan:
@@ -276,13 +276,13 @@ func (v *typeView) insertField(f *[]*types.Field, childTypes *[]*typeView, befor
 				if !before {
 					i--
 				}
-				(*childTypes)[i].TakeKeyboardFocus()
+				SetKeyboardFocus((*childTypes)[i])
 			}
 		} else {
 			if success != nil {
 				success()
 			} else {
-				t.TakeKeyboardFocus()
+				SetKeyboardFocus(t)
 			}
 		}
 	})
@@ -311,13 +311,13 @@ func (v *typeView) insertVar(vs *[]*types.Var, childTypes *[]*typeView, before b
 				if !before {
 					i--
 				}
-				(*childTypes)[i].TakeKeyboardFocus()
+				SetKeyboardFocus((*childTypes)[i])
 			}
 		} else {
 			if success != nil {
 				success()
 			} else {
-				t.TakeKeyboardFocus()
+				SetKeyboardFocus(t)
 			}
 		}
 	})
@@ -346,13 +346,13 @@ func (v *typeView) insertMethod(m *[]*types.Method, childTypes *[]*typeView, bef
 				if !before {
 					i--
 				}
-				(*childTypes)[i].TakeKeyboardFocus()
+				SetKeyboardFocus((*childTypes)[i])
 			}
 		} else {
 			if success != nil {
 				success()
 			} else {
-				t.TakeKeyboardFocus()
+				SetKeyboardFocus(t)
 			}
 		}
 	})
@@ -371,7 +371,7 @@ func (v *typeView) focusNearest(child *typeView, dirKey int) {
 	}
 	nearest := nearestView(v, views, MapTo(child, Center(child), v), dirKey)
 	if nearest != nil {
-		nearest.TakeKeyboardFocus()
+		SetKeyboardFocus(nearest)
 	}
 }
 
@@ -385,17 +385,17 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 			p.focusNearest(v, event.Key)
 		}
 	case KeyEnter:
-		done := v.TakeKeyboardFocus
+		done := func() { SetKeyboardFocus(v) }
 		switch t := (*v.typ).(type) {
 		case *types.Pointer, *types.Array, *types.Slice, *types.Chan:
-			v.childTypes.right[0].TakeKeyboardFocus()
+			SetKeyboardFocus(v.childTypes.right[0])
 		case *types.Map:
-			v.childTypes.left[0].TakeKeyboardFocus()
+			SetKeyboardFocus(v.childTypes.left[0])
 		case *types.Struct:
 			if len(t.Fields) == 0 {
 				v.edit(done)
 			} else {
-				v.childTypes.right[0].TakeKeyboardFocus()
+				SetKeyboardFocus(v.childTypes.right[0])
 			}
 		case *types.Signature:
 			switch {
@@ -404,34 +404,34 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 			case len(t.Params) == 0:
 				v.addVars(&t.Params, &v.childTypes.left, func() {
 					if len(t.Params) == 0 {
-						v.childTypes.right[0].TakeKeyboardFocus()
+						SetKeyboardFocus(v.childTypes.right[0])
 					} else {
-						v.childTypes.left[0].TakeKeyboardFocus()
+						SetKeyboardFocus(v.childTypes.left[0])
 					}
 				})
 			case len(t.Results) == 0:
 				v.addVars(&t.Results, &v.childTypes.right, func() {
 					if len(t.Results) == 0 {
-						v.childTypes.left[0].TakeKeyboardFocus()
+						SetKeyboardFocus(v.childTypes.left[0])
 					} else {
-						v.childTypes.right[0].TakeKeyboardFocus()
+						SetKeyboardFocus(v.childTypes.right[0])
 					}
 				})
 			default:
-				v.childTypes.left[0].TakeKeyboardFocus()
+				SetKeyboardFocus(v.childTypes.left[0])
 			}
 		case *types.Interface:
 			if len(t.Methods) == 0 {
 				v.edit(done)
 			} else {
-				v.childTypes.right[0].TakeKeyboardFocus()
+				SetKeyboardFocus(v.childTypes.right[0])
 			}
 		}
 	case KeyEscape:
 		if v.done != nil {
 			v.done()
 		} else {
-			v.Parent().TakeKeyboardFocus()
+			SetKeyboardFocus(v.Parent())
 		}
 	case KeyBackspace:
 		if p, ok := v.Parent().(*typeView); ok {
@@ -452,7 +452,7 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 					v.nameText.SetText(oldName)
 				}
 			}
-			v.TakeKeyboardFocus()
+			SetKeyboardFocus(v)
 		})
 	case KeyComma:
 		if p, ok := v.Parent().(*typeView); ok {
@@ -498,9 +498,9 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 							if i == len {
 								i--
 							}
-							p.childTypes.right[i].TakeKeyboardFocus()
+							SetKeyboardFocus(p.childTypes.right[i])
 						} else {
-							p.TakeKeyboardFocus()
+							SetKeyboardFocus(p)
 						}
 						break
 					}
@@ -514,9 +514,9 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 							if i == len {
 								i--
 							}
-							p.childTypes.left[i].TakeKeyboardFocus()
+							SetKeyboardFocus(p.childTypes.left[i])
 						} else {
-							p.TakeKeyboardFocus()
+							SetKeyboardFocus(p)
 						}
 						break
 					}
@@ -529,9 +529,9 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 							if i == len {
 								i--
 							}
-							p.childTypes.right[i].TakeKeyboardFocus()
+							SetKeyboardFocus(p.childTypes.right[i])
 						} else {
-							p.TakeKeyboardFocus()
+							SetKeyboardFocus(p)
 						}
 						break
 					}
@@ -545,9 +545,9 @@ func (v *typeView) KeyPressed(event KeyEvent) {
 							if i == len {
 								i--
 							}
-							p.childTypes.right[i].TakeKeyboardFocus()
+							SetKeyboardFocus(p.childTypes.right[i])
 						} else {
-							p.TakeKeyboardFocus()
+							SetKeyboardFocus(p)
 						}
 						break
 					}

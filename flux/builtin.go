@@ -73,7 +73,7 @@ func (n *makeNode) editType() {
 			n.setType(t)
 		} else {
 			n.blk.removeNode(n)
-			n.blk.TakeKeyboardFocus()
+			SetKeyboardFocus(n.blk)
 		}
 	})
 }
@@ -91,6 +91,6 @@ func (n *makeNode) setType(t types.Type) {
 			n.newInput(&types.Var{Name: "cap", Type: types.Typ[types.Int]})
 		}
 		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+Height(n.typ)/2))
-		n.TakeKeyboardFocus()
+		SetKeyboardFocus(n)
 	}
 }

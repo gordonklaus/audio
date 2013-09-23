@@ -51,7 +51,7 @@ func (n *funcNode) Close() {
 	case n.awaken <- true:
 	default:
 	}
-	Close(n.ViewBase)
+	Close(n)
 	n.done()
 }
 
@@ -132,7 +132,7 @@ func (n *funcNode) update() bool {
 	return true
 }
 
-func (n *funcNode) TookKeyboardFocus() { n.funcblk.TakeKeyboardFocus() }
+func (n *funcNode) TookKeyboardFocus() { SetKeyboardFocus(n.funcblk) }
 
 func (n *funcNode) KeyPressed(event KeyEvent) {
 	switch event.Key {

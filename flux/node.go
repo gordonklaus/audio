@@ -35,7 +35,7 @@ func newNodeText(node *nodeBase) *nodeText {
 func (t *nodeText) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case KeyEnter:
-		t.node.TakeKeyboardFocus()
+		SetKeyboardFocus(t.node)
 	default:
 		t.TextBase.KeyPressed(event)
 	}
@@ -171,20 +171,20 @@ func (n *nodeBase) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft:
 		if p := seqIn(n); p != nil {
-			p.TakeKeyboardFocus()
+			SetKeyboardFocus(p)
 		} else {
 			n.blk.outermost().focusNearestView(n, event.Key)
 		}
 	case KeyRight:
 		if p := seqOut(n); p != nil {
-			p.TakeKeyboardFocus()
+			SetKeyboardFocus(p)
 		} else {
 			n.blk.outermost().focusNearestView(n, event.Key)
 		}
 	case KeyUp, KeyDown:
 		n.blk.outermost().focusNearestView(n, event.Key)
 	case KeyEscape:
-		n.blk.TakeKeyboardFocus()
+		SetKeyboardFocus(n.blk)
 	default:
 		n.ViewBase.KeyPressed(event)
 	}
@@ -371,7 +371,7 @@ func (n *compositeLiteralNode) editType() {
 			n.setType(t)
 		} else {
 			n.blk.removeNode(n)
-			n.blk.TakeKeyboardFocus()
+			SetKeyboardFocus(n.blk)
 		}
 	})
 }
@@ -399,7 +399,7 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 			// TODO: variable number of key/value input pairs?
 		}
 		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+Height(n.typ)/2))
-		n.TakeKeyboardFocus()
+		SetKeyboardFocus(n)
 	}
 }
 

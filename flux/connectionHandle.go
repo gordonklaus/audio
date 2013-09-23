@@ -33,7 +33,7 @@ func newConnectionHandle(spec connectionHandleSpecializer, c *connection) *conne
 
 func (h *connectionHandle) startEditing() {
 	h.spec.saveConnection()
-	h.TakeKeyboardFocus()
+	SetKeyboardFocus(h)
 	h.editing = true
 	h.conn.reform()
 }
@@ -50,7 +50,7 @@ func (h *connectionHandle) stopEditing() {
 			h.conn.reform()
 		} else {
 			h.conn.blk.removeConnection(h.conn)
-			h.conn.blk.TakeKeyboardFocus()
+			SetKeyboardFocus(h.conn.blk)
 		}
 	}
 }
@@ -76,7 +76,7 @@ func (h *connectionHandle) KeyPressed(event KeyEvent) {
 		if h.editing {
 			h.cancelEditing()
 		} else {
-			h.conn.TakeKeyboardFocus()
+			SetKeyboardFocus(h.conn)
 		}
 	default:
 		h.ViewBase.KeyPressed(event)
@@ -153,9 +153,9 @@ func (h *connectionSourceHandle) KeyPressed(event KeyEvent) {
 	}
 
 	if event.Key == KeyDown && h.conn.src != nil {
-		h.conn.src.TakeKeyboardFocus()
+		SetKeyboardFocus(h.conn.src)
 	} else if event.Key == KeyUp {
-		h.conn.dstHandle.TakeKeyboardFocus()
+		SetKeyboardFocus(h.conn.dstHandle)
 	} else {
 		h.connectionHandle.KeyPressed(event)
 	}
@@ -209,9 +209,9 @@ func (h *connectionDestinationHandle) KeyPressed(event KeyEvent) {
 	}
 
 	if event.Key == KeyDown {
-		h.conn.srcHandle.TakeKeyboardFocus()
+		SetKeyboardFocus(h.conn.srcHandle)
 	} else if event.Key == KeyUp && h.conn.dst != nil {
-		h.conn.dst.TakeKeyboardFocus()
+		SetKeyboardFocus(h.conn.dst)
 	} else {
 		h.connectionHandle.KeyPressed(event)
 	}

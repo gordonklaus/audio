@@ -186,7 +186,7 @@ nx:
 }
 
 func (b *block) startEditing() {
-	b.TakeKeyboardFocus()
+	SetKeyboardFocus(b)
 	b.editing = true
 }
 
@@ -442,7 +442,7 @@ func (b *block) focusNearestView(v View, dirKey int) {
 	}
 	nearest := nearestView(b, views, MapTo(v, Center(v), b), dirKey)
 	if nearest != nil {
-		nearest.TakeKeyboardFocus()
+		SetKeyboardFocus(nearest)
 	}
 }
 
@@ -493,7 +493,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 		switch v := b.GetKeyboardFocus().(type) {
 		case *block:
 			if v.node != nil {
-				v.node.TakeKeyboardFocus()
+				SetKeyboardFocus(v.node)
 			}
 		case *portsNode:
 		case node:
@@ -509,7 +509,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 				c.blk.removeConnection(c)
 			}
 			b.removeNode(v)
-			foc.TakeKeyboardFocus()
+			SetKeyboardFocus(foc)
 		}
 	case KeyEscape:
 		if b.editing {
@@ -519,7 +519,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 				b.stopEditing()
 			}
 		} else if outer := b.outer(); outer != nil {
-			outer.TakeKeyboardFocus()
+			SetKeyboardFocus(outer)
 		} else {
 			b.func_().Close()
 		}
@@ -537,10 +537,10 @@ func (b *block) KeyPressed(event KeyEvent) {
 				}
 				browser.canceled = func() {
 					Close(browser)
-					b.TakeKeyboardFocus()
+					SetKeyboardFocus(b)
 				}
 				browser.text.KeyPressed(event)
-				browser.text.TakeKeyboardFocus()
+				SetKeyboardFocus(browser.text)
 			case "\"", "'", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
 				text := event.Text
 				kind := token.INT
@@ -556,9 +556,9 @@ func (b *block) KeyPressed(event KeyEvent) {
 				n.text.SetText(text)
 				n.text.Reject = func() {
 					b.removeNode(n)
-					b.TakeKeyboardFocus()
+					SetKeyboardFocus(b)
 				}
-				n.text.TakeKeyboardFocus()
+				SetKeyboardFocus(n.text)
 			case "{":
 				n := newCompositeLiteralNode()
 				b.addNode(n)
@@ -611,7 +611,7 @@ func newNode(b *block, obj types.Object) {
 	}); ok {
 		nn.editType()
 	} else {
-		n.TakeKeyboardFocus()
+		SetKeyboardFocus(n)
 	}
 }
 
@@ -686,7 +686,7 @@ func (n *portsNode) removePort(p *port) {
 			f.subPkgRef((*vars)[i].Type)
 			*vars = append((*vars)[:i], (*vars)[i+1:]...)
 			n.removePortBase(p)
-			n.TakeKeyboardFocus()
+			SetKeyboardFocus(n)
 			break
 		}
 	}
@@ -713,11 +713,11 @@ func (n *portsNode) KeyPressed(event KeyEvent) {
 			if v.Type != nil {
 				*vars = append(*vars, v)
 				f.addPkgRef(v.Type)
-				p.TakeKeyboardFocus()
+				SetKeyboardFocus(p)
 			} else {
 				n.removePortBase(p)
 				n.reposition()
-				n.TakeKeyboardFocus()
+				SetKeyboardFocus(n)
 			}
 		})
 	} else {

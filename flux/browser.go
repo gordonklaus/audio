@@ -576,13 +576,13 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 					savePackageName(pkg.Package)
 				}
 				b.text.SetText("")
-				b.text.TakeKeyboardFocus()
+				SetKeyboardFocus(b.text)
 			}
 			t.Reject = func() {
 				b.text.SetText(b.text.GetText())
-				b.text.TakeKeyboardFocus()
+				SetKeyboardFocus(b.text)
 			}
-			t.TakeKeyboardFocus()
+			SetKeyboardFocus(t)
 			return
 		}
 

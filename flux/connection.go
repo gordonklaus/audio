@@ -154,19 +154,19 @@ func (c *connection) LostKeyboardFocus() { c.focused = false; c.Repaint() }
 func (c *connection) KeyPressed(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft:
-		c.src.TakeKeyboardFocus()
+		SetKeyboardFocus(c.src)
 	case KeyRight:
-		c.dst.TakeKeyboardFocus()
+		SetKeyboardFocus(c.dst)
 	case KeyDown, KeyUp:
 		c.blk.outermost().focusNearestView(c, event.Key)
 	case KeyBackspace:
-		c.src.TakeKeyboardFocus()
+		SetKeyboardFocus(c.src)
 		c.blk.removeConnection(c)
 	case KeyDelete:
-		c.dst.TakeKeyboardFocus()
+		SetKeyboardFocus(c.dst)
 		c.blk.removeConnection(c)
 	case KeyEscape:
-		c.blk.TakeKeyboardFocus()
+		SetKeyboardFocus(c.blk)
 	default:
 		if event.Text == "\\" {
 			c.feedback = !c.feedback

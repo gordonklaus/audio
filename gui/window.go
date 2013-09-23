@@ -66,7 +66,7 @@ func (w *Window) SetCentralView(v View) {
 			w.AddChild(v)
 		}
 		Resize(v, Size(w))
-		w.SetKeyboardFocus(v)
+		SetKeyboardFocus(v)
 	}
 }
 
@@ -190,7 +190,7 @@ func (w *Window) run() {
 	wg.Wait()
 }
 
-func (w *Window) SetKeyboardFocus(view View) {
+func (w *Window) setKeyboardFocus(view View) {
 	if w.keyboardFocus != view {
 		// change w.keyboardFocus first to avoid possible infinite recursion
 		oldFocus := w.keyboardFocus

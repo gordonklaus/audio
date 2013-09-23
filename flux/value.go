@@ -125,7 +125,7 @@ func (n *valueNode) KeyPressed(event KeyEvent) {
 			if !n.addr {
 				n.set = !n.set
 				n.reform()
-				n.TakeKeyboardFocus()
+				SetKeyboardFocus(n)
 			}
 		default:
 			n.nodeBase.KeyPressed(event)

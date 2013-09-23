@@ -32,7 +32,7 @@ func (c ClickHandler) MouseReleased(button int, p Point) {}
 
 func NewClickKeyboardFocuser(view View) ClickHandler {
 	return func(int, Point) {
-		view.TakeKeyboardFocus()
+		SetKeyboardFocus(view)
 	}
 }
 

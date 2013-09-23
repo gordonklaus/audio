@@ -34,9 +34,8 @@ type View interface {
 	Rect() Rectangle
 	SetRect(Rectangle)
 
-	SetKeyboardFocus(View)
+	setKeyboardFocus(View)
 	GetKeyboardFocus() View
-	TakeKeyboardFocus()
 	TookKeyboardFocus()
 	LostKeyboardFocus()
 	KeyPressed(KeyEvent)
@@ -165,9 +164,10 @@ func ResizeToFit(v View, margin float64) {
 	v.SetRect(rect.Inset(-margin))
 }
 
-func (v *ViewBase) SetKeyboardFocus(view View) {
+func SetKeyboardFocus(v View) { v.setKeyboardFocus(v) }
+func (v *ViewBase) setKeyboardFocus(view View) {
 	if v.parent != nil {
-		v.parent.SetKeyboardFocus(view)
+		v.parent.setKeyboardFocus(view)
 	}
 }
 func (v ViewBase) GetKeyboardFocus() View {
@@ -176,7 +176,6 @@ func (v ViewBase) GetKeyboardFocus() View {
 	}
 	return nil
 }
-func (v *ViewBase) TakeKeyboardFocus() { v.Self.SetKeyboardFocus(v.Self) }
 func (v *ViewBase) TookKeyboardFocus() {}
 func (v *ViewBase) LostKeyboardFocus() {}
 func (v *ViewBase) KeyPressed(event KeyEvent) {

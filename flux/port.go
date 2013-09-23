@@ -27,7 +27,7 @@ func newPort(out bool, n node, v *types.Var) *port {
 	p.valView.Hide()
 	p.connsChanged = func() {}
 	p.AddChild(p.valView)
-	p.SetRect(ZR.Inset(-portSize/2))
+	p.SetRect(ZR.Inset(-portSize / 2))
 	p.setType(*p.valView.typ)
 	return p
 }
@@ -102,17 +102,17 @@ func (p *port) LostKeyboardFocus() { p.focused = false; p.Repaint(); p.valView.H
 
 func (p *port) KeyPressed(event KeyEvent) {
 	if p.out && event.Key == KeyLeft || !p.out && event.Key == KeyRight {
-		p.node.TakeKeyboardFocus()
+		SetKeyboardFocus(p.node)
 		return
 	}
 	if p.obj.Type != seqType &&
 		(p.out && event.Key == KeyRight && len(p.conns) > 0 ||
 			!p.out && event.Key == KeyLeft && len(p.conns) > 0) {
-		p.conns[len(p.conns)-1].TakeKeyboardFocus()
+		SetKeyboardFocus(p.conns[len(p.conns)-1])
 		return
 	}
 	if p.obj.Type == seqType && event.Key == KeyDown && len(p.conns) > 0 {
-		p.conns[len(p.conns)-1].TakeKeyboardFocus()
+		SetKeyboardFocus(p.conns[len(p.conns)-1])
 		return
 	}
 
@@ -134,20 +134,20 @@ func (p *port) KeyPressed(event KeyEvent) {
 			}); ok {
 				n.removePort(p)
 			} else {
-				p.node.TakeKeyboardFocus()
+				SetKeyboardFocus(p.node)
 			}
 		} else if len(p.conns) > 0 {
-			p.conns[len(p.conns)-1].TakeKeyboardFocus()
+			SetKeyboardFocus(p.conns[len(p.conns)-1])
 		}
 	case KeyEscape:
-		p.node.TakeKeyboardFocus()
+		SetKeyboardFocus(p.node)
 	default:
 		p.ViewBase.KeyPressed(event)
 	}
 }
 
 func (p *port) MousePressed(button int, pt Point) {
-	p.TakeKeyboardFocus()
+	SetKeyboardFocus(p)
 	c := newConnection()
 	if p.out {
 		c.setSrc(p)
