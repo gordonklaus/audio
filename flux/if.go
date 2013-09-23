@@ -57,7 +57,7 @@ func (n *ifNode) update() bool {
 	if f && t {
 		return false
 	}
-	n.falseblk.Move(Pt(-blockRadius, -4-n.falseblk.Height()))
+	n.falseblk.Move(Pt(-blockRadius, -4-Height(n.falseblk)))
 	n.trueblk.Move(Pt(-blockRadius, 4))
 	ResizeToFit(n, 0)
 	return true
@@ -90,6 +90,6 @@ func (n *ifNode) KeyPressed(event KeyEvent) {
 
 func (n ifNode) Paint() {
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
-	DrawLine(MapToParent(n.input, n.input.Center()), MapToParent(n.seqOut, n.seqOut.Center()))
+	DrawLine(MapToParent(n.input, Center(n.input)), MapToParent(n.seqOut, Center(n.seqOut)))
 	DrawLine(Pt(0, -4), Pt(0, 4))
 }

@@ -108,12 +108,12 @@ func (c *connection) reform() {
 		unconnectedOffset.X = -208
 	}
 	if c.src != nil {
-		c.srcPt = MapTo(c.src, c.src.Center(), c.blk)
+		c.srcPt = MapTo(c.src, Center(c.src), c.blk)
 	} else {
 		c.srcPt = c.dstPt.Sub(unconnectedOffset)
 	}
 	if c.dst != nil {
-		c.dstPt = MapTo(c.dst, c.dst.Center(), c.blk)
+		c.dstPt = MapTo(c.dst, Center(c.dst), c.blk)
 	} else {
 		c.dstPt = c.srcPt.Add(unconnectedOffset)
 	}
@@ -125,7 +125,7 @@ func (c *connection) reform() {
 		rect = Rectangle{c.srcPt, c.dstPt}.Canon()
 	}
 	c.Move(rect.Min)
-	c.Resize(rect.Dx(), rect.Dy())
+	c.SetRect(rect)
 
 	handleOffset := c.dstPt.Sub(c.srcPt).Div(4)
 	if c.srcHandle.editing {

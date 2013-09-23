@@ -2,26 +2,26 @@ package main
 
 import (
 	"code.google.com/p/go.exp/go/types"
-	"code.google.com/p/gordon-go/gui"
+	. "code.google.com/p/gordon-go/gui"
 	. "code.google.com/p/gordon-go/util"
 )
 
 func main() {
 	newFluxWindow()
-	gui.Run()
+	Run()
 }
 
 type fluxWindow struct {
-	*gui.Window
+	*Window
 	browser *browser
 }
 
 func newFluxWindow() *fluxWindow {
 	w := &fluxWindow{}
-	w.Window = gui.NewWindow(w)
+	w.Window = NewWindow(w)
 	w.browser = newBrowser(fluxSourceOnly, nil, nil)
 	w.AddChild(w.browser)
-	w.Resize(w.Size().XY())
+	w.SetRect(w.Rect())
 	w.browser.accepted = func(obj types.Object) {
 		switch obj := obj.(type) {
 		case *types.TypeName:
@@ -29,7 +29,7 @@ func newFluxWindow() *fluxWindow {
 			w.browser.Hide()
 			v := w.browser.typeView
 			w.AddChild(v)
-			gui.MoveCenter(v, w.Center())
+			MoveCenter(v, Center(w))
 			reset := func() {
 				w.browser.AddChild(v)
 				w.browser.Show()
@@ -57,7 +57,7 @@ func newFluxWindow() *fluxWindow {
 			go n.animate()
 			w.browser.Hide()
 			w.AddChild(n)
-			n.Move(w.Center())
+			n.Move(Center(w))
 			n.done = func() {
 				w.browser.Show()
 				w.browser.text.SetText("")
@@ -70,7 +70,7 @@ func newFluxWindow() *fluxWindow {
 	return w
 }
 
-func (w *fluxWindow) Resize(width, height float64) {
-	w.Window.Resize(width, height)
-	w.browser.Move(w.Center())
+func (w *fluxWindow) SetRect(r Rectangle) {
+	w.Window.SetRect(r)
+	w.browser.Move(Center(w))
 }

@@ -130,40 +130,40 @@ func (v *typeView) reform() {
 	maxWidth := float64(0)
 	h1 := float64(0)
 	for i, c := range v.childTypes.left {
-		h1 += c.Height()
+		h1 += Height(c)
 		if i > 0 {
 			h1 += spacing
 		}
-		if w := c.Width(); w > maxWidth {
+		if w := Width(c); w > maxWidth {
 			maxWidth = w
 		}
 	}
 	h2 := float64(0)
 	for i, c := range v.childTypes.right {
-		h2 += c.Height()
+		h2 += Height(c)
 		if i > 0 {
 			h2 += spacing
 		}
 	}
 	x := 0.0
 	if v.nameText != nil {
-		v.nameText.Move(Pt(0, (math.Max(h1, h2)-v.nameText.Height())/2))
-		x += v.nameText.Width() + spacing
+		v.nameText.Move(Pt(0, (math.Max(h1, h2)-Height(v.nameText))/2))
+		x += Width(v.nameText) + spacing
 	}
 	y := math.Max(0, h2-h1) / 2
 	for i := len(v.childTypes.left) - 1; i >= 0; i-- {
 		c := v.childTypes.left[i]
-		c.Move(Pt(x+maxWidth-c.Width(), y))
-		y += c.Height() + spacing
+		c.Move(Pt(x+maxWidth-Width(c), y))
+		y += Height(c) + spacing
 	}
 	x += maxWidth + spacing
-	v.text.Move(Pt(x, (math.Max(h1, h2)-v.text.Height())/2))
-	x += v.text.Width() + spacing
+	v.text.Move(Pt(x, (math.Max(h1, h2)-Height(v.text))/2))
+	x += Width(v.text) + spacing
 	y = math.Max(0, h1-h2) / 2
 	for i := len(v.childTypes.right) - 1; i >= 0; i-- {
 		c := v.childTypes.right[i]
 		c.Move(Pt(x, y))
-		y += c.Height() + spacing
+		y += Height(c) + spacing
 	}
 
 	ResizeToFit(v, 2)
@@ -198,9 +198,9 @@ func (v *typeView) editType(done func()) {
 		}
 		b := newBrowser(v.mode, pkg, imports)
 		v.AddChild(b)
-		b.Move(v.Center())
+		b.Move(Center(v))
 		b.accepted = func(obj types.Object) {
-			b.Close()
+			Close(b)
 			n := obj.(*types.TypeName)
 			if n.Type != nil {
 				v.setType(n.Type)
@@ -210,7 +210,7 @@ func (v *typeView) editType(done func()) {
 			v.editType(done)
 		}
 		b.canceled = func() {
-			b.Close()
+			Close(b)
 			done()
 		}
 		b.text.TakeKeyboardFocus()
@@ -369,7 +369,7 @@ func (v *typeView) focusNearest(child *typeView, dirKey int) {
 	for _, v := range append(v.childTypes.left, v.childTypes.right...) {
 		views = append(views, v)
 	}
-	nearest := nearestView(v, views, MapTo(child, child.Center(), v), dirKey)
+	nearest := nearestView(v, views, MapTo(child, Center(child), v), dirKey)
 	if nearest != nil {
 		nearest.TakeKeyboardFocus()
 	}

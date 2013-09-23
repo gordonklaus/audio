@@ -109,10 +109,9 @@ func (n *loopNode) update() bool {
 	if !b.update() {
 		return false
 	}
-	y2 := b.Size().Y / 2
-	b.Move(Pt(0, -y2))
+	b.Move(Pt(0, -Height(b)/2))
 	n.inputsNode.reposition()
-	MoveCenter(n.seqOut, Pt(b.Size().X, 0))
+	MoveCenter(n.seqOut, Pt(Width(b), 0))
 	ResizeToFit(n, 0)
 	return true
 }

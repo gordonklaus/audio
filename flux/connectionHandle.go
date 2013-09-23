@@ -26,7 +26,7 @@ func newConnectionHandle(spec connectionHandleSpecializer, c *connection) *conne
 	h.ViewBase = NewView(h)
 	h.spec = spec
 	h.conn = c
-	h.Resize(connectionHandleSize, connectionHandleSize)
+	Resize(h, Pt(connectionHandleSize, connectionHandleSize))
 	h.Self = spec
 	return h
 }

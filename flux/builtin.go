@@ -90,7 +90,7 @@ func (n *makeNode) setType(t types.Type) {
 		if _, ok := t.(*types.Slice); ok {
 			n.newInput(&types.Var{Name: "cap", Type: types.Typ[types.Int]})
 		}
-		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+n.typ.Height()/2))
+		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+Height(n.typ)/2))
 		n.TakeKeyboardFocus()
 	}
 }

@@ -127,8 +127,7 @@ func (n *nodeBase) reform() {
 		rect = rect.Union(MapRectToParent(p, p.Rect()))
 	}
 
-	n.Pan(rect.Min)
-	n.Resize(rect.Dx(), rect.Dy())
+	n.SetRect(rect)
 }
 
 func (n nodeBase) block() *block      { return n.blk }
@@ -195,7 +194,7 @@ func (n nodeBase) Paint() {
 	const DX = 8.0
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
 	for _, p := range append(n.ins, n.outs...) {
-		pt := MapToParent(p, p.Center())
+		pt := MapToParent(p, Center(p))
 		dx := -DX
 		if p.out {
 			dx = DX
@@ -399,7 +398,7 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 		case *types.Map:
 			// TODO: variable number of key/value input pairs?
 		}
-		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+n.typ.Height()/2))
+		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+Height(n.typ)/2))
 		n.TakeKeyboardFocus()
 	}
 }

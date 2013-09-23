@@ -16,7 +16,7 @@ type port struct {
 	connsChanged func()
 }
 
-const portSize = 11
+const portSize = 11.0
 
 func newInput(n node, v *types.Var) *port  { return newPort(false, n, v) }
 func newOutput(n node, v *types.Var) *port { return newPort(true, n, v) }
@@ -27,8 +27,7 @@ func newPort(out bool, n node, v *types.Var) *port {
 	p.valView.Hide()
 	p.connsChanged = func() {}
 	p.AddChild(p.valView)
-	p.Resize(portSize, portSize)
-	p.Pan(Pt(portSize, portSize).Div(-2))
+	p.SetRect(ZR.Inset(-portSize/2))
 	p.setType(*p.valView.typ)
 	return p
 }
@@ -36,9 +35,9 @@ func newPort(out bool, n node, v *types.Var) *port {
 func (p *port) setType(t types.Type) {
 	p.valView.setType(t)
 	if p.out {
-		p.valView.Move(Pt(12, -p.valView.Height()/2))
+		p.valView.Move(Pt(12, -Height(p.valView)/2))
 	} else {
-		p.valView.Move(Pt(-p.valView.Width()-12, -p.valView.Height()/2))
+		p.valView.Move(Pt(-Width(p.valView)-12, -Height(p.valView)/2))
 	}
 }
 

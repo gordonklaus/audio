@@ -339,7 +339,7 @@ func (b *browser) Paint() {
 	rect := ZR
 	if b.newObj == nil && len(b.nameTexts) > 0 {
 		cur := b.nameTexts[b.i]
-		rect = Rect(0, cur.Position().Y, cur.Position().X+cur.Width(), cur.Position().Y+cur.Height())
+		rect = Rect(0, cur.Position().Y, cur.Position().X+Width(cur), cur.Position().Y+Height(cur))
 	} else {
 		rect = MapRectToParent(b.text, b.text.Rect())
 		rect.Min.X = 0
@@ -461,11 +461,11 @@ ok:
 	}
 	xOffset := 0.0
 	if t, ok := b.lastPathText(); ok {
-		xOffset = t.Position().X + t.Width()
+		xOffset = t.Position().X + Width(t)
 	}
 
 	for _, l := range b.nameTexts {
-		l.Close()
+		Close(l)
 	}
 	b.nameTexts = []Text{}
 	width := 0.0
@@ -476,23 +476,23 @@ ok:
 		l.SetBackgroundColor(Color{0, 0, 0, .7})
 		b.AddChild(l)
 		b.nameTexts = append(b.nameTexts, l)
-		l.Move(Pt(xOffset, float64(n-i-1)*l.Height()))
-		if l.Width() > width {
-			width = l.Width()
+		l.Move(Pt(xOffset, float64(n-i-1)*Height(l)))
+		if Width(l) > width {
+			width = Width(l)
 		}
 	}
 	b.text.Raise()
-	b.Resize(xOffset+width, float64(len(b.nameTexts))*b.text.Height())
+	Resize(b, Pt(xOffset+width, float64(len(b.nameTexts))*Height(b.text)))
 
-	yOffset := float64(n-b.i-1) * b.text.Height()
+	yOffset := float64(n-b.i-1) * Height(b.text)
 	b.text.Move(Pt(xOffset, yOffset))
 	if b.typeView != nil {
-		b.typeView.Close()
+		Close(b.typeView)
 	}
 	if pkg, ok := cur.(buildPackage); ok {
 		t := b.pkgNameText
 		t.SetText(pkg.Name)
-		t.Move(Pt(xOffset+width+16, yOffset-(t.Height()-b.text.Height())/2))
+		t.Move(Pt(xOffset+width+16, yOffset-(Height(t)-Height(b.text))/2))
 		if pkg.Name != path.Base(pkg.Dir) {
 			t.Show()
 		} else {
@@ -515,14 +515,14 @@ ok:
 			b.AddChild(b.typeView)
 		}
 		if b.typeView != nil {
-			b.typeView.Move(Pt(xOffset+width+16, yOffset-(b.typeView.Height()-b.text.Height())/2))
+			b.typeView.Move(Pt(xOffset+width+16, yOffset-(Height(b.typeView)-Height(b.text))/2))
 		}
 	}
 	for _, p := range b.pathTexts {
 		p.Move(Pt(p.Position().X, yOffset))
 	}
 
-	b.Pan(Pt(0, yOffset))
+	Pan(b, Pt(0, yOffset))
 }
 func (t *nodeNameText) LostKeyboardFocus() { t.b.cancel() }
 func (t *nodeNameText) KeyPressed(event KeyEvent) {
@@ -557,7 +557,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			}
 
 			i := len(b.pathTexts) - 1
-			b.pathTexts[i].Close()
+			Close(b.pathTexts[i])
 			b.pathTexts = b.pathTexts[:i]
 
 			t.SetText("")
@@ -659,7 +659,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 				b.AddChild(pathText)
 				x := 0.0
 				if t, ok := b.lastPathText(); ok {
-					x = t.Position().X + t.Width()
+					x = t.Position().X + Width(t)
 				}
 				pathText.Move(Pt(x, 0))
 				b.pathTexts = append(b.pathTexts, pathText)

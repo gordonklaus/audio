@@ -51,7 +51,7 @@ func (n *funcNode) Close() {
 	case n.awaken <- true:
 	default:
 	}
-	n.ViewBase.Close()
+	Close(n.ViewBase)
 	n.done()
 }
 

@@ -16,7 +16,7 @@ type Window struct {
 	control       chan interface{}
 	key           chan KeyEvent
 	mouse         chan interface{}
-	paint         chan paint
+	paint         chan struct{}
 	do            chan func()
 }
 
@@ -37,7 +37,7 @@ func NewWindow(self View) *Window {
 	w.control = make(chan interface{})
 	w.key = make(chan KeyEvent, 10)
 	w.mouse = make(chan interface{}, 100)
-	w.paint = make(chan paint, 1)
+	w.paint = make(chan struct{}, 1)
 	w.do = make(chan func())
 
 	// glfw should fire initial resize events to avoid this duplication (https://github.com/glfw/glfw/issues/62)
@@ -45,7 +45,7 @@ func NewWindow(self View) *Window {
 	gl.MatrixMode(gl.PROJECTION)
 	gl.LoadIdentity()
 	gl.Ortho(0, gl.Double(width), 0, gl.Double(height), -1, 1)
-	w.Resize(float64(width), float64(height))
+	Resize(w, Pt(float64(width), float64(height)))
 	width, height = w.w.FramebufferSize()
 	gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
 
@@ -65,30 +65,25 @@ func (w *Window) SetCentralView(v View) {
 		if v.Parent() != w {
 			w.AddChild(v)
 		}
-		v.Resize(w.Size().XY())
+		Resize(v, Size(w))
 		w.SetKeyboardFocus(v)
 	}
 }
 
-type paint struct{}
-type close struct {
-	w *Window
-}
-type resize struct {
-	w, h float64
-}
-type mouseMove struct {
-	Pos Point
-}
-type mouseButton struct {
-	Pos    Point
-	Button int
-	Action int
-}
-
 func (w *Window) run() {
+	type (
+		close       *Window
+		resize      Point
+		mouseMove   Point
+		mouseButton struct {
+			Pos    Point
+			Button int
+			Action int
+		}
+	)
+
 	w.w.OnClose(func() {
-		w.control <- close{w}
+		w.control <- close(w)
 	})
 	w.w.OnResize(func(width, height int) {
 		w.control <- resize{float64(width), float64(height)}
@@ -119,8 +114,8 @@ func (w *Window) run() {
 
 	var pos Point
 	w.w.OnMouseMove(func(x, y float64) {
-		pos = Pt(x, w.Height()-y)
-		w.mouse <- mouseMove{pos}
+		pos = Pt(x, Height(w)-y)
+		w.mouse <- mouseMove(pos)
 	})
 	w.w.OnMouseButton(func(button, action, mods int) {
 		w.mouse <- mouseButton{pos, button, action}
@@ -146,15 +141,15 @@ func (w *Window) run() {
 			case c := <-w.control:
 				switch c := c.(type) {
 				case close:
-					closeWindow <- c.w
+					closeWindow <- c
 					return
 				case resize:
 					gl.MatrixMode(gl.PROJECTION)
 					gl.LoadIdentity()
-					gl.Ortho(0, gl.Double(c.w), 0, gl.Double(c.h), -1, 1)
-					w.Self.Resize(c.w, c.h)
+					gl.Ortho(0, gl.Double(c.X), 0, gl.Double(c.Y), -1, 1)
+					Resize(w.Self, Point(c))
 					if w.centralView != nil {
-						w.centralView.Resize(c.w, c.h)
+						Resize(w.centralView, Point(c))
 					}
 				}
 			case k := <-w.key:
@@ -169,21 +164,18 @@ func (w *Window) run() {
 				switch m := m.(type) {
 				case mouseMove:
 					for button, v := range w.mouseFocus {
-						pt := MapFrom(v, m.Pos, w.Self)
-						v.MouseDragged(button, pt)
+						v.MouseDragged(button, MapFrom(v, Point(m), w.Self))
 					}
 				case mouseButton:
 					if m.Action == Press {
 						v := w.Self.GetMouseFocus(m.Button, m.Pos)
 						if v != nil {
 							w.mouseFocus[m.Button] = v
-							pt := MapFrom(v, m.Pos, w.Self)
-							v.MousePressed(m.Button, pt)
+							v.MousePressed(m.Button, MapFrom(v, m.Pos, w.Self))
 						}
 					} else if m.Action == Release {
 						if v, ok := w.mouseFocus[m.Button]; ok {
-							pt := MapFrom(v, m.Pos, w.Self)
-							v.MouseReleased(m.Button, pt)
+							v.MouseReleased(m.Button, MapFrom(v, m.Pos, w.Self))
 							delete(w.mouseFocus, m.Button)
 						}
 					}
@@ -217,7 +209,7 @@ func (w *Window) SetMouseFocus(focus MouseHandlerView, button int) { w.mouseFocu
 
 func (w *Window) Repaint() {
 	select {
-	case w.paint <- paint{}:
+	case w.paint <- struct{}{}:
 	default:
 	}
 }
