@@ -108,12 +108,12 @@ func (c *connection) reform() {
 		unconnectedOffset.X = -208
 	}
 	if c.src != nil {
-		c.srcPt = c.src.MapTo(c.src.Center(), c.blk)
+		c.srcPt = MapTo(c.src, c.src.Center(), c.blk)
 	} else {
 		c.srcPt = c.dstPt.Sub(unconnectedOffset)
 	}
 	if c.dst != nil {
-		c.dstPt = c.dst.MapTo(c.dst.Center(), c.blk)
+		c.dstPt = MapTo(c.dst, c.dst.Center(), c.blk)
 	} else {
 		c.dstPt = c.srcPt.Add(unconnectedOffset)
 	}
@@ -129,14 +129,14 @@ func (c *connection) reform() {
 
 	handleOffset := c.dstPt.Sub(c.srcPt).Div(4)
 	if c.srcHandle.editing {
-		c.srcHandle.MoveCenter(c.MapFromParent(c.srcPt))
+		MoveCenter(c.srcHandle, MapFromParent(c, c.srcPt))
 	} else {
-		c.srcHandle.MoveCenter(c.MapFromParent(c.srcPt.Add(handleOffset)))
+		MoveCenter(c.srcHandle, MapFromParent(c, c.srcPt.Add(handleOffset)))
 	}
 	if c.dstHandle.editing {
-		c.dstHandle.MoveCenter(c.MapFromParent(c.dstPt))
+		MoveCenter(c.dstHandle, MapFromParent(c, c.dstPt))
 	} else {
-		c.dstHandle.MoveCenter(c.MapFromParent(c.dstPt.Sub(handleOffset)))
+		MoveCenter(c.dstHandle, MapFromParent(c, c.dstPt.Sub(handleOffset)))
 	}
 }
 
@@ -177,9 +177,9 @@ func (c *connection) KeyPressed(event KeyEvent) {
 	}
 }
 
-func (c connection) Paint() {
+func (c *connection) Paint() {
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[c.focused])
-	start, end := c.MapFromParent(c.srcPt), c.MapFromParent(c.dstPt)
+	start, end := MapFromParent(c, c.srcPt), MapFromParent(c, c.dstPt)
 	var pts []Point
 	if c.src != nil && c.src.obj.Type == seqType || c.dst != nil && c.dst.obj.Type == seqType {
 		pts = []Point{start, Pt(start.X, start.Y-40), Pt(end.X, end.Y-40), end}

@@ -28,13 +28,13 @@ func newIfNode() *ifNode {
 	n.AddChild(n.trueblk)
 
 	n.seqIn = newInput(n, &types.Var{Name: "seq", Type: seqType})
-	n.seqIn.MoveCenter(Pt(-portSize, 0))
+	MoveCenter(n.seqIn, Pt(-portSize, 0))
 	n.AddChild(n.seqIn)
 	n.seqOut = newOutput(n, &types.Var{Name: "seq", Type: seqType})
-	n.seqOut.MoveCenter(Pt(portSize, 0))
+	MoveCenter(n.seqOut, Pt(portSize, 0))
 	n.AddChild(n.seqOut)
 
-	n.input.MoveCenter(Pt(-2*portSize, 0))
+	MoveCenter(n.input, Pt(-2*portSize, 0))
 	n.update()
 	return n
 }
@@ -90,6 +90,6 @@ func (n *ifNode) KeyPressed(event KeyEvent) {
 
 func (n ifNode) Paint() {
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
-	DrawLine(n.input.MapToParent(n.input.Center()), n.seqOut.MapToParent(n.seqOut.Center()))
+	DrawLine(MapToParent(n.input, n.input.Center()), MapToParent(n.seqOut, n.seqOut.Center()))
 	DrawLine(Pt(0, -4), Pt(0, 4))
 }

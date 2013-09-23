@@ -234,7 +234,7 @@ func (b *block) update() (updated bool) {
 			if n2 == n1 {
 				continue
 			}
-			dir := n1.MapToParent(n1.Center()).Sub(n2.MapToParent(n2.Center()))
+			dir := MapToParent(n1, n1.Center()).Sub(MapToParent(n2, n2.Center()))
 			if dir == ZP {
 				dir = Pt(rand.NormFloat64(), rand.NormFloat64())
 			}
@@ -262,7 +262,7 @@ func (b *block) update() (updated bool) {
 				}
 				x := c.srcPt
 				y := c.dstPt
-				p := n1.MapToParent(n1.Center())
+				p := MapToParent(n1, n1.Center())
 				dir := p.Sub(PointToLine(p, x, y))
 				if dir == ZP {
 					dir = Pt(rand.NormFloat64(), rand.NormFloat64())
@@ -384,7 +384,7 @@ func (b *block) update() (updated bool) {
 
 	rect := ZR
 	for n := range b.nodes {
-		r := n.MapRectToParent(n.Rect())
+		r := MapRectToParent(n, n.Rect())
 		if n, ok := n.(*portsNode); ok {
 			// portsNodes are later reposition()ed to the boundary; thus we must adjust for the margin (blockRadius)
 			if n.out {
@@ -400,7 +400,7 @@ func (b *block) update() (updated bool) {
 		}
 	}
 	for c := range b.conns {
-		rect = rect.Union(c.MapRectToParent(c.Rect()))
+		rect = rect.Union(MapRectToParent(c, c.Rect()))
 	}
 	if rect == ZR {
 		rect = Rect(0, 0, 16, 0)
@@ -420,7 +420,7 @@ func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) 
 	dir := map[int]Point{KeyLeft: {-1, 0}, KeyRight: {1, 0}, KeyUp: {0, 1}, KeyDown: {0, -1}}[dirKey]
 	best := 0.0
 	for _, v := range views {
-		d := v.MapTo(v.Center(), parent).Sub(p)
+		d := MapTo(v, v.Center(), parent).Sub(p)
 		score := (dir.X*d.X + dir.Y*d.Y) / (d.X*d.X + d.Y*d.Y)
 		if score > best {
 			best = score
@@ -441,7 +441,7 @@ func (b *block) focusNearestView(v View, dirKey int) {
 	for _, c := range b.allConns() {
 		views = append(views, c)
 	}
-	nearest := nearestView(b, views, v.MapTo(v.Center(), b), dirKey)
+	nearest := nearestView(b, views, MapTo(v, v.Center(), b), dirKey)
 	if nearest != nil {
 		nearest.TakeKeyboardFocus()
 	}
@@ -463,7 +463,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 			for _, n := range outermost.allNodes() {
 				views = append(views, n)
 			}
-			if n := nearestView(b, views, v.MapTo(v.Center(), outermost), event.Key); n != nil {
+			if n := nearestView(b, views, MapTo(v, v.Center(), outermost), event.Key); n != nil {
 				b.editingNode = n.(node)
 			}
 		} else {
@@ -553,7 +553,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 				}
 				n := newBasicLiteralNode(kind)
 				b.addNode(n)
-				n.MoveCenter(b.Center())
+				MoveCenter(n, b.Center())
 				n.text.SetText(text)
 				n.text.Reject = func() {
 					b.removeNode(n)
@@ -563,7 +563,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 			case "{":
 				n := newCompositeLiteralNode()
 				b.addNode(n)
-				n.MoveCenter(b.Center())
+				MoveCenter(n, b.Center())
 				n.editType()
 			case "":
 				b.ViewBase.KeyPressed(event)
@@ -606,7 +606,7 @@ func newNode(b *block, obj types.Object) {
 		panic("bad obj")
 	}
 	b.addNode(n)
-	n.MoveCenter(b.Center())
+	MoveCenter(n, b.Center())
 	if nn, ok := n.(interface {
 		editType()
 	}); ok {
@@ -661,9 +661,9 @@ func (n *portsNode) reposition() {
 	b := n.blk
 	y := b.Center().Y
 	if n.out {
-		n.MoveOrigin(Pt(b.Rect().Max.X, y))
+		MoveOrigin(n, Pt(b.Rect().Max.X, y))
 	} else {
-		n.MoveOrigin(Pt(b.Rect().Min.X, y))
+		MoveOrigin(n, Pt(b.Rect().Min.X, y))
 	}
 }
 

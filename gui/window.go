@@ -169,7 +169,7 @@ func (w *Window) run() {
 				switch m := m.(type) {
 				case mouseMove:
 					for button, v := range w.mouseFocus {
-						pt := v.MapFrom(m.Pos, w.Self)
+						pt := MapFrom(v, m.Pos, w.Self)
 						v.MouseDragged(button, pt)
 					}
 				case mouseButton:
@@ -177,12 +177,12 @@ func (w *Window) run() {
 						v := w.Self.GetMouseFocus(m.Button, m.Pos)
 						if v != nil {
 							w.mouseFocus[m.Button] = v
-							pt := v.MapFrom(m.Pos, w.Self)
+							pt := MapFrom(v, m.Pos, w.Self)
 							v.MousePressed(m.Button, pt)
 						}
 					} else if m.Action == Release {
 						if v, ok := w.mouseFocus[m.Button]; ok {
-							pt := v.MapFrom(m.Pos, w.Self)
+							pt := MapFrom(v, m.Pos, w.Self)
 							v.MouseReleased(m.Button, pt)
 							delete(w.mouseFocus, m.Button)
 						}
@@ -227,7 +227,7 @@ func (w Window) repaint() {
 	gl.LoadIdentity()
 
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-	w.GetViewBase().paintBase()
+	w.base().paint()
 	w.w.SwapBuffers()
 }
 

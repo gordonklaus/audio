@@ -29,7 +29,7 @@ func newFluxWindow() *fluxWindow {
 			w.browser.Hide()
 			v := w.browser.typeView
 			w.AddChild(v)
-			v.MoveCenter(w.Center())
+			gui.MoveCenter(v, w.Center())
 			reset := func() {
 				w.browser.AddChild(v)
 				w.browser.Show()

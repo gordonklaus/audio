@@ -39,7 +39,7 @@ func (n *typeAssertNode) setType(t types.Type) {
 	n.outs[0].setType(t)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
-		n.typ.MoveCenter(Pt(0, n.Rect().Max.Y+n.typ.Height()/2))
+		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+n.typ.Height()/2))
 		n.TakeKeyboardFocus()
 	}
 }

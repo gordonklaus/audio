@@ -22,7 +22,7 @@ func newLoopNode() *loopNode {
 	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
 	n.input = newInput(n, &types.Var{})
 	n.input.connsChanged = n.updateInputType
-	n.input.MoveCenter(Pt(-2*portSize, 0))
+	MoveCenter(n.input, Pt(-2*portSize, 0))
 	n.AddChild(n.input)
 	n.loopblk = newBlock(n)
 	n.inputsNode = newInputsNode()
@@ -31,7 +31,7 @@ func newLoopNode() *loopNode {
 	n.AddChild(n.loopblk)
 
 	n.seqIn = newInput(n, &types.Var{Name: "seq", Type: seqType})
-	n.seqIn.MoveCenter(ZP)
+	MoveCenter(n.seqIn, ZP)
 	n.AddChild(n.seqIn)
 	n.seqOut = newOutput(n, &types.Var{Name: "seq", Type: seqType})
 	n.AddChild(n.seqOut)
@@ -112,7 +112,7 @@ func (n *loopNode) update() bool {
 	y2 := b.Size().Y / 2
 	b.Move(Pt(0, -y2))
 	n.inputsNode.reposition()
-	n.seqOut.MoveCenter(Pt(b.Size().X, 0))
+	MoveCenter(n.seqOut, Pt(b.Size().X, 0))
 	ResizeToFit(n, 0)
 	return true
 }

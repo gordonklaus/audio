@@ -119,12 +119,12 @@ func newConnectionSourceHandle(conn *connection) *connectionSourceHandle {
 func (h *connectionSourceHandle) saveConnection()         { h.savedConnection = h.conn.src }
 func (h *connectionSourceHandle) restoreSavedConnection() { h.conn.setSrc(h.savedConnection) }
 
-func (h connectionSourceHandle) updateConnection(pt Point) {
+func (h *connectionSourceHandle) updateConnection(pt Point) {
 	b := h.conn.blk.outermost()
-	if p, ok := ViewAt(b, h.MapTo(pt, b)).(*port); ok && h.conn.dst != nil && h.conn.dst.canConnect(p) {
+	if p, ok := ViewAt(b, MapTo(h, pt, b)).(*port); ok && h.conn.dst != nil && h.conn.dst.canConnect(p) {
 		h.conn.setSrc(p)
 	} else {
-		h.conn.dstPt = h.MapTo(pt, h.conn.blk)
+		h.conn.dstPt = MapTo(h, pt, h.conn.blk)
 		h.conn.setDst(nil)
 	}
 }
@@ -140,7 +140,7 @@ func (h *connectionSourceHandle) moveToNearestConnectablePort(dirKey int) {
 		}
 	}
 
-	v := nearestView(b, ports, h.conn.blk.MapTo(h.conn.srcPt, b), dirKey)
+	v := nearestView(b, ports, MapTo(h.conn.blk, h.conn.srcPt, b), dirKey)
 	if p, ok := v.(*port); ok {
 		h.conn.setSrc(p)
 	}
@@ -175,12 +175,12 @@ func newConnectionDestinationHandle(conn *connection) *connectionDestinationHand
 func (h *connectionDestinationHandle) saveConnection()         { h.savedConnection = h.conn.dst }
 func (h *connectionDestinationHandle) restoreSavedConnection() { h.conn.setDst(h.savedConnection) }
 
-func (h connectionDestinationHandle) updateConnection(pt Point) {
+func (h *connectionDestinationHandle) updateConnection(pt Point) {
 	b := h.conn.blk.outermost()
-	if p, ok := ViewAt(b, h.MapTo(pt, b)).(*port); ok && h.conn.src != nil && p.canConnect(h.conn.src) {
+	if p, ok := ViewAt(b, MapTo(h, pt, b)).(*port); ok && h.conn.src != nil && p.canConnect(h.conn.src) {
 		h.conn.setDst(p)
 	} else {
-		h.conn.srcPt = h.MapTo(pt, h.conn.blk)
+		h.conn.srcPt = MapTo(h, pt, h.conn.blk)
 		h.conn.setSrc(nil)
 	}
 }
@@ -196,7 +196,7 @@ func (h *connectionDestinationHandle) moveToNearestConnectablePort(dirKey int) {
 		}
 	}
 
-	v := nearestView(b, ports, h.conn.blk.MapTo(h.conn.dstPt, b), dirKey)
+	v := nearestView(b, ports, MapTo(h.conn.blk, h.conn.dstPt, b), dirKey)
 	if p, ok := v.(*port); ok {
 		h.conn.setDst(p)
 	}

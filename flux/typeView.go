@@ -369,7 +369,7 @@ func (v *typeView) focusNearest(child *typeView, dirKey int) {
 	for _, v := range append(v.childTypes.left, v.childTypes.right...) {
 		views = append(views, v)
 	}
-	nearest := nearestView(v, views, child.MapTo(child.Center(), v), dirKey)
+	nearest := nearestView(v, views, MapTo(child, child.Center(), v), dirKey)
 	if nearest != nil {
 		nearest.TakeKeyboardFocus()
 	}

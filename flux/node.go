@@ -90,9 +90,9 @@ func (n *nodeBase) newOutput(v *types.Var) *port {
 
 func (n *nodeBase) addSeqPorts() {
 	seqIn := n.newInput(&types.Var{Name: "seq", Type: seqType})
-	seqIn.MoveCenter(Pt(-8, 0))
+	MoveCenter(seqIn, Pt(-8, 0))
 	seqOut := n.newOutput(&types.Var{Name: "seq", Type: seqType})
-	seqOut.MoveCenter(Pt(8, 0))
+	MoveCenter(seqOut, Pt(8, 0))
 }
 
 func (n *nodeBase) removePortBase(p *port) { // intentionally named to not implement interface{removePort(*port)}
@@ -118,13 +118,13 @@ func (n *nodeBase) reform() {
 	rect := ZR
 	for i, p := range ins {
 		y := -portSize * (float64(i) - (numIn-1)/2)
-		p.MoveCenter(Pt(-8-rx*math.Sqrt(ry*ry-y*y)/ry, y))
-		rect = rect.Union(p.MapRectToParent(p.Rect()))
+		MoveCenter(p, Pt(-8-rx*math.Sqrt(ry*ry-y*y)/ry, y))
+		rect = rect.Union(MapRectToParent(p, p.Rect()))
 	}
 	for i, p := range outs {
 		y := -portSize * (float64(i) - (numOut-1)/2)
-		p.MoveCenter(Pt(8+rx*math.Sqrt(ry*ry-y*y)/ry, y))
-		rect = rect.Union(p.MapRectToParent(p.Rect()))
+		MoveCenter(p, Pt(8+rx*math.Sqrt(ry*ry-y*y)/ry, y))
+		rect = rect.Union(MapRectToParent(p, p.Rect()))
 	}
 
 	n.Pan(rect.Min)
@@ -195,7 +195,7 @@ func (n nodeBase) Paint() {
 	const DX = 8.0
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
 	for _, p := range append(n.ins, n.outs...) {
-		pt := p.MapToParent(p.Center())
+		pt := MapToParent(p, p.Center())
 		dx := -DX
 		if p.out {
 			dx = DX
@@ -399,7 +399,7 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 		case *types.Map:
 			// TODO: variable number of key/value input pairs?
 		}
-		n.typ.MoveCenter(Pt(0, n.Rect().Max.Y+n.typ.Height()/2))
+		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+n.typ.Height()/2))
 		n.TakeKeyboardFocus()
 	}
 }
