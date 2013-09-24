@@ -98,9 +98,9 @@ func (n *valueNode) reform() {
 	n.y.setType(yt)
 }
 
-func (n *valueNode) KeyPressed(event KeyEvent) {
+func (n *valueNode) KeyPress(event KeyEvent) {
 	if _, ok := n.obj.(*types.Const); ok {
-		n.nodeBase.KeyPressed(event)
+		n.nodeBase.KeyPress(event)
 	} else {
 		switch event.Text {
 		case "&":
@@ -125,10 +125,10 @@ func (n *valueNode) KeyPressed(event KeyEvent) {
 			if !n.addr {
 				n.set = !n.set
 				n.reform()
-				SetKeyboardFocus(n)
+				SetKeyFocus(n)
 			}
 		default:
-			n.nodeBase.KeyPressed(event)
+			n.nodeBase.KeyPress(event)
 		}
 	}
 }

@@ -33,7 +33,7 @@ func newConnectionHandle(spec connectionHandleSpecializer, c *connection) *conne
 
 func (h *connectionHandle) startEditing() {
 	h.spec.saveConnection()
-	SetKeyboardFocus(h)
+	SetKeyFocus(h)
 	h.editing = true
 	h.conn.reform()
 }
@@ -49,16 +49,16 @@ func (h *connectionHandle) stopEditing() {
 		if h.conn.connected() {
 			h.conn.reform()
 		} else {
-			h.conn.blk.removeConnection(h.conn)
-			SetKeyboardFocus(h.conn.blk)
+			h.conn.blk.removeConn(h.conn)
+			SetKeyFocus(h.conn.blk)
 		}
 	}
 }
 
-func (h *connectionHandle) TookKeyboardFocus() { h.focused = true; h.Repaint() }
-func (h *connectionHandle) LostKeyboardFocus() { h.focused = false; h.stopEditing(); h.Repaint() }
+func (h *connectionHandle) TookKeyFocus() { h.focused = true; h.Repaint() }
+func (h *connectionHandle) LostKeyFocus() { h.focused = false; h.stopEditing(); h.Repaint() }
 
-func (h *connectionHandle) KeyPressed(event KeyEvent) {
+func (h *connectionHandle) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft, KeyRight, KeyUp, KeyDown:
 		if h.editing {
@@ -76,10 +76,10 @@ func (h *connectionHandle) KeyPressed(event KeyEvent) {
 		if h.editing {
 			h.cancelEditing()
 		} else {
-			SetKeyboardFocus(h.conn)
+			SetKeyFocus(h.conn)
 		}
 	default:
-		h.ViewBase.KeyPressed(event)
+		h.ViewBase.KeyPress(event)
 	}
 }
 
@@ -147,18 +147,18 @@ func (h *connectionSourceHandle) moveToNearestConnectablePort(dirKey int) {
 	}
 }
 
-func (h *connectionSourceHandle) KeyPressed(event KeyEvent) {
+func (h *connectionSourceHandle) KeyPress(event KeyEvent) {
 	if h.editing {
-		h.connectionHandle.KeyPressed(event)
+		h.connectionHandle.KeyPress(event)
 		return
 	}
 
 	if event.Key == KeyDown && h.conn.src != nil {
-		SetKeyboardFocus(h.conn.src)
+		SetKeyFocus(h.conn.src)
 	} else if event.Key == KeyUp {
-		SetKeyboardFocus(h.conn.dstHandle)
+		SetKeyFocus(h.conn.dstHandle)
 	} else {
-		h.connectionHandle.KeyPressed(event)
+		h.connectionHandle.KeyPress(event)
 	}
 }
 
@@ -203,17 +203,17 @@ func (h *connectionDestinationHandle) moveToNearestConnectablePort(dirKey int) {
 	}
 }
 
-func (h *connectionDestinationHandle) KeyPressed(event KeyEvent) {
+func (h *connectionDestinationHandle) KeyPress(event KeyEvent) {
 	if h.editing {
-		h.connectionHandle.KeyPressed(event)
+		h.connectionHandle.KeyPress(event)
 		return
 	}
 
 	if event.Key == KeyDown {
-		SetKeyboardFocus(h.conn.srcHandle)
+		SetKeyFocus(h.conn.srcHandle)
 	} else if event.Key == KeyUp && h.conn.dst != nil {
-		SetKeyboardFocus(h.conn.dst)
+		SetKeyFocus(h.conn.dst)
 	} else {
-		h.connectionHandle.KeyPressed(event)
+		h.connectionHandle.KeyPress(event)
 	}
 }

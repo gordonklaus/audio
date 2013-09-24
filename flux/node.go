@@ -32,12 +32,12 @@ func newNodeText(node *nodeBase) *nodeText {
 	t.TextBase = NewTextBase(t, "")
 	return t
 }
-func (t *nodeText) KeyPressed(event KeyEvent) {
+func (t *nodeText) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyEnter:
-		SetKeyboardFocus(t.node)
+		SetKeyFocus(t.node)
 	default:
-		t.TextBase.KeyPressed(event)
+		t.TextBase.KeyPress(event)
 	}
 	t.node.reform()
 }
@@ -97,7 +97,7 @@ func (n *nodeBase) addSeqPorts() {
 
 func (n *nodeBase) removePortBase(p *port) { // intentionally named to not implement interface{removePort(*port)}
 	for _, c := range p.conns {
-		c.blk.removeConnection(c)
+		c.blk.removeConn(c)
 	}
 	if p.out {
 		SliceRemove(&n.outs, p)
@@ -164,29 +164,29 @@ func (n *nodeBase) Move(p Point) {
 
 func (n nodeBase) Center() Point { return ZP }
 
-func (n *nodeBase) TookKeyboardFocus() { n.focused = true; n.Repaint() }
-func (n *nodeBase) LostKeyboardFocus() { n.focused = false; n.Repaint() }
+func (n *nodeBase) TookKeyFocus() { n.focused = true; n.Repaint() }
+func (n *nodeBase) LostKeyFocus() { n.focused = false; n.Repaint() }
 
-func (n *nodeBase) KeyPressed(event KeyEvent) {
+func (n *nodeBase) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft:
 		if p := seqIn(n); p != nil {
-			SetKeyboardFocus(p)
+			SetKeyFocus(p)
 		} else {
 			n.blk.outermost().focusNearestView(n, event.Key)
 		}
 	case KeyRight:
 		if p := seqOut(n); p != nil {
-			SetKeyboardFocus(p)
+			SetKeyFocus(p)
 		} else {
 			n.blk.outermost().focusNearestView(n, event.Key)
 		}
 	case KeyUp, KeyDown:
 		n.blk.outermost().focusNearestView(n, event.Key)
 	case KeyEscape:
-		SetKeyboardFocus(n.blk)
+		SetKeyFocus(n.blk)
 	default:
-		n.ViewBase.KeyPressed(event)
+		n.ViewBase.KeyPress(event)
 	}
 }
 
@@ -371,7 +371,7 @@ func (n *compositeLiteralNode) editType() {
 			n.setType(t)
 		} else {
 			n.blk.removeNode(n)
-			SetKeyboardFocus(n.blk)
+			SetKeyFocus(n.blk)
 		}
 	})
 }
@@ -399,7 +399,7 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 			// TODO: variable number of key/value input pairs?
 		}
 		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+Height(n.typ)/2))
-		SetKeyboardFocus(n)
+		SetKeyFocus(n)
 	}
 }
 

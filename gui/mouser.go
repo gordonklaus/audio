@@ -24,7 +24,7 @@ func (c Clicker) Mouse(m MouseEvent) { c(m) }
 
 func NewClickFocuser(view View) Clicker {
 	return func(MouseEvent) {
-		SetKeyboardFocus(view)
+		SetKeyFocus(view)
 	}
 }
 
@@ -43,7 +43,7 @@ func (d *Mover) Mouse(m MouseEvent) {
 		d.v.Raise()
 		d.p = m.Pos
 	case Drag, Release:
-		d.v.Move(d.v.Position().Add(m.Pos.Sub(d.p)))
+		d.v.Move(d.v.Pos().Add(m.Pos.Sub(d.p)))
 	}
 }
 

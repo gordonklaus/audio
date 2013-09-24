@@ -84,7 +84,7 @@ func (n *loopNode) updateInputType() {
 	default:
 		if len(in.outs) == 2 {
 			for _, c := range in.outs[1].conns {
-				c.blk.removeConnection(c)
+				c.blk.removeConn(c)
 			}
 			in.RemoveChild(in.outs[1])
 			in.outs = in.outs[:1]
@@ -123,17 +123,17 @@ func (n *loopNode) Move(p Point) {
 	}
 }
 
-func (n *loopNode) TookKeyboardFocus() { n.focused = true; n.Repaint() }
-func (n *loopNode) LostKeyboardFocus() { n.focused = false; n.Repaint() }
+func (n *loopNode) TookKeyFocus() { n.focused = true; n.Repaint() }
+func (n *loopNode) LostKeyFocus() { n.focused = false; n.Repaint() }
 
-func (n *loopNode) KeyPressed(event KeyEvent) {
+func (n *loopNode) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft, KeyRight, KeyUp, KeyDown:
 		n.blk.outermost().focusNearestView(n, event.Key)
 	case KeyEscape:
-		SetKeyboardFocus(n.blk)
+		SetKeyFocus(n.blk)
 	default:
-		n.ViewBase.KeyPressed(event)
+		n.ViewBase.KeyPress(event)
 	}
 }
 

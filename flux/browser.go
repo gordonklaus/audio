@@ -339,7 +339,7 @@ func (b *browser) Paint() {
 	rect := ZR
 	if b.newObj == nil && len(b.nameTexts) > 0 {
 		cur := b.nameTexts[b.i]
-		rect = Rect(0, cur.Position().Y, cur.Position().X+Width(cur), cur.Position().Y+Height(cur))
+		rect = Rect(0, cur.Pos().Y, cur.Pos().X+Width(cur), cur.Pos().Y+Height(cur))
 	} else {
 		rect = MapRectToParent(b.text, b.text.Rect())
 		rect.Min.X = 0
@@ -461,7 +461,7 @@ ok:
 	}
 	xOffset := 0.0
 	if t, ok := b.lastPathText(); ok {
-		xOffset = t.Position().X + Width(t)
+		xOffset = t.Pos().X + Width(t)
 	}
 
 	for _, l := range b.nameTexts {
@@ -519,13 +519,13 @@ ok:
 		}
 	}
 	for _, p := range b.pathTexts {
-		p.Move(Pt(p.Position().X, yOffset))
+		p.Move(Pt(p.Pos().X, yOffset))
 	}
 
 	Pan(b, Pt(0, yOffset))
 }
-func (t *nodeNameText) LostKeyboardFocus() { t.b.cancel() }
-func (t *nodeNameText) KeyPressed(event KeyEvent) {
+func (t *nodeNameText) LostKeyFocus() { t.b.cancel() }
+func (t *nodeNameText) KeyPress(event KeyEvent) {
 	b := t.b
 	switch event.Key {
 	case KeyUp:
@@ -540,7 +540,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 		}
 	case KeyBackspace:
 		if len(t.GetText()) > 0 {
-			t.TextBase.KeyPressed(event)
+			t.TextBase.KeyPress(event)
 			break
 		}
 		fallthrough
@@ -576,13 +576,13 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 					savePackageName(pkg.Package)
 				}
 				b.text.SetText("")
-				SetKeyboardFocus(b.text)
+				SetKeyFocus(b.text)
 			}
 			t.Reject = func() {
 				b.text.SetText(b.text.GetText())
-				SetKeyboardFocus(b.text)
+				SetKeyFocus(b.text)
 			}
-			SetKeyboardFocus(t)
+			SetKeyFocus(t)
 			return
 		}
 
@@ -659,7 +659,7 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 				b.AddChild(pathText)
 				x := 0.0
 				if t, ok := b.lastPathText(); ok {
-					x = t.Position().X + Width(t)
+					x = t.Pos().X + Width(t)
 				}
 				pathText.Move(Pt(x, 0))
 				b.pathTexts = append(b.pathTexts, pathText)
@@ -709,12 +709,12 @@ func (t *nodeNameText) KeyPressed(event KeyEvent) {
 			case "5":
 				b.newObj = &types.Const{Pkg: pkg}
 			default:
-				t.TextBase.KeyPressed(event)
+				t.TextBase.KeyPress(event)
 				return
 			}
 			t.SetText("")
 		} else {
-			t.TextBase.KeyPressed(event)
+			t.TextBase.KeyPress(event)
 		}
 	}
 }

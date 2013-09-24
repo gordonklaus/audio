@@ -29,7 +29,7 @@ func (n *typeAssertNode) editType() {
 			n.setType(t)
 		} else {
 			n.blk.removeNode(n)
-			SetKeyboardFocus(n.blk)
+			SetKeyFocus(n.blk)
 		}
 	})
 }
@@ -40,6 +40,6 @@ func (n *typeAssertNode) setType(t types.Type) {
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
 		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+Height(n.typ)/2))
-		SetKeyboardFocus(n)
+		SetKeyFocus(n)
 	}
 }

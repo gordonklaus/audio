@@ -70,21 +70,21 @@ func (n *ifNode) Move(p Point) {
 	}
 }
 
-func (n *ifNode) TookKeyboardFocus() { n.focused = true; n.Repaint() }
-func (n *ifNode) LostKeyboardFocus() { n.focused = false; n.Repaint() }
+func (n *ifNode) TookKeyFocus() { n.focused = true; n.Repaint() }
+func (n *ifNode) LostKeyFocus() { n.focused = false; n.Repaint() }
 
-func (n *ifNode) KeyPressed(event KeyEvent) {
+func (n *ifNode) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft, KeyRight:
 		n.blk.outermost().focusNearestView(n, event.Key)
 	case KeyUp:
-		SetKeyboardFocus(n.trueblk)
+		SetKeyFocus(n.trueblk)
 	case KeyDown:
-		SetKeyboardFocus(n.falseblk)
+		SetKeyFocus(n.falseblk)
 	case KeyEscape:
-		SetKeyboardFocus(n.blk)
+		SetKeyFocus(n.blk)
 	default:
-		n.ViewBase.KeyPressed(event)
+		n.ViewBase.KeyPress(event)
 	}
 }
 

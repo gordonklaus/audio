@@ -19,21 +19,21 @@ type View interface {
 	Raise()
 	Lower()
 
-	Position() Point
+	Pos() Point
 	Move(Point)
 
 	Rect() Rectangle
 	SetRect(Rectangle)
 
-	setKeyboardFocus(View)
-	GetKeyboardFocus() View
-	TookKeyboardFocus()
-	LostKeyboardFocus()
+	setKeyFocus(View)
+	KeyFocus() View
+	TookKeyFocus()
+	LostKeyFocus()
 
-	KeyPressed(KeyEvent)
-	KeyReleased(KeyEvent)
+	KeyPress(KeyEvent)
+	KeyRelease(KeyEvent)
 
-	setMouseFocus(focus MouserView, button int)
+	setMouser(m MouserView, button int)
 
 	Repaint()
 	Paint()
@@ -122,7 +122,7 @@ func (v *ViewBase) Lower() {
 	}
 }
 
-func (v ViewBase) Position() Point { return v.position }
+func (v ViewBase) Pos() Point { return v.position }
 func (v *ViewBase) Move(p Point) {
 	v.position = p
 	v.Self.Repaint()
@@ -158,36 +158,36 @@ func ResizeToFit(v View, margin float64) {
 	v.SetRect(rect.Inset(-margin))
 }
 
-func SetKeyboardFocus(v View) { v.setKeyboardFocus(v) }
-func (v *ViewBase) setKeyboardFocus(view View) {
+func SetKeyFocus(v View) { v.setKeyFocus(v) }
+func (v *ViewBase) setKeyFocus(view View) {
 	if v.parent != nil {
-		v.parent.setKeyboardFocus(view)
+		v.parent.setKeyFocus(view)
 	}
 }
-func (v ViewBase) GetKeyboardFocus() View {
+func (v ViewBase) KeyFocus() View {
 	if v.parent != nil {
-		return v.parent.GetKeyboardFocus()
+		return v.parent.KeyFocus()
 	}
 	return nil
 }
-func (v *ViewBase) TookKeyboardFocus() {}
-func (v *ViewBase) LostKeyboardFocus() {}
+func (v *ViewBase) TookKeyFocus() {}
+func (v *ViewBase) LostKeyFocus() {}
 
-func (v *ViewBase) KeyPressed(event KeyEvent) {
+func (v *ViewBase) KeyPress(event KeyEvent) {
 	if v.parent != nil {
-		v.parent.KeyPressed(event)
+		v.parent.KeyPress(event)
 	}
 }
-func (v *ViewBase) KeyReleased(event KeyEvent) {
+func (v *ViewBase) KeyRelease(event KeyEvent) {
 	if v.parent != nil {
-		v.parent.KeyReleased(event)
+		v.parent.KeyRelease(event)
 	}
 }
 
-func SetMouseFocus(m MouserView, button int) { m.setMouseFocus(m, button) }
-func (v *ViewBase) setMouseFocus(m MouserView, button int) {
+func SetMouser(m MouserView, button int) { m.setMouser(m, button) }
+func (v *ViewBase) setMouser(m MouserView, button int) {
 	if v.parent != nil {
-		v.parent.setMouseFocus(m, button)
+		v.parent.setMouser(m, button)
 	}
 }
 
@@ -202,7 +202,7 @@ func (v ViewBase) paint() {
 	}
 	gl.PushMatrix()
 	defer gl.PopMatrix()
-	delta := v.Position().Sub(v.Rect().Min)
+	delta := v.Pos().Sub(v.Rect().Min)
 	gl.Translated(gl.Double(delta.X), gl.Double(delta.Y), 0)
 	v.Self.Paint()
 	for _, child := range v.Self.Children() {
@@ -234,7 +234,7 @@ func viewAtFunc(v View, p Point, f func(View) View) View {
 }
 
 func MapFromParent(v View, p Point) Point {
-	return p.Sub(v.Position()).Add(v.Rect().Min)
+	return p.Sub(v.Pos()).Add(v.Rect().Min)
 }
 func MapFrom(v View, p Point, parent View) Point {
 	if v == parent || v.Parent() == nil {
@@ -243,7 +243,7 @@ func MapFrom(v View, p Point, parent View) Point {
 	return MapFromParent(v, MapFrom(v.Parent(), p, parent))
 }
 func MapToParent(v View, p Point) Point {
-	return p.Sub(v.Rect().Min).Add(v.Position())
+	return p.Sub(v.Rect().Min).Add(v.Pos())
 }
 func MapTo(v View, p Point, parent View) Point {
 	if v == parent || v.Parent() == nil {

@@ -65,7 +65,7 @@ func (b *block) removeNode(n node) {
 	}
 }
 
-func (b *block) addConnection(c *connection) {
+func (b *block) addConn(c *connection) {
 	if c.blk != nil {
 		delete(c.blk.conns, c)
 	}
@@ -75,7 +75,7 @@ func (b *block) addConnection(c *connection) {
 	b.conns[c] = true
 }
 
-func (b *block) removeConnection(c *connection) {
+func (b *block) removeConn(c *connection) {
 	c.disconnect()
 	delete(b.conns, c)
 	b.RemoveChild(c)
@@ -186,7 +186,7 @@ nx:
 }
 
 func (b *block) startEditing() {
-	SetKeyboardFocus(b)
+	SetKeyFocus(b)
 	b.editing = true
 }
 
@@ -333,11 +333,11 @@ func (b *block) update() (updated bool) {
 
 	center := ZP
 	for n := range b.nodes {
-		center = center.Add(n.Position())
+		center = center.Add(n.Pos())
 	}
 	center = center.Div(float64(len(b.nodes)))
 	for n := range b.nodes {
-		addVel(n, center.Sub(n.Position().Mul(nodeCenterCoef)))
+		addVel(n, center.Sub(n.Pos().Mul(nodeCenterCoef)))
 		l := b.vel[n].Len()
 		if l > 0 {
 			b.vel[n] = b.vel[n].Mul(math.Tanh(speedCompress*l/topSpeed) * topSpeed / l)
@@ -378,7 +378,7 @@ func (b *block) update() (updated bool) {
 		dt := math.Min(1.0/fps, 100/meanSpeed) // slow down time at high speeds to avoid oscillation
 		for n := range b.nodes {
 			b.vel[n] = b.vel[n].Mul(.5 + rand.Float64()) // a little noise to break up small oscillations
-			n.Move(n.Position().Add(b.vel[n].Mul(dt)).Sub(center))
+			n.Move(n.Pos().Add(b.vel[n].Mul(dt)).Sub(center))
 		}
 	}
 
@@ -442,14 +442,14 @@ func (b *block) focusNearestView(v View, dirKey int) {
 	}
 	nearest := nearestView(b, views, MapTo(v, Center(v), b), dirKey)
 	if nearest != nil {
-		SetKeyboardFocus(nearest)
+		SetKeyFocus(nearest)
 	}
 }
 
-func (b *block) TookKeyboardFocus() { b.focused = true; b.Repaint() }
-func (b *block) LostKeyboardFocus() { b.focused = false; b.stopEditing(); b.Repaint() }
+func (b *block) TookKeyFocus() { b.focused = true; b.Repaint() }
+func (b *block) LostKeyFocus() { b.focused = false; b.stopEditing(); b.Repaint() }
 
-func (b *block) KeyPressed(event KeyEvent) {
+func (b *block) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft, KeyRight, KeyUp, KeyDown:
 		outermost := b.outermost()
@@ -490,10 +490,10 @@ func (b *block) KeyPressed(event KeyEvent) {
 			b.startEditing()
 		}
 	case KeyBackspace, KeyDelete:
-		switch v := b.GetKeyboardFocus().(type) {
+		switch v := b.KeyFocus().(type) {
 		case *block:
 			if v.node != nil {
-				SetKeyboardFocus(v.node)
+				SetKeyFocus(v.node)
 			}
 		case *portsNode:
 		case node:
@@ -506,10 +506,10 @@ func (b *block) KeyPressed(event KeyEvent) {
 				foc = out[len(out)-1].dst.node
 			}
 			for _, c := range append(in, out...) {
-				c.blk.removeConnection(c)
+				c.blk.removeConn(c)
 			}
 			b.removeNode(v)
-			SetKeyboardFocus(foc)
+			SetKeyFocus(foc)
 		}
 	case KeyEscape:
 		if b.editing {
@@ -519,7 +519,7 @@ func (b *block) KeyPressed(event KeyEvent) {
 				b.stopEditing()
 			}
 		} else if outer := b.outer(); outer != nil {
-			SetKeyboardFocus(outer)
+			SetKeyFocus(outer)
 		} else {
 			b.func_().Close()
 		}
@@ -537,10 +537,10 @@ func (b *block) KeyPressed(event KeyEvent) {
 				}
 				browser.canceled = func() {
 					Close(browser)
-					SetKeyboardFocus(b)
+					SetKeyFocus(b)
 				}
-				browser.text.KeyPressed(event)
-				SetKeyboardFocus(browser.text)
+				browser.text.KeyPress(event)
+				SetKeyFocus(browser.text)
 			case "\"", "'", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
 				text := event.Text
 				kind := token.INT
@@ -556,19 +556,19 @@ func (b *block) KeyPressed(event KeyEvent) {
 				n.text.SetText(text)
 				n.text.Reject = func() {
 					b.removeNode(n)
-					SetKeyboardFocus(b)
+					SetKeyFocus(b)
 				}
-				SetKeyboardFocus(n.text)
+				SetKeyFocus(n.text)
 			case "{":
 				n := newCompositeLiteralNode()
 				b.addNode(n)
 				MoveCenter(n, Center(b))
 				n.editType()
 			case "":
-				b.ViewBase.KeyPressed(event)
+				b.ViewBase.KeyPress(event)
 			}
 		} else {
-			b.ViewBase.KeyPressed(event)
+			b.ViewBase.KeyPress(event)
 		}
 	}
 }
@@ -611,7 +611,7 @@ func newNode(b *block, obj types.Object) {
 	}); ok {
 		nn.editType()
 	} else {
-		SetKeyboardFocus(n)
+		SetKeyFocus(n)
 	}
 }
 
@@ -686,14 +686,14 @@ func (n *portsNode) removePort(p *port) {
 			f.subPkgRef((*vars)[i].Type)
 			*vars = append((*vars)[:i], (*vars)[i+1:]...)
 			n.removePortBase(p)
-			SetKeyboardFocus(n)
+			SetKeyFocus(n)
 			break
 		}
 	}
 	n.reposition()
 }
 
-func (n *portsNode) KeyPressed(event KeyEvent) {
+func (n *portsNode) KeyPress(event KeyEvent) {
 	if n.editable && event.Text == "," {
 		f := n.blk.func_()
 		sig := f.obj.GetType().(*types.Signature)
@@ -713,14 +713,14 @@ func (n *portsNode) KeyPressed(event KeyEvent) {
 			if v.Type != nil {
 				*vars = append(*vars, v)
 				f.addPkgRef(v.Type)
-				SetKeyboardFocus(p)
+				SetKeyFocus(p)
 			} else {
 				n.removePortBase(p)
 				n.reposition()
-				SetKeyboardFocus(n)
+				SetKeyFocus(n)
 			}
 		})
 	} else {
-		n.nodeBase.KeyPressed(event)
+		n.nodeBase.KeyPress(event)
 	}
 }

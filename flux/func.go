@@ -132,14 +132,14 @@ func (n *funcNode) update() bool {
 	return true
 }
 
-func (n *funcNode) TookKeyboardFocus() { SetKeyboardFocus(n.funcblk) }
+func (n *funcNode) TookKeyFocus() { SetKeyFocus(n.funcblk) }
 
-func (n *funcNode) KeyPressed(event KeyEvent) {
+func (n *funcNode) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyF1:
 		saveFunc(*n)
 	default:
-		n.ViewBase.KeyPressed(event)
+		n.ViewBase.KeyPress(event)
 	}
 }
 

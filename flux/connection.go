@@ -99,7 +99,7 @@ func (c *connection) reblock() {
 			}
 		}
 	}
-	newblk.addConnection(c)
+	newblk.addConn(c)
 }
 
 func (c *connection) reform() {
@@ -148,31 +148,31 @@ func (c *connection) startEditing() {
 	}
 }
 
-func (c *connection) TookKeyboardFocus() { c.focused = true; c.Repaint() }
-func (c *connection) LostKeyboardFocus() { c.focused = false; c.Repaint() }
+func (c *connection) TookKeyFocus() { c.focused = true; c.Repaint() }
+func (c *connection) LostKeyFocus() { c.focused = false; c.Repaint() }
 
-func (c *connection) KeyPressed(event KeyEvent) {
+func (c *connection) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft:
-		SetKeyboardFocus(c.src)
+		SetKeyFocus(c.src)
 	case KeyRight:
-		SetKeyboardFocus(c.dst)
+		SetKeyFocus(c.dst)
 	case KeyDown, KeyUp:
 		c.blk.outermost().focusNearestView(c, event.Key)
 	case KeyBackspace:
-		SetKeyboardFocus(c.src)
-		c.blk.removeConnection(c)
+		SetKeyFocus(c.src)
+		c.blk.removeConn(c)
 	case KeyDelete:
-		SetKeyboardFocus(c.dst)
-		c.blk.removeConnection(c)
+		SetKeyFocus(c.dst)
+		c.blk.removeConn(c)
 	case KeyEscape:
-		SetKeyboardFocus(c.blk)
+		SetKeyFocus(c.blk)
 	default:
 		if event.Text == "\\" {
 			c.feedback = !c.feedback
 			c.reform()
 		} else {
-			c.ViewBase.KeyPressed(event)
+			c.ViewBase.KeyPress(event)
 		}
 	}
 }

@@ -88,7 +88,7 @@ func (t *TextBase) SetValidator(validator func(*string) bool) {
 	t.validator = validator
 }
 
-func (t *TextBase) KeyPressed(event KeyEvent) {
+func (t *TextBase) KeyPress(event KeyEvent) {
 	if len(event.Text) > 0 {
 		text := t.text + event.Text
 		if t.validator == nil || t.validator(&text) {

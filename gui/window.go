@@ -11,8 +11,8 @@ type Window struct {
 	w *glfw.Window
 	*ViewBase
 	centralView   View
-	keyboardFocus View
-	mouseFocus    map[int]MouserView
+	keyFocus      View
+	mouser        map[int]MouserView
 	control       chan interface{}
 	key           chan KeyEvent
 	mouse         chan MouseEvent
@@ -33,7 +33,7 @@ func NewWindow(self View) *Window {
 		self = w
 	}
 	w.ViewBase = NewView(w)
-	w.mouseFocus = make(map[int]MouserView)
+	w.mouser = make(map[int]MouserView)
 	w.control = make(chan interface{})
 	w.key = make(chan KeyEvent, 10)
 	w.mouse = make(chan MouseEvent, 100)
@@ -66,7 +66,7 @@ func (w *Window) SetCentralView(v View) {
 			w.AddChild(v)
 		}
 		Resize(v, Size(w))
-		SetKeyboardFocus(v)
+		SetKeyFocus(v)
 	}
 }
 
@@ -150,11 +150,11 @@ func (w *Window) run() {
 					}
 				}
 			case k := <-w.key:
-				if w.keyboardFocus != nil {
+				if w.keyFocus != nil {
 					if k.Action != Release {
-						w.keyboardFocus.KeyPressed(k)
+						w.keyFocus.KeyPress(k)
 					} else {
-						w.keyboardFocus.KeyReleased(k)
+						w.keyFocus.KeyRelease(k)
 					}
 				}
 			case m := <-w.mouse:
@@ -165,19 +165,19 @@ func (w *Window) run() {
 						return v
 					}).(MouserView)
 					if v != nil {
-						w.mouseFocus[m.Button] = v
+						w.mouser[m.Button] = v
 						m.Pos = MapFrom(v, m.Pos, w.Self)
 						v.Mouse(m)
 					}
 				case Move:
-					for button, v := range w.mouseFocus {
+					for button, v := range w.mouser {
 						v.Mouse(MouseEvent{MapFrom(v, m.Pos, w.Self), Drag, button})
 					}
 				case Release:
-					if v, ok := w.mouseFocus[m.Button]; ok {
+					if v, ok := w.mouser[m.Button]; ok {
 						m.Pos = MapFrom(v, m.Pos, w.Self)
 						v.Mouse(m)
-						delete(w.mouseFocus, m.Button)
+						delete(w.mouser, m.Button)
 					}
 				}
 			case <-w.paint:
@@ -190,22 +190,22 @@ func (w *Window) run() {
 	wg.Wait()
 }
 
-func (w *Window) setKeyboardFocus(view View) {
-	if w.keyboardFocus != view {
-		// change w.keyboardFocus first to avoid possible infinite recursion
-		oldFocus := w.keyboardFocus
-		w.keyboardFocus = view
+func (w *Window) setKeyFocus(view View) {
+	if w.keyFocus != view {
+		// change w.keyFocus first to avoid possible infinite recursion
+		oldFocus := w.keyFocus
+		w.keyFocus = view
 		if oldFocus != nil {
-			oldFocus.LostKeyboardFocus()
+			oldFocus.LostKeyFocus()
 		}
-		if w.keyboardFocus != nil {
-			w.keyboardFocus.TookKeyboardFocus()
+		if w.keyFocus != nil {
+			w.keyFocus.TookKeyFocus()
 		}
 	}
 }
-func (w Window) GetKeyboardFocus() View { return w.keyboardFocus }
+func (w Window) KeyFocus() View { return w.keyFocus }
 
-func (w *Window) setMouseFocus(focus MouserView, button int) { w.mouseFocus[button] = focus }
+func (w *Window) setMouser(m MouserView, button int) { w.mouser[button] = m }
 
 func (w *Window) Repaint() {
 	select {

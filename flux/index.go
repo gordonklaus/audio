@@ -77,7 +77,7 @@ func (n *indexNode) updateInputType() {
 		default:
 			if n.ok != nil {
 				for _, c := range n.ok.conns {
-					c.blk.removeConnection(c)
+					c.blk.removeConn(c)
 				}
 				n.RemoveChild(n.ok)
 				n.outs = n.outs[:1]

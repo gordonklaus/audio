@@ -34,7 +34,7 @@ func newFluxWindow() *fluxWindow {
 				w.browser.AddChild(v)
 				w.browser.Show()
 				w.browser.text.SetText("")
-				SetKeyboardFocus(w.browser.text)
+				SetKeyFocus(w.browser.text)
 			}
 			if typ.Underlying == nil {
 				v.edit(func() {
@@ -50,7 +50,7 @@ func newFluxWindow() *fluxWindow {
 					saveType(typ)
 					reset()
 				}
-				SetKeyboardFocus(v)
+				SetKeyFocus(v)
 			}
 		case *types.Func, method:
 			n := newFuncNode(obj)
@@ -61,12 +61,12 @@ func newFluxWindow() *fluxWindow {
 			n.done = func() {
 				w.browser.Show()
 				w.browser.text.SetText("")
-				SetKeyboardFocus(w.browser.text)
+				SetKeyFocus(w.browser.text)
 			}
-			SetKeyboardFocus(n)
+			SetKeyFocus(n)
 		}
 	}
-	SetKeyboardFocus(w.browser.text)
+	SetKeyFocus(w.browser.text)
 	return w
 }
 
