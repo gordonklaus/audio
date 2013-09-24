@@ -12,10 +12,10 @@ type Window struct {
 	*ViewBase
 	centralView   View
 	keyboardFocus View
-	mouseFocus    map[int]MouseHandlerView
+	mouseFocus    map[int]MouserView
 	control       chan interface{}
 	key           chan KeyEvent
-	mouse         chan interface{}
+	mouse         chan MouseEvent
 	paint         chan struct{}
 	do            chan func()
 }
@@ -33,10 +33,10 @@ func NewWindow(self View) *Window {
 		self = w
 	}
 	w.ViewBase = NewView(w)
-	w.mouseFocus = make(map[int]MouseHandlerView)
+	w.mouseFocus = make(map[int]MouserView)
 	w.control = make(chan interface{})
 	w.key = make(chan KeyEvent, 10)
-	w.mouse = make(chan interface{}, 100)
+	w.mouse = make(chan MouseEvent, 100)
 	w.paint = make(chan struct{}, 1)
 	w.do = make(chan func())
 
@@ -72,14 +72,8 @@ func (w *Window) SetCentralView(v View) {
 
 func (w *Window) run() {
 	type (
-		close       *Window
-		resize      Point
-		mouseMove   Point
-		mouseButton struct {
-			Pos    Point
-			Button int
-			Action int
-		}
+		close  *Window
+		resize Point
 	)
 
 	w.w.OnClose(func() {
@@ -112,13 +106,16 @@ func (w *Window) run() {
 		}
 	})
 
-	var pos Point
+	m := MouseEvent{}
 	w.w.OnMouseMove(func(x, y float64) {
-		pos = Pt(x, Height(w)-y)
-		w.mouse <- mouseMove(pos)
+		m.Pos = Pt(x, Height(w)-y)
+		m.Action = Move
+		w.mouse <- m
 	})
 	w.w.OnMouseButton(func(button, action, mods int) {
-		w.mouse <- mouseButton{pos, button, action}
+		m.Button = button
+		m.Action = action
+		w.mouse <- m
 	})
 
 	var wg sync.WaitGroup
@@ -161,23 +158,26 @@ func (w *Window) run() {
 					}
 				}
 			case m := <-w.mouse:
-				switch m := m.(type) {
-				case mouseMove:
-					for button, v := range w.mouseFocus {
-						v.MouseDragged(button, MapFrom(v, Point(m), w.Self))
+				switch m.Action {
+				case Press:
+					v, _ := viewAtFunc(w, m.Pos, func(v View) View {
+						v, _ = v.(MouserView)
+						return v
+					}).(MouserView)
+					if v != nil {
+						w.mouseFocus[m.Button] = v
+						m.Pos = MapFrom(v, m.Pos, w.Self)
+						v.Mouse(m)
 					}
-				case mouseButton:
-					if m.Action == Press {
-						v := w.Self.GetMouseFocus(m.Button, m.Pos)
-						if v != nil {
-							w.mouseFocus[m.Button] = v
-							v.MousePressed(m.Button, MapFrom(v, m.Pos, w.Self))
-						}
-					} else if m.Action == Release {
-						if v, ok := w.mouseFocus[m.Button]; ok {
-							v.MouseReleased(m.Button, MapFrom(v, m.Pos, w.Self))
-							delete(w.mouseFocus, m.Button)
-						}
+				case Move:
+					for button, v := range w.mouseFocus {
+						v.Mouse(MouseEvent{MapFrom(v, m.Pos, w.Self), Drag, button})
+					}
+				case Release:
+					if v, ok := w.mouseFocus[m.Button]; ok {
+						m.Pos = MapFrom(v, m.Pos, w.Self)
+						v.Mouse(m)
+						delete(w.mouseFocus, m.Button)
 					}
 				}
 			case <-w.paint:
@@ -205,7 +205,7 @@ func (w *Window) setKeyboardFocus(view View) {
 }
 func (w Window) GetKeyboardFocus() View { return w.keyboardFocus }
 
-func (w *Window) SetMouseFocus(focus MouseHandlerView, button int) { w.mouseFocus[button] = focus }
+func (w *Window) setMouseFocus(focus MouserView, button int) { w.mouseFocus[button] = focus }
 
 func (w *Window) Repaint() {
 	select {

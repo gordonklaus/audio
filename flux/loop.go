@@ -7,7 +7,7 @@ import (
 
 type loopNode struct {
 	*ViewBase
-	AggregateMouseHandler
+	AggregateMouser
 	blk           *block
 	input         *port
 	seqIn, seqOut *port
@@ -19,7 +19,7 @@ type loopNode struct {
 func newLoopNode() *loopNode {
 	n := &loopNode{}
 	n.ViewBase = NewView(n)
-	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
+	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
 	n.input = newInput(n, &types.Var{})
 	n.input.connsChanged = n.updateInputType
 	MoveCenter(n.input, Pt(-2*portSize, 0))

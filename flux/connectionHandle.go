@@ -83,20 +83,21 @@ func (h *connectionHandle) KeyPressed(event KeyEvent) {
 	}
 }
 
-func (h *connectionHandle) MousePressed(button int, p Point) {
-	h.startEditing()
-	h.spec.updateConnection(p)
-}
-func (h *connectionHandle) MouseDragged(button int, p Point) {
-	if h.editing {
-		h.spec.updateConnection(p)
+func (h *connectionHandle) Mouse(m MouseEvent) {
+	switch m.Action {
+	case Press:
+		h.startEditing()
+		h.spec.updateConnection(m.Pos)
+	case Drag:
+		if h.editing {
+			h.spec.updateConnection(m.Pos)
+		}
+	case Release:
+		if h.editing {
+			h.spec.updateConnection(m.Pos)
+		}
+		h.stopEditing()
 	}
-}
-func (h *connectionHandle) MouseReleased(button int, p Point) {
-	if h.editing {
-		h.spec.updateConnection(p)
-	}
-	h.stopEditing()
 }
 
 func (h connectionHandle) Paint() {

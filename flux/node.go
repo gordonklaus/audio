@@ -13,7 +13,7 @@ import (
 
 type node interface {
 	View
-	MouseHandler
+	Mouser
 	block() *block
 	setBlock(b *block)
 	inputs() []*port
@@ -49,7 +49,7 @@ func (t nodeText) Paint() {
 type nodeBase struct {
 	*ViewBase
 	self node
-	AggregateMouseHandler
+	AggregateMouser
 	blk     *block
 	text    *nodeText
 	ins     []*port
@@ -64,7 +64,7 @@ const (
 func newNodeBase(self node) *nodeBase {
 	n := &nodeBase{self: self}
 	n.ViewBase = NewView(n)
-	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(self), NewViewDragger(self)}
+	n.AggregateMouser = AggregateMouser{NewClickFocuser(self), NewMover(self)}
 	n.text = newNodeText(n)
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	n.AddChild(n.text)

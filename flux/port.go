@@ -146,20 +146,18 @@ func (p *port) KeyPressed(event KeyEvent) {
 	}
 }
 
-func (p *port) MousePressed(button int, pt Point) {
+func (p *port) Mouse(m MouseEvent) {
 	SetKeyboardFocus(p)
 	c := newConnection()
 	if p.out {
 		c.setSrc(p)
-		c.dstHandle.SetMouseFocus(c.dstHandle, button)
+		SetMouseFocus(c.dstHandle, m.Button)
 	} else {
 		c.setDst(p)
-		c.srcHandle.SetMouseFocus(c.srcHandle, button)
+		SetMouseFocus(c.srcHandle, m.Button)
 	}
 	c.startEditing()
 }
-func (p port) MouseDragged(button int, pt Point)  {}
-func (p port) MouseReleased(button int, pt Point) {}
 
 func (p port) Paint() {
 	if p.focused {

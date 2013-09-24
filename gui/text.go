@@ -22,20 +22,18 @@ type Text interface {
 	SetBackgroundColor(Color)
 	SetFrameColor(Color)
 	SetFrameSize(float64)
-	SetEditable(bool)
 	SetValidator(func(*string) bool)
 }
 
 type TextBase struct {
 	*ViewBase
-	AggregateMouseHandler
+	AggregateMouser
 	Self                Text
 	text                string
 	textColor           Color
 	frameSize           float64
 	frameColor          Color
 	backgroundColor     Color
-	editable            bool
 	validator           func(*string) bool
 	Accept, TextChanged func(string)
 	Reject              func()
@@ -48,7 +46,7 @@ func NewTextBase(self Text, text string) *TextBase {
 		self = t
 	}
 	t.ViewBase = NewView(t)
-	t.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(t)}
+	t.AggregateMouser = AggregateMouser{NewClickFocuser(t)}
 	t.textColor = Color{1, 1, 1, 1}
 	t.backgroundColor = Color{0, 0, 0, 1}
 	t.Accept, t.Reject, t.TextChanged = func(string) {}, func() {}, func(string) {}
@@ -86,19 +84,8 @@ func (t *TextBase) SetFrameSize(size float64) {
 	Resize(t, Pt(2*t.frameSize+font.Advance(t.text), 2*t.frameSize-font.Descender()+font.Ascender()))
 }
 
-func (t *TextBase) SetEditable(editable bool) {
-	t.editable = editable
-}
-
 func (t *TextBase) SetValidator(validator func(*string) bool) {
 	t.validator = validator
-}
-
-func (t *TextBase) GetMouseFocus(button int, p Point) MouseHandlerView {
-	if t.editable {
-		return t.ViewBase.GetMouseFocus(button, p)
-	}
-	return nil
 }
 
 func (t *TextBase) KeyPressed(event KeyEvent) {

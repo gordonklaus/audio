@@ -7,7 +7,7 @@ import (
 
 type ifNode struct {
 	*ViewBase
-	AggregateMouseHandler
+	AggregateMouser
 	blk           *block
 	input         *port
 	seqIn, seqOut *port
@@ -19,7 +19,7 @@ type ifNode struct {
 func newIfNode() *ifNode {
 	n := &ifNode{}
 	n.ViewBase = NewView(n)
-	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
+	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
 	n.input = newInput(n, &types.Var{Type: types.Typ[types.Bool]})
 	n.falseblk = newBlock(n)
 	n.trueblk = newBlock(n)

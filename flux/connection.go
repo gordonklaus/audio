@@ -7,7 +7,7 @@ import (
 
 type connection struct {
 	*ViewBase
-	AggregateMouseHandler
+	AggregateMouser
 	blk      *block
 	src      *port
 	dst      *port
@@ -24,7 +24,7 @@ type connection struct {
 func newConnection() *connection {
 	c := &connection{}
 	c.ViewBase = NewView(c)
-	c.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(c)}
+	c.AggregateMouser = AggregateMouser{NewClickFocuser(c)}
 	c.srcHandle = newConnectionSourceHandle(c)
 	c.dstHandle = newConnectionDestinationHandle(c)
 	c.AddChild(c.srcHandle)

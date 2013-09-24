@@ -9,7 +9,7 @@ import (
 
 type funcNode struct {
 	*ViewBase
-	AggregateMouseHandler
+	AggregateMouser
 	obj                     types.Object
 	pkgRefs                 map[*types.Package]int
 	inputsNode, outputsNode *portsNode
@@ -21,7 +21,7 @@ type funcNode struct {
 func newFuncNode(obj types.Object) *funcNode {
 	n := &funcNode{obj: obj}
 	n.ViewBase = NewView(n)
-	n.AggregateMouseHandler = AggregateMouseHandler{NewClickKeyboardFocuser(n), NewViewDragger(n)}
+	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
 	n.pkgRefs = map[*types.Package]int{}
 	n.funcblk = newBlock(n)
 	n.inputsNode = newInputsNode()
