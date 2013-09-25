@@ -237,7 +237,7 @@ func (b *block) update() (updated bool) {
 			if n2 == n1 {
 				continue
 			}
-			dir := MapToParent(n1, Center(n1)).Sub(MapToParent(n2, Center(n2)))
+			dir := CenterInParent(n1).Sub(CenterInParent(n2))
 			if dir == ZP {
 				dir = Pt(rand.NormFloat64(), rand.NormFloat64())
 			}
@@ -265,7 +265,7 @@ func (b *block) update() (updated bool) {
 				}
 				x := c.srcPt
 				y := c.dstPt
-				p := MapToParent(n1, Center(n1))
+				p := CenterInParent(n1)
 				dir := p.Sub(PointToLine(p, x, y))
 				if dir == ZP {
 					dir = Pt(rand.NormFloat64(), rand.NormFloat64())
@@ -387,7 +387,7 @@ func (b *block) update() (updated bool) {
 
 	rect := ZR
 	for n := range b.nodes {
-		r := MapRectToParent(n, Rect(n))
+		r := RectInParent(n)
 		if n, ok := n.(*portsNode); ok {
 			// portsNodes are later reposition()ed to the boundary; thus we must adjust for the margin (blockRadius)
 			if n.out {
@@ -403,7 +403,7 @@ func (b *block) update() (updated bool) {
 		}
 	}
 	for c := range b.conns {
-		rect = rect.Union(MapRectToParent(c, Rect(c)))
+		rect = rect.Union(RectInParent(c))
 	}
 	if rect == ZR {
 		rect = Rectangle{ZP, Pt(16, 0)}

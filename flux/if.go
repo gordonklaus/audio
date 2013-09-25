@@ -88,6 +88,6 @@ func (n *ifNode) KeyPress(event KeyEvent) {
 
 func (n ifNode) Paint() {
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
-	DrawLine(MapToParent(n.input, Center(n.input)), MapToParent(n.seqOut, Center(n.seqOut)))
+	DrawLine(CenterInParent(n.input), CenterInParent(n.seqOut))
 	DrawLine(Pt(0, -4), Pt(0, 4))
 }

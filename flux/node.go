@@ -119,12 +119,12 @@ func (n *nodeBase) reform() {
 	for i, p := range ins {
 		y := -portSize * (float64(i) - (numIn-1)/2)
 		MoveCenter(p, Pt(-8-rx*math.Sqrt(ry*ry-y*y)/ry, y))
-		rect = rect.Union(MapRectToParent(p, Rect(p)))
+		rect = rect.Union(RectInParent(p))
 	}
 	for i, p := range outs {
 		y := -portSize * (float64(i) - (numOut-1)/2)
 		MoveCenter(p, Pt(8+rx*math.Sqrt(ry*ry-y*y)/ry, y))
-		rect = rect.Union(MapRectToParent(p, Rect(p)))
+		rect = rect.Union(RectInParent(p))
 	}
 
 	n.SetRect(rect)
@@ -197,7 +197,7 @@ func (n nodeBase) Paint() {
 	const DX = 8.0
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
 	for _, p := range append(n.ins, n.outs...) {
-		pt := MapToParent(p, Center(p))
+		pt := CenterInParent(p)
 		dx := -DX
 		if p.out {
 			dx = DX

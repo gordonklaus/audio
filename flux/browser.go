@@ -341,7 +341,7 @@ func (b *browser) Paint() {
 		cur := b.nameTexts[b.i]
 		rect = Rectangle{Pt(0, Pos(cur).Y), Pos(cur).Add(Size(cur))}
 	} else {
-		rect = MapRectToParent(b.text, Rect(b.text))
+		rect = RectInParent(b.text)
 		rect.Min.X = 0
 	}
 	SetColor(Color{1, 1, 1, .7})

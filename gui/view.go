@@ -119,8 +119,13 @@ func (v *ViewBase) Move(p Point) { v.pos = p; Repaint(v.Self) }
 func MoveCenter(v View, p Point) { v.Move(p.Sub(Size(v).Div(2))) }
 func MoveOrigin(v View, p Point) { v.Move(p.Add(Rect(v).Min)) }
 
-func Rect(v View) Rectangle             { return v.base().rect }
+func Rect(v View) Rectangle { return v.base().rect }
+func RectInParent(v View) Rectangle {
+	r := Rect(v)
+	return Rectangle{MapToParent(v, r.Min), MapToParent(v, r.Max)}
+}
 func Center(v View) Point               { return Rect(v).Min.Add(Size(v).Div(2)) }
+func CenterInParent(v View) Point       { return MapToParent(v, Center(v)) }
 func Size(v View) Point                 { return Rect(v).Size() }
 func Width(v View) float64              { return Rect(v).Dx() }
 func Height(v View) float64             { return Rect(v).Dy() }
@@ -138,7 +143,7 @@ func ResizeToFit(v View, margin float64) {
 	rect := ZR
 	for i := 0; i < NumChildren(v); i++ {
 		c := Child(v, i)
-		r := MapRectToParent(c, Rect(c))
+		r := RectInParent(c)
 		if i == 0 {
 			rect = r
 		} else {
@@ -186,13 +191,13 @@ func Repaint(v View) {
 	}
 }
 
-func (v ViewBase) paint() {
+func (v *ViewBase) paint() {
 	if v.hidden {
 		return
 	}
 	gl.PushMatrix()
 	defer gl.PopMatrix()
-	d := v.pos.Sub(v.rect.Min)
+	d := MapToParent(v, ZP)
 	gl.Translated(gl.Double(d.X), gl.Double(d.Y), 0)
 	v.Self.Paint()
 	for _, child := range v.children {
@@ -239,17 +244,4 @@ func MapTo(v View, p Point, parent View) Point {
 		return p
 	}
 	return MapTo(Parent(v), MapToParent(v, p), parent)
-}
-
-func MapRectFromParent(v View, r Rectangle) Rectangle {
-	return Rectangle{MapFromParent(v, r.Min), MapFromParent(v, r.Max)}
-}
-func MapRectFrom(v View, r Rectangle, parent View) Rectangle {
-	return Rectangle{MapFrom(v, r.Min, parent), MapFrom(v, r.Max, parent)}
-}
-func MapRectToParent(v View, r Rectangle) Rectangle {
-	return Rectangle{MapToParent(v, r.Min), MapToParent(v, r.Max)}
-}
-func MapRectTo(v View, r Rectangle, parent View) Rectangle {
-	return Rectangle{MapTo(v, r.Min, parent), MapTo(v, r.Max, parent)}
 }
