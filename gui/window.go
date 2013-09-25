@@ -10,14 +10,14 @@ import (
 type Window struct {
 	w *glfw.Window
 	*ViewBase
-	centralView   View
-	keyFocus      View
-	mouser        map[int]MouserView
-	control       chan interface{}
-	key           chan KeyEvent
-	mouse         chan MouseEvent
-	paint         chan struct{}
-	do            chan func()
+	centralView View
+	keyFocus    View
+	mouser      map[int]MouserView
+	control     chan interface{}
+	key         chan KeyEvent
+	mouse       chan MouseEvent
+	paint       chan struct{}
+	do          chan func()
 }
 
 func NewWindow(self View) *Window {
@@ -56,14 +56,16 @@ func NewWindow(self View) *Window {
 	return w
 }
 
+func (w *Window) win() *Window { return w }
+
 func (w *Window) SetCentralView(v View) {
 	if w.centralView != nil {
-		w.RemoveChild(w.centralView)
+		RemoveChild(w, w.centralView)
 	}
 	w.centralView = v
 	if v != nil {
-		if v.Parent() != w {
-			w.AddChild(v)
+		if Parent(v) != w {
+			AddChild(w, v)
 		}
 		Resize(v, Size(w))
 		SetKeyFocus(v)
@@ -89,7 +91,8 @@ func (w *Window) run() {
 	keyEvent := KeyEvent{}
 	w.w.OnKey(func(key, scancode, action, mods int) {
 		keyEvent.Key = key
-		keyEvent.Action = action
+		keyEvent.action = action
+		keyEvent.Repeat = action == glfw.Repeat
 		keyEvent.Shift = mods&glfw.ModShift != 0
 		keyEvent.Ctrl = mods&glfw.ModControl != 0
 		keyEvent.Alt = mods&glfw.ModAlt != 0
@@ -109,12 +112,12 @@ func (w *Window) run() {
 	m := MouseEvent{}
 	w.w.OnMouseMove(func(x, y float64) {
 		m.Pos = Pt(x, Height(w)-y)
-		m.Action = Move
+		m.Move, m.Press, m.Release, m.Drag = true, false, false, false
 		w.mouse <- m
 	})
 	w.w.OnMouseButton(func(button, action, mods int) {
 		m.Button = button
-		m.Action = action
+		m.Move, m.Press, m.Release, m.Drag = false, action == glfw.Press, action == glfw.Release, false
 		w.mouse <- m
 	})
 
@@ -151,15 +154,15 @@ func (w *Window) run() {
 				}
 			case k := <-w.key:
 				if w.keyFocus != nil {
-					if k.Action != Release {
+					if k.action != Release {
 						w.keyFocus.KeyPress(k)
 					} else {
 						w.keyFocus.KeyRelease(k)
 					}
 				}
 			case m := <-w.mouse:
-				switch m.Action {
-				case Press:
+				switch {
+				case m.Press:
 					v, _ := viewAtFunc(w, m.Pos, func(v View) View {
 						v, _ = v.(MouserView)
 						return v
@@ -169,11 +172,15 @@ func (w *Window) run() {
 						m.Pos = MapFrom(v, m.Pos, w.Self)
 						v.Mouse(m)
 					}
-				case Move:
+				case m.Move:
 					for button, v := range w.mouser {
-						v.Mouse(MouseEvent{MapFrom(v, m.Pos, w.Self), Drag, button})
+						m := m
+						m.Pos = MapFrom(v, m.Pos, w.Self)
+						m.Move, m.Drag = false, true
+						m.Button = button
+						v.Mouse(m)
 					}
-				case Release:
+				case m.Release:
 					if v, ok := w.mouser[m.Button]; ok {
 						m.Pos = MapFrom(v, m.Pos, w.Self)
 						v.Mouse(m)
@@ -181,7 +188,12 @@ func (w *Window) run() {
 					}
 				}
 			case <-w.paint:
-				w.repaint()
+				gl.MatrixMode(gl.MODELVIEW)
+				gl.LoadIdentity()
+
+				gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+				w.base().paint()
+				w.w.SwapBuffers()
 			case f := <-w.do:
 				f()
 			}
@@ -203,26 +215,12 @@ func (w *Window) setKeyFocus(view View) {
 		}
 	}
 }
-func (w Window) KeyFocus() View { return w.keyFocus }
 
 func (w *Window) setMouser(m MouserView, button int) { w.mouser[button] = m }
 
-func (w *Window) Repaint() {
+func (w *Window) repaint() {
 	select {
 	case w.paint <- struct{}{}:
 	default:
 	}
-}
-
-func (w Window) repaint() {
-	gl.MatrixMode(gl.MODELVIEW)
-	gl.LoadIdentity()
-
-	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-	w.base().paint()
-	w.w.SwapBuffers()
-}
-
-func (w Window) Do(f func()) {
-	w.do <- f
 }

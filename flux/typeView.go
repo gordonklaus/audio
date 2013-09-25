@@ -26,7 +26,7 @@ func newTypeView(t *types.Type) *typeView {
 	v.text = NewText("")
 	v.text.SetTextColor(getTextColor(&types.TypeName{}, .7))
 	v.text.SetBackgroundColor(Color{0, 0, 0, .3})
-	v.AddChild(v.text)
+	AddChild(v, v.text)
 	v.setType(*t)
 	return v
 }
@@ -54,7 +54,7 @@ func newValueView(val types.Object) *typeView {
 		*name = text
 		v.reform()
 	}
-	v.AddChild(v.nameText)
+	AddChild(v, v.nameText)
 	v.reform()
 	return v
 }
@@ -107,15 +107,15 @@ func (v *typeView) setType(t types.Type) {
 	}
 	v.text.SetText(s)
 
-	for len(v.Children()) > 0 {
-		v.RemoveChild(v.Children()[0])
+	for len(Children(v)) > 0 {
+		RemoveChild(v, Children(v)[0])
 	}
-	v.AddChild(v.text)
+	AddChild(v, v.text)
 	for _, c := range append(v.childTypes.left, v.childTypes.right...) {
-		v.AddChild(c)
+		AddChild(v, c)
 	}
 	if v.nameText != nil {
-		v.AddChild(v.nameText)
+		AddChild(v, v.nameText)
 	}
 
 	if _, ok := t.(*types.Pointer); ok && v.mode == compositeOrPtrType {
@@ -147,27 +147,27 @@ func (v *typeView) reform() {
 	}
 	x := 0.0
 	if v.nameText != nil {
-		v.nameText.Move(Pt(0, (math.Max(h1, h2)-Height(v.nameText))/2))
+		Move(v.nameText, Pt(0, (math.Max(h1, h2)-Height(v.nameText))/2))
 		x += Width(v.nameText) + spacing
 	}
 	y := math.Max(0, h2-h1) / 2
 	for i := len(v.childTypes.left) - 1; i >= 0; i-- {
 		c := v.childTypes.left[i]
-		c.Move(Pt(x+maxWidth-Width(c), y))
+		Move(c, Pt(x+maxWidth-Width(c), y))
 		y += Height(c) + spacing
 	}
 	x += maxWidth + spacing
-	v.text.Move(Pt(x, (math.Max(h1, h2)-Height(v.text))/2))
+	Move(v.text, Pt(x, (math.Max(h1, h2)-Height(v.text))/2))
 	x += Width(v.text) + spacing
 	y = math.Max(0, h1-h2) / 2
 	for i := len(v.childTypes.right) - 1; i >= 0; i-- {
 		c := v.childTypes.right[i]
-		c.Move(Pt(x, y))
+		Move(c, Pt(x, y))
 		y += Height(c) + spacing
 	}
 
 	ResizeToFit(v, 2)
-	if p, ok := v.Parent().(*typeView); ok {
+	if p, ok := Parent(v).(*typeView); ok {
 		p.reform()
 	}
 }
@@ -186,7 +186,7 @@ func (v *typeView) editType(done func()) {
 	case nil:
 		var pkg *types.Package
 		var imports []*types.Package
-		for v := View(v); v != nil; v = v.Parent() {
+		for v := View(v); v != nil; v = Parent(v) {
 			if n, ok := v.(node); ok {
 				f := n.block().func_()
 				pkg, imports = f.pkg(), f.imports()
@@ -197,8 +197,8 @@ func (v *typeView) editType(done func()) {
 			// TODO: get pkg and imports for the type being edited
 		}
 		b := newBrowser(v.mode, pkg, imports)
-		v.AddChild(b)
-		b.Move(Center(v))
+		AddChild(v, b)
+		Move(b, Center(v))
 		b.accepted = func(obj types.Object) {
 			Close(b)
 			n := obj.(*types.TypeName)
@@ -375,13 +375,13 @@ func (v *typeView) focusNearest(child *typeView, dirKey int) {
 	}
 }
 
-func (v *typeView) TookKeyFocus() { v.focused = true; v.Repaint() }
-func (v *typeView) LostKeyFocus() { v.focused = false; v.Repaint() }
+func (v *typeView) TookKeyFocus() { v.focused = true; Repaint(v) }
+func (v *typeView) LostKeyFocus() { v.focused = false; Repaint(v) }
 
 func (v *typeView) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft, KeyRight, KeyUp, KeyDown:
-		if p, ok := v.Parent().(*typeView); ok {
+		if p, ok := Parent(v).(*typeView); ok {
 			p.focusNearest(v, event.Key)
 		}
 	case KeyEnter:
@@ -431,10 +431,10 @@ func (v *typeView) KeyPress(event KeyEvent) {
 		if v.done != nil {
 			v.done()
 		} else {
-			SetKeyFocus(v.Parent())
+			SetKeyFocus(Parent(v))
 		}
 	case KeyBackspace:
-		if p, ok := v.Parent().(*typeView); ok {
+		if p, ok := Parent(v).(*typeView); ok {
 			if _, ok := (*p.typ).(*types.Interface); ok {
 				break
 			}
@@ -455,7 +455,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 			SetKeyFocus(v)
 		})
 	case KeyComma:
-		if p, ok := v.Parent().(*typeView); ok {
+		if p, ok := Parent(v).(*typeView); ok {
 			switch t := (*p.typ).(type) {
 			case *types.Struct:
 				for i, c := range p.childTypes.right {
@@ -487,7 +487,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 			}
 		}
 	case KeyDelete:
-		if p, ok := v.Parent().(*typeView); ok {
+		if p, ok := Parent(v).(*typeView); ok {
 			switch t := (*p.typ).(type) {
 			case *types.Struct:
 				for i, c := range p.childTypes.right {
@@ -557,10 +557,10 @@ func (v *typeView) KeyPress(event KeyEvent) {
 	}
 }
 
-func (v typeView) Paint() {
+func (v *typeView) Paint() {
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[v.focused])
 	SetLineWidth(1)
-	DrawRect(v.Rect())
+	DrawRect(Rect(v))
 }
 
 type generic struct{ types.Type }

@@ -19,7 +19,7 @@ func newTypeAssertNode() *typeAssertNode {
 	n.newOutput(&types.Var{Name: "ok", Type: types.Typ[types.Bool]})
 	n.typ = newTypeView(&v.Type)
 	n.typ.mode = typesOnly
-	n.AddChild(n.typ)
+	AddChild(n, n.typ)
 	return n
 }
 
@@ -39,7 +39,7 @@ func (n *typeAssertNode) setType(t types.Type) {
 	n.outs[0].setType(t)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
-		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+Height(n.typ)/2))
+		MoveCenter(n.typ, Pt(0, Rect(n).Max.Y+Height(n.typ)/2))
 		SetKeyFocus(n)
 	}
 }

@@ -20,19 +20,19 @@ func newFluxWindow() *fluxWindow {
 	w := &fluxWindow{}
 	w.Window = NewWindow(w)
 	w.browser = newBrowser(fluxSourceOnly, nil, nil)
-	w.AddChild(w.browser)
-	w.SetRect(w.Rect())
+	AddChild(w, w.browser)
+	SetRect(w, Rect(w))
 	w.browser.accepted = func(obj types.Object) {
 		switch obj := obj.(type) {
 		case *types.TypeName:
 			typ := obj.Type.(*types.NamedType)
-			w.browser.Hide()
+			Hide(w.browser)
 			v := w.browser.typeView
-			w.AddChild(v)
+			AddChild(w, v)
 			MoveCenter(v, Center(w))
 			reset := func() {
-				w.browser.AddChild(v)
-				w.browser.Show()
+				AddChild(w.browser, v)
+				Show(w.browser)
 				w.browser.text.SetText("")
 				SetKeyFocus(w.browser.text)
 			}
@@ -55,11 +55,11 @@ func newFluxWindow() *fluxWindow {
 		case *types.Func, method:
 			n := newFuncNode(obj)
 			go n.animate()
-			w.browser.Hide()
-			w.AddChild(n)
-			n.Move(Center(w))
+			Hide(w.browser)
+			AddChild(w, n)
+			Move(n, Center(w))
 			n.done = func() {
-				w.browser.Show()
+				Show(w.browser)
 				w.browser.text.SetText("")
 				SetKeyFocus(w.browser.text)
 			}
@@ -70,7 +70,6 @@ func newFluxWindow() *fluxWindow {
 	return w
 }
 
-func (w *fluxWindow) SetRect(r Rectangle) {
-	w.Window.SetRect(r)
-	w.browser.Move(Center(w))
+func (w *fluxWindow) RectSet(r Rectangle) {
+	Move(w.browser, Center(w))
 }

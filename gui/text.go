@@ -66,17 +66,17 @@ func (t *TextBase) SetText(text string) {
 func (t TextBase) GetTextColor() Color { return t.textColor }
 func (t *TextBase) SetTextColor(c Color) {
 	t.textColor = c
-	t.Repaint()
+	Repaint(t)
 }
 
 func (t *TextBase) SetBackgroundColor(c Color) {
 	t.backgroundColor = c
-	t.Repaint()
+	Repaint(t)
 }
 
 func (t *TextBase) SetFrameColor(c Color) {
 	t.frameColor = c
-	t.Repaint()
+	Repaint(t)
 }
 
 func (t *TextBase) SetFrameSize(size float64) {
@@ -110,13 +110,13 @@ func (t *TextBase) KeyPress(event KeyEvent) {
 	}
 }
 
-func (t TextBase) Paint() {
+func (t *TextBase) Paint() {
 	SetColor(t.backgroundColor)
-	FillRect(t.Rect().Inset(t.frameSize))
+	FillRect(Rect(t).Inset(t.frameSize))
 	if t.frameSize > 0 {
 		SetColor(t.frameColor)
 		SetLineWidth(t.frameSize)
-		DrawRect(t.Rect())
+		DrawRect(Rect(t))
 	}
 
 	SetColor(t.textColor)

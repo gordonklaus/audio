@@ -51,11 +51,11 @@ func newBrowser(mode browserMode, currentPkg *types.Package, imports []*types.Pa
 
 	b.text = newNodeNameText(b)
 	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
-	b.AddChild(b.text)
+	AddChild(b, b.text)
 
 	b.pkgNameText = NewText("")
 	b.pkgNameText.SetBackgroundColor(Color{0, 0, 0, .7})
-	b.AddChild(b.pkgNameText)
+	AddChild(b, b.pkgNameText)
 
 	b.text.SetText("")
 
@@ -339,9 +339,9 @@ func (b *browser) Paint() {
 	rect := ZR
 	if b.newObj == nil && len(b.nameTexts) > 0 {
 		cur := b.nameTexts[b.i]
-		rect = Rect(0, cur.Pos().Y, cur.Pos().X+Width(cur), cur.Pos().Y+Height(cur))
+		rect = Rectangle{Pt(0, Pos(cur).Y), Pos(cur).Add(Size(cur))}
 	} else {
-		rect = MapRectToParent(b.text, b.text.Rect())
+		rect = MapRectToParent(b.text, Rect(b.text))
 		rect.Min.X = 0
 	}
 	SetColor(Color{1, 1, 1, .7})
@@ -461,7 +461,7 @@ ok:
 	}
 	xOffset := 0.0
 	if t, ok := b.lastPathText(); ok {
-		xOffset = t.Pos().X + Width(t)
+		xOffset = Pos(t).X + Width(t)
 	}
 
 	for _, l := range b.nameTexts {
@@ -474,32 +474,32 @@ ok:
 		l := NewText(obj.GetName())
 		l.SetTextColor(getTextColor(obj, .7))
 		l.SetBackgroundColor(Color{0, 0, 0, .7})
-		b.AddChild(l)
+		AddChild(b, l)
 		b.nameTexts = append(b.nameTexts, l)
-		l.Move(Pt(xOffset, float64(n-i-1)*Height(l)))
+		Move(l, Pt(xOffset, float64(n-i-1)*Height(l)))
 		if Width(l) > width {
 			width = Width(l)
 		}
 	}
-	b.text.Raise()
+	Raise(b.text)
 	Resize(b, Pt(xOffset+width, float64(len(b.nameTexts))*Height(b.text)))
 
 	yOffset := float64(n-b.i-1) * Height(b.text)
-	b.text.Move(Pt(xOffset, yOffset))
+	Move(b.text, Pt(xOffset, yOffset))
 	if b.typeView != nil {
 		Close(b.typeView)
 	}
 	if pkg, ok := cur.(buildPackage); ok {
 		t := b.pkgNameText
 		t.SetText(pkg.Name)
-		t.Move(Pt(xOffset+width+16, yOffset-(Height(t)-Height(b.text))/2))
+		Move(t, Pt(xOffset+width+16, yOffset-(Height(t)-Height(b.text))/2))
 		if pkg.Name != path.Base(pkg.Dir) {
-			t.Show()
+			Show(t)
 		} else {
-			t.Hide()
+			Hide(t)
 		}
 	} else {
-		b.pkgNameText.Hide()
+		Hide(b.pkgNameText)
 	}
 	if cur != nil {
 		b.text.SetTextColor(getTextColor(cur, 1))
@@ -507,19 +507,19 @@ ok:
 		case *types.TypeName:
 			if t, ok := cur.Type.(*types.NamedType); ok {
 				b.typeView = newTypeView(&t.Underlying)
-				b.AddChild(b.typeView)
+				AddChild(b, b.typeView)
 			}
 		case *types.Func, method, *types.Var, *types.Const, field:
 			t := cur.GetType()
 			b.typeView = newTypeView(&t)
-			b.AddChild(b.typeView)
+			AddChild(b, b.typeView)
 		}
 		if b.typeView != nil {
-			b.typeView.Move(Pt(xOffset+width+16, yOffset-(Height(b.typeView)-Height(b.text))/2))
+			Move(b.typeView, Pt(xOffset+width+16, yOffset-(Height(b.typeView)-Height(b.text))/2))
 		}
 	}
 	for _, p := range b.pathTexts {
-		p.Move(Pt(p.Pos().X, yOffset))
+		Move(p, Pt(Pos(p).X, yOffset))
 	}
 
 	Pan(b, Pt(0, yOffset))
@@ -569,7 +569,7 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 		}
 		if pkg, ok := cur.(buildPackage); ok && event.Shift {
 			t := b.pkgNameText
-			t.Show()
+			Show(t)
 			t.Accept = func(s string) {
 				if s != pkg.Name {
 					pkg.Name = s
@@ -656,12 +656,12 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 				pathText := NewText(obj.GetName() + sep)
 				pathText.SetTextColor(getTextColor(obj, 1))
 				pathText.SetBackgroundColor(Color{0, 0, 0, .7})
-				b.AddChild(pathText)
+				AddChild(b, pathText)
 				x := 0.0
 				if t, ok := b.lastPathText(); ok {
-					x = t.Pos().X + Width(t)
+					x = Pos(t).X + Width(t)
 				}
-				pathText.Move(Pt(x, 0))
+				Move(pathText, Pt(x, 0))
 				b.pathTexts = append(b.pathTexts, pathText)
 
 				t.SetText("")

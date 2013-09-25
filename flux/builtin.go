@@ -63,7 +63,7 @@ func newMakeNode() *makeNode {
 	n.newOutput(v)
 	n.typ = newTypeView(&v.Type)
 	n.typ.mode = makeableType
-	n.AddChild(n.typ)
+	AddChild(n, n.typ)
 	return n
 }
 
@@ -90,7 +90,7 @@ func (n *makeNode) setType(t types.Type) {
 		if _, ok := t.(*types.Slice); ok {
 			n.newInput(&types.Var{Name: "cap", Type: types.Typ[types.Int]})
 		}
-		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+Height(n.typ)/2))
+		MoveCenter(n.typ, Pt(0, Rect(n).Max.Y+Height(n.typ)/2))
 		SetKeyFocus(n)
 	}
 }

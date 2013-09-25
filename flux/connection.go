@@ -27,8 +27,8 @@ func newConnection() *connection {
 	c.AggregateMouser = AggregateMouser{NewClickFocuser(c)}
 	c.srcHandle = newConnectionSourceHandle(c)
 	c.dstHandle = newConnectionDestinationHandle(c)
-	c.AddChild(c.srcHandle)
-	c.AddChild(c.dstHandle)
+	AddChild(c, c.srcHandle)
+	AddChild(c, c.dstHandle)
 	return c
 }
 
@@ -120,12 +120,12 @@ func (c *connection) reform() {
 
 	var rect Rectangle
 	if c.src != nil && c.src.obj.Type == seqType || c.dst != nil && c.dst.obj.Type == seqType {
-		rect = Rect(c.srcPt.X, math.Min(c.srcPt.Y, c.dstPt.Y)-25, c.dstPt.X, math.Max(c.srcPt.Y, c.dstPt.Y))
+		rect = Rectangle{Pt(c.srcPt.X, math.Min(c.srcPt.Y, c.dstPt.Y)-25), Pt(c.dstPt.X, math.Max(c.srcPt.Y, c.dstPt.Y))}
 	} else {
 		rect = Rectangle{c.srcPt, c.dstPt}.Canon()
 	}
-	c.Move(rect.Min)
-	c.SetRect(rect)
+	Move(c, rect.Min)
+	SetRect(c, rect)
 
 	handleOffset := c.dstPt.Sub(c.srcPt).Div(4)
 	if c.srcHandle.editing {
@@ -148,8 +148,8 @@ func (c *connection) startEditing() {
 	}
 }
 
-func (c *connection) TookKeyFocus() { c.focused = true; c.Repaint() }
-func (c *connection) LostKeyFocus() { c.focused = false; c.Repaint() }
+func (c *connection) TookKeyFocus() { c.focused = true; Repaint(c) }
+func (c *connection) LostKeyFocus() { c.focused = false; Repaint(c) }
 
 func (c *connection) KeyPress(event KeyEvent) {
 	switch event.Key {

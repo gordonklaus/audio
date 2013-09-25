@@ -241,17 +241,6 @@ func (r Rectangle) Canon() Rectangle {
 // ZR is the zero Rectangle.
 var ZR Rectangle
 
-// Rect is shorthand for Rectangle{Pt(x0, y0), Pt(x1, y1)}.
-func Rect(x0, y0, x1, y1 float64) Rectangle {
-	if x0 > x1 {
-		x0, x1 = x1, x0
-	}
-	if y0 > y1 {
-		y0, y1 = y1, y0
-	}
-	return Rectangle{Point{x0, y0}, Point{x1, y1}}
-}
-
 // PointToLine returns the Point on line segment (x, y) that is nearest to p.
 func PointToLine(p, x, y Point) Point {
 	xy := y.Sub(x)

@@ -7,43 +7,24 @@ import (
 
 type View interface {
 	base() *ViewBase
+	win() *Window
 
-	Parent() View
-	Children() []View
-	AddChild(View)
-	RemoveChild(View)
+	Moved(Point)
+	RectSet(Rectangle)
 
-	Show()
-	Hide()
-
-	Raise()
-	Lower()
-
-	Pos() Point
-	Move(Point)
-
-	Rect() Rectangle
-	SetRect(Rectangle)
-
-	setKeyFocus(View)
-	KeyFocus() View
 	TookKeyFocus()
 	LostKeyFocus()
 
 	KeyPress(KeyEvent)
 	KeyRelease(KeyEvent)
 
-	setMouser(m MouserView, button int)
-
-	Repaint()
 	Paint()
-
-	Do(func())
 }
 
 type KeyEvent struct {
 	Key                     int
-	Action                  int
+	action                  int
+	Repeat                  bool
 	Text                    string // only present on Press and Repeat, not Release
 	Shift, Ctrl, Alt, Super bool
 }
@@ -72,104 +53,118 @@ func NewView(self View) *ViewBase {
 }
 
 func (v *ViewBase) base() *ViewBase { return v }
-
-func (v ViewBase) Parent() View     { return v.parent }
-func (v ViewBase) Children() []View { return v.children }
-func (v *ViewBase) AddChild(child View) {
-	if child.Parent() != nil {
-		child.Parent().RemoveChild(child)
+func (v *ViewBase) win() *Window {
+	if v.parent == nil {
+		return nil
 	}
-	v.children = append(v.children, child)
-	child.base().parent = v.Self
-	child.Repaint()
+	return v.parent.win()
 }
-func (v *ViewBase) RemoveChild(child View) {
-	SliceRemove(&v.children, child)
+
+func Parent(v View) View     { return v.base().parent }
+func Children(v View) []View { return v.base().children }
+func AddChild(v, child View) {
+	if Parent(child) != nil {
+		RemoveChild(Parent(child), child)
+	}
+	b := v.base()
+	b.children = append(b.children, child)
+	child.base().parent = v
+	Repaint(child)
+}
+func RemoveChild(v, child View) {
+	SliceRemove(&v.base().children, child)
 	child.base().parent = nil
-	v.Self.Repaint()
+	Repaint(v)
 }
 func Close(v View) {
-	if v.Parent() != nil {
-		v.Parent().RemoveChild(v)
+	if Parent(v) != nil {
+		RemoveChild(Parent(v), v)
 	}
 }
 
-func (v *ViewBase) Show() { v.hidden = false; v.Self.Repaint() }
-func (v *ViewBase) Hide() { v.hidden = true; v.Self.Repaint() }
+func Show(v View) { v.base().hidden = false; Repaint(v) }
+func Hide(v View) { v.base().hidden = true; Repaint(v) }
 
-func (v *ViewBase) Raise() {
-	if v.parent != nil {
-		p := v.parent.base()
+func Raise(v View) {
+	if Parent(v) != nil {
+		p := Parent(v).base()
 		for i, view := range p.children {
-			if view == v.Self {
+			if view == v {
 				p.children = append(append(p.children[:i], p.children[i+1:]...), view)
-				p.Self.Repaint()
+				Repaint(p)
 				return
 			}
 		}
 	}
 }
-func (v *ViewBase) Lower() {
-	if v.parent != nil {
-		p := v.parent.base()
+func Lower(v View) {
+	if Parent(v) != nil {
+		p := Parent(v).base()
 		for i, view := range p.children {
-			if view == v.Self {
+			if view == v {
 				p.children = append(p.children[i:i+1], append(p.children[:i], p.children[i+1:]...)...)
-				p.Self.Repaint()
+				Repaint(p)
 				return
 			}
 		}
 	}
 }
 
-func (v ViewBase) Pos() Point { return v.position }
-func (v *ViewBase) Move(p Point) {
-	v.position = p
-	v.Self.Repaint()
+func Pos(v View) Point { return v.base().position }
+func Move(v View, p Point) {
+	v.base().position = p
+	v.Moved(p)
+	Repaint(v)
 }
-func MoveCenter(v View, p Point) { v.Move(p.Sub(Size(v).Div(2))) }
-func MoveOrigin(v View, p Point) { v.Move(p.Add(v.Rect().Min)) }
+func MoveCenter(v View, p Point) { Move(v, p.Sub(Size(v).Div(2))) }
+func MoveOrigin(v View, p Point) { Move(v, p.Add(Rect(v).Min)) }
+func (v ViewBase) Moved(p Point) {}
 
-func (v ViewBase) Rect() Rectangle      { return v.rect }
-func Center(v View) Point               { return v.Rect().Min.Add(Size(v).Div(2)) }
-func Size(v View) Point                 { return v.Rect().Size() }
-func Width(v View) float64              { return v.Rect().Dx() }
-func Height(v View) float64             { return v.Rect().Dy() }
-func (v *ViewBase) SetRect(r Rectangle) { v.rect = r; v.Repaint() }
+func Rect(v View) Rectangle { return v.base().rect }
+func Center(v View) Point   { return Rect(v).Min.Add(Size(v).Div(2)) }
+func Size(v View) Point     { return Rect(v).Size() }
+func Width(v View) float64  { return Rect(v).Dx() }
+func Height(v View) float64 { return Rect(v).Dy() }
+func SetRect(v View, r Rectangle) {
+	v.base().rect = r
+	v.RectSet(r)
+	Repaint(v)
+}
+func (v ViewBase) RectSet(r Rectangle) {}
 func Pan(v View, p Point) {
-	r := v.Rect()
-	v.SetRect(r.Add(p.Sub(r.Min)))
+	r := Rect(v)
+	SetRect(v, r.Add(p.Sub(r.Min)))
 }
 func Resize(v View, s Point) {
-	r := v.Rect()
+	r := Rect(v)
 	r.Max = r.Min.Add(s)
-	v.SetRect(r)
+	SetRect(v, r)
 }
 func ResizeToFit(v View, margin float64) {
-	if len(v.Children()) == 0 {
-		v.SetRect(ZR)
+	if len(Children(v)) == 0 {
+		SetRect(v, ZR)
 		return
 	}
-	c1 := v.Children()[0]
-	rect := MapRectToParent(c1, c1.Rect())
-	for _, c := range v.Children() {
-		rect = rect.Union(MapRectToParent(c, c.Rect()))
+	c1 := Children(v)[0]
+	rect := MapRectToParent(c1, Rect(c1))
+	for _, c := range Children(v) {
+		rect = rect.Union(MapRectToParent(c, Rect(c)))
 	}
-	v.SetRect(rect.Inset(-margin))
+	SetRect(v, rect.Inset(-margin))
 }
 
-func SetKeyFocus(v View) { v.setKeyFocus(v) }
-func (v *ViewBase) setKeyFocus(view View) {
-	if v.parent != nil {
-		v.parent.setKeyFocus(view)
+func SetKeyFocus(v View) {
+	if w := v.win(); w != nil {
+		w.setKeyFocus(v)
 	}
 }
-func (v ViewBase) KeyFocus() View {
-	if v.parent != nil {
-		return v.parent.KeyFocus()
+func KeyFocus(v View) View {
+	if w := v.win(); w != nil {
+		return w.keyFocus
 	}
 	return nil
 }
+
 func (v *ViewBase) TookKeyFocus() {}
 func (v *ViewBase) LostKeyFocus() {}
 
@@ -184,45 +179,45 @@ func (v *ViewBase) KeyRelease(event KeyEvent) {
 	}
 }
 
-func SetMouser(m MouserView, button int) { m.setMouser(m, button) }
-func (v *ViewBase) setMouser(m MouserView, button int) {
-	if v.parent != nil {
-		v.parent.setMouser(m, button)
+func SetMouser(m MouserView, button int) {
+	if w := m.win(); w != nil {
+		w.setMouser(m, button)
 	}
 }
 
-func (v ViewBase) Repaint() {
-	if v.parent != nil {
-		v.parent.Repaint()
+func Repaint(v View) {
+	if w := v.win(); w != nil {
+		w.repaint()
 	}
 }
+
 func (v ViewBase) paint() {
 	if v.hidden {
 		return
 	}
 	gl.PushMatrix()
 	defer gl.PopMatrix()
-	delta := v.Pos().Sub(v.Rect().Min)
+	delta := v.position.Sub(v.rect.Min)
 	gl.Translated(gl.Double(delta.X), gl.Double(delta.Y), 0)
 	v.Self.Paint()
-	for _, child := range v.Self.Children() {
+	for _, child := range v.children {
 		child.base().paint()
 	}
 }
 func (v ViewBase) Paint() {}
 
-func (v ViewBase) Do(f func()) {
-	if v.parent != nil {
-		v.parent.Do(f)
+func Do(v View, f func()) {
+	if w := v.win(); w != nil {
+		w.do <- f
 	}
 }
 
 func ViewAt(v View, p Point) View { return viewAtFunc(v, p, func(v View) View { return v }) }
 func viewAtFunc(v View, p Point, f func(View) View) View {
-	if !p.In(v.Rect()) {
+	if !p.In(Rect(v)) {
 		return nil
 	}
-	children := v.Children()
+	children := Children(v)
 	for i := len(children) - 1; i >= 0; i-- {
 		child := children[i]
 		view := viewAtFunc(child, MapFromParent(child, p), f)
@@ -234,22 +229,22 @@ func viewAtFunc(v View, p Point, f func(View) View) View {
 }
 
 func MapFromParent(v View, p Point) Point {
-	return p.Sub(v.Pos()).Add(v.Rect().Min)
+	return p.Sub(Pos(v)).Add(Rect(v).Min)
 }
 func MapFrom(v View, p Point, parent View) Point {
-	if v == parent || v.Parent() == nil {
+	if v == parent || Parent(v) == nil {
 		return p
 	}
-	return MapFromParent(v, MapFrom(v.Parent(), p, parent))
+	return MapFromParent(v, MapFrom(Parent(v), p, parent))
 }
 func MapToParent(v View, p Point) Point {
-	return p.Sub(v.Rect().Min).Add(v.Pos())
+	return p.Sub(Rect(v).Min).Add(Pos(v))
 }
 func MapTo(v View, p Point, parent View) Point {
-	if v == parent || v.Parent() == nil {
+	if v == parent || Parent(v) == nil {
 		return p
 	}
-	return MapTo(v.Parent(), MapToParent(v, p), parent)
+	return MapTo(Parent(v), MapToParent(v, p), parent)
 }
 
 func MapRectFromParent(v View, r Rectangle) Rectangle {

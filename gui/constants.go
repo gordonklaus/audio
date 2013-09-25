@@ -1,11 +1,11 @@
 package gui
 
+import "code.google.com/p/gordon-go/glfw"
+
 const (
-	Release = 0
-	Press   = 1
-	Repeat  = 2
-	Move    = 3
-	Drag    = 4
+	Release = glfw.Release
+	Press   = glfw.Press
+	Repeat  = glfw.Repeat
 )
 
 const (

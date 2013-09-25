@@ -67,14 +67,14 @@ func newNodeBase(self node) *nodeBase {
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(self), NewMover(self)}
 	n.text = newNodeText(n)
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
-	n.AddChild(n.text)
+	AddChild(n, n.text)
 	n.ViewBase.Self = self
 	return n
 }
 
 func (n *nodeBase) newInput(v *types.Var) *port {
 	p := newInput(n.self, v)
-	n.AddChild(p)
+	AddChild(n, p)
 	n.ins = append(n.ins, p)
 	n.reform()
 	return p
@@ -82,7 +82,7 @@ func (n *nodeBase) newInput(v *types.Var) *port {
 
 func (n *nodeBase) newOutput(v *types.Var) *port {
 	p := newOutput(n.self, v)
-	n.AddChild(p)
+	AddChild(n, p)
 	n.outs = append(n.outs, p)
 	n.reform()
 	return p
@@ -104,7 +104,7 @@ func (n *nodeBase) removePortBase(p *port) { // intentionally named to not imple
 	} else {
 		SliceRemove(&n.ins, p)
 	}
-	n.RemoveChild(p)
+	RemoveChild(n, p)
 	n.reform()
 }
 
@@ -119,15 +119,15 @@ func (n *nodeBase) reform() {
 	for i, p := range ins {
 		y := -portSize * (float64(i) - (numIn-1)/2)
 		MoveCenter(p, Pt(-8-rx*math.Sqrt(ry*ry-y*y)/ry, y))
-		rect = rect.Union(MapRectToParent(p, p.Rect()))
+		rect = rect.Union(MapRectToParent(p, Rect(p)))
 	}
 	for i, p := range outs {
 		y := -portSize * (float64(i) - (numOut-1)/2)
 		MoveCenter(p, Pt(8+rx*math.Sqrt(ry*ry-y*y)/ry, y))
-		rect = rect.Union(MapRectToParent(p, p.Rect()))
+		rect = rect.Union(MapRectToParent(p, Rect(p)))
 	}
 
-	n.SetRect(rect)
+	SetRect(n, rect)
 }
 
 func (n nodeBase) block() *block      { return n.blk }
@@ -153,19 +153,19 @@ func (n nodeBase) outConns() (conns []*connection) {
 	return
 }
 
-func (n *nodeBase) Move(p Point) {
-	n.ViewBase.Move(p)
-	for _, p := range append(n.ins, n.outs...) {
-		for _, c := range p.conns {
-			c.reform()
-		}
+func (n *nodeBase) Moved(p Point) { nodeMoved(n) }
+
+func nodeMoved(n node) {
+	for _, c := range append(n.inConns(), n.outConns()...) {
+		c.reform()
+	}
+	if f := n.block().func_(); f != nil {
+		f.wakeUp()
 	}
 }
 
-func (n nodeBase) Center() Point { return ZP }
-
-func (n *nodeBase) TookKeyFocus() { n.focused = true; n.Repaint() }
-func (n *nodeBase) LostKeyFocus() { n.focused = false; n.Repaint() }
+func (n *nodeBase) TookKeyFocus() { n.focused = true; Repaint(n) }
+func (n *nodeBase) LostKeyFocus() { n.focused = false; Repaint(n) }
 
 func (n *nodeBase) KeyPress(event KeyEvent) {
 	switch event.Key {
@@ -362,7 +362,7 @@ func newCompositeLiteralNode() *compositeLiteralNode {
 	n.newOutput(v)
 	n.typ = newTypeView(&v.Type)
 	n.typ.mode = compositeOrPtrType
-	n.AddChild(n.typ)
+	AddChild(n, n.typ)
 	return n
 }
 func (n *compositeLiteralNode) editType() {
@@ -398,7 +398,7 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 		case *types.Map:
 			// TODO: variable number of key/value input pairs?
 		}
-		MoveCenter(n.typ, Pt(0, n.Rect().Max.Y+Height(n.typ)/2))
+		MoveCenter(n.typ, Pt(0, Rect(n).Max.Y+Height(n.typ)/2))
 		SetKeyFocus(n)
 	}
 }

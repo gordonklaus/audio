@@ -39,11 +39,14 @@ func (b *block) outermost() *block {
 	}
 	return b
 }
-func (b *block) func_() *funcNode { return b.outermost().node.(*funcNode) }
+func (b *block) func_() *funcNode {
+	f, _ := b.outermost().node.(*funcNode)
+	return f
+}
 
 func (b *block) addNode(n node) {
 	if !b.nodes[n] {
-		b.AddChild(n)
+		AddChild(b, n)
 		b.nodes[n] = true
 		n.setBlock(b)
 		switch n := n.(type) {
@@ -56,7 +59,7 @@ func (b *block) addNode(n node) {
 }
 
 func (b *block) removeNode(n node) {
-	b.RemoveChild(n)
+	RemoveChild(b, n)
 	delete(b.nodes, n)
 	delete(b.vel, n)
 	switch n := n.(type) {
@@ -70,15 +73,15 @@ func (b *block) addConn(c *connection) {
 		delete(c.blk.conns, c)
 	}
 	c.blk = b
-	b.AddChild(c)
-	c.Lower()
+	AddChild(b, c)
+	Lower(c)
 	b.conns[c] = true
 }
 
 func (b *block) removeConn(c *connection) {
 	c.disconnect()
 	delete(b.conns, c)
-	b.RemoveChild(c)
+	RemoveChild(b, c)
 }
 
 func (b block) allNodes() (nodes []node) {
@@ -333,11 +336,11 @@ func (b *block) update() (updated bool) {
 
 	center := ZP
 	for n := range b.nodes {
-		center = center.Add(n.Pos())
+		center = center.Add(Pos(n))
 	}
 	center = center.Div(float64(len(b.nodes)))
 	for n := range b.nodes {
-		addVel(n, center.Sub(n.Pos().Mul(nodeCenterCoef)))
+		addVel(n, center.Sub(Pos(n).Mul(nodeCenterCoef)))
 		l := b.vel[n].Len()
 		if l > 0 {
 			b.vel[n] = b.vel[n].Mul(math.Tanh(speedCompress*l/topSpeed) * topSpeed / l)
@@ -378,13 +381,13 @@ func (b *block) update() (updated bool) {
 		dt := math.Min(1.0/fps, 100/meanSpeed) // slow down time at high speeds to avoid oscillation
 		for n := range b.nodes {
 			b.vel[n] = b.vel[n].Mul(.5 + rand.Float64()) // a little noise to break up small oscillations
-			n.Move(n.Pos().Add(b.vel[n].Mul(dt)).Sub(center))
+			Move(n, Pos(n).Add(b.vel[n].Mul(dt)).Sub(center))
 		}
 	}
 
 	rect := ZR
 	for n := range b.nodes {
-		r := MapRectToParent(n, n.Rect())
+		r := MapRectToParent(n, Rect(n))
 		if n, ok := n.(*portsNode); ok {
 			// portsNodes are later reposition()ed to the boundary; thus we must adjust for the margin (blockRadius)
 			if n.out {
@@ -400,17 +403,17 @@ func (b *block) update() (updated bool) {
 		}
 	}
 	for c := range b.conns {
-		rect = rect.Union(MapRectToParent(c, c.Rect()))
+		rect = rect.Union(MapRectToParent(c, Rect(c)))
 	}
 	if rect == ZR {
-		rect = Rect(0, 0, 16, 0)
+		rect = Rectangle{ZP, Pt(16, 0)}
 	}
 	rect = rect.Inset(-blockRadius)
-	if b.Rect().Size().Sub(rect.Size()).Len() < .01 {
+	if Rect(b).Size().Sub(rect.Size()).Len() < .01 {
 		b.vel = map[node]Point{}
 		return
 	}
-	b.SetRect(rect)
+	SetRect(b, rect)
 
 	return true
 }
@@ -446,8 +449,8 @@ func (b *block) focusNearestView(v View, dirKey int) {
 	}
 }
 
-func (b *block) TookKeyFocus() { b.focused = true; b.Repaint() }
-func (b *block) LostKeyFocus() { b.focused = false; b.stopEditing(); b.Repaint() }
+func (b *block) TookKeyFocus() { b.focused = true; Repaint(b) }
+func (b *block) LostKeyFocus() { b.focused = false; b.stopEditing(); Repaint(b) }
 
 func (b *block) KeyPress(event KeyEvent) {
 	switch event.Key {
@@ -471,13 +474,13 @@ func (b *block) KeyPress(event KeyEvent) {
 	case KeySpace:
 		if b.editingNode != nil {
 			if b.nodes[b.editingNode] {
-				b.RemoveChild(b.editingNode)
+				RemoveChild(b, b.editingNode)
 				delete(b.nodes, b.editingNode)
 				b.addNode(b.editingNode)
 			} else {
 				b.removeNode(b.editingNode)
 				b.nodes[b.editingNode] = true
-				b.AddChild(b.editingNode)
+				AddChild(b, b.editingNode)
 			}
 		}
 	case KeyEnter:
@@ -490,7 +493,7 @@ func (b *block) KeyPress(event KeyEvent) {
 			b.startEditing()
 		}
 	case KeyBackspace, KeyDelete:
-		switch v := b.KeyFocus().(type) {
+		switch v := KeyFocus(b).(type) {
 		case *block:
 			if v.node != nil {
 				SetKeyFocus(v.node)
@@ -521,7 +524,7 @@ func (b *block) KeyPress(event KeyEvent) {
 		} else if outer := b.outer(); outer != nil {
 			SetKeyFocus(outer)
 		} else {
-			b.func_().Close()
+			b.func_().close()
 		}
 	default:
 		if !(event.Ctrl || event.Alt || event.Super) {
@@ -529,8 +532,8 @@ func (b *block) KeyPress(event KeyEvent) {
 			default:
 				f := b.func_()
 				browser := newBrowser(browse, f.pkg(), f.imports())
-				b.AddChild(browser)
-				browser.Move(Center(b))
+				AddChild(b, browser)
+				Move(browser, Center(b))
 				browser.accepted = func(obj types.Object) {
 					Close(browser)
 					newNode(b, obj)
@@ -615,7 +618,7 @@ func newNode(b *block, obj types.Object) {
 	}
 }
 
-func (b block) Paint() {
+func (b *block) Paint() {
 	if b.editing {
 		SetColor(Color{.7, .4, 0, 1})
 	} else if b.focused {
@@ -624,7 +627,7 @@ func (b block) Paint() {
 		SetColor(Color{.5, .5, .5, 1})
 	}
 	{
-		rect := b.Rect()
+		rect := Rect(b)
 		l, r, b, t := rect.Min.X, rect.Max.X, rect.Min.Y, rect.Max.Y
 		lb, bl := Pt(l, b+blockRadius), Pt(l+blockRadius, b)
 		rb, br := Pt(r, b+blockRadius), Pt(r-blockRadius, b)
@@ -660,9 +663,9 @@ func (n *portsNode) reposition() {
 	b := n.blk
 	y := Center(b).Y
 	if n.out {
-		MoveOrigin(n, Pt(b.Rect().Max.X, y))
+		MoveOrigin(n, Pt(Rect(b).Max.X, y))
 	} else {
-		MoveOrigin(n, Pt(b.Rect().Min.X, y))
+		MoveOrigin(n, Pt(Rect(b).Min.X, y))
 	}
 }
 
@@ -708,7 +711,7 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 			vars = &sig.Params
 		}
 		n.reposition()
-		p.valView.Show()
+		Show(p.valView)
 		p.valView.edit(func() {
 			if v.Type != nil {
 				*vars = append(*vars, v)

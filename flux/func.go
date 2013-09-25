@@ -30,7 +30,7 @@ func newFuncNode(obj types.Object) *funcNode {
 	n.outputsNode = newOutputsNode()
 	n.outputsNode.editable = true
 	n.funcblk.addNode(n.outputsNode)
-	n.AddChild(n.funcblk)
+	AddChild(n, n.funcblk)
 	n.awaken = make(chan bool, 1)
 	n.stop = make(chan bool, 1)
 
@@ -44,7 +44,7 @@ func newFuncNode(obj types.Object) *funcNode {
 	return n
 }
 
-func (n *funcNode) Close() {
+func (n *funcNode) close() {
 	saveFunc(*n)
 	n.stop <- true
 	select {
@@ -106,9 +106,10 @@ func (n *funcNode) animate() {
 	updated := make(chan bool)
 	for {
 		next := time.After(time.Second / fps)
-		n.Do(func() {
+		Do(n, func() {
 			updated <- n.update()
 		})
+
 		if <-updated {
 			<-next
 		} else {
@@ -119,6 +120,13 @@ func (n *funcNode) animate() {
 			return
 		default:
 		}
+	}
+}
+
+func (n *funcNode) wakeUp() {
+	select {
+	case n.awaken <- true:
+	default:
 	}
 }
 
@@ -140,13 +148,5 @@ func (n *funcNode) KeyPress(event KeyEvent) {
 		saveFunc(*n)
 	default:
 		n.ViewBase.KeyPress(event)
-	}
-}
-
-func (n *funcNode) Repaint() {
-	n.ViewBase.Repaint()
-	select {
-	case n.awaken <- true:
-	default:
 	}
 }

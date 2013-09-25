@@ -24,10 +24,10 @@ func newPort(out bool, n node, v *types.Var) *port {
 	p := &port{out: out, node: n, obj: v}
 	p.ViewBase = NewView(p)
 	p.valView = newValueView(v)
-	p.valView.Hide()
+	Hide(p.valView)
 	p.connsChanged = func() {}
-	p.AddChild(p.valView)
-	p.SetRect(ZR.Inset(-portSize / 2))
+	AddChild(p, p.valView)
+	SetRect(p, ZR.Inset(-portSize/2))
 	p.setType(*p.valView.typ)
 	return p
 }
@@ -35,9 +35,9 @@ func newPort(out bool, n node, v *types.Var) *port {
 func (p *port) setType(t types.Type) {
 	p.valView.setType(t)
 	if p.out {
-		p.valView.Move(Pt(12, -Height(p.valView)/2))
+		Move(p.valView, Pt(12, -Height(p.valView)/2))
 	} else {
-		p.valView.Move(Pt(-Width(p.valView)-12, -Height(p.valView)/2))
+		Move(p.valView, Pt(-Width(p.valView)-12, -Height(p.valView)/2))
 	}
 }
 
@@ -97,8 +97,8 @@ func (p *port) disconnect(c *connection) {
 	}
 }
 
-func (p *port) TookKeyFocus() { p.focused = true; p.Repaint(); p.valView.Show() }
-func (p *port) LostKeyFocus() { p.focused = false; p.Repaint(); p.valView.Hide() }
+func (p *port) TookKeyFocus() { p.focused = true; Repaint(p); Show(p.valView) }
+func (p *port) LostKeyFocus() { p.focused = false; Repaint(p); Hide(p.valView) }
 
 func (p *port) KeyPress(event KeyEvent) {
 	if p.out && event.Key == KeyLeft || !p.out && event.Key == KeyRight {

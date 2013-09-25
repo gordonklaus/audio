@@ -55,8 +55,8 @@ func (h *connectionHandle) stopEditing() {
 	}
 }
 
-func (h *connectionHandle) TookKeyFocus() { h.focused = true; h.Repaint() }
-func (h *connectionHandle) LostKeyFocus() { h.focused = false; h.stopEditing(); h.Repaint() }
+func (h *connectionHandle) TookKeyFocus() { h.focused = true; Repaint(h) }
+func (h *connectionHandle) LostKeyFocus() { h.focused = false; h.stopEditing(); Repaint(h) }
 
 func (h *connectionHandle) KeyPress(event KeyEvent) {
 	switch event.Key {
@@ -84,15 +84,15 @@ func (h *connectionHandle) KeyPress(event KeyEvent) {
 }
 
 func (h *connectionHandle) Mouse(m MouseEvent) {
-	switch m.Action {
-	case Press:
+	switch {
+	case m.Press:
 		h.startEditing()
 		h.spec.updateConnection(m.Pos)
-	case Drag:
+	case m.Drag:
 		if h.editing {
 			h.spec.updateConnection(m.Pos)
 		}
-	case Release:
+	case m.Release:
 		if h.editing {
 			h.spec.updateConnection(m.Pos)
 		}

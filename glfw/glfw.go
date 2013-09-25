@@ -9,6 +9,12 @@ import (
 	"runtime"
 )
 
+const (
+	Press   = C.GLFW_PRESS
+	Release = C.GLFW_RELEASE
+	Repeat  = C.GLFW_REPEAT
+)
+
 func init() {
 	runtime.LockOSThread()
 }

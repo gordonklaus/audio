@@ -5,9 +5,9 @@ type Mouser interface {
 }
 
 type MouseEvent struct {
-	Pos    Point
-	Action int
-	Button int
+	Pos                        Point
+	Move, Press, Release, Drag bool
+	Button                     int
 }
 
 type AggregateMouser []Mouser
@@ -38,12 +38,12 @@ func NewMover(v View) *Mover {
 }
 
 func (d *Mover) Mouse(m MouseEvent) {
-	switch m.Action {
-	case Press:
-		d.v.Raise()
+	switch {
+	case m.Press:
+		Raise(d.v)
 		d.p = m.Pos
-	case Drag, Release:
-		d.v.Move(d.v.Pos().Add(m.Pos.Sub(d.p)))
+	case m.Drag, m.Release:
+		Move(d.v, Pos(d.v).Add(m.Pos.Sub(d.p)))
 	}
 }
 
@@ -57,10 +57,10 @@ func NewPanner(v View) *Panner {
 }
 
 func (p *Panner) Mouse(m MouseEvent) {
-	switch m.Action {
-	case Press:
+	switch {
+	case m.Press:
 		p.p = m.Pos
-	case Drag, Release:
+	case m.Drag, m.Release:
 		Pan(p.v, p.p.Sub(m.Pos))
 	}
 }
