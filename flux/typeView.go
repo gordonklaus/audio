@@ -26,7 +26,7 @@ func newTypeView(t *types.Type) *typeView {
 	v.text = NewText("")
 	v.text.SetTextColor(getTextColor(&types.TypeName{}, .7))
 	v.text.SetBackgroundColor(Color{0, 0, 0, .3})
-	AddChild(v, v.text)
+	v.Add(v.text)
 	v.setType(*t)
 	return v
 }
@@ -54,7 +54,7 @@ func newValueView(val types.Object) *typeView {
 		*name = text
 		v.reform()
 	}
-	AddChild(v, v.nameText)
+	v.Add(v.nameText)
 	v.reform()
 	return v
 }
@@ -107,15 +107,15 @@ func (v *typeView) setType(t types.Type) {
 	}
 	v.text.SetText(s)
 
-	for len(Children(v)) > 0 {
-		RemoveChild(v, Children(v)[0])
+	for NumChildren(v) > 0 {
+		v.Remove(Child(v, 0))
 	}
-	AddChild(v, v.text)
+	v.Add(v.text)
 	for _, c := range append(v.childTypes.left, v.childTypes.right...) {
-		AddChild(v, c)
+		v.Add(c)
 	}
 	if v.nameText != nil {
-		AddChild(v, v.nameText)
+		v.Add(v.nameText)
 	}
 
 	if _, ok := t.(*types.Pointer); ok && v.mode == compositeOrPtrType {
@@ -147,22 +147,22 @@ func (v *typeView) reform() {
 	}
 	x := 0.0
 	if v.nameText != nil {
-		Move(v.nameText, Pt(0, (math.Max(h1, h2)-Height(v.nameText))/2))
+		v.nameText.Move(Pt(0, (math.Max(h1, h2)-Height(v.nameText))/2))
 		x += Width(v.nameText) + spacing
 	}
 	y := math.Max(0, h2-h1) / 2
 	for i := len(v.childTypes.left) - 1; i >= 0; i-- {
 		c := v.childTypes.left[i]
-		Move(c, Pt(x+maxWidth-Width(c), y))
+		c.Move(Pt(x+maxWidth-Width(c), y))
 		y += Height(c) + spacing
 	}
 	x += maxWidth + spacing
-	Move(v.text, Pt(x, (math.Max(h1, h2)-Height(v.text))/2))
+	v.text.Move(Pt(x, (math.Max(h1, h2)-Height(v.text))/2))
 	x += Width(v.text) + spacing
 	y = math.Max(0, h1-h2) / 2
 	for i := len(v.childTypes.right) - 1; i >= 0; i-- {
 		c := v.childTypes.right[i]
-		Move(c, Pt(x, y))
+		c.Move(Pt(x, y))
 		y += Height(c) + spacing
 	}
 
@@ -197,10 +197,10 @@ func (v *typeView) editType(done func()) {
 			// TODO: get pkg and imports for the type being edited
 		}
 		b := newBrowser(v.mode, pkg, imports)
-		AddChild(v, b)
-		Move(b, Center(v))
+		v.Add(b)
+		b.Move(Center(v))
 		b.accepted = func(obj types.Object) {
-			Close(b)
+			b.Close()
 			n := obj.(*types.TypeName)
 			if n.Type != nil {
 				v.setType(n.Type)
@@ -210,7 +210,7 @@ func (v *typeView) editType(done func()) {
 			v.editType(done)
 		}
 		b.canceled = func() {
-			Close(b)
+			b.Close()
 			done()
 		}
 		SetKeyFocus(b.text)

@@ -26,8 +26,8 @@ func newPort(out bool, n node, v *types.Var) *port {
 	p.valView = newValueView(v)
 	Hide(p.valView)
 	p.connsChanged = func() {}
-	AddChild(p, p.valView)
-	SetRect(p, ZR.Inset(-portSize/2))
+	p.Add(p.valView)
+	p.SetRect(ZR.Inset(-portSize / 2))
 	p.setType(*p.valView.typ)
 	return p
 }
@@ -35,9 +35,9 @@ func newPort(out bool, n node, v *types.Var) *port {
 func (p *port) setType(t types.Type) {
 	p.valView.setType(t)
 	if p.out {
-		Move(p.valView, Pt(12, -Height(p.valView)/2))
+		p.valView.Move(Pt(12, -Height(p.valView)/2))
 	} else {
-		Move(p.valView, Pt(-Width(p.valView)-12, -Height(p.valView)/2))
+		p.valView.Move(Pt(-Width(p.valView)-12, -Height(p.valView)/2))
 	}
 }
 

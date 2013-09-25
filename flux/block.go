@@ -46,7 +46,7 @@ func (b *block) func_() *funcNode {
 
 func (b *block) addNode(n node) {
 	if !b.nodes[n] {
-		AddChild(b, n)
+		b.Add(n)
 		b.nodes[n] = true
 		n.setBlock(b)
 		switch n := n.(type) {
@@ -59,7 +59,7 @@ func (b *block) addNode(n node) {
 }
 
 func (b *block) removeNode(n node) {
-	RemoveChild(b, n)
+	b.Remove(n)
 	delete(b.nodes, n)
 	delete(b.vel, n)
 	switch n := n.(type) {
@@ -73,7 +73,7 @@ func (b *block) addConn(c *connection) {
 		delete(c.blk.conns, c)
 	}
 	c.blk = b
-	AddChild(b, c)
+	b.Add(c)
 	Lower(c)
 	b.conns[c] = true
 }
@@ -81,7 +81,7 @@ func (b *block) addConn(c *connection) {
 func (b *block) removeConn(c *connection) {
 	c.disconnect()
 	delete(b.conns, c)
-	RemoveChild(b, c)
+	b.Remove(c)
 }
 
 func (b block) allNodes() (nodes []node) {
@@ -381,7 +381,7 @@ func (b *block) update() (updated bool) {
 		dt := math.Min(1.0/fps, 100/meanSpeed) // slow down time at high speeds to avoid oscillation
 		for n := range b.nodes {
 			b.vel[n] = b.vel[n].Mul(.5 + rand.Float64()) // a little noise to break up small oscillations
-			Move(n, Pos(n).Add(b.vel[n].Mul(dt)).Sub(center))
+			n.Move(Pos(n).Add(b.vel[n].Mul(dt)).Sub(center))
 		}
 	}
 
@@ -413,7 +413,7 @@ func (b *block) update() (updated bool) {
 		b.vel = map[node]Point{}
 		return
 	}
-	SetRect(b, rect)
+	b.SetRect(rect)
 
 	return true
 }
@@ -474,13 +474,13 @@ func (b *block) KeyPress(event KeyEvent) {
 	case KeySpace:
 		if b.editingNode != nil {
 			if b.nodes[b.editingNode] {
-				RemoveChild(b, b.editingNode)
+				b.Remove(b.editingNode)
 				delete(b.nodes, b.editingNode)
 				b.addNode(b.editingNode)
 			} else {
 				b.removeNode(b.editingNode)
 				b.nodes[b.editingNode] = true
-				AddChild(b, b.editingNode)
+				b.Add(b.editingNode)
 			}
 		}
 	case KeyEnter:
@@ -524,7 +524,7 @@ func (b *block) KeyPress(event KeyEvent) {
 		} else if outer := b.outer(); outer != nil {
 			SetKeyFocus(outer)
 		} else {
-			b.func_().close()
+			b.func_().Close()
 		}
 	default:
 		if !(event.Ctrl || event.Alt || event.Super) {
@@ -532,14 +532,14 @@ func (b *block) KeyPress(event KeyEvent) {
 			default:
 				f := b.func_()
 				browser := newBrowser(browse, f.pkg(), f.imports())
-				AddChild(b, browser)
-				Move(browser, Center(b))
+				b.Add(browser)
+				browser.Move(Center(b))
 				browser.accepted = func(obj types.Object) {
-					Close(browser)
+					browser.Close()
 					newNode(b, obj)
 				}
 				browser.canceled = func() {
-					Close(browser)
+					browser.Close()
 					SetKeyFocus(b)
 				}
 				browser.text.KeyPress(event)

@@ -23,18 +23,18 @@ func newLoopNode() *loopNode {
 	n.input = newInput(n, &types.Var{})
 	n.input.connsChanged = n.updateInputType
 	MoveCenter(n.input, Pt(-2*portSize, 0))
-	AddChild(n, n.input)
+	n.Add(n.input)
 	n.loopblk = newBlock(n)
 	n.inputsNode = newInputsNode()
 	n.inputsNode.newOutput(&types.Var{})
 	n.loopblk.addNode(n.inputsNode)
-	AddChild(n, n.loopblk)
+	n.Add(n.loopblk)
 
 	n.seqIn = newInput(n, &types.Var{Name: "seq", Type: seqType})
 	MoveCenter(n.seqIn, ZP)
-	AddChild(n, n.seqIn)
+	n.Add(n.seqIn)
 	n.seqOut = newOutput(n, &types.Var{Name: "seq", Type: seqType})
-	AddChild(n, n.seqOut)
+	n.Add(n.seqOut)
 
 	n.updateInputType()
 	return n
@@ -86,7 +86,7 @@ func (n *loopNode) updateInputType() {
 			for _, c := range in.outs[1].conns {
 				c.blk.removeConn(c)
 			}
-			RemoveChild(in, in.outs[1])
+			in.Remove(in.outs[1])
 			in.outs = in.outs[:1]
 		}
 	case *types.Array, *types.Slice, *types.Map:
@@ -109,14 +109,17 @@ func (n *loopNode) update() bool {
 	if !b.update() {
 		return false
 	}
-	Move(b, Pt(0, -Height(b)/2))
+	b.Move(Pt(0, -Height(b)/2))
 	n.inputsNode.reposition()
 	MoveCenter(n.seqOut, Pt(Width(b), 0))
 	ResizeToFit(n, 0)
 	return true
 }
 
-func (n *loopNode) Moved(p Point) { nodeMoved(n) }
+func (n *loopNode) Move(p Point) {
+	n.ViewBase.Move(p)
+	nodeMoved(n)
+}
 
 func (n *loopNode) TookKeyFocus() { n.focused = true; Repaint(n) }
 func (n *loopNode) LostKeyFocus() { n.focused = false; Repaint(n) }

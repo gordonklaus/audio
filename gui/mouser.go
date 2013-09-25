@@ -43,7 +43,7 @@ func (d *Mover) Mouse(m MouseEvent) {
 		Raise(d.v)
 		d.p = m.Pos
 	case m.Drag, m.Release:
-		Move(d.v, Pos(d.v).Add(m.Pos.Sub(d.p)))
+		d.v.Move(Pos(d.v).Add(m.Pos.Sub(d.p)))
 	}
 }
 

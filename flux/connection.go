@@ -27,8 +27,8 @@ func newConnection() *connection {
 	c.AggregateMouser = AggregateMouser{NewClickFocuser(c)}
 	c.srcHandle = newConnectionSourceHandle(c)
 	c.dstHandle = newConnectionDestinationHandle(c)
-	AddChild(c, c.srcHandle)
-	AddChild(c, c.dstHandle)
+	c.Add(c.srcHandle)
+	c.Add(c.dstHandle)
 	return c
 }
 
@@ -124,8 +124,8 @@ func (c *connection) reform() {
 	} else {
 		rect = Rectangle{c.srcPt, c.dstPt}.Canon()
 	}
-	Move(c, rect.Min)
-	SetRect(c, rect)
+	c.Move(rect.Min)
+	c.SetRect(rect)
 
 	handleOffset := c.dstPt.Sub(c.srcPt).Div(4)
 	if c.srcHandle.editing {

@@ -9,8 +9,12 @@ type View interface {
 	base() *ViewBase
 	win() *Window
 
-	Moved(Point)
-	RectSet(Rectangle)
+	Add(View)
+	Remove(View)
+	Close()
+
+	Move(Point)
+	SetRect(Rectangle)
 
 	TookKeyFocus()
 	LostKeyFocus()
@@ -40,7 +44,7 @@ type ViewBase struct {
 	children []View
 	hidden   bool
 	rect     Rectangle
-	position Point
+	pos      Point
 }
 
 func NewView(self View) *ViewBase {
@@ -60,25 +64,25 @@ func (v *ViewBase) win() *Window {
 	return v.parent.win()
 }
 
-func Parent(v View) View     { return v.base().parent }
-func Children(v View) []View { return v.base().children }
-func AddChild(v, child View) {
-	if Parent(child) != nil {
-		RemoveChild(Parent(child), child)
+func Parent(v View) View       { return v.base().parent }
+func NumChildren(v View) int   { return len(v.base().children) }
+func Child(v View, i int) View { return v.base().children[i] }
+func (v *ViewBase) Add(u View) {
+	if Parent(u) != nil {
+		Parent(u).Remove(u)
 	}
-	b := v.base()
-	b.children = append(b.children, child)
-	child.base().parent = v
-	Repaint(child)
+	v.children = append(v.children, u)
+	u.base().parent = v.Self
+	Repaint(v.Self)
 }
-func RemoveChild(v, child View) {
-	SliceRemove(&v.base().children, child)
-	child.base().parent = nil
-	Repaint(v)
+func (v *ViewBase) Remove(u View) {
+	SliceRemove(&v.children, u)
+	u.base().parent = nil
+	Repaint(v.Self)
 }
-func Close(v View) {
-	if Parent(v) != nil {
-		RemoveChild(Parent(v), v)
+func (v *ViewBase) Close() {
+	if v.parent != nil {
+		v.parent.Remove(v.Self)
 	}
 }
 
@@ -110,47 +114,38 @@ func Lower(v View) {
 	}
 }
 
-func Pos(v View) Point { return v.base().position }
-func Move(v View, p Point) {
-	v.base().position = p
-	v.Moved(p)
-	Repaint(v)
-}
-func MoveCenter(v View, p Point) { Move(v, p.Sub(Size(v).Div(2))) }
-func MoveOrigin(v View, p Point) { Move(v, p.Add(Rect(v).Min)) }
-func (v ViewBase) Moved(p Point) {}
+func Pos(v View) Point           { return v.base().pos }
+func (v *ViewBase) Move(p Point) { v.pos = p; Repaint(v.Self) }
+func MoveCenter(v View, p Point) { v.Move(p.Sub(Size(v).Div(2))) }
+func MoveOrigin(v View, p Point) { v.Move(p.Add(Rect(v).Min)) }
 
-func Rect(v View) Rectangle { return v.base().rect }
-func Center(v View) Point   { return Rect(v).Min.Add(Size(v).Div(2)) }
-func Size(v View) Point     { return Rect(v).Size() }
-func Width(v View) float64  { return Rect(v).Dx() }
-func Height(v View) float64 { return Rect(v).Dy() }
-func SetRect(v View, r Rectangle) {
-	v.base().rect = r
-	v.RectSet(r)
-	Repaint(v)
-}
-func (v ViewBase) RectSet(r Rectangle) {}
+func Rect(v View) Rectangle             { return v.base().rect }
+func Center(v View) Point               { return Rect(v).Min.Add(Size(v).Div(2)) }
+func Size(v View) Point                 { return Rect(v).Size() }
+func Width(v View) float64              { return Rect(v).Dx() }
+func Height(v View) float64             { return Rect(v).Dy() }
+func (v *ViewBase) SetRect(r Rectangle) { v.rect = r; Repaint(v.Self) }
 func Pan(v View, p Point) {
 	r := Rect(v)
-	SetRect(v, r.Add(p.Sub(r.Min)))
+	v.SetRect(r.Add(p.Sub(r.Min)))
 }
 func Resize(v View, s Point) {
 	r := Rect(v)
 	r.Max = r.Min.Add(s)
-	SetRect(v, r)
+	v.SetRect(r)
 }
 func ResizeToFit(v View, margin float64) {
-	if len(Children(v)) == 0 {
-		SetRect(v, ZR)
-		return
+	rect := ZR
+	for i := 0; i < NumChildren(v); i++ {
+		c := Child(v, i)
+		r := MapRectToParent(c, Rect(c))
+		if i == 0 {
+			rect = r
+		} else {
+			rect = rect.Union(r)
+		}
 	}
-	c1 := Children(v)[0]
-	rect := MapRectToParent(c1, Rect(c1))
-	for _, c := range Children(v) {
-		rect = rect.Union(MapRectToParent(c, Rect(c)))
-	}
-	SetRect(v, rect.Inset(-margin))
+	v.SetRect(rect.Inset(-margin))
 }
 
 func SetKeyFocus(v View) {
@@ -197,8 +192,8 @@ func (v ViewBase) paint() {
 	}
 	gl.PushMatrix()
 	defer gl.PopMatrix()
-	delta := v.position.Sub(v.rect.Min)
-	gl.Translated(gl.Double(delta.X), gl.Double(delta.Y), 0)
+	d := v.pos.Sub(v.rect.Min)
+	gl.Translated(gl.Double(d.X), gl.Double(d.Y), 0)
 	v.Self.Paint()
 	for _, child := range v.children {
 		child.base().paint()
@@ -217,9 +212,8 @@ func viewAtFunc(v View, p Point, f func(View) View) View {
 	if !p.In(Rect(v)) {
 		return nil
 	}
-	children := Children(v)
-	for i := len(children) - 1; i >= 0; i-- {
-		child := children[i]
+	for i := NumChildren(v) - 1; i >= 0; i-- {
+		child := Child(v, i)
 		view := viewAtFunc(child, MapFromParent(child, p), f)
 		if view != nil {
 			return view

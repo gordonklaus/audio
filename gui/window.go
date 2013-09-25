@@ -60,12 +60,12 @@ func (w *Window) win() *Window { return w }
 
 func (w *Window) SetCentralView(v View) {
 	if w.centralView != nil {
-		RemoveChild(w, w.centralView)
+		w.Remove(w.centralView)
 	}
 	w.centralView = v
 	if v != nil {
 		if Parent(v) != w {
-			AddChild(w, v)
+			w.Add(v)
 		}
 		Resize(v, Size(w))
 		SetKeyFocus(v)

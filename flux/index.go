@@ -2,7 +2,6 @@ package main
 
 import (
 	"code.google.com/p/go.exp/go/types"
-	. "code.google.com/p/gordon-go/gui"
 )
 
 type indexNode struct {
@@ -80,7 +79,7 @@ func (n *indexNode) updateInputType() {
 				for _, c := range n.ok.conns {
 					c.blk.removeConn(c)
 				}
-				RemoveChild(n, n.ok)
+				n.Remove(n.ok)
 				n.outs = n.outs[:1]
 				n.ok = nil
 			}

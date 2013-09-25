@@ -23,16 +23,16 @@ func newIfNode() *ifNode {
 	n.input = newInput(n, &types.Var{Type: types.Typ[types.Bool]})
 	n.falseblk = newBlock(n)
 	n.trueblk = newBlock(n)
-	AddChild(n, n.input)
-	AddChild(n, n.falseblk)
-	AddChild(n, n.trueblk)
+	n.Add(n.input)
+	n.Add(n.falseblk)
+	n.Add(n.trueblk)
 
 	n.seqIn = newInput(n, &types.Var{Name: "seq", Type: seqType})
 	MoveCenter(n.seqIn, Pt(-portSize, 0))
-	AddChild(n, n.seqIn)
+	n.Add(n.seqIn)
 	n.seqOut = newOutput(n, &types.Var{Name: "seq", Type: seqType})
 	MoveCenter(n.seqOut, Pt(portSize, 0))
-	AddChild(n, n.seqOut)
+	n.Add(n.seqOut)
 
 	MoveCenter(n.input, Pt(-2*portSize, 0))
 	n.update()
@@ -57,13 +57,16 @@ func (n *ifNode) update() bool {
 	if f && t {
 		return false
 	}
-	Move(n.falseblk, Pt(-blockRadius, -4-Height(n.falseblk)))
-	Move(n.trueblk, Pt(-blockRadius, 4))
+	n.falseblk.Move(Pt(-blockRadius, -4-Height(n.falseblk)))
+	n.trueblk.Move(Pt(-blockRadius, 4))
 	ResizeToFit(n, 0)
 	return true
 }
 
-func (n *ifNode) Moved(p Point) { nodeMoved(n) }
+func (n *ifNode) Move(p Point) {
+	n.ViewBase.Move(p)
+	nodeMoved(n)
+}
 
 func (n *ifNode) TookKeyFocus() { n.focused = true; Repaint(n) }
 func (n *ifNode) LostKeyFocus() { n.focused = false; Repaint(n) }

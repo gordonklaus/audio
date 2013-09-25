@@ -63,7 +63,7 @@ func newMakeNode() *makeNode {
 	n.newOutput(v)
 	n.typ = newTypeView(&v.Type)
 	n.typ.mode = makeableType
-	AddChild(n, n.typ)
+	n.Add(n.typ)
 	return n
 }
 

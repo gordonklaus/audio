@@ -67,14 +67,14 @@ func newNodeBase(self node) *nodeBase {
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(self), NewMover(self)}
 	n.text = newNodeText(n)
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
-	AddChild(n, n.text)
+	n.Add(n.text)
 	n.ViewBase.Self = self
 	return n
 }
 
 func (n *nodeBase) newInput(v *types.Var) *port {
 	p := newInput(n.self, v)
-	AddChild(n, p)
+	n.Add(p)
 	n.ins = append(n.ins, p)
 	n.reform()
 	return p
@@ -82,7 +82,7 @@ func (n *nodeBase) newInput(v *types.Var) *port {
 
 func (n *nodeBase) newOutput(v *types.Var) *port {
 	p := newOutput(n.self, v)
-	AddChild(n, p)
+	n.Add(p)
 	n.outs = append(n.outs, p)
 	n.reform()
 	return p
@@ -104,7 +104,7 @@ func (n *nodeBase) removePortBase(p *port) { // intentionally named to not imple
 	} else {
 		SliceRemove(&n.ins, p)
 	}
-	RemoveChild(n, p)
+	n.Remove(p)
 	n.reform()
 }
 
@@ -127,7 +127,7 @@ func (n *nodeBase) reform() {
 		rect = rect.Union(MapRectToParent(p, Rect(p)))
 	}
 
-	SetRect(n, rect)
+	n.SetRect(rect)
 }
 
 func (n nodeBase) block() *block      { return n.blk }
@@ -153,7 +153,10 @@ func (n nodeBase) outConns() (conns []*connection) {
 	return
 }
 
-func (n *nodeBase) Moved(p Point) { nodeMoved(n) }
+func (n *nodeBase) Move(p Point) {
+	n.ViewBase.Move(p)
+	nodeMoved(n)
+}
 
 func nodeMoved(n node) {
 	for _, c := range append(n.inConns(), n.outConns()...) {
@@ -362,7 +365,7 @@ func newCompositeLiteralNode() *compositeLiteralNode {
 	n.newOutput(v)
 	n.typ = newTypeView(&v.Type)
 	n.typ.mode = compositeOrPtrType
-	AddChild(n, n.typ)
+	n.Add(n.typ)
 	return n
 }
 func (n *compositeLiteralNode) editType() {

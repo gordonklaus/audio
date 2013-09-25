@@ -51,11 +51,11 @@ func newBrowser(mode browserMode, currentPkg *types.Package, imports []*types.Pa
 
 	b.text = newNodeNameText(b)
 	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
-	AddChild(b, b.text)
+	b.Add(b.text)
 
 	b.pkgNameText = NewText("")
 	b.pkgNameText.SetBackgroundColor(Color{0, 0, 0, .7})
-	AddChild(b, b.pkgNameText)
+	b.Add(b.pkgNameText)
 
 	b.text.SetText("")
 
@@ -465,7 +465,7 @@ ok:
 	}
 
 	for _, l := range b.nameTexts {
-		Close(l)
+		l.Close()
 	}
 	b.nameTexts = []Text{}
 	width := 0.0
@@ -474,9 +474,9 @@ ok:
 		l := NewText(obj.GetName())
 		l.SetTextColor(getTextColor(obj, .7))
 		l.SetBackgroundColor(Color{0, 0, 0, .7})
-		AddChild(b, l)
+		b.Add(l)
 		b.nameTexts = append(b.nameTexts, l)
-		Move(l, Pt(xOffset, float64(n-i-1)*Height(l)))
+		l.Move(Pt(xOffset, float64(n-i-1)*Height(l)))
 		if Width(l) > width {
 			width = Width(l)
 		}
@@ -485,14 +485,14 @@ ok:
 	Resize(b, Pt(xOffset+width, float64(len(b.nameTexts))*Height(b.text)))
 
 	yOffset := float64(n-b.i-1) * Height(b.text)
-	Move(b.text, Pt(xOffset, yOffset))
+	b.text.Move(Pt(xOffset, yOffset))
 	if b.typeView != nil {
-		Close(b.typeView)
+		b.typeView.Close()
 	}
 	if pkg, ok := cur.(buildPackage); ok {
 		t := b.pkgNameText
 		t.SetText(pkg.Name)
-		Move(t, Pt(xOffset+width+16, yOffset-(Height(t)-Height(b.text))/2))
+		t.Move(Pt(xOffset+width+16, yOffset-(Height(t)-Height(b.text))/2))
 		if pkg.Name != path.Base(pkg.Dir) {
 			Show(t)
 		} else {
@@ -507,19 +507,19 @@ ok:
 		case *types.TypeName:
 			if t, ok := cur.Type.(*types.NamedType); ok {
 				b.typeView = newTypeView(&t.Underlying)
-				AddChild(b, b.typeView)
+				b.Add(b.typeView)
 			}
 		case *types.Func, method, *types.Var, *types.Const, field:
 			t := cur.GetType()
 			b.typeView = newTypeView(&t)
-			AddChild(b, b.typeView)
+			b.Add(b.typeView)
 		}
 		if b.typeView != nil {
-			Move(b.typeView, Pt(xOffset+width+16, yOffset-(Height(b.typeView)-Height(b.text))/2))
+			b.typeView.Move(Pt(xOffset+width+16, yOffset-(Height(b.typeView)-Height(b.text))/2))
 		}
 	}
 	for _, p := range b.pathTexts {
-		Move(p, Pt(Pos(p).X, yOffset))
+		p.Move(Pt(Pos(p).X, yOffset))
 	}
 
 	Pan(b, Pt(0, yOffset))
@@ -557,7 +557,7 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 			}
 
 			i := len(b.pathTexts) - 1
-			Close(b.pathTexts[i])
+			b.pathTexts[i].Close()
 			b.pathTexts = b.pathTexts[:i]
 
 			t.SetText("")
@@ -656,12 +656,12 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 				pathText := NewText(obj.GetName() + sep)
 				pathText.SetTextColor(getTextColor(obj, 1))
 				pathText.SetBackgroundColor(Color{0, 0, 0, .7})
-				AddChild(b, pathText)
+				b.Add(pathText)
 				x := 0.0
 				if t, ok := b.lastPathText(); ok {
 					x = Pos(t).X + Width(t)
 				}
-				Move(pathText, Pt(x, 0))
+				pathText.Move(Pt(x, 0))
 				b.pathTexts = append(b.pathTexts, pathText)
 
 				t.SetText("")

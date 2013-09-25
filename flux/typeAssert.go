@@ -19,7 +19,7 @@ func newTypeAssertNode() *typeAssertNode {
 	n.newOutput(&types.Var{Name: "ok", Type: types.Typ[types.Bool]})
 	n.typ = newTypeView(&v.Type)
 	n.typ.mode = typesOnly
-	AddChild(n, n.typ)
+	n.Add(n.typ)
 	return n
 }
 
