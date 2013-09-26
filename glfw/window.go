@@ -16,6 +16,7 @@ type Window struct {
 	charCB              CharFunc
 	mouseMoveCB         MouseMoveFunc
 	mouseButtonCB       MouseButtonFunc
+	scrollCB            ScrollFunc
 }
 
 func NewWindow(width, height int, title string) *Window {

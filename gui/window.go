@@ -16,6 +16,7 @@ type Window struct {
 	control     chan interface{}
 	key         chan KeyEvent
 	mouse       chan MouseEvent
+	scroll      chan ScrollEvent
 	paint       chan struct{}
 	do          chan func()
 }
@@ -35,8 +36,9 @@ func NewWindow(self View) *Window {
 	w.ViewBase = NewView(w)
 	w.mouser = make(map[int]MouserView)
 	w.control = make(chan interface{})
-	w.key = make(chan KeyEvent, 10)
-	w.mouse = make(chan MouseEvent, 100)
+	w.key = make(chan KeyEvent)
+	w.mouse = make(chan MouseEvent)
+	w.scroll = make(chan ScrollEvent)
 	w.paint = make(chan struct{}, 1)
 	w.do = make(chan func())
 
@@ -111,7 +113,7 @@ func (w *Window) run() {
 
 	m := MouseEvent{}
 	w.w.OnMouseMove(func(x, y float64) {
-		m.Pos = Pt(x, Height(w)-y)
+		m.Pos = Pt(x, y)
 		m.Move, m.Press, m.Release, m.Drag = true, false, false, false
 		w.mouse <- m
 	})
@@ -120,6 +122,14 @@ func (w *Window) run() {
 		m.Move, m.Press, m.Release, m.Drag = false, action == glfw.Press, action == glfw.Release, false
 		w.mouse <- m
 	})
+	w.w.OnScroll(func(dx, dy float64) {
+		w.scroll <- ScrollEvent{m.Pos, Pt(dx, -dy)}
+	})
+
+	mapToWindow := func(p Point) Point {
+		p.Y = Height(w) - p.Y
+		return p.Add(Rect(w).Min)
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -163,7 +173,8 @@ func (w *Window) run() {
 			case m := <-w.mouse:
 				switch {
 				case m.Press:
-					v, _ := viewAtFunc(w, m.Pos, func(v View) View {
+					m.Pos = mapToWindow(m.Pos)
+					v, _ := viewAtFunc(w.Self, m.Pos, func(v View) View {
 						v, _ = v.(MouserView)
 						return v
 					}).(MouserView)
@@ -173,6 +184,7 @@ func (w *Window) run() {
 						v.Mouse(m)
 					}
 				case m.Move:
+					m.Pos = mapToWindow(m.Pos)
 					for button, v := range w.mouser {
 						m := m
 						m.Pos = MapFrom(v, m.Pos, w.Self)
@@ -181,11 +193,22 @@ func (w *Window) run() {
 						v.Mouse(m)
 					}
 				case m.Release:
+					m.Pos = mapToWindow(m.Pos)
 					if v, ok := w.mouser[m.Button]; ok {
 						m.Pos = MapFrom(v, m.Pos, w.Self)
 						v.Mouse(m)
 						delete(w.mouser, m.Button)
 					}
+				}
+			case s := <-w.scroll:
+				s.Pos = mapToWindow(s.Pos)
+				v, _ := viewAtFunc(w.Self, s.Pos, func(v View) View {
+					v, _ = v.(ScrollerView)
+					return v
+				}).(ScrollerView)
+				if v != nil {
+					s.Pos = MapFrom(v, s.Pos, w.Self)
+					v.Scroll(s)
 				}
 			case <-w.paint:
 				gl.MatrixMode(gl.MODELVIEW)

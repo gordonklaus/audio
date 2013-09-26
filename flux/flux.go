@@ -13,12 +13,14 @@ func main() {
 
 type fluxWindow struct {
 	*Window
+	*Panner
 	browser *browser
 }
 
 func newFluxWindow() *fluxWindow {
 	w := &fluxWindow{}
 	w.Window = NewWindow(w)
+	w.Panner = NewPanner(w)
 	w.browser = newBrowser(fluxSourceOnly, nil, nil)
 	w.Add(w.browser)
 	w.SetRect(Rect(w))
@@ -73,4 +75,8 @@ func newFluxWindow() *fluxWindow {
 func (w *fluxWindow) SetRect(r Rectangle) {
 	w.Window.SetRect(r)
 	w.browser.Move(Center(w))
+}
+
+func (w *fluxWindow) Scroll(s ScrollEvent) {
+	w.SetRect(Rect(w).Sub(s.Delta.Mul(4)))
 }

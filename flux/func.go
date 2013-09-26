@@ -133,7 +133,9 @@ func (n *funcNode) update() bool {
 	}
 	n.inputsNode.reposition()
 	n.outputsNode.reposition()
+	c := CenterInParent(n)
 	ResizeToFit(n, 0)
+	MoveCenter(n, c)
 	return true
 }
 

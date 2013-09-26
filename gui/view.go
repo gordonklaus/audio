@@ -38,6 +38,19 @@ type MouserView interface {
 	View
 }
 
+type Scroller interface {
+	Scroll(ScrollEvent)
+}
+
+type ScrollerView interface {
+	Scroller
+	View
+}
+
+type ScrollEvent struct {
+	Pos, Delta Point
+}
+
 type ViewBase struct {
 	Self     View
 	parent   View

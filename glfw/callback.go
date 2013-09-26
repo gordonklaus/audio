@@ -15,6 +15,7 @@ type KeyFunc func(key, scancode, action, mods int)
 type CharFunc func(char rune)
 type MouseMoveFunc func(x, y float64)
 type MouseButtonFunc func(button, action, mods int)
+type ScrollFunc func(dx, dy float64)
 
 const (
 	ModShift   = 1
@@ -97,6 +98,15 @@ func (w *Window) OnMouseButton(f MouseButtonFunc) {
 	}
 }
 
+func (w *Window) OnScroll(f ScrollFunc) {
+	w.scrollCB = f
+	if f != nil {
+		C.setScrollCallback(w.w)
+	} else {
+		C.clearScrollCallback(w.w)
+	}
+}
+
 //export errorCB
 func errorCB(err C.int, desc *C.char) {
 	errorCallback(errors.New(C.GoString(desc)))
@@ -135,6 +145,11 @@ func mouseMoveCB(w unsafe.Pointer, x, y C.double) {
 //export mouseButtonCB
 func mouseButtonCB(w unsafe.Pointer, button, action, mods C.int) {
 	win(w).mouseButtonCB(int(button), int(action), int(mods))
+}
+
+//export scrollCB
+func scrollCB(w unsafe.Pointer, dx, dy C.double) {
+	win(w).scrollCB(float64(dx), float64(dy))
 }
 
 func win(w unsafe.Pointer) *Window {

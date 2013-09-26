@@ -80,3 +80,13 @@ void setMouseButtonCallback(GLFWwindow* w) {
 void clearMouseButtonCallback(GLFWwindow* w) {
 	glfwSetMouseButtonCallback(w, 0);
 }
+
+void scrollCallback(GLFWwindow* w, double dx, double dy) {
+	scrollCB(w, dx, dy);
+}
+void setScrollCallback(GLFWwindow* w) {
+	glfwSetScrollCallback(w, &scrollCallback);
+}
+void clearScrollCallback(GLFWwindow* w) {
+	glfwSetScrollCallback(w, 0);
+}

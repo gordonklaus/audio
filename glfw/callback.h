@@ -27,4 +27,7 @@ void clearMouseMoveCallback(GLFWwindow* w);
 void setMouseButtonCallback(GLFWwindow* w);
 void clearMouseButtonCallback(GLFWwindow* w);
 
+void setScrollCallback(GLFWwindow* w);
+void clearScrollCallback(GLFWwindow* w);
+
 #endif

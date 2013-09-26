@@ -61,6 +61,6 @@ func (p *Panner) Mouse(m MouseEvent) {
 	case m.Press:
 		p.p = m.Pos
 	case m.Drag, m.Release:
-		Pan(p.v, p.p.Sub(m.Pos))
+		Pan(p.v, Rect(p.v).Min.Add(p.p.Sub(m.Pos)))
 	}
 }
