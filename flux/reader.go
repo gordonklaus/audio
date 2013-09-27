@@ -35,12 +35,16 @@ func loadFunc(f *funcNode) bool {
 		r.addVar(p.Names[0].Name, f.inputsNode.newOutput(v))
 		f.addPkgRef(v.Type)
 	}
-	for i, p := range decl.Type.Results.List {
+	var results []*ast.Field
+	if r := decl.Type.Results; r != nil {
+		results = r.List
+	}
+	for i, p := range results {
 		r.vars[p.Names[0].Name] = nil
 		f.addPkgRef(t.Results[i].Type)
 	}
 	r.readBlock(f.funcblk, decl.Body.List)
-	for i, p := range decl.Type.Results.List {
+	for i, p := range results {
 		r.connect(p.Names[0].Name, f.outputsNode.newInput(t.Results[i]))
 	}
 	return true

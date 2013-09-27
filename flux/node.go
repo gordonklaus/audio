@@ -353,6 +353,15 @@ func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 	return n
 }
 
+func (n *basicLiteralNode) KeyPress(k KeyEvent) {
+	switch k.Key {
+	case KeyEnter:
+		SetKeyFocus(n.text)
+	default:
+		n.nodeBase.KeyPress(k)
+	}
+}
+
 type compositeLiteralNode struct {
 	*nodeBase
 	typ *typeView
