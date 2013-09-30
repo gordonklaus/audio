@@ -25,28 +25,11 @@ func loadFunc(f *funcNode) bool {
 		}
 		r.pkgNames[name] = pkg
 	}
-	t := f.obj.GetType().(*types.Signature)
 	decl := file.Decls[len(file.Decls)-1].(*ast.FuncDecl) // get param and result var names from the source, as the obj names might not match
 	if decl.Recv != nil {
-		r.addVar(decl.Recv.List[0].Names[0].Name, f.inputsNode.newOutput(t.Recv))
+		r.addVar(decl.Recv.List[0].Names[0].Name, f.inputsNode.newOutput(f.obj.GetType().(*types.Signature).Recv))
 	}
-	for i, p := range decl.Type.Params.List {
-		v := t.Params[i]
-		r.addVar(p.Names[0].Name, f.inputsNode.newOutput(v))
-		f.addPkgRef(v.Type)
-	}
-	var results []*ast.Field
-	if r := decl.Type.Results; r != nil {
-		results = r.List
-	}
-	for i, p := range results {
-		r.vars[p.Names[0].Name] = nil
-		f.addPkgRef(t.Results[i].Type)
-	}
-	r.readBlock(f.funcblk, decl.Body.List)
-	for i, p := range results {
-		r.connect(p.Names[0].Name, f.outputsNode.newInput(t.Results[i]))
-	}
+	r.fun(f, decl.Type, decl.Body)
 	return true
 }
 
@@ -57,6 +40,32 @@ type reader struct {
 	varTypes map[string]types.Type
 	cmap     ast.CommentMap
 	seqNodes map[int]node
+}
+
+func (r *reader) fun(f *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
+	obj := f.obj
+	if obj == nil {
+		obj = f.output.obj
+	}
+	sig := obj.GetType().(*types.Signature)
+	
+	for i, p := range typ.Params.List {
+		v := sig.Params[i]
+		r.addVar(p.Names[0].Name, f.inputsNode.newOutput(v))
+		f.addPkgRef(v.Type)
+	}
+	var results []*ast.Field
+	if r := typ.Results; r != nil {
+		results = r.List
+	}
+	for i, p := range results {
+		r.vars[p.Names[0].Name] = nil
+		f.addPkgRef(sig.Results[i].Type)
+	}
+	r.readBlock(f.funcblk, body.List)
+	for i, p := range results {
+		r.connect(p.Names[0].Name, f.outputsNode.newInput(sig.Results[i]))
+	}
 }
 
 func (r *reader) readBlock(b *block, s []ast.Stmt) {
@@ -121,6 +130,12 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 					r.connect(name(x.X), n.ins[0])
 					r.addVar(name(s.Lhs[0]), n.outs[0])
 					r.addVar(name(s.Lhs[1]), n.outs[1])
+				case *ast.FuncLit:
+					n := newFuncNode(nil)
+					b.addNode(n)
+					n.output.setType(r.typ(x.Type))
+					r.addVar(name(s.Lhs[0]), n.output)
+					r.fun(n, x.Type, x.Body)
 				}
 			} else {
 				if x, ok := s.Lhs[0].(*ast.IndexExpr); ok {
@@ -344,6 +359,19 @@ func (r *reader) typ(x ast.Expr) types.Type {
 		return &types.Struct{}
 	case *ast.InterfaceType:
 		return &types.Interface{}
+	case *ast.FuncType:
+		t := &types.Signature{}
+		if x.Params != nil {
+			for _, f := range x.Params.List {
+				t.Params = append(t.Params, &types.Var{Name: f.Names[0].Name, Type: r.typ(f.Type)})
+			}
+		}
+		if x.Results != nil {
+			for _, f := range x.Results.List {
+				t.Results = append(t.Results, &types.Var{Name: f.Names[0].Name, Type: r.typ(f.Type)})
+			}
+		}
+		return t
 	}
 	panic("not yet implemented")
 }

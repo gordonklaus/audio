@@ -10,10 +10,14 @@ import (
 type funcNode struct {
 	*ViewBase
 	AggregateMouser
-	obj                     types.Object
-	pkgRefs                 map[*types.Package]int
+	blk                     *block
+	output                  *port
 	inputsNode, outputsNode *portsNode
 	funcblk                 *block
+	focused                 bool
+	
+	obj                     types.Object
+	pkgRefs                 map[*types.Package]int
 	awaken, stop            chan struct{}
 	done                    func()
 }
@@ -22,7 +26,10 @@ func newFuncNode(obj types.Object) *funcNode {
 	n := &funcNode{obj: obj}
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
-	n.pkgRefs = map[*types.Package]int{}
+	if n.lit() {
+		n.output = newOutput(n, &types.Var{Type: &types.Signature{}})
+		n.Add(n.output)
+	}
 	n.funcblk = newBlock(n)
 	n.inputsNode = newInputsNode()
 	n.inputsNode.editable = true
@@ -31,25 +38,33 @@ func newFuncNode(obj types.Object) *funcNode {
 	n.outputsNode.editable = true
 	n.funcblk.addNode(n.outputsNode)
 	n.Add(n.funcblk)
-	n.awaken = make(chan struct{}, 1)
-	n.stop = make(chan struct{}, 1)
 
-	if !loadFunc(n) {
-		if m, ok := obj.(method); ok {
-			n.inputsNode.newOutput(m.Type.Recv)
+	if !n.lit() {
+		n.pkgRefs = map[*types.Package]int{}
+		n.awaken = make(chan struct{}, 1)
+		n.stop = make(chan struct{}, 1)
+		
+		if !loadFunc(n) {
+			if m, ok := obj.(method); ok {
+				n.inputsNode.newOutput(m.Type.Recv)
+			}
+			saveFunc(n)
 		}
-		saveFunc(*n)
 	}
 
 	return n
 }
 
+func (n funcNode) lit() bool { return n.obj == nil }
+
 func (n *funcNode) Close() {
-	saveFunc(*n)
-	n.stop <- struct{}{}
-	n.wakeUp()
+	if !n.lit() {
+		saveFunc(n)
+		n.stop <- struct{}{}
+		n.wakeUp()
+		n.done()
+	}
 	n.ViewBase.Close()
-	n.done()
 }
 
 func (n funcNode) pkg() *types.Package {
@@ -90,12 +105,23 @@ func (n *funcNode) subPkgRef(x interface{}) {
 	}
 }
 
-func (n funcNode) block() *block           { return nil }
-func (n funcNode) setBlock(b *block)       {}
+func (n funcNode) block() *block           { return n.blk }
+func (n *funcNode) setBlock(b *block)      { n.blk = b }
 func (n funcNode) inputs() []*port         { return nil }
-func (n funcNode) outputs() []*port        { return nil }
-func (n funcNode) inConns() []*connection  { return nil }
-func (n funcNode) outConns() []*connection { return nil }
+func (n funcNode) outputs() (p []*port)    {
+	if n.lit() {
+		p = append(p, n.output)
+	}
+	return
+}
+func (n funcNode) inConns() []*connection  { return n.funcblk.inConns() }
+func (n funcNode) outConns() []*connection {
+	c := n.funcblk.outConns()
+	if n.lit() {
+		c = append(c, n.output.conns...)
+	}
+	return c
+}
 
 const fps = 60
 
@@ -128,8 +154,13 @@ func (n *funcNode) wakeUp() {
 }
 
 func (n *funcNode) update() bool {
-	if !n.funcblk.update() {
+	b := n.funcblk
+	if !b.update() {
 		return false
+	}
+	b.Move(Pt(0, -Height(b)/2))
+	if n.lit() {
+		MoveCenter(n.output, Pt(Width(b)+portSize, 0))
 	}
 	n.inputsNode.reposition()
 	n.outputsNode.reposition()
@@ -139,13 +170,38 @@ func (n *funcNode) update() bool {
 	return true
 }
 
-func (n *funcNode) TookKeyFocus() { SetKeyFocus(n.funcblk) }
+func (n *funcNode) Move(p Point) {
+	n.ViewBase.Move(p)
+	nodeMoved(n)
+}
+
+func (n *funcNode) TookKeyFocus() {
+	if n.lit() {
+		n.focused = true
+		Repaint(n)
+	} else {
+		SetKeyFocus(n.funcblk)
+	}
+}
+func (n *funcNode) LostKeyFocus() { n.focused = false; Repaint(n) }
 
 func (n *funcNode) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyF1:
-		saveFunc(*n)
+		if !n.lit() {
+			saveFunc(n)
+		} else {
+			n.ViewBase.KeyPress(event)
+		}
 	default:
 		n.ViewBase.KeyPress(event)
+	}
+}
+
+func (n funcNode) Paint() {
+	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
+	if n.lit() {
+		x := Width(n.funcblk)
+		DrawLine(Pt(x, 0), Pt(x+portSize, 0))
 	}
 }

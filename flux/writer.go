@@ -59,7 +59,7 @@ func saveType(t *types.NamedType) {
 	w.write("type %s %s", t.Obj.Name, w.typ(u))
 }
 
-func saveFunc(f funcNode) {
+func saveFunc(f *funcNode) {
 	w := newWriter(f.obj)
 	defer w.close()
 
@@ -67,53 +67,7 @@ func saveFunc(f funcNode) {
 		w.pkgNames[p] = w.name(p.Name)
 	}
 	w.imports()
-
-	w.write("func ")
-	vars := map[*port]string{}
-
-	// name the results first so we can tell if a param connects directly to a result
-	for _, p := range f.outputsNode.ins {
-		vars[p] = w.name(p.obj.Name)
-	}
-	existing := map[string]string{}
-	name := func(p *port) string {
-		name := w.name(p.obj.Name)
-		for _, c := range p.conns {
-			if v, ok := vars[c.dst]; ok {
-				existing[v] = name
-			} else {
-				vars[c.dst] = name
-			}
-		}
-		return name
-	}
-	params := f.inputsNode.outs
-	if _, ok := f.obj.(method); ok {
-		p := params[0]
-		params = params[1:]
-		w.write("(%s %s) ", name(p), w.typ(p.obj.Type))
-	}
-	w.write("%s(", f.obj.GetName())
-	for i, p := range params {
-		if i > 0 {
-			w.write(", ")
-		}
-		w.write("%s %s", name(p), w.typ(p.obj.Type))
-	}
-	w.write(") (")
-	for i, p := range f.outputsNode.ins {
-		if i > 0 {
-			w.write(", ")
-		}
-		w.write("%s %s", vars[p], w.typ(p.obj.Type))
-	}
-	w.write(") {\n")
-	w.assignExisting(existing)
-	w.block(f.funcblk, vars)
-	if len(f.outputsNode.ins) > 0 {
-		w.src.WriteString("\treturn\n")
-	}
-	w.src.WriteString("}")
+	w.fun(f, map[*port]string{})
 }
 
 type writer struct {
@@ -166,6 +120,71 @@ func (w *writer) imports() {
 		w.write(strconv.Quote(p.Path) + "\n")
 	}
 	w.write(")\n\n")
+}
+
+func (w *writer) fun(f *funcNode, vars map[*port]string) {
+	vars, varsCopy := map[*port]string{}, vars
+	for k, v := range varsCopy {
+		vars[k] = v
+	}
+
+	w.write("func ")
+
+	obj := f.obj
+	if obj == nil {
+		obj = f.output.obj
+	}
+
+	// name the results first so we can tell if a param connects directly to a result
+	existing := map[string]string{}
+	for _, p := range f.outputsNode.ins {
+		name := w.name(p.obj.Name)
+		if v, ok := vars[p]; ok {
+			// there is a connection from an outer block to this result of this func literal
+			existing[name] = v
+		}
+		vars[p] = name
+	}
+	name := func(p *port) string {
+		name := w.name(p.obj.Name)
+		for _, c := range p.conns {
+			if v, ok := vars[c.dst]; ok {
+				existing[v] = name
+			} else {
+				vars[c.dst] = name
+			}
+		}
+		return name
+	}
+	params := f.inputsNode.outs
+	if _, ok := obj.(method); ok {
+		p := params[0]
+		params = params[1:]
+		w.write("(%s %s) ", name(p), w.typ(p.obj.Type))
+	}
+	w.write("%s(", obj.GetName())
+	for i, p := range params {
+		if i > 0 {
+			w.write(", ")
+		}
+		w.write("%s %s", name(p), w.typ(p.obj.Type))
+	}
+	w.write(") (")
+	for i, p := range f.outputsNode.ins {
+		if i > 0 {
+			w.write(", ")
+		}
+		w.write("%s %s", vars[p], w.typ(p.obj.Type))
+	}
+	w.write(") {\n")
+	w.nindent++
+	w.assignExisting(existing)
+	w.nindent--
+	w.block(f.funcblk, vars)
+	if len(f.outputsNode.ins) > 0 {
+		w.indent("\treturn\n")
+	}
+	w.indent("}\n")
 }
 
 func (w *writer) block(b *block, vars map[*port]string) {
@@ -301,6 +320,11 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			case *typeAssertNode:
 				if len(n.ins[0].conns) > 0 && len(results) > 0 {
 					w.indent("%s := %s.(%s)\n", strings.Join(results, ", "), args[0], w.typ(*n.typ.typ))
+				}
+			case *funcNode:
+				if len(results) > 0 {
+					w.indent("%s := ", results[0])
+					w.fun(n, vars)
 				}
 			}
 			w.assignExisting(existing)

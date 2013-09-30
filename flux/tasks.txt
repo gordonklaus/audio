@@ -1,5 +1,6 @@
 TODO
 
+- don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.
 - bug:  a connection from inside a conditional block out to a node's inport modifies the variable associated with that inport; but that variable may be used elsewhere also -- other inports will receive the modified value even if they don't have a connection from the conditional block.  solution: each inport gets its own variable.  (this was observed when the variable originated as a func param; but does it work this way in general?)
 - allow var.field expressions in valueNode, where var is a package-scope variable (see the next item).
 - implement address expressions in valueNode.  otherwise there is no way to get &localVar.field &pkg.var or &pkg.var.field.

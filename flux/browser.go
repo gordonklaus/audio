@@ -254,7 +254,7 @@ func (b browser) filteredObjs() (objs []types.Object) {
 
 	if len(b.path) == 0 {
 		if b.mode == browse {
-			for _, name := range []string{"[]", "[]=", "addr", "if", "indirect", "loop", "typeAssert"} {
+			for _, name := range []string{"[]", "[]=", "addr", "func", "if", "indirect", "loop", "typeAssert"} {
 				objs = append(objs, special{name: name})
 			}
 		}

@@ -35,7 +35,7 @@ func newNodeText(node *nodeBase) *nodeText {
 func (t *nodeText) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyEnter:
-		SetKeyFocus(t.node)
+		SetKeyFocus(t.node.self)
 	default:
 		t.TextBase.KeyPress(event)
 	}
@@ -155,14 +155,14 @@ func (n nodeBase) outConns() (conns []*connection) {
 
 func (n *nodeBase) Move(p Point) {
 	n.ViewBase.Move(p)
-	nodeMoved(n)
+	nodeMoved(n.self)
 }
 
 func nodeMoved(n node) {
 	for _, c := range append(n.inConns(), n.outConns()...) {
 		c.reform()
 	}
-	if f := n.block().func_(); f != nil {
+	if f := func_(n); f != nil {
 		f.wakeUp()
 	}
 }

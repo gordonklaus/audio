@@ -44,6 +44,14 @@ func (b *block) func_() *funcNode {
 	return f
 }
 
+func func_(n node) *funcNode {
+	if b := n.block(); b != nil {
+		return b.func_()
+	}
+	fn, _ := n.(*funcNode)
+	return fn
+}
+
 func (b *block) addNode(n node) {
 	if !b.nodes[n] {
 		b.Add(n)
@@ -54,6 +62,9 @@ func (b *block) addNode(n node) {
 			if _, ok := n.obj.(method); !ok {
 				b.func_().addPkgRef(n.obj)
 			}
+		}
+		if f := b.func_(); f != nil {
+			f.wakeUp()
 		}
 	}
 }
@@ -66,6 +77,9 @@ func (b *block) removeNode(n node) {
 	case *callNode:
 		b.func_().subPkgRef(n.obj)
 	}
+	if f := b.func_(); f != nil {
+		f.wakeUp()
+	}
 }
 
 func (b *block) addConn(c *connection) {
@@ -76,12 +90,18 @@ func (b *block) addConn(c *connection) {
 	b.Add(c)
 	Lower(c)
 	b.conns[c] = true
+	if f := b.func_(); f != nil {
+		f.wakeUp()
+	}
 }
 
 func (b *block) removeConn(c *connection) {
 	c.disconnect()
 	delete(b.conns, c)
 	b.Remove(c)
+	if f := b.func_(); f != nil {
+		f.wakeUp()
+	}
 }
 
 func (b block) allNodes() (nodes []node) {
@@ -92,6 +112,8 @@ func (b block) allNodes() (nodes []node) {
 			nodes = append(nodes, append(n.falseblk.allNodes(), n.trueblk.allNodes()...)...)
 		case *loopNode:
 			nodes = append(nodes, n.loopblk.allNodes()...)
+		case *funcNode:
+			nodes = append(nodes, n.funcblk.allNodes()...)
 		}
 	}
 	return
@@ -107,6 +129,8 @@ func (b block) allConns() (conns []*connection) {
 			conns = append(conns, append(n.falseblk.allConns(), n.trueblk.allConns()...)...)
 		case *loopNode:
 			conns = append(conns, n.loopblk.allConns()...)
+		case *funcNode:
+			conns = append(conns, n.funcblk.allConns()...)
 		}
 	}
 	return
@@ -587,6 +611,8 @@ func newNode(b *block, obj types.Object) {
 			n = newIndexNode(true)
 		case "addr":
 			n = newValueNode(nil, true, false, false)
+		case "func":
+			n = newFuncNode(nil)
 		case "if":
 			n = newIfNode()
 		case "indirect":
@@ -670,13 +696,17 @@ func (n *portsNode) reposition() {
 }
 
 func (n *portsNode) removePort(p *port) {
-	f := n.blk.func_()
-	sig := f.obj.GetType().(*types.Signature)
+	f := n.blk.node.(*funcNode)
+	obj := f.obj
+	if obj == nil {
+		obj = f.output.obj
+	}
+	sig := obj.GetType().(*types.Signature)
 	var ports []*port
 	var vars *[]*types.Var
 	if p.out {
 		ports = n.outs
-		if _, ok := f.obj.(method); ok { // don't remove receiver
+		if _, ok := obj.(method); ok { // don't remove receiver
 			ports = ports[1:]
 		}
 		vars = &sig.Params
@@ -690,16 +720,23 @@ func (n *portsNode) removePort(p *port) {
 			*vars = append((*vars)[:i], (*vars)[i+1:]...)
 			n.removePortBase(p)
 			SetKeyFocus(n)
+			if f.obj == nil {
+				f.output.setType(f.output.obj.Type)
+			}
+			n.reposition()
 			break
 		}
 	}
-	n.reposition()
 }
 
 func (n *portsNode) KeyPress(event KeyEvent) {
 	if n.editable && event.Text == "," {
-		f := n.blk.func_()
-		sig := f.obj.GetType().(*types.Signature)
+		f := n.blk.node.(*funcNode)
+		obj := f.obj
+		if obj == nil {
+			obj = f.output.obj
+		}
+		sig := obj.GetType().(*types.Signature)
 		var p *port
 		var vars *[]*types.Var
 		v := &types.Var{}
@@ -721,6 +758,9 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 				n.removePortBase(p)
 				n.reposition()
 				SetKeyFocus(n)
+			}
+			if f.obj == nil {
+				f.output.setType(f.output.obj.Type)
 			}
 		})
 	} else {
