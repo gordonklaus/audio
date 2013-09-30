@@ -49,6 +49,12 @@ func (w *Window) ShouldClose() bool {
 	return C.glfwWindowShouldClose(w.w) == C.GL_TRUE
 }
 
+func (w *Window) MousePosition() (_, _ float64) {
+	var x, y C.double
+	C.glfwGetCursorPos(w.w, &x, &y)
+	return float64(x), float64(y)
+}
+
 func (w *Window) SwapBuffers() {
 	C.glfwSwapBuffers(w.w)
 }

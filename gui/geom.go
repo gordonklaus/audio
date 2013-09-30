@@ -55,8 +55,8 @@ func (p Point) Angle() float64 {
 
 // In returns whether p is in r.
 func (p Point) In(r Rectangle) bool {
-	return r.Min.X <= p.X && p.X < r.Max.X &&
-		r.Min.Y <= p.Y && p.Y < r.Max.Y
+	return r.Min.X <= p.X && p.X <= r.Max.X &&
+		r.Min.Y <= p.Y && p.Y <= r.Max.Y
 }
 
 // Mod returns the point q in r such that p.X-q.X is a multiple of r's width
