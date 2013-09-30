@@ -9,28 +9,40 @@ import (
 	"strings"
 )
 
-func loadFunc(f *funcNode) bool {
+func loadFunc(obj types.Object) *funcNode {
+	f := newFuncNode()
+	f.obj = obj
+	f.pkgRefs = map[*types.Package]int{}
+	f.awaken = make(chan struct{}, 1)
+	f.stop = make(chan struct{}, 1)
+
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, fluxPath(f.obj), nil, parser.ParseComments)
-	if err != nil {
-		return false
-	}
-	r := &reader{f.obj.GetPkg(), map[string]*types.Package{}, map[string][]*port{}, map[string]types.Type{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
-	for _, i := range file.Imports {
-		path, _ := strconv.Unquote(i.Path.Value)
-		pkg := r.pkg.Imports[path]
-		name := pkg.Name
-		if i.Name != nil {
-			name = i.Name.Name
+	file, err := parser.ParseFile(fset, fluxPath(obj), nil, parser.ParseComments)
+	if err == nil {
+		r := &reader{obj.GetPkg(), map[string]*types.Package{}, map[string][]*port{}, map[string]types.Type{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
+		for _, i := range file.Imports {
+			path, _ := strconv.Unquote(i.Path.Value)
+			pkg := r.pkg.Imports[path]
+			name := pkg.Name
+			if i.Name != nil {
+				name = i.Name.Name
+			}
+			r.pkgNames[name] = pkg
 		}
-		r.pkgNames[name] = pkg
+		decl := file.Decls[len(file.Decls)-1].(*ast.FuncDecl) // get param and result var names from the source, as the obj names might not match
+		if decl.Recv != nil {
+			r.addVar(decl.Recv.List[0].Names[0].Name, f.inputsNode.newOutput(obj.GetType().(*types.Signature).Recv))
+		}
+		r.fun(f, decl.Type, decl.Body)
+	} else {
+		// this is a new func; save it
+		if m, ok := obj.(method); ok {
+			f.inputsNode.newOutput(m.Type.Recv)
+		}
+		saveFunc(f)
 	}
-	decl := file.Decls[len(file.Decls)-1].(*ast.FuncDecl) // get param and result var names from the source, as the obj names might not match
-	if decl.Recv != nil {
-		r.addVar(decl.Recv.List[0].Names[0].Name, f.inputsNode.newOutput(f.obj.GetType().(*types.Signature).Recv))
-	}
-	r.fun(f, decl.Type, decl.Body)
-	return true
+
+	return f
 }
 
 type reader struct {
@@ -42,17 +54,17 @@ type reader struct {
 	seqNodes map[int]node
 }
 
-func (r *reader) fun(f *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
-	obj := f.obj
+func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
+	obj := n.obj
 	if obj == nil {
-		obj = f.output.obj
+		obj = n.output.obj
 	}
 	sig := obj.GetType().(*types.Signature)
-	
+
 	for i, p := range typ.Params.List {
 		v := sig.Params[i]
-		r.addVar(p.Names[0].Name, f.inputsNode.newOutput(v))
-		f.addPkgRef(v.Type)
+		r.addVar(p.Names[0].Name, n.inputsNode.newOutput(v))
+		n.addPkgRef(v.Type)
 	}
 	var results []*ast.Field
 	if r := typ.Results; r != nil {
@@ -60,15 +72,15 @@ func (r *reader) fun(f *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 	}
 	for i, p := range results {
 		r.vars[p.Names[0].Name] = nil
-		f.addPkgRef(sig.Results[i].Type)
+		n.addPkgRef(sig.Results[i].Type)
 	}
-	r.readBlock(f.funcblk, body.List)
+	r.block(n.funcblk, body.List)
 	for i, p := range results {
-		r.connect(p.Names[0].Name, f.outputsNode.newInput(sig.Results[i]))
+		r.connect(p.Names[0].Name, n.outputsNode.newInput(sig.Results[i]))
 	}
 }
 
-func (r *reader) readBlock(b *block, s []ast.Stmt) {
+func (r *reader) block(b *block, s []ast.Stmt) {
 	for _, s := range s {
 		switch s := s.(type) {
 		case *ast.AssignStmt:
@@ -131,7 +143,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 					r.addVar(name(s.Lhs[0]), n.outs[0])
 					r.addVar(name(s.Lhs[1]), n.outs[1])
 				case *ast.FuncLit:
-					n := newFuncNode(nil)
+					n := newFuncLiteralNode()
 					b.addNode(n)
 					n.output.setType(r.typ(x.Type))
 					r.addVar(name(s.Lhs[0]), n.output)
@@ -197,15 +209,15 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 			if s.Init != nil {
 				r.addVar(name(s.Init.(*ast.AssignStmt).Lhs[0]), n.inputsNode.outs[0])
 			}
-			r.readBlock(n.loopblk, s.Body.List)
+			r.block(n.loopblk, s.Body.List)
 			r.seq(n, s)
 		case *ast.IfStmt:
 			n := newIfNode()
 			b.addNode(n)
 			r.connect(name(s.Cond), n.input)
-			r.readBlock(n.trueblk, s.Body.List)
+			r.block(n.trueblk, s.Body.List)
 			if s.Else != nil {
-				r.readBlock(n.falseblk, s.Else.(*ast.BlockStmt).List)
+				r.block(n.falseblk, s.Else.(*ast.BlockStmt).List)
 			}
 			r.seq(n, s)
 		case *ast.RangeStmt:
@@ -216,7 +228,7 @@ func (r *reader) readBlock(b *block, s []ast.Stmt) {
 			if s.Value != nil {
 				r.addVar(name(s.Value), n.inputsNode.outs[1])
 			}
-			r.readBlock(n.loopblk, s.Body.List)
+			r.block(n.loopblk, s.Body.List)
 			r.seq(n, s)
 		case *ast.ExprStmt:
 			switch x := s.X.(type) {

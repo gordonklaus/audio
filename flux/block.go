@@ -612,7 +612,7 @@ func newNode(b *block, obj types.Object) {
 		case "addr":
 			n = newValueNode(nil, true, false, false)
 		case "func":
-			n = newFuncNode(nil)
+			n = newFuncLiteralNode()
 		case "if":
 			n = newIfNode()
 		case "indirect":

@@ -15,21 +15,25 @@ type funcNode struct {
 	inputsNode, outputsNode *portsNode
 	funcblk                 *block
 	focused                 bool
-	
-	obj                     types.Object
-	pkgRefs                 map[*types.Package]int
-	awaken, stop            chan struct{}
-	done                    func()
+
+	obj          types.Object
+	pkgRefs      map[*types.Package]int
+	awaken, stop chan struct{}
+	done         func()
 }
 
-func newFuncNode(obj types.Object) *funcNode {
-	n := &funcNode{obj: obj}
+func newFuncLiteralNode() *funcNode {
+	n := newFuncNode()
+	n.output = newOutput(n, &types.Var{Type: &types.Signature{}})
+	n.Add(n.output)
+	return n
+}
+
+// helper constructor -- does not produce a complete funcNode
+func newFuncNode() *funcNode {
+	n := &funcNode{}
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
-	if n.lit() {
-		n.output = newOutput(n, &types.Var{Type: &types.Signature{}})
-		n.Add(n.output)
-	}
 	n.funcblk = newBlock(n)
 	n.inputsNode = newInputsNode()
 	n.inputsNode.editable = true
@@ -38,20 +42,6 @@ func newFuncNode(obj types.Object) *funcNode {
 	n.outputsNode.editable = true
 	n.funcblk.addNode(n.outputsNode)
 	n.Add(n.funcblk)
-
-	if !n.lit() {
-		n.pkgRefs = map[*types.Package]int{}
-		n.awaken = make(chan struct{}, 1)
-		n.stop = make(chan struct{}, 1)
-		
-		if !loadFunc(n) {
-			if m, ok := obj.(method); ok {
-				n.inputsNode.newOutput(m.Type.Recv)
-			}
-			saveFunc(n)
-		}
-	}
-
 	return n
 }
 
@@ -105,16 +95,16 @@ func (n *funcNode) subPkgRef(x interface{}) {
 	}
 }
 
-func (n funcNode) block() *block           { return n.blk }
-func (n *funcNode) setBlock(b *block)      { n.blk = b }
-func (n funcNode) inputs() []*port         { return nil }
-func (n funcNode) outputs() (p []*port)    {
+func (n funcNode) block() *block      { return n.blk }
+func (n *funcNode) setBlock(b *block) { n.blk = b }
+func (n funcNode) inputs() []*port    { return nil }
+func (n funcNode) outputs() (p []*port) {
 	if n.lit() {
 		p = append(p, n.output)
 	}
 	return
 }
-func (n funcNode) inConns() []*connection  { return n.funcblk.inConns() }
+func (n funcNode) inConns() []*connection { return n.funcblk.inConns() }
 func (n funcNode) outConns() []*connection {
 	c := n.funcblk.outConns()
 	if n.lit() {

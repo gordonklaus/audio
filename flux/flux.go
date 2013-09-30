@@ -55,7 +55,7 @@ func newFluxWindow() *fluxWindow {
 				SetKeyFocus(v)
 			}
 		case *types.Func, method:
-			n := newFuncNode(obj)
+			n := loadFunc(obj)
 			go n.animate()
 			Hide(w.browser)
 			w.Add(n)
