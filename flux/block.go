@@ -14,12 +14,11 @@ const blockRadius = 16
 
 type block struct {
 	*ViewBase
-	node             node
-	nodes            map[node]bool
-	conns            map[*connection]bool
-	focused, editing bool
-	editingNode      node
-	vel              map[node]Point
+	node    node
+	nodes   map[node]bool
+	conns   map[*connection]bool
+	focused bool
+	vel     map[node]Point
 }
 
 func newBlock(n node) *block {
@@ -242,16 +241,6 @@ nx:
 	}
 	ok = true
 	return
-}
-
-func (b *block) startEditing() {
-	SetKeyFocus(b)
-	b.editing = true
-}
-
-func (b *block) stopEditing() {
-	b.editing = false
-	b.editingNode = nil
 }
 
 // TODO: consider not repositioning portsNodes, as doing so may contribute to poor convergence and poor measure of meanSpeed
@@ -496,48 +485,12 @@ func (b *block) focusNearestView(v View, dirKey int) {
 }
 
 func (b *block) TookKeyFocus() { b.focused = true; Repaint(b) }
-func (b *block) LostKeyFocus() { b.focused = false; b.stopEditing(); Repaint(b) }
+func (b *block) LostKeyFocus() { b.focused = false; Repaint(b) }
 
 func (b *block) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft, KeyRight, KeyUp, KeyDown:
-		outermost := b.outermost()
-		if b.editing {
-			var v View = b.editingNode
-			if v == nil {
-				v = b
-			}
-			views := []View{}
-			for _, n := range outermost.allNodes() {
-				views = append(views, n)
-			}
-			if n := nearestView(b, views, MapTo(v, Center(v), outermost), event.Key); n != nil {
-				b.editingNode = n.(node)
-			}
-		} else {
-			outermost.focusNearestView(KeyFocus(b), event.Key)
-		}
-	case KeySpace:
-		if b.editingNode != nil {
-			if b.nodes[b.editingNode] {
-				b.Remove(b.editingNode)
-				delete(b.nodes, b.editingNode)
-				b.addNode(b.editingNode)
-			} else {
-				b.removeNode(b.editingNode)
-				b.nodes[b.editingNode] = true
-				b.Add(b.editingNode)
-			}
-		}
-	case KeyEnter:
-		if b.editing {
-			if b.editingNode != nil && !b.nodes[b.editingNode] {
-				b.nodes[b.editingNode] = true
-			}
-			b.stopEditing()
-		} else {
-			b.startEditing()
-		}
+		b.outermost().focusNearestView(KeyFocus(b), event.Key)
 	case KeyBackspace, KeyDelete:
 		switch v := KeyFocus(b).(type) {
 		case *block:
@@ -561,13 +514,7 @@ func (b *block) KeyPress(event KeyEvent) {
 			SetKeyFocus(foc)
 		}
 	case KeyEscape:
-		if b.editing {
-			if b.editingNode != nil {
-				b.editingNode = nil
-			} else {
-				b.stopEditing()
-			}
-		} else if outer := b.outer(); outer != nil {
+		if outer := b.outer(); outer != nil {
 			SetKeyFocus(outer)
 		} else {
 			b.func_().Close()
@@ -667,9 +614,7 @@ func newNode(b *block, obj types.Object) {
 }
 
 func (b *block) Paint() {
-	if b.editing {
-		SetColor(Color{.7, .4, 0, 1})
-	} else if b.focused {
+	if b.focused {
 		SetColor(Color{.3, .3, .7, 1})
 	} else {
 		SetColor(Color{.5, .5, .5, 1})

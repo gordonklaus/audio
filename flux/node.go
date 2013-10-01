@@ -118,7 +118,7 @@ func (n *nodeBase) reform() {
 	rect := ZR
 	for i, p := range ins {
 		y := -portSize * (float64(i) - (numIn-1)/2)
-		x := -rx*math.Sqrt(ry*ry-y*y)/ry
+		x := -rx * math.Sqrt(ry*ry-y*y) / ry
 		if len(ins) > 1 {
 			x -= 8
 		}
@@ -127,7 +127,7 @@ func (n *nodeBase) reform() {
 	}
 	for i, p := range outs {
 		y := -portSize * (float64(i) - (numOut-1)/2)
-		x := rx*math.Sqrt(ry*ry-y*y)/ry
+		x := rx * math.Sqrt(ry*ry-y*y) / ry
 		if len(outs) > 1 {
 			x += 8
 		}
