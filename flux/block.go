@@ -58,7 +58,7 @@ func (b *block) addNode(n node) {
 		n.setBlock(b)
 		switch n := n.(type) {
 		case *callNode:
-			if _, ok := n.obj.(method); !ok {
+			if _, ok := n.obj.(method); !ok && n.obj != nil {
 				b.func_().addPkgRef(n.obj)
 			}
 		}
@@ -580,6 +580,8 @@ func newNode(b *block, obj types.Object) {
 			n = newIndexNode(true)
 		case "addr":
 			n = newValueNode(nil, true, false, false)
+		case "call":
+			n = newCallNode(nil)
 		case "func":
 			n = newFuncLiteralNode()
 		case "if":

@@ -271,9 +271,13 @@ func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n node) {
 	n = newCallNode(obj)
 	b.addNode(n)
 	args := x.Args
-	if _, ok := obj.(method); ok {
+	switch obj.(type) {
+	case method:
 		recv := x.Fun.(*ast.SelectorExpr).X
 		args = append([]ast.Expr{recv}, args...)
+	case nil:
+		f := x.Fun.(*ast.Ident)
+		args = append([]ast.Expr{f}, args...)
 	}
 	switch n := n.(type) {
 	case *makeNode:

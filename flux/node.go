@@ -248,43 +248,6 @@ func outs(n node) (p []*port) {
 	return
 }
 
-type callNode struct {
-	*nodeBase
-	obj types.Object
-}
-
-func newCallNode(obj types.Object) node {
-	if t, ok := obj.GetType().(*types.Signature); ok {
-		n := &callNode{obj: obj}
-		n.nodeBase = newNodeBase(n)
-		name := obj.GetName()
-		if t.Recv != nil {
-			n.newInput(t.Recv)
-			name = "." + name
-		}
-		n.text.SetText(name)
-		for _, v := range t.Params {
-			n.newInput(v)
-		}
-		for _, v := range t.Results {
-			n.newOutput(v)
-		}
-		n.addSeqPorts()
-		return n
-	}
-
-	switch obj.GetName() {
-	case "delete":
-		return newDeleteNode()
-	case "len":
-		return newLenNode()
-	case "make":
-		return newMakeNode()
-	default:
-		panic("unknown builtin: " + obj.GetName())
-	}
-}
-
 type basicLiteralNode struct {
 	*nodeBase
 	kind token.Token

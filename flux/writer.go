@@ -223,11 +223,15 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			switch n := n.(type) {
 			case *callNode:
 				f := ""
-				if m, ok := n.obj.(method); ok {
-					f = args[0] + "." + m.Name
+				switch obj := n.obj.(type) {
+				default:
+					f = w.qualifiedName(obj)
+				case method:
+					f = args[0] + "." + obj.Name
 					args = args[1:]
-				} else {
-					f = w.qualifiedName(n.obj)
+				case nil:
+					f = args[0]
+					args = args[1:]
 				}
 				w.indent("")
 				if len(results) > 0 {
