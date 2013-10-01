@@ -22,7 +22,7 @@ func newLoopNode() *loopNode {
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
 	n.input = newInput(n, &types.Var{})
 	n.input.connsChanged = n.updateInputType
-	MoveCenter(n.input, Pt(-2*portSize, 0))
+	MoveCenter(n.input, Pt(-portSize/2, 0))
 	n.Add(n.input)
 	n.loopblk = newBlock(n)
 	n.inputsNode = newInputsNode()
@@ -31,7 +31,7 @@ func newLoopNode() *loopNode {
 	n.Add(n.loopblk)
 
 	n.seqIn = newInput(n, &types.Var{Name: "seq", Type: seqType})
-	MoveCenter(n.seqIn, ZP)
+	MoveCenter(n.seqIn, Pt(portSize/2, 0))
 	n.Add(n.seqIn)
 	n.seqOut = newOutput(n, &types.Var{Name: "seq", Type: seqType})
 	n.Add(n.seqOut)
@@ -109,9 +109,9 @@ func (n *loopNode) update() bool {
 	if !b.update() {
 		return false
 	}
-	b.Move(Pt(0, -Height(b)/2))
+	b.Move(Pt(portSize/2, -Height(b)/2))
 	n.inputsNode.reposition()
-	MoveCenter(n.seqOut, Pt(Width(b), 0))
+	MoveCenter(n.seqOut, Pt(portSize/2+Width(b), 0))
 	ResizeToFit(n, 0)
 	return true
 }
@@ -126,8 +126,6 @@ func (n *loopNode) LostKeyFocus() { n.focused = false; Repaint(n) }
 
 func (n *loopNode) KeyPress(event KeyEvent) {
 	switch event.Key {
-	case KeyLeft, KeyRight, KeyUp, KeyDown:
-		n.blk.outermost().focusNearestView(n, event.Key)
 	case KeyEscape:
 		SetKeyFocus(n.blk)
 	default:
@@ -137,5 +135,5 @@ func (n *loopNode) KeyPress(event KeyEvent) {
 
 func (n loopNode) Paint() {
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
-	DrawLine(ZP, Pt(-2*portSize, 0))
+	DrawLine(Pt(-portSize/2, 0), Pt(portSize/2, 0))
 }

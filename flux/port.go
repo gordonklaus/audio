@@ -101,10 +101,6 @@ func (p *port) TookKeyFocus() { p.focused = true; Repaint(p); Show(p.valView) }
 func (p *port) LostKeyFocus() { p.focused = false; Repaint(p); Hide(p.valView) }
 
 func (p *port) KeyPress(event KeyEvent) {
-	if p.out && event.Key == KeyLeft || !p.out && event.Key == KeyRight {
-		SetKeyFocus(p.node)
-		return
-	}
 	if p.obj.Type != seqType &&
 		(p.out && event.Key == KeyRight && len(p.conns) > 0 ||
 			!p.out && event.Key == KeyLeft && len(p.conns) > 0) {
@@ -125,8 +121,6 @@ func (p *port) KeyPress(event KeyEvent) {
 			c.setDst(p)
 		}
 		c.startEditing()
-	case KeyLeft, KeyRight, KeyUp, KeyDown:
-		p.node.block().outermost().focusNearestView(p, event.Key)
 	case KeyBackspace, KeyDelete:
 		if p.out && event.Key == KeyBackspace || !p.out && event.Key == KeyDelete {
 			if n, ok := p.node.(interface {

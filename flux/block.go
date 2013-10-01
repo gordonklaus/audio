@@ -104,34 +104,66 @@ func (b *block) removeConn(c *connection) {
 	}
 }
 
-func (b block) allNodes() (nodes []node) {
+func (b *block) walk(bf func(*block), nf func(node), cf func(*connection)) {
+	if bf != nil {
+		bf(b)
+	}
 	for n := range b.nodes {
-		nodes = append(nodes, n)
+		if nf != nil {
+			nf(n)
+		}
 		switch n := n.(type) {
 		case *ifNode:
-			nodes = append(nodes, append(n.falseblk.allNodes(), n.trueblk.allNodes()...)...)
+			n.falseblk.walk(bf, nf, cf)
+			n.trueblk.walk(bf, nf, cf)
 		case *loopNode:
-			nodes = append(nodes, n.loopblk.allNodes()...)
+			n.loopblk.walk(bf, nf, cf)
 		case *funcNode:
-			nodes = append(nodes, n.funcblk.allNodes()...)
+			n.funcblk.walk(bf, nf, cf)
 		}
 	}
+	if cf != nil {
+		for c := range b.conns {
+			cf(c)
+		}
+	}
+}
+
+func (b *block) allBlocks() (blocks []*block) {
+	b.walk(func(b *block) {
+		blocks = append(blocks, b)
+	}, nil, nil)
+	return
+}
+
+func (b *block) allNodes() (nodes []node) {
+	b.walk(nil, func(n node) {
+		nodes = append(nodes, n)
+	}, nil)
 	return
 }
 
 func (b block) allConns() (conns []*connection) {
-	for c := range b.conns {
+	b.walk(nil, nil, func(c *connection) {
 		conns = append(conns, c)
-	}
-	for n := range b.nodes {
-		switch n := n.(type) {
-		case *ifNode:
-			conns = append(conns, append(n.falseblk.allConns(), n.trueblk.allConns()...)...)
-		case *loopNode:
-			conns = append(conns, n.loopblk.allConns()...)
-		case *funcNode:
-			conns = append(conns, n.funcblk.allConns()...)
+	})
+	return
+}
+
+func (b block) allFocusableViews() (views []View) {
+	for _, b := range b.allBlocks() {
+		if len(b.nodes) == 0 {
+			views = append(views, b)
 		}
+	}
+	for _, n := range b.allNodes() {
+		views = append(views, n)
+		for _, p := range append(n.inputs(), n.outputs()...) {
+			views = append(views, p)
+		}
+	}
+	for _, c := range b.allConns() {
+		views = append(views, c)
 	}
 	return
 }
@@ -415,9 +447,9 @@ func (b *block) update() (updated bool) {
 		if n, ok := n.(*portsNode); ok {
 			// portsNodes are later reposition()ed to the boundary; thus we must adjust for the margin (blockRadius)
 			if n.out {
-				r = r.Sub(Pt(blockRadius, 0))
+				r = r.Sub(Pt(blockRadius-2, 0))
 			} else {
-				r = r.Add(Pt(blockRadius, 0))
+				r = r.Add(Pt(blockRadius-2, 0))
 			}
 		}
 		if rect == ZR {
@@ -446,7 +478,7 @@ func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) 
 	dir := map[int]Point{KeyLeft: {-1, 0}, KeyRight: {1, 0}, KeyUp: {0, 1}, KeyDown: {0, -1}}[dirKey]
 	best := 0.0
 	for _, v := range views {
-		d := MapTo(v, Center(v), parent).Sub(p)
+		d := MapTo(v, ZP, parent).Sub(p)
 		score := (dir.X*d.X + dir.Y*d.Y) / (d.X*d.X + d.Y*d.Y)
 		if score > best {
 			best = score
@@ -457,17 +489,7 @@ func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) 
 }
 
 func (b *block) focusNearestView(v View, dirKey int) {
-	views := []View{}
-	for _, n := range b.allNodes() {
-		views = append(views, n)
-		for _, p := range append(n.inputs(), n.outputs()...) {
-			views = append(views, p)
-		}
-	}
-	for _, c := range b.allConns() {
-		views = append(views, c)
-	}
-	nearest := nearestView(b, views, MapTo(v, Center(v), b), dirKey)
+	nearest := nearestView(b, b.allFocusableViews(), MapTo(v, ZP, b), dirKey)
 	if nearest != nil {
 		SetKeyFocus(nearest)
 	}
@@ -493,7 +515,7 @@ func (b *block) KeyPress(event KeyEvent) {
 				b.editingNode = n.(node)
 			}
 		} else {
-			outermost.focusNearestView(b, event.Key)
+			outermost.focusNearestView(KeyFocus(b), event.Key)
 		}
 	case KeySpace:
 		if b.editingNode != nil {
@@ -689,9 +711,9 @@ func (n *portsNode) reposition() {
 	b := n.blk
 	y := Center(b).Y
 	if n.out {
-		MoveOrigin(n, Pt(Rect(b).Max.X, y))
+		MoveOrigin(n, Pt(Rect(b).Max.X-2, y))
 	} else {
-		MoveOrigin(n, Pt(Rect(b).Min.X, y))
+		MoveOrigin(n, Pt(Rect(b).Min.X+2, y))
 	}
 }
 

@@ -27,7 +27,6 @@ type Text interface {
 
 type TextBase struct {
 	*ViewBase
-	AggregateMouser
 	Self                Text
 	text                string
 	textColor           Color
@@ -46,7 +45,6 @@ func NewTextBase(self Text, text string) *TextBase {
 		self = t
 	}
 	t.ViewBase = NewView(t)
-	t.AggregateMouser = AggregateMouser{NewClickFocuser(t)}
 	t.textColor = Color{1, 1, 1, 1}
 	t.backgroundColor = Color{0, 0, 0, 1}
 	t.Accept, t.Reject, t.TextChanged = func(string) {}, func() {}, func(string) {}

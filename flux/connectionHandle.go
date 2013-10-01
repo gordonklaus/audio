@@ -64,7 +64,7 @@ func (h *connectionHandle) KeyPress(event KeyEvent) {
 		if h.editing {
 			h.spec.moveToNearestConnectablePort(event.Key)
 		} else {
-			h.conn.blk.outermost().focusNearestView(h.spec, event.Key)
+			h.ViewBase.KeyPress(event)
 		}
 	case KeyEnter:
 		if h.editing {

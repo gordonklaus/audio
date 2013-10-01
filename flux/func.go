@@ -148,9 +148,9 @@ func (n *funcNode) update() bool {
 	if !b.update() {
 		return false
 	}
-	b.Move(Pt(0, -Height(b)/2))
+	b.Move(Pt(-Width(b)-portSize/2, -Height(b)/2))
 	if n.lit() {
-		MoveCenter(n.output, Pt(Width(b)+portSize, 0))
+		MoveCenter(n.output, Pt(portSize/2, 0))
 	}
 	n.inputsNode.reposition()
 	n.outputsNode.reposition()
@@ -191,7 +191,6 @@ func (n *funcNode) KeyPress(event KeyEvent) {
 func (n funcNode) Paint() {
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
 	if n.lit() {
-		x := Width(n.funcblk)
-		DrawLine(Pt(x, 0), Pt(x+portSize, 0))
+		DrawLine(Pt(-portSize/2, 0), Pt(portSize/2, 0))
 	}
 }

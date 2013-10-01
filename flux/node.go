@@ -118,15 +118,22 @@ func (n *nodeBase) reform() {
 	rect := ZR
 	for i, p := range ins {
 		y := -portSize * (float64(i) - (numIn-1)/2)
-		MoveCenter(p, Pt(-8-rx*math.Sqrt(ry*ry-y*y)/ry, y))
+		x := -rx*math.Sqrt(ry*ry-y*y)/ry
+		if len(ins) > 1 {
+			x -= 8
+		}
+		MoveCenter(p, Pt(x, y))
 		rect = rect.Union(RectInParent(p))
 	}
 	for i, p := range outs {
 		y := -portSize * (float64(i) - (numOut-1)/2)
-		MoveCenter(p, Pt(8+rx*math.Sqrt(ry*ry-y*y)/ry, y))
+		x := rx*math.Sqrt(ry*ry-y*y)/ry
+		if len(outs) > 1 {
+			x += 8
+		}
+		MoveCenter(p, Pt(x, y))
 		rect = rect.Union(RectInParent(p))
 	}
-
 	n.SetRect(rect)
 }
 
@@ -172,20 +179,6 @@ func (n *nodeBase) LostKeyFocus() { n.focused = false; Repaint(n) }
 
 func (n *nodeBase) KeyPress(event KeyEvent) {
 	switch event.Key {
-	case KeyLeft:
-		if p := seqIn(n); p != nil {
-			SetKeyFocus(p)
-		} else {
-			n.blk.outermost().focusNearestView(n, event.Key)
-		}
-	case KeyRight:
-		if p := seqOut(n); p != nil {
-			SetKeyFocus(p)
-		} else {
-			n.blk.outermost().focusNearestView(n, event.Key)
-		}
-	case KeyUp, KeyDown:
-		n.blk.outermost().focusNearestView(n, event.Key)
 	case KeyEscape:
 		SetKeyFocus(n.blk)
 	default:
