@@ -308,8 +308,8 @@ func (b *block) update() (updated bool) {
 						continue conns
 					}
 				}
-				x := c.srcPt
-				y := c.dstPt
+				x := MapToParent(c, c.srcPt)
+				y := MapToParent(c, c.dstPt)
 				p := CenterInParent(n1)
 				dir := p.Sub(PointToLine(p, x, y))
 				if dir == ZP {
@@ -330,6 +330,7 @@ func (b *block) update() (updated bool) {
 		if c.src == nil || c.dst == nil {
 			continue
 		}
+		// FIXME: srcPts and dstPts need to be mapped to a common parent
 		// for b := b; b != nil; b = b.outer() {
 		// 	for c2 := range b.conns {
 		// 		if c == c2 ||

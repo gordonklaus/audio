@@ -125,8 +125,10 @@ func (h *connectionSourceHandle) updateConnection(pt Point) {
 	if p, ok := ViewAt(b, MapTo(h, pt, b)).(*port); ok && h.conn.dst != nil && h.conn.dst.canConnect(p) {
 		h.conn.setSrc(p)
 	} else {
-		h.conn.dstPt = MapTo(h, pt, h.conn.blk)
-		h.conn.setDst(nil)
+		srcPt := MapToParent(h, pt)
+		h.conn.setSrc(nil)
+		h.conn.srcPt = srcPt
+		Repaint(h)
 	}
 }
 
@@ -141,7 +143,7 @@ func (h *connectionSourceHandle) moveToNearestConnectablePort(dirKey int) {
 		}
 	}
 
-	v := nearestView(b, ports, MapTo(h.conn.blk, h.conn.srcPt, b), dirKey)
+	v := nearestView(b, ports, MapTo(h.conn, h.conn.srcPt, b), dirKey)
 	if p, ok := v.(*port); ok {
 		h.conn.setSrc(p)
 	}
@@ -181,8 +183,10 @@ func (h *connectionDestinationHandle) updateConnection(pt Point) {
 	if p, ok := ViewAt(b, MapTo(h, pt, b)).(*port); ok && h.conn.src != nil && p.canConnect(h.conn.src) {
 		h.conn.setDst(p)
 	} else {
-		h.conn.srcPt = MapTo(h, pt, h.conn.blk)
-		h.conn.setSrc(nil)
+		dstPt := MapToParent(h, pt)
+		h.conn.setDst(nil)
+		h.conn.dstPt = dstPt
+		Repaint(h)
 	}
 }
 
@@ -197,7 +201,7 @@ func (h *connectionDestinationHandle) moveToNearestConnectablePort(dirKey int) {
 		}
 	}
 
-	v := nearestView(b, ports, MapTo(h.conn.blk, h.conn.dstPt, b), dirKey)
+	v := nearestView(b, ports, MapTo(h.conn, h.conn.dstPt, b), dirKey)
 	if p, ok := v.(*port); ok {
 		h.conn.setDst(p)
 	}

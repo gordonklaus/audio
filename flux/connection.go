@@ -103,19 +103,20 @@ func (c *connection) reblock() {
 }
 
 func (c *connection) reform() {
-	unconnectedOffset := Pt(48, 0)
+	unconnectedOffset := Pt(32, 0)
 	if c.feedback {
-		unconnectedOffset.X = -208
+		unconnectedOffset.X = -96
 	}
 	if c.src != nil {
 		c.srcPt = MapTo(c.src, Center(c.src), c.blk)
-	} else {
-		c.srcPt = c.dstPt.Sub(unconnectedOffset)
 	}
 	if c.dst != nil {
 		c.dstPt = MapTo(c.dst, Center(c.dst), c.blk)
 	} else {
 		c.dstPt = c.srcPt.Add(unconnectedOffset)
+	}
+	if c.src == nil {
+		c.srcPt = c.dstPt.Sub(unconnectedOffset)
 	}
 
 	var rect Rectangle
@@ -124,19 +125,28 @@ func (c *connection) reform() {
 	} else {
 		rect = Rectangle{c.srcPt, c.dstPt}.Canon()
 	}
-	c.Move(rect.Min)
+	
+	pos := rect.Min
+
+	// center the origin so that keyboard navigation works
+	center := rect.Center()
+	c.srcPt = c.srcPt.Sub(center)
+	c.dstPt = c.dstPt.Sub(center)
+	rect = rect.Sub(center)
+	
+	c.Move(pos)
 	c.SetRect(rect)
 
 	handleOffset := c.dstPt.Sub(c.srcPt).Div(4)
 	if c.srcHandle.editing {
-		MoveCenter(c.srcHandle, MapFromParent(c, c.srcPt))
+		MoveCenter(c.srcHandle, c.srcPt)
 	} else {
-		MoveCenter(c.srcHandle, MapFromParent(c, c.srcPt.Add(handleOffset)))
+		MoveCenter(c.srcHandle, c.srcPt.Add(handleOffset))
 	}
 	if c.dstHandle.editing {
-		MoveCenter(c.dstHandle, MapFromParent(c, c.dstPt))
+		MoveCenter(c.dstHandle, c.dstPt)
 	} else {
-		MoveCenter(c.dstHandle, MapFromParent(c, c.dstPt.Sub(handleOffset)))
+		MoveCenter(c.dstHandle, c.dstPt.Sub(handleOffset))
 	}
 }
 
@@ -179,7 +189,7 @@ func (c *connection) KeyPress(event KeyEvent) {
 
 func (c *connection) Paint() {
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[c.focused])
-	start, end := MapFromParent(c, c.srcPt), MapFromParent(c, c.dstPt)
+	start, end := c.srcPt, c.dstPt
 	var pts []Point
 	if c.src != nil && c.src.obj.Type == seqType || c.dst != nil && c.dst.obj.Type == seqType {
 		pts = []Point{start, Pt(start.X, start.Y-40), Pt(end.X, end.Y-40), end}
