@@ -690,7 +690,7 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 		}
 		makeInRoot := len(b.path) == 0 && (b.currentPkg != nil || event.Text == "1")
 		makeInType := recv != nil && event.Text == "3"
-		if b.newObj == nil && b.mode != typesOnly && event.Ctrl && (makeInRoot || makeInPkg || makeInType) {
+		if b.newObj == nil && b.mode != typesOnly && event.Command && (makeInRoot || makeInPkg || makeInType) {
 			switch event.Text {
 			case "1":
 				b.newObj = buildPackage{nil, &build.Package{}}

@@ -176,14 +176,9 @@ func (n *funcNode) TookKeyFocus() {
 func (n *funcNode) LostKeyFocus() { n.focused = false; Repaint(n) }
 
 func (n *funcNode) KeyPress(event KeyEvent) {
-	switch event.Key {
-	case KeyF1:
-		if !n.lit() {
-			saveFunc(n)
-		} else {
-			n.ViewBase.KeyPress(event)
-		}
-	default:
+	if event.Command && event.Key == KeyS && !n.lit() {
+		saveFunc(n)
+	} else {
 		n.ViewBase.KeyPress(event)
 	}
 }

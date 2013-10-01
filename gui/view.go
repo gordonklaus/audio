@@ -31,6 +31,7 @@ type KeyEvent struct {
 	Repeat                  bool
 	Text                    string // only present on Press and Repeat, not Release
 	Shift, Ctrl, Alt, Super bool
+	Command                 bool // platform-independent command key (Super on OS X, Ctrl elsewhere)
 }
 
 type MouserView interface {

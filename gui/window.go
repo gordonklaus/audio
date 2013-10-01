@@ -99,6 +99,7 @@ func (w *Window) run() {
 		keyEvent.Ctrl = mods&glfw.ModControl != 0
 		keyEvent.Alt = mods&glfw.ModAlt != 0
 		keyEvent.Super = mods&glfw.ModSuper != 0
+		keyEvent.Command = commandKey(keyEvent)
 		if key >= KeyEscape || action == Release {
 			keyEvent.Text = ""
 			w.key <- keyEvent
