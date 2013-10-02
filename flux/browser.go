@@ -629,7 +629,10 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 			}
 		}
 		b.newObj = nil
-		if _, ok := obj.(buildPackage); !ok {
+
+		_, isPkg := obj.(buildPackage)
+		_, isType := obj.(*types.TypeName)
+		if !isPkg && !(b.mode == browse && isType) {
 			b.finished = true
 			b.accepted(obj)
 			return

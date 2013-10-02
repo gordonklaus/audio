@@ -608,8 +608,6 @@ func newNode(b *block, obj types.Object) {
 		}
 	case *types.Var, *types.Const, field:
 		n = newValueNode(obj, false, false, false)
-	default:
-		panic("bad obj")
 	}
 	b.addNode(n)
 	MoveCenter(n, Center(b))
