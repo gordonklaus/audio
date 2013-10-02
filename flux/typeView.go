@@ -381,9 +381,43 @@ func (v *typeView) LostKeyFocus() { v.focused = false; Repaint(v) }
 func (v *typeView) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyLeft, KeyRight, KeyUp, KeyDown:
-		if p, ok := Parent(v).(*typeView); ok {
-			p.focusNearest(v, event.Key)
+		foc := KeyFocus(v)
+		if foc == v {
+			v.ViewBase.KeyPress(event)
+			return
 		}
+		moveFocus := func(these, others []*typeView, dir int) bool {
+			for i, c := range these {
+				if c == foc {
+					switch event.Key {
+					case dir:
+						min := math.MaxFloat64
+						nearest := (*typeView)(nil)
+						cy := CenterInParent(c).Y
+						for _, c2 := range others {
+							d := math.Abs(cy - CenterInParent(c2).Y)
+							if d < min {
+								min, nearest = d, c2
+							}
+						}
+						if nearest != nil {
+							SetKeyFocus(nearest)
+						}
+					case KeyUp:
+						if i > 0 {
+							SetKeyFocus(these[i-1])
+						}
+					case KeyDown:
+						if i < len(these)-1 {
+							SetKeyFocus(these[i+1])
+						}
+					}
+					return true
+				}
+			}
+			return false
+		}
+		_ = moveFocus(v.childTypes.left, v.childTypes.right, KeyRight) || moveFocus(v.childTypes.right, v.childTypes.left, KeyLeft)
 	case KeyEnter:
 		done := func() { SetKeyFocus(v) }
 		switch t := (*v.typ).(type) {

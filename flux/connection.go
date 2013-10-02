@@ -125,7 +125,7 @@ func (c *connection) reform() {
 	} else {
 		rect = Rectangle{c.srcPt, c.dstPt}.Canon()
 	}
-	
+
 	pos := rect.Min
 
 	// center the origin so that keyboard navigation works
@@ -133,7 +133,7 @@ func (c *connection) reform() {
 	c.srcPt = c.srcPt.Sub(center)
 	c.dstPt = c.dstPt.Sub(center)
 	rect = rect.Sub(center)
-	
+
 	c.Move(pos)
 	c.SetRect(rect)
 

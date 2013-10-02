@@ -69,15 +69,19 @@ func (b *block) addNode(n node) {
 }
 
 func (b *block) removeNode(n node) {
-	b.Remove(n)
-	delete(b.nodes, n)
-	delete(b.vel, n)
-	switch n := n.(type) {
-	case *callNode:
-		b.func_().subPkgRef(n.obj)
-	}
-	if f := b.func_(); f != nil {
-		f.wakeUp()
+	if b.nodes[n] {
+		b.Remove(n)
+		delete(b.nodes, n)
+		delete(b.vel, n)
+		switch n := n.(type) {
+		case *callNode:
+			if _, ok := n.obj.(method); !ok && n.obj != nil {
+				b.func_().subPkgRef(n.obj)
+			}
+		}
+		if f := b.func_(); f != nil {
+			f.wakeUp()
+		}
 	}
 }
 
