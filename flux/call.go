@@ -40,18 +40,18 @@ func newCallNode(obj types.Object) node {
 		n.text.SetText("call")
 		in := n.newInput(&types.Var{})
 		in.connsChanged = func() {
-			if len(in.conns) > 0 && in.obj.Type == nil {
+			for _, p := range append(ins(n), outs(n)...) {
+				if p != in {
+					n.removePortBase(p)
+				}
+			}
+			if len(in.conns) > 0 {
 				if sig, ok := in.conns[0].src.obj.Type.(*types.Signature); ok {
 					in.setType(sig)
 					n.addPorts(sig)
 				}
 			} else {
 				in.setType(nil)
-				for _, p := range append(ins(n), outs(n)...) {
-					if p != in {
-						n.removePortBase(p)
-					}
-				}
 			}
 		}
 		n.addSeqPorts()

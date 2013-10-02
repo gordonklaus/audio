@@ -222,23 +222,25 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			results, existing := w.results(n, vars)
 			switch n := n.(type) {
 			case *callNode:
-				f := ""
-				switch obj := n.obj.(type) {
-				default:
-					f = w.qualifiedName(obj)
-				case method:
-					f = args[0] + "." + obj.Name
-					args = args[1:]
-				case nil:
-					f = args[0]
-					args = args[1:]
+				if !(n.obj == nil && len(args) == 0) {
+					f := ""
+					switch obj := n.obj.(type) {
+					default:
+						f = w.qualifiedName(obj)
+					case method:
+						f = args[0] + "." + obj.Name
+						args = args[1:]
+					case nil:
+						f = args[0]
+						args = args[1:]
+					}
+					w.indent("")
+					if len(results) > 0 {
+						w.write(strings.Join(results, ", ") + " := ")
+					}
+					w.write("%s(%s)", f, strings.Join(args, ", "))
+					w.seq(n)
 				}
-				w.indent("")
-				if len(results) > 0 {
-					w.write(strings.Join(results, ", ") + " := ")
-				}
-				w.write("%s(%s)", f, strings.Join(args, ", "))
-				w.seq(n)
 			case *deleteNode:
 				if len(n.ins[0].conns) > 0 {
 					w.indent("delete(%s, %s)", args[0], args[1])
