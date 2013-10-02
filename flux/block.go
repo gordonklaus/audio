@@ -587,6 +587,8 @@ func newNode(b *block, obj types.Object) {
 			n = newValueNode(nil, true, false, false)
 		case "call":
 			n = newCallNode(nil)
+		case "convert":
+			n = newConvertNode()
 		case "func":
 			n = newFuncLiteralNode()
 		case "if":

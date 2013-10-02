@@ -87,11 +87,11 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			if s.Tok == token.DEFINE {
 				switch x := s.Rhs[0].(type) {
 				case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
-					r.newValueNode(b, x, s.Lhs[0], false, s)
+					r.value(b, x, s.Lhs[0], false, s)
 				case *ast.CompositeLit:
-					r.newCompositeLiteralNode(b, s, x, false)
+					r.compositeLit(b, s, x, false)
 				case *ast.CallExpr:
-					n := r.newCallNode(b, x)
+					n := r.callOrConvert(b, x)
 					for i, lhs := range s.Lhs {
 						r.addVar(name(lhs), n.outputs()[i])
 					}
@@ -113,9 +113,9 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					case token.AND:
 						switch y := x.X.(type) {
 						case *ast.CompositeLit:
-							r.newCompositeLiteralNode(b, s, y, true)
+							r.compositeLit(b, s, y, true)
 						default:
-							r.newValueNode(b, x, s.Lhs[0], false, s)
+							r.value(b, x, s.Lhs[0], false, s)
 						}
 					case token.NOT:
 						n := newOperatorNode(&types.Func{Name: x.Op.String()})
@@ -171,7 +171,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 						break
 					}
 				}
-				r.newValueNode(b, s.Lhs[0], s.Rhs[0], true, s)
+				r.value(b, s.Lhs[0], s.Rhs[0], true, s)
 			}
 		case *ast.DeclStmt:
 			decl := s.Decl.(*ast.GenDecl)
@@ -197,7 +197,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					}
 					r.addVar(name(v.Names[0]), n.outs[0])
 				case *ast.Ident, *ast.SelectorExpr:
-					r.newValueNode(b, x, v.Names[0], false, s)
+					r.value(b, x, v.Names[0], false, s)
 				}
 			}
 		case *ast.ForStmt:
@@ -233,13 +233,13 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 		case *ast.ExprStmt:
 			switch x := s.X.(type) {
 			case *ast.CallExpr:
-				r.seq(r.newCallNode(b, x), s)
+				r.seq(r.callOrConvert(b, x), s)
 			}
 		}
 	}
 }
 
-func (r *reader) newValueNode(b *block, x, y ast.Expr, set bool, an ast.Node) {
+func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
 	var addr, indirect bool
 	switch x2 := x.(type) {
 	case *ast.UnaryExpr:
@@ -266,7 +266,15 @@ func (r *reader) newValueNode(b *block, x, y ast.Expr, set bool, an ast.Node) {
 	r.seq(n, an)
 }
 
-func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n node) {
+func (r *reader) callOrConvert(b *block, x *ast.CallExpr) (n node) {
+	if p, ok := x.Fun.(*ast.ParenExpr); ok { // writer puts conversions in parens for easy recognition
+		n := newConvertNode()
+		b.addNode(n)
+		n.setType(r.typ(p.X))
+		r.connect(x.Args[0].(*ast.Ident).Name, n.ins[0])
+		return n
+	}
+
 	obj := r.obj(x.Fun)
 	n = newCallNode(obj)
 	b.addNode(n)
@@ -275,7 +283,7 @@ func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n node) {
 	case method:
 		recv := x.Fun.(*ast.SelectorExpr).X
 		args = append([]ast.Expr{recv}, args...)
-	case nil:
+	case nil: // func value call
 		f := x.Fun.(*ast.Ident)
 		args = append([]ast.Expr{f}, args...)
 	}
@@ -292,7 +300,7 @@ func (r *reader) newCallNode(b *block, x *ast.CallExpr) (n node) {
 	return
 }
 
-func (r *reader) newCompositeLiteralNode(b *block, s *ast.AssignStmt, x *ast.CompositeLit, ptr bool) {
+func (r *reader) compositeLit(b *block, s *ast.AssignStmt, x *ast.CompositeLit, ptr bool) {
 	t := r.typ(x.Type)
 	if ptr {
 		t = &types.Pointer{Base: t}

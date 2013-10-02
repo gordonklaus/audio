@@ -323,6 +323,10 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					}
 					w.seq(n)
 				}
+			case *convertNode:
+				if len(n.ins[0].conns) > 0 && len(results) > 0 {
+					w.indent("%s := (%s)(%s)\n", results[0], w.typ(*n.typ.typ), args[0]) // parenthesize type for easy recognition in reader
+				}
 			case *typeAssertNode:
 				if len(n.ins[0].conns) > 0 && len(results) > 0 {
 					w.indent("%s := %s.(%s)\n", strings.Join(results, ", "), args[0], w.typ(*n.typ.typ))
