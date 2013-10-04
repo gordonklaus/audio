@@ -236,6 +236,10 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			case *ast.CallExpr:
 				r.seq(r.callOrConvert(b, x), s)
 			}
+		case *ast.BranchStmt:
+			n := newBranchNode(s.Tok.String())
+			b.addNode(n)
+			r.seq(n, s)
 		}
 	}
 }

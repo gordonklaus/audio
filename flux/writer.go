@@ -411,6 +411,9 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			w.block(n.loopblk, vars)
 			w.indent("}")
 			w.seq(n)
+		case *branchNode:
+			w.indent(n.text.GetText())
+			w.seq(n)
 		}
 	}
 

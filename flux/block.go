@@ -397,6 +397,7 @@ func (b *block) update() (updated bool) {
 		}
 	}
 
+	// TODO: compute mean acceleration instead of mean velocity
 	meanVel := ZP
 	nVel := 0.0
 	for n := range b.nodes {
@@ -585,6 +586,8 @@ func newNode(b *block, obj types.Object) {
 			n = newIndexNode(true)
 		case "addr":
 			n = newValueNode(nil, true, false, false)
+		case "break", "continue":
+			n = newBranchNode(obj.name)
 		case "call":
 			n = newCallNode(nil)
 		case "convert":
