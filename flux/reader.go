@@ -92,8 +92,9 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					r.compositeLit(b, s, x, false)
 				case *ast.CallExpr:
 					n := r.callOrConvert(b, x)
+					outs := outs(n)
 					for i, lhs := range s.Lhs {
-						r.addVar(name(lhs), n.outputs()[i])
+						r.addVar(name(lhs), outs[i])
 					}
 					r.seq(n, s)
 				case *ast.IndexExpr:
@@ -294,7 +295,9 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) (n node) {
 	}
 	for i, arg := range args {
 		if arg, ok := arg.(*ast.Ident); ok {
-			r.connect(arg.Name, n.inputs()[i])
+			// ins(n) must be called on each iteration because making a connection may
+			// cause inputs to change, in particular in the case of calling a func value
+			r.connect(arg.Name, ins(n)[i])
 		}
 	}
 	return
