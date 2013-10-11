@@ -188,11 +188,7 @@ func (w *writer) fun(f *funcNode, vars map[*port]string) {
 }
 
 func (w *writer) block(b *block, vars map[*port]string) {
-	order, ok := b.nodeOrder()
-	if !ok {
-		fmt.Println("cyclic!")
-		return
-	}
+	order := b.nodeOrder()
 
 	vars, varsCopy := map[*port]string{}, vars
 	for k, v := range varsCopy {
@@ -202,8 +198,10 @@ func (w *writer) block(b *block, vars map[*port]string) {
 	w.nindent++
 
 	for c := range b.conns {
+		// TODO: declare vars for multi-connected outports (pass-by-value semantics): (len(c.src.conns) > 1 || c.src.node.block() != b) && c.dst.obj.Type != seqType
 		if _, ok := vars[c.dst]; !ok && c.src.node.block() != b {
 			name := w.name("v")
+			// TODO: import packages for types named in var decls
 			w.indent("var %s %s\n", name, w.typ(c.dst.obj.Type))
 			vars[c.dst] = name
 		}

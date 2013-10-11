@@ -193,58 +193,89 @@ func (b block) outConns() (conns []*connection) {
 	return
 }
 
-func (b *block) nodeOrder() (order []node, ok bool) {
+func (b *block) nodeOrder() (order []node) {
 	visited := Set{}
-	var insertInOrder func(n node, visitedThisCall Set) bool
-	insertInOrder = func(n node, visitedThisCall Set) bool {
+	var insertInOrder func(n node, visitedThisCall Set)
+	insertInOrder = func(n node, visitedThisCall Set) {
 		if visitedThisCall[n] {
-			return false
+			panic("cyclic")
 		}
 		visitedThisCall[n] = true
 
 		if !visited[n] {
 			visited[n] = true
-		conns:
-			for _, c := range n.inConns() {
-				if b.conns[c] {
-					src := c.src.node
-					for !b.nodes[src] {
-						src = src.block().node
-						if src == nil {
-							continue conns
-						}
-					}
-					if !insertInOrder(src, visitedThisCall.Copy()) {
-						return false
-					}
-				}
+			for _, src := range srcsInBlock(n) {
+				insertInOrder(src, visitedThisCall.Copy())
 			}
 			order = append(order, n)
 		}
-		return true
 	}
 
 	endNodes := []node{}
-nx:
 	for n := range b.nodes {
-		for _, c := range n.outConns() {
-			if c.blk == b {
-				continue nx
-			}
+		if len(dstsInBlock(n)) == 0 {
+			endNodes = append(endNodes, n)
 		}
-		endNodes = append(endNodes, n)
 	}
 	if len(endNodes) == 0 && len(b.nodes) > 0 {
-		return
+		panic("cyclic")
 	}
 
 	for _, n := range endNodes {
-		if !insertInOrder(n, Set{}) {
-			return
+		insertInOrder(n, Set{})
+	}
+	return
+}
+
+func srcsInBlock(n node) (srcs []node) {
+	b := n.block()
+	for _, c := range n.inConns() {
+		if c.feedback || c.src == nil {
+			continue
+		}
+		if src := parentNodeInBlock(c.src.node, b); src != nil {
+			srcs = append(srcs, src)
 		}
 	}
-	ok = true
+	for _, c := range n.outConns() {
+		if !c.feedback || c.dst == nil {
+			continue
+		}
+		if dst := parentNodeInBlock(c.dst.node, b); dst != nil && dst != n {
+			srcs = append(srcs, dst)
+		}
+	}
 	return
+}
+
+func dstsInBlock(n node) (dsts []node) {
+	b := n.block()
+	for _, c := range n.outConns() {
+		if c.feedback || c.dst == nil {
+			continue
+		}
+		if dst := parentNodeInBlock(c.dst.node, b); dst != nil {
+			dsts = append(dsts, dst)
+		}
+	}
+	for _, c := range n.inConns() {
+		if !c.feedback || c.src == nil {
+			continue
+		}
+		if src := parentNodeInBlock(c.src.node, b); src != nil && src != n {
+			dsts = append(dsts, src)
+		}
+	}
+	return
+}
+
+func parentNodeInBlock(n node, blk *block) node {
+	for b := n.block(); b != nil; n, b = b.node, b.outer() {
+		if b == blk {
+			return n
+		}
+	}
+	return nil
 }
 
 // TODO: consider not repositioning portsNodes, as doing so may contribute to poor convergence and poor measure of meanSpeed

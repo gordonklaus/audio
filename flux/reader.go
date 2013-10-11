@@ -19,7 +19,7 @@ func loadFunc(obj types.Object) *funcNode {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, fluxPath(obj), nil, parser.ParseComments)
 	if err == nil {
-		r := &reader{obj.GetPkg(), map[string]*types.Package{}, map[string][]*port{}, map[string]types.Type{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
+		r := &reader{obj.GetPkg(), map[string]*types.Package{}, vars{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
 		for _, i := range file.Imports {
 			path, _ := strconv.Unquote(i.Path.Value)
 			pkg := r.pkg.Imports[path]
@@ -48,8 +48,7 @@ func loadFunc(obj types.Object) *funcNode {
 type reader struct {
 	pkg      *types.Package
 	pkgNames map[string]*types.Package
-	vars     map[string][]*port // there is a bug here; names can be reused between disjoint blocks; vars should be passed as a param and copied, as in writer
-	varTypes map[string]types.Type
+	vars     vars
 	cmap     ast.CommentMap
 	seqNodes map[int]node
 }
@@ -71,7 +70,7 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 		results = r.List
 	}
 	for i, p := range results {
-		r.vars[p.Names[0].Name] = nil
+		r.vars[p.Names[0].Name] = &var_{}
 		n.addPkgRef(sig.Results[i].Type)
 	}
 	r.block(n.funcblk, body.List)
@@ -81,6 +80,9 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 }
 
 func (r *reader) block(b *block, s []ast.Stmt) {
+	oldvars := r.vars
+	r.vars = r.vars.copy()
+
 	for _, s := range s {
 		switch s := s.(type) {
 		case *ast.AssignStmt:
@@ -160,28 +162,29 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 						r.connect(i.Name, n.inVal)
 					}
 					r.seq(n, s)
-					break
-				}
-				if id, ok := s.Lhs[0].(*ast.Ident); ok {
-					if _, ok := r.vars[id.Name]; ok {
-						for i := range s.Lhs {
-							lh := name(s.Lhs[i])
-							rh := name(s.Rhs[i])
-							r.vars[lh] = append(r.vars[lh], r.vars[rh]...)
+				} else if id, ok := s.Lhs[0].(*ast.Ident); !ok || r.vars[id.Name] == nil {
+					r.value(b, s.Lhs[0], s.Rhs[0], true, s)
+				} else {
+					for i := range s.Lhs {
+						lh := name(s.Lhs[i])
+						rh := name(s.Rhs[i])
+						if dst := r.vars[lh].dst; dst != nil {
+							c := newConnection()
+							c.feedback = true
+							c.setSrc(r.vars[rh].srcs[0])
+							c.setDst(dst)
+						} else {
+							r.vars[lh].srcs = append(r.vars[lh].srcs, r.vars[rh].srcs[0])
 						}
-						break
 					}
 				}
-				r.value(b, s.Lhs[0], s.Rhs[0], true, s)
 			}
 		case *ast.DeclStmt:
 			decl := s.Decl.(*ast.GenDecl)
 			v := decl.Specs[0].(*ast.ValueSpec)
 			switch decl.Tok {
 			case token.VAR:
-				name := v.Names[0].Name
-				r.vars[name] = nil
-				r.varTypes[name] = r.typ(v.Type)
+				r.vars[v.Names[0].Name] = &var_{typ: r.typ(v.Type)}
 			case token.CONST:
 				switch x := v.Values[0].(type) {
 				case *ast.BasicLit:
@@ -242,6 +245,8 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			r.seq(n, s)
 		}
 	}
+
+	r.vars = oldvars
 }
 
 func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
@@ -271,7 +276,7 @@ func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
 	r.seq(n, an)
 }
 
-func (r *reader) callOrConvert(b *block, x *ast.CallExpr) (n node) {
+func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
 	if p, ok := x.Fun.(*ast.ParenExpr); ok { // writer puts conversions in parens for easy recognition
 		n := newConvertNode()
 		b.addNode(n)
@@ -281,7 +286,7 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) (n node) {
 	}
 
 	obj := r.obj(x.Fun)
-	n = newCallNode(obj)
+	n := newCallNode(obj)
 	b.addNode(n)
 	args := x.Args
 	switch obj.(type) {
@@ -304,7 +309,7 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) (n node) {
 			r.connect(arg.Name, ins(n)[i])
 		}
 	}
-	return
+	return n
 }
 
 func (r *reader) compositeLit(b *block, s *ast.AssignStmt, x *ast.CompositeLit, ptr bool) {
@@ -348,7 +353,7 @@ func (r *reader) obj(x ast.Expr) types.Object {
 			return pkg.Scope.Lookup(n2)
 		}
 		// TODO: use types.LookupFieldOrMethod()
-		t, _ := indirect(r.varTypes[n1])
+		t, _ := indirect(r.vars[n1].typ)
 		recv := t.(*types.NamedType)
 		for _, m := range recv.Methods {
 			if m.Name == n2 {
@@ -407,18 +412,19 @@ func (r *reader) typ(x ast.Expr) types.Type {
 	panic("not yet implemented")
 }
 
-func (r *reader) connect(name string, in *port) {
-	for _, out := range r.vars[name] {
+func (r *reader) connect(name string, dst *port) {
+	v := r.vars[name]
+	for _, src := range v.srcs {
 		c := newConnection()
-		c.setSrc(out)
-		c.setDst(in)
+		c.setSrc(src)
+		c.setDst(dst)
 	}
+	v.dst = dst
 }
 
 func (r *reader) addVar(name string, out *port) {
 	if name != "" && name != "_" {
-		r.vars[name] = append(r.vars[name], out)
-		r.varTypes[name] = out.obj.Type
+		r.vars[name] = &var_{[]*port{out}, out.obj.Type, nil}
 	}
 }
 
@@ -442,4 +448,19 @@ func (r *reader) seq(n node, an ast.Node) {
 
 func name(x ast.Expr) string {
 	return x.(*ast.Ident).Name
+}
+
+type vars map[string]*var_
+type var_ struct {
+	srcs []*port
+	typ  types.Type
+	dst  *port
+}
+
+func (v vars) copy() vars {
+	v2 := vars{}
+	for n, x := range v {
+		v2[n] = x
+	}
+	return v2
 }

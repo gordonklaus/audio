@@ -82,19 +82,26 @@ func (c *connection) setDst(dst *port) {
 
 func (c *connection) reblock() {
 	var newblk *block
-	if c.src == nil && c.dst == nil {
+	switch {
+	case c.src == nil && c.dst == nil:
 		return
-	} else if c.src == nil {
+	case c.src == nil:
 		newblk = c.dst.node.block()
-	} else if c.dst == nil {
+	case c.dst == nil:
 		newblk = c.src.node.block()
-	} else {
-	loop:
-		for srcblk := c.src.node.block(); srcblk != nil; srcblk = srcblk.outer() {
-			for dstblk := c.dst.node.block(); dstblk != nil; dstblk = dstblk.outer() {
-				if srcblk == dstblk {
-					newblk = srcblk
-					break loop
+	default:
+		for b := c.src.node.block(); ; b = b.outer() {
+			if parentNodeInBlock(c.dst.node, b) != nil {
+				newblk = b
+				break
+			}
+		}
+		if c.feedback {
+			for {
+				n := newblk.node
+				newblk = n.block()
+				if _, ok := n.(*loopNode); ok {
+					break
 				}
 			}
 		}
@@ -163,6 +170,11 @@ func (c *connection) LostKeyFocus() { c.focused = false; Repaint(c) }
 
 func (c *connection) KeyPress(event KeyEvent) {
 	switch event.Key {
+	case KeyBackslash:
+		if c.src == nil || c.dst == nil {
+			c.feedback = !c.feedback
+			c.reform()
+		}
 	case KeyLeft:
 		SetKeyFocus(c.src)
 	case KeyRight:
@@ -178,12 +190,7 @@ func (c *connection) KeyPress(event KeyEvent) {
 	case KeyEscape:
 		SetKeyFocus(c.blk)
 	default:
-		if event.Text == "\\" {
-			c.feedback = !c.feedback
-			c.reform()
-		} else {
-			c.ViewBase.KeyPress(event)
-		}
+		c.ViewBase.KeyPress(event)
 	}
 }
 

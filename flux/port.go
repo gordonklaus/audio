@@ -41,46 +41,57 @@ func (p *port) setType(t types.Type) {
 	}
 }
 
-func (p port) canConnect(q *port) bool {
-	pSeq, qSeq := p.obj.Type == seqType, q.obj.Type == seqType
-	if pSeq && !qSeq || !pSeq && qSeq {
+func canConnect(src, dst *port, feedback bool) bool {
+	if src.out == dst.out {
 		return false
 	}
-	if p.out == q.out {
+	for _, c := range src.conns {
+		if c.dst == dst {
+			return false
+		}
+	}
+	// TODO: types.IsAssignableTo(src.obj.Type, dst.obj.Type) (handles seqType, too?)
+	if (src.obj.Type == seqType) != (dst.obj.Type == seqType) {
+		return false
+	}
+	if src.obj.Type == seqType && (src.node.block() != dst.node.block() || precedes(src.node, dst.node)) {
 		return false
 	}
 
-	src, dst := q.node, p.node
-	if p.out {
-		src, dst = dst, src
-	}
-	return !precedes(dst, src)
-}
+	// TODO: recursive func literals
+	// if f, ok := src.node.(*funcNode); ok && parentNodeInBlock(dst.node, f.funcblk) != nil {
+	// 	return true
+	// }
 
-func precedes(start, end node) bool {
-loop:
-	for n1 := start; n1.block() != nil; n1 = n1.block().node {
-		for n2 := end; n2.block() != nil; n2 = n2.block().node {
-			if n1.block() == n2.block() {
-				start, end = n1, n2
-				break loop
+	n1, n2 := src.node, dst.node
+	for b := n1.block(); ; n1, b = b.node, b.outer() {
+		if n := parentNodeInBlock(n2, b); n != nil {
+			n2 = n
+			break
+		}
+	}
+	if feedback {
+		for b := n1.block(); ; b = b.outer() {
+			if b == nil {
+				return false
+			}
+			if _, ok := b.node.(*loopNode); ok {
+				break
 			}
 		}
+		n1, n2 = n2, n1
+	} else if n1 == n2 {
+		return false
 	}
+	return !precedes(n2, n1)
+}
 
-	if start == end {
-		return true
-	}
-
-	for _, c := range start.outConns() {
-		if c.dst == nil {
-			continue
-		}
-		if precedes(c.dst.node, end) {
+func precedes(n1, n2 node) bool {
+	for _, dst := range dstsInBlock(n1) {
+		if dst == n2 || precedes(dst, n2) {
 			return true
 		}
 	}
-
 	return false
 }
 

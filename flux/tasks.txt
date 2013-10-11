@@ -1,17 +1,16 @@
 TODO
 
+- pass by value semantics: every connection makes a copy.
+- automatically address addressable outputs, i.e. slice index, ptr-to-array index, field of ptr-to-struct.  automatically indirect inputs, never automatically address inputs (as if all nodes were expressions).  addrNode (valueNode with addr==true) is the only way to get *T from T.
+- wireless connections
 - don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.
 - bug:  a connection from inside a conditional block out to a node's inport modifies the variable associated with that inport; but that variable may be used elsewhere also -- other inports will receive the modified value even if they don't have a connection from the conditional block.  solution: each inport gets its own variable.  (this was observed when the variable originated as a func param; but does it work this way in general?)
-- allow var.field expressions in valueNode, where var is a package-scope variable (see the next item).
-- implement address expressions in valueNode.  otherwise there is no way to get &localVar.field &pkg.var or &pkg.var.field.
 - make connectionBundles to reduce wire clutter?  each port has at most one connectionBundle that branches off connections near each port it connects to.  or don't add a new object, just draw connections coincident that originate at the same port.  especially bundle coincident connections that cross block boundaries.
-- go/types has parameter and result names like name·1, which is invalid in Go source.  fix go/types or strip these chars.
-- allow to build types when using browser in block.  if a composite type (or pointer to one) is built, make a compositeLiteralNode; otherwise make a conversionNode; and allow toggling between compositeLiteral and conversionNode by hitting a key ('\'?) when node is focused.
-- consider the matter of addressability and copying.  currently, there is one variable per input, plus one variable for each connection that exits a block.  there should be a clear rule for when a copy is made so that it is obvious which connections refer to the same value.
+- GcImport yields parameter and result names like name·1, which is invalid in Go source.  fix go/types or strip these chars.
 - fix bug in indexNode and loopNode:  crash when changing/deleting input connection (something to do with outputs changing)?  might have to do with trying to connect the input to the 2nd inputsNode output, which disappears before the connection is made.
 - fix typeView bug(s):
   - type T big.Int, e.g.,  shows up as the struct{} that big.Int is
-- browser shows unexported types and struct fields
+- hide unexported struct fields and interface methods in browser's typeView
 - in browser, by default don't show non-Go dirs; toggle visibility with a key
 - browser bug:  right arrow two levels deep, left arrow to root, scroll up or down several items; everything disappears
 - prefix names with pkg name in browser and typeView
@@ -24,10 +23,8 @@ TODO
   - order of imports (alphabetical).
   - node order? pro: deterministic build, stable files; con: hides bugs
   - variable names (also seqIDs)
-- typechecking cgo files somehow works by including an empty "C" package in pkgs map; perhaps find out why.  a better way might be to run 'go tool cgo' on cgo files?
 - color conns by type.  hash type name, interpret as color.  or, use multiple colors to describe the whole type tree (outlined, woven, etc).
 - improve valueView editing; currently, name and type can't be edited separately.  solution:  allow to focus name text.
-- fix connection drawing during mouse editing
 - find a better way to embed font (current using something like https://github.com/jteeuwen/go-bindata, https://groups.google.com/forum/#!msg/golang-nuts/UOIUyn7uFsY/Uescy-cI7hQJ) (best to wait for this https://code.google.com/p/go/issues/detail?id=3035).  Or consider installing it in a fixed location (OS X: in app bundle.  Linux: in /usr/share?  Windows: in application directory?)  Also check the go src directory in case someone has go-gotten flux?
 - handle constant expressions:
   - write result to constant (not variable), or type may not propagate correctly
@@ -37,17 +34,6 @@ TODO
 before releasing:
 - handle all errors
   - including reader.go parsing errors?
-- gofmt
-
-
-DONE
-
-- automatic arrangment
-- pretty blocks, nodes, conns
-- funcs:  inputs, outputs
-- types, methods
-- loops
-- allow package name to differ from directory name
 
 
 LINKS
