@@ -704,35 +704,37 @@ func (n *portsNode) reposition() {
 }
 
 func (n *portsNode) removePort(p *port) {
-	f := n.blk.node.(*funcNode)
-	obj := f.obj
-	if obj == nil {
-		obj = f.output.obj
-	}
-	sig := obj.GetType().(*types.Signature)
-	var ports []*port
-	var vars *[]*types.Var
-	if p.out {
-		ports = n.outs
-		if _, ok := obj.(method); ok { // don't remove receiver
-			ports = ports[1:]
+	if n.editable {
+		f := n.blk.node.(*funcNode)
+		obj := f.obj
+		if obj == nil {
+			obj = f.output.obj
 		}
-		vars = &sig.Params
-	} else {
-		ports = n.ins
-		vars = &sig.Results
-	}
-	for i, q := range ports {
-		if q == p {
-			f.subPkgRef((*vars)[i].Type)
-			*vars = append((*vars)[:i], (*vars)[i+1:]...)
-			n.removePortBase(p)
-			SetKeyFocus(n)
-			if f.obj == nil {
-				f.output.setType(f.output.obj.Type)
+		sig := obj.GetType().(*types.Signature)
+		var ports []*port
+		var vars *[]*types.Var
+		if p.out {
+			ports = n.outs
+			if _, ok := obj.(method); ok { // don't remove receiver
+				ports = ports[1:]
 			}
-			n.reposition()
-			break
+			vars = &sig.Params
+		} else {
+			ports = n.ins
+			vars = &sig.Results
+		}
+		for i, q := range ports {
+			if q == p {
+				n.blk.func_().subPkgRef((*vars)[i].Type)
+				*vars = append((*vars)[:i], (*vars)[i+1:]...)
+				n.removePortBase(p)
+				SetKeyFocus(n)
+				if f.obj == nil {
+					f.output.setType(f.output.obj.Type)
+				}
+				n.reposition()
+				break
+			}
 		}
 	}
 }
@@ -760,7 +762,7 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 		p.valView.edit(func() {
 			if v.Type != nil {
 				*vars = append(*vars, v)
-				f.addPkgRef(v.Type)
+				n.blk.func_().addPkgRef(v.Type)
 				SetKeyFocus(p)
 			} else {
 				n.removePortBase(p)

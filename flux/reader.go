@@ -55,15 +55,17 @@ type reader struct {
 
 func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 	obj := n.obj
+	f := n
 	if obj == nil {
 		obj = n.output.obj
+		f = n.blk.func_()
 	}
 	sig := obj.GetType().(*types.Signature)
 
 	for i, p := range typ.Params.List {
 		v := sig.Params[i]
 		r.addVar(p.Names[0].Name, n.inputsNode.newOutput(v))
-		n.addPkgRef(v.Type)
+		f.addPkgRef(v.Type)
 	}
 	var results []*ast.Field
 	if r := typ.Results; r != nil {
@@ -71,7 +73,7 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 	}
 	for i, p := range results {
 		r.vars[p.Names[0].Name] = &var_{}
-		n.addPkgRef(sig.Results[i].Type)
+		f.addPkgRef(sig.Results[i].Type)
 	}
 	r.block(n.funcblk, body.List)
 	for i, p := range results {
