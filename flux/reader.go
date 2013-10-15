@@ -105,9 +105,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					n := newIndexNode(false)
 					b.addNode(n)
 					r.connect(name(x.X), n.x)
-					if arg, ok := x.Index.(*ast.Ident); ok {
-						r.connect(arg.Name, n.key)
-					}
+					r.connect(name(x.Index), n.key)
 					r.addVar(name(s.Lhs[0]), n.outVal)
 					if len(s.Lhs) == 2 {
 						r.addVar(name(s.Lhs[1]), n.ok)
@@ -125,20 +123,14 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					case token.NOT:
 						n := newOperatorNode(&types.Func{Name: x.Op.String()})
 						b.addNode(n)
-						if arg, ok := x.X.(*ast.Ident); ok {
-							r.connect(arg.Name, n.ins[0])
-						}
+						r.connect(name(x.X), n.ins[0])
 						r.addVar(name(s.Lhs[0]), n.outs[0])
 					}
 				case *ast.BinaryExpr:
 					n := newOperatorNode(&types.Func{Name: x.Op.String()})
 					b.addNode(n)
-					if arg, ok := x.X.(*ast.Ident); ok {
-						r.connect(arg.Name, n.ins[0])
-					}
-					if arg, ok := x.Y.(*ast.Ident); ok {
-						r.connect(arg.Name, n.ins[1])
-					}
+					r.connect(name(x.X), n.ins[0])
+					r.connect(name(x.Y), n.ins[1])
 					r.addVar(name(s.Lhs[0]), n.outs[0])
 				case *ast.TypeAssertExpr:
 					n := newTypeAssertNode()
@@ -160,9 +152,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					b.addNode(n)
 					r.connect(name(x.X), n.x)
 					r.connect(name(x.Index), n.key)
-					if i, ok := s.Rhs[0].(*ast.Ident); ok {
-						r.connect(i.Name, n.inVal)
-					}
+					r.connect(name(s.Rhs[0]), n.inVal)
 					r.seq(n, s)
 				} else if id, ok := s.Lhs[0].(*ast.Ident); !ok || r.vars[id.Name] == nil {
 					r.value(b, s.Lhs[0], s.Rhs[0], true, s)
@@ -283,7 +273,7 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
 		n := newConvertNode()
 		b.addNode(n)
 		n.setType(r.typ(p.X))
-		r.connect(x.Args[0].(*ast.Ident).Name, n.ins[0])
+		r.connect(name(x.Args[0]), n.ins[0])
 		return n
 	}
 
@@ -296,8 +286,7 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
 		recv := x.Fun.(*ast.SelectorExpr).X
 		args = append([]ast.Expr{recv}, args...)
 	case nil: // func value call
-		f := x.Fun.(*ast.Ident)
-		args = append([]ast.Expr{f}, args...)
+		args = append([]ast.Expr{x.Fun}, args...)
 	}
 	switch n := n.(type) {
 	case *makeNode:
@@ -305,11 +294,9 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
 		args = args[1:]
 	}
 	for i, arg := range args {
-		if arg, ok := arg.(*ast.Ident); ok {
-			// ins(n) must be called on each iteration because making a connection may
-			// cause inputs to change, in particular in the case of calling a func value
-			r.connect(arg.Name, ins(n)[i])
-		}
+		// ins(n) must be called on each iteration because making a connection may
+		// cause inputs to change, in particular in the case of calling a func value
+		r.connect(name(arg), ins(n)[i])
 	}
 	return n
 }
@@ -415,13 +402,14 @@ func (r *reader) typ(x ast.Expr) types.Type {
 }
 
 func (r *reader) connect(name string, dst *port) {
-	v := r.vars[name]
-	for _, src := range v.srcs {
-		c := newConnection()
-		c.setSrc(src)
-		c.setDst(dst)
+	if v, ok := r.vars[name]; ok { // ignore literals (0, nil, "")
+		for _, src := range v.srcs {
+			c := newConnection()
+			c.setSrc(src)
+			c.setDst(dst)
+		}
+		v.dst = dst
 	}
-	v.dst = dst
 }
 
 func (r *reader) addVar(name string, out *port) {
@@ -449,7 +437,10 @@ func (r *reader) seq(n node, an ast.Node) {
 }
 
 func name(x ast.Expr) string {
-	return x.(*ast.Ident).Name
+	if x, ok := x.(*ast.Ident); ok {
+		return x.Name
+	}
+	return ""
 }
 
 type vars map[string]*var_
