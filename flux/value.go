@@ -7,20 +7,24 @@ import (
 
 type valueNode struct {
 	*nodeBase
-	obj                 types.Object
-	addr, indirect, set bool
-	x                   *port // the value to be read from or written to (input)
-	y                   *port // the result of the read (output) or the argument to write (input)
+	obj types.Object // package var or struct field, or nil if this is an assign (=) or indirect node
+	set bool
+	x   *port // the target of the operation (struct or pointer)
+	y   *port // the result of the read (output) or the argument to write (input)
 }
 
-func newValueNode(obj types.Object, addr, indirect, set bool) *valueNode {
-	n := &valueNode{obj: obj, addr: addr, indirect: indirect, set: set}
+func newValueNode(obj types.Object, set bool) *valueNode {
+	n := &valueNode{obj: obj, set: set}
 	n.nodeBase = newNodeBase(n)
-	if f, ok := obj.(field); ok {
-		n.x = n.newInput(&types.Var{Name: "x", Type: f.recv})
-	} else if obj == nil {
-		n.x = n.newInput(&types.Var{Name: "x"})
+	text := ""
+	if _, ok := obj.(field); ok || obj == nil {
+		n.x = n.newInput(&types.Var{})
 		n.x.connsChanged = n.reform
+		text = "."
+	}
+	if obj != nil {
+		text += obj.GetName()
+		n.text.SetText(text)
 	}
 	if set {
 		n.y = n.newInput(&types.Var{})
@@ -35,33 +39,13 @@ func newValueNode(obj types.Object, addr, indirect, set bool) *valueNode {
 }
 
 func (n *valueNode) reform() {
-	text := ""
-	if n.addr {
-		text = "&"
-	} else if n.indirect {
-		text = "*"
-	}
-	if _, ok := n.obj.(field); ok {
-		text += "."
-	}
-	if n.obj != nil {
-		text += n.obj.GetName()
-	} else {
-		text += "x"
-	}
-	n.text.SetText(text)
-
 	if n.set {
 		if n.y.out {
 			n.removePortBase(n.y)
 			n.y = n.newInput(&types.Var{})
-			if n.x != nil {
-				n.y.connsChanged = n.reform
-			}
 		}
 	} else {
 		if !n.y.out {
-			n.y.connsChanged = func() {}
 			n.removePortBase(n.y)
 			n.y = n.newOutput(&types.Var{})
 		}
@@ -69,28 +53,34 @@ func (n *valueNode) reform() {
 	var yt types.Type
 	if n.obj != nil {
 		yt = n.obj.GetType()
-		if n.addr {
-			yt = &types.Pointer{Base: yt}
-		} else if n.indirect {
-			yt, _ = indirect(yt)
+		if _, ok := n.obj.(*types.Const); !ok {
+			yt = &types.Pointer{yt}
 		}
-	} else {
+	}
+	if n.x != nil {
 		var xt types.Type
-		if len(n.x.conns) > 0 {
-			xt = n.x.conns[0].src.obj.Type
-			yt = xt
-			if n.addr {
-				yt = &types.Pointer{Base: yt}
-			} else if n.indirect {
-				yt, _ = indirect(yt)
+		if n.obj != nil {
+			xt = n.obj.(field).recv
+			// TODO: use indirect result of types.LookupFieldOrMethod, or types.Selection.Indirect()
+			if n.set {
+				xt = &types.Pointer{xt}
+			} else {
+				if len(n.x.conns) > 0 {
+					xt = n.x.conns[0].src.obj.Type
+				}
+				if _, ok := xt.(*types.Pointer); !ok {
+					yt = n.obj.GetType()
+				}
 			}
-		} else if n.set && len(n.y.conns) > 0 {
-			yt = n.y.conns[0].src.obj.Type
-			xt = yt
-			if n.addr {
-				xt, _ = indirect(xt)
-			} else if n.indirect {
-				xt = &types.Pointer{Base: xt}
+		} else {
+			if len(n.x.conns) > 0 {
+				xt = n.x.conns[0].src.obj.Type
+				yt, _ = indirect(xt)
+			}
+			if n.set {
+				n.text.SetText("=")
+			} else {
+				n.text.SetText("indirect")
 			}
 		}
 		n.x.setType(xt)
@@ -99,34 +89,20 @@ func (n *valueNode) reform() {
 }
 
 func (n *valueNode) KeyPress(event KeyEvent) {
-	if _, ok := n.obj.(*types.Const); ok {
+	if _, ok := n.obj.(*types.Const); ok || n.obj == nil {
 		n.nodeBase.KeyPress(event)
 	} else {
 		switch event.Text {
-		case "&":
-			if !n.set {
-				n.addr = !n.addr
-				n.indirect = false
-				n.reform()
-			}
-		case "*":
-			var t types.Type
-			if n.obj != nil {
-				t = n.obj.GetType()
-			} else {
-				t = n.x.obj.Type
-			}
-			if _, ok := indirect(t); ok || t == nil {
-				n.addr = false
-				n.indirect = !n.indirect
-				n.reform()
-			}
 		case "=":
-			if !n.addr {
-				n.set = !n.set
-				n.reform()
-				SetKeyFocus(n)
+			if n.x != nil {
+				// TODO: use indirect result of types.LookupFieldOrMethod, or types.Selection.Indirect()
+				if _, ok := n.x.obj.Type.(*types.Pointer); !ok {
+					break
+				}
 			}
+			n.set = !n.set
+			n.reform()
+			SetKeyFocus(n)
 		default:
 			n.nodeBase.KeyPress(event)
 		}

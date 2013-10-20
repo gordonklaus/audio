@@ -17,7 +17,8 @@ func newDeleteNode() *deleteNode {
 	key := n.newInput(&types.Var{Name: "key", Type: generic{}})
 	m.connsChanged = func() {
 		if len(m.conns) > 0 {
-			if t, ok := m.conns[0].src.obj.Type.(*types.Map); ok {
+			t, _ := indirect(m.conns[0].src.obj.Type)
+			if t, ok := t.(*types.Map); ok {
 				m.setType(t)
 				key.setType(t.Key)
 			}
@@ -42,7 +43,13 @@ func newLenNode() *lenNode {
 	n.newOutput(&types.Var{Type: types.Typ[types.Int]})
 	in.connsChanged = func() {
 		if len(in.conns) > 0 {
-			in.setType(in.conns[0].src.obj.Type)
+			t := in.conns[0].src.obj.Type
+			if tt, ok := indirect(t); ok {
+				if _, ok := tt.(*types.Array); !ok {
+					t = tt
+				}
+			}
+			in.setType(t)
 		} else {
 			in.setType(generic{})
 		}

@@ -46,7 +46,8 @@ func newCallNode(obj types.Object) node {
 				}
 			}
 			if len(in.conns) > 0 {
-				if sig, ok := in.conns[0].src.obj.Type.(*types.Signature); ok {
+				t, _ := indirect(in.conns[0].src.obj.Type)
+				if sig, ok := t.(*types.Signature); ok {
 					in.setType(sig)
 					n.addPorts(sig)
 				}

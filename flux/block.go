@@ -193,7 +193,10 @@ func (b block) outConns() (conns []*connection) {
 	return
 }
 
-func (b *block) nodeOrder() (order []node) {
+func (b *block) nodeOrder() []node {
+	order := []node{}
+	var inputsNode *portsNode
+
 	visited := Set{}
 	var insertInOrder func(n node, visitedThisCall Set)
 	insertInOrder = func(n node, visitedThisCall Set) {
@@ -207,7 +210,13 @@ func (b *block) nodeOrder() (order []node) {
 			for _, src := range srcsInBlock(n) {
 				insertInOrder(src, visitedThisCall.Copy())
 			}
-			order = append(order, n)
+			if pn, ok := n.(*portsNode); ok {
+				if !pn.out {
+					inputsNode = pn
+				}
+			} else {
+				order = append(order, n)
+			}
 		}
 	}
 
@@ -224,7 +233,10 @@ func (b *block) nodeOrder() (order []node) {
 	for _, n := range endNodes {
 		insertInOrder(n, Set{})
 	}
-	return
+	if inputsNode != nil {
+		order = append([]node{inputsNode}, order...)
+	}
+	return order
 }
 
 func srcsInBlock(n node) (srcs []node) {
@@ -611,12 +623,12 @@ func newNode(b *block, obj types.Object) {
 	switch obj := obj.(type) {
 	case special:
 		switch obj.name {
+		case "=":
+			n = newValueNode(nil, true)
 		case "[]":
 			n = newIndexNode(false)
 		case "[]=":
 			n = newIndexNode(true)
-		case "addr":
-			n = newValueNode(nil, true, false, false)
 		case "break", "continue":
 			n = newBranchNode(obj.name)
 		case "call":
@@ -628,7 +640,7 @@ func newNode(b *block, obj types.Object) {
 		case "if":
 			n = newIfNode()
 		case "indirect":
-			n = newValueNode(nil, false, true, false)
+			n = newValueNode(nil, false)
 		case "loop":
 			n = newLoopNode()
 		case "typeAssert":
@@ -641,7 +653,7 @@ func newNode(b *block, obj types.Object) {
 			n = newOperatorNode(obj)
 		}
 	case *types.Var, *types.Const, field:
-		n = newValueNode(obj, false, false, false)
+		n = newValueNode(obj, false)
 	}
 	b.addNode(n)
 	MoveCenter(n, Center(b))

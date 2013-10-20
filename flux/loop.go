@@ -52,35 +52,42 @@ func (n loopNode) outConns() []*connection {
 }
 
 func (n *loopNode) updateInputType() {
-	var t, key, elt types.Type
+	var t, u, key, elt types.Type
 	key = types.Typ[types.Int]
+	// TODO: loop over conns until a non-nil src is found, then break after getting the type (and do the same in other nodes)
 	if len(n.input.conns) > 0 {
 		if p := n.input.conns[0].src; p != nil {
-			t = p.obj.Type
+			ptr := false
+			t, ptr = indirect(p.obj.Type)
+			u = t
 			if n, ok := t.(*types.NamedType); ok {
-				t = n.Underlying
+				u = n.Underlying
 			}
-			switch t := t.(type) {
+			switch u := u.(type) {
 			case *types.Basic:
-				if t.Info&types.IsString != 0 {
+				if u.Info&types.IsString != 0 {
 					elt = types.Typ[types.Rune]
-				} else if t.Kind != types.UntypedInt {
-					key = t
+				} else if u.Kind != types.UntypedInt {
+					key = u
 				}
 			case *types.Array:
-				elt = t.Elt
+				elt = u.Elt
+				if ptr {
+					t = p.obj.Type
+					elt = &types.Pointer{elt}
+				}
 			case *types.Slice:
-				elt = t.Elt
+				elt = &types.Pointer{u.Elt}
 			case *types.Map:
-				key, elt = t.Key, t.Elt
+				key, elt = u.Key, u.Elt
 			case *types.Chan:
-				key = t.Elt
+				key = u.Elt
 			}
 		}
 	}
 
 	in := n.inputsNode
-	switch t.(type) {
+	switch u.(type) {
 	default:
 		if len(in.outs) == 2 {
 			for _, c := range in.outs[1].conns {

@@ -93,7 +93,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 				case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
 					r.value(b, x, s.Lhs[0], false, s)
 				case *ast.CompositeLit:
-					r.compositeLit(b, s, x, false)
+					r.compositeLit(b, x, false, s)
 				case *ast.CallExpr:
 					n := r.callOrConvert(b, x)
 					outs := outs(n)
@@ -102,21 +102,15 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					}
 					r.seq(n, s)
 				case *ast.IndexExpr:
-					n := newIndexNode(false)
-					b.addNode(n)
-					r.connect(name(x.X), n.x)
-					r.connect(name(x.Index), n.key)
-					r.addVar(name(s.Lhs[0]), n.outVal)
-					if len(s.Lhs) == 2 {
-						r.addVar(name(s.Lhs[1]), n.ok)
-					}
-					r.seq(n, s)
+					r.index(b, x, s.Lhs[0], false, s)
 				case *ast.UnaryExpr:
 					switch x.Op {
 					case token.AND:
 						switch y := x.X.(type) {
 						case *ast.CompositeLit:
-							r.compositeLit(b, s, y, true)
+							r.compositeLit(b, y, true, s)
+						case *ast.IndexExpr:
+							r.index(b, y, s.Lhs[0], false, s)
 						default:
 							r.value(b, x, s.Lhs[0], false, s)
 						}
@@ -148,12 +142,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 				}
 			} else {
 				if x, ok := s.Lhs[0].(*ast.IndexExpr); ok {
-					n := newIndexNode(true)
-					b.addNode(n)
-					r.connect(name(x.X), n.x)
-					r.connect(name(x.Index), n.key)
-					r.connect(name(s.Rhs[0]), n.inVal)
-					r.seq(n, s)
+					r.index(b, x, s.Rhs[0], true, s)
 				} else if id, ok := s.Lhs[0].(*ast.Ident); !ok || r.vars[id.Name] == nil {
 					r.value(b, s.Lhs[0], s.Rhs[0], true, s)
 				} else {
@@ -176,7 +165,11 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			v := decl.Specs[0].(*ast.ValueSpec)
 			switch decl.Tok {
 			case token.VAR:
-				r.vars[v.Names[0].Name] = &var_{typ: r.typ(v.Type)}
+				if v.Type != nil {
+					r.vars[v.Names[0].Name] = &var_{typ: r.typ(v.Type)}
+				} else {
+					r.addVar(v.Names[0].Name, b.node.(*loopNode).inputsNode.outs[1])
+				}
 			case token.CONST:
 				switch x := v.Values[0].(type) {
 				case *ast.BasicLit:
@@ -227,10 +220,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			r.block(n.loopblk, s.Body.List)
 			r.seq(n, s)
 		case *ast.ExprStmt:
-			switch x := s.X.(type) {
-			case *ast.CallExpr:
-				r.seq(r.callOrConvert(b, x), s)
-			}
+			r.seq(r.callOrConvert(b, s.X.(*ast.CallExpr)), s)
 		case *ast.BranchStmt:
 			n := newBranchNode(s.Tok.String())
 			b.addNode(n)
@@ -242,23 +232,16 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 }
 
 func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
-	var addr, indirect bool
-	switch x2 := x.(type) {
-	case *ast.UnaryExpr:
+	if x2, ok := x.(*ast.UnaryExpr); ok {
 		x = x2.X
-		addr = true
-	case *ast.StarExpr:
-		x = x2.X
-		indirect = true
 	}
-	n := newValueNode(r.obj(x), addr, indirect, set)
+	n := newValueNode(r.obj(x), set)
 	b.addNode(n)
-	if n.x != nil {
-		if s, ok := x.(*ast.SelectorExpr); ok {
-			r.connect(name(s.X), n.x)
-		} else {
-			r.connect(name(x), n.x)
-		}
+	switch x := x.(type) {
+	case *ast.SelectorExpr:
+		r.connect(name(x.X), n.x)
+	case *ast.StarExpr:
+		r.connect(name(x.X), n.x)
 	}
 	if set {
 		r.connect(name(y), n.y)
@@ -301,10 +284,10 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
 	return n
 }
 
-func (r *reader) compositeLit(b *block, s *ast.AssignStmt, x *ast.CompositeLit, ptr bool) {
+func (r *reader) compositeLit(b *block, x *ast.CompositeLit, ptr bool, s *ast.AssignStmt) {
 	t := r.typ(x.Type)
 	if ptr {
-		t = &types.Pointer{Base: t}
+		t = &types.Pointer{t}
 	}
 	n := newCompositeLiteralNode()
 	b.addNode(n)
@@ -325,6 +308,22 @@ elts:
 	r.addVar(name(s.Lhs[0]), n.outs[0])
 }
 
+func (r *reader) index(b *block, x *ast.IndexExpr, y ast.Expr, set bool, s *ast.AssignStmt) {
+	n := newIndexNode(set)
+	b.addNode(n)
+	r.connect(name(x.X), n.x)
+	r.connect(name(x.Index), n.key)
+	if set {
+		r.connect(name(y), n.inVal)
+	} else {
+		r.addVar(name(y), n.outVal)
+	}
+	if len(s.Lhs) == 2 {
+		r.addVar(name(s.Lhs[1]), n.ok)
+	}
+	r.seq(n, s)
+}
+
 func (r *reader) obj(x ast.Expr) types.Object {
 	// TODO: shouldn't go/types be able to do this for me?
 	switch x := x.(type) {
@@ -342,7 +341,14 @@ func (r *reader) obj(x ast.Expr) types.Object {
 			return pkg.Scope.Lookup(n2)
 		}
 		// TODO: use types.LookupFieldOrMethod()
-		t, _ := indirect(r.vars[n1].typ)
+		t := r.vars[n1].typ
+		for {
+			if p, ok := t.(*types.Pointer); ok {
+				t = p.Base
+			} else {
+				break
+			}
+		}
 		recv := t.(*types.NamedType)
 		for _, m := range recv.Methods {
 			if m.Name == n2 {
@@ -388,12 +394,20 @@ func (r *reader) typ(x ast.Expr) types.Type {
 		t := &types.Signature{}
 		if x.Params != nil {
 			for _, f := range x.Params.List {
-				t.Params = append(t.Params, &types.Var{Name: f.Names[0].Name, Type: r.typ(f.Type)})
+				name := ""
+				if len(f.Names) > 0 {
+					name = f.Names[0].Name
+				}
+				t.Params = append(t.Params, &types.Var{Name: name, Type: r.typ(f.Type)})
 			}
 		}
 		if x.Results != nil {
 			for _, f := range x.Results.List {
-				t.Results = append(t.Results, &types.Var{Name: f.Names[0].Name, Type: r.typ(f.Type)})
+				name := ""
+				if len(f.Names) > 0 {
+					name = f.Names[0].Name
+				}
+				t.Results = append(t.Results, &types.Var{Name: name, Type: r.typ(f.Type)})
 			}
 		}
 		return t
@@ -437,8 +451,11 @@ func (r *reader) seq(n node, an ast.Node) {
 }
 
 func name(x ast.Expr) string {
-	if x, ok := x.(*ast.Ident); ok {
+	switch x := x.(type) {
+	case *ast.Ident:
 		return x.Name
+	case *ast.StarExpr:
+		return name(x.X)
 	}
 	return ""
 }

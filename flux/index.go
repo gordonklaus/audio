@@ -9,6 +9,7 @@ type indexNode struct {
 	set           bool
 	x, key, inVal *port
 	outVal, ok    *port
+	addressable   bool
 }
 
 func newIndexNode(set bool) *indexNode {
@@ -33,21 +34,34 @@ func newIndexNode(set bool) *indexNode {
 }
 
 func (n *indexNode) updateInputType() {
+	n.addressable = false
+
 	var t, key, elt types.Type
 	if len(n.x.conns) > 0 {
 		if p := n.x.conns[0].src; p != nil {
-			t = p.obj.Type
+			var ptr bool
+			t, ptr = indirect(p.obj.Type)
+			u := t
 			if n, ok := t.(*types.NamedType); ok {
-				t = n.Underlying
+				u = n.Underlying
 			}
 			key = types.Typ[types.Int]
-			switch t := t.(type) {
+			switch u := u.(type) {
 			case *types.Array:
-				elt = t.Elt
+				elt = u.Elt
+				if ptr && !n.set {
+					t = p.obj.Type
+					elt = &types.Pointer{elt}
+					n.addressable = true
+				}
 			case *types.Slice:
-				elt = t.Elt
+				elt = u.Elt
+				if !n.set {
+					elt = &types.Pointer{elt}
+					n.addressable = true
+				}
 			case *types.Map:
-				key, elt = t.Key, t.Elt
+				key, elt = u.Key, u.Elt
 			}
 		}
 	} else {

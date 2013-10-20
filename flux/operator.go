@@ -55,7 +55,7 @@ func newOperatorNode(obj types.Object) *operatorNode {
 func combineInputTypes(p []*port) (t types.Type) {
 	for _, p := range p {
 		if len(p.conns) > 0 {
-			t2 := p.conns[0].src.obj.Type
+			t2, _ := indirect(p.conns[0].src.obj.Type)
 			switch {
 			case t == nil:
 				t = t2

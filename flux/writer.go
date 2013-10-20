@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"code.google.com/p/go.exp/go/types"
 	"fmt"
 	"go/ast"
 	"go/build"
 	"go/parser"
 	"go/token"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -47,13 +49,7 @@ func saveType(t *types.NamedType) {
 	defer w.close()
 
 	u := t.Underlying
-	walkType(u, func(tt *types.NamedType) {
-		if p := tt.Obj.Pkg; p != t.Obj.Pkg {
-			if _, ok := w.pkgNames[p]; !ok {
-				w.pkgNames[p] = w.name(p.Name)
-			}
-		}
-	})
+	w.collectPkgs(u)
 	w.imports()
 
 	w.write("type %s %s", t.Obj.Name, w.typ(u))
@@ -66,12 +62,24 @@ func saveFunc(f *funcNode) {
 	for p := range f.pkgRefs {
 		w.pkgNames[p] = w.name(p.Name)
 	}
-	w.imports()
+	
+	// some package names are collected during w.fun, so delay w.imports
+	buf := bytes.Buffer{}
+	src := w.src
+	w.src = struct {
+		*bytes.Buffer
+		io.Closer
+	}{&buf, nil}
 	w.fun(f, map[*port]string{})
+	w.src = src
+	
+	w.imports()
+	w.src.Write(buf.Bytes())
 }
 
 type writer struct {
-	src      *os.File
+	src      io.WriteCloser
+	pkg      *types.Package
 	pkgNames map[*types.Package]string
 	names    map[string]int
 	seqID    int
@@ -80,16 +88,15 @@ type writer struct {
 }
 
 func newWriter(obj types.Object) *writer {
-	pkg := obj.GetPkg()
 	src, err := os.Create(fluxPath(obj))
 	if err != nil {
 		panic(err)
 	}
-	w := &writer{src, map[*types.Package]string{}, map[string]int{}, 0, map[node]int{}, 0}
+	w := &writer{src, obj.GetPkg(), map[*types.Package]string{}, map[string]int{}, 0, map[node]int{}, 0}
 	fluxObjs[obj] = true
 
-	w.write("package %s\n\n", pkg.Name)
-	for _, obj := range append(types.Universe.Entries, pkg.Scope.Entries...) {
+	w.write("package %s\n\n", w.pkg.Name)
+	for _, obj := range append(types.Universe.Entries, w.pkg.Scope.Entries...) {
 		w.name(obj.GetName())
 	}
 	return w
@@ -105,6 +112,16 @@ func (w *writer) indent(format string, a ...interface{}) {
 
 func (w *writer) close() {
 	w.src.Close()
+}
+
+func (w *writer) collectPkgs(t types.Type) {
+	walkType(t, func(n *types.NamedType) {
+		if p := n.Obj.Pkg; p != w.pkg {
+			if _, ok := w.pkgNames[p]; !ok {
+				w.pkgNames[p] = w.name(p.Name)
+			}
+		}
+	})
 }
 
 func (w *writer) imports() {
@@ -135,46 +152,35 @@ func (w *writer) fun(f *funcNode, vars map[*port]string) {
 		obj = f.output.obj
 	}
 
-	// name the results first so we can tell if a param connects directly to a result
-	existing := map[string]string{}
-	for _, p := range f.outputsNode.ins {
-		name := w.name(p.obj.Name)
-		if v, ok := vars[p]; ok {
-			// there is a connection from an outer block to this result of this func literal
-			existing[name] = v
-		}
-		vars[p] = name
-	}
-	name := func(p *port) string {
-		name := w.name(p.obj.Name)
-		for _, c := range p.conns {
-			if v, ok := vars[c.dst]; ok {
-				existing[v] = name
-			} else {
-				vars[c.dst] = name
-			}
-		}
-		return name
-	}
 	params := f.inputsNode.outs
 	if _, ok := obj.(method); ok {
 		p := params[0]
 		params = params[1:]
-		w.write("(%s %s) ", name(p), w.typ(p.obj.Type))
+		name := w.name(p.obj.Name)
+		vars[p] = name
+		w.write("(%s %s) ", name, w.typ(p.obj.Type))
 	}
 	w.write("%s(", obj.GetName())
 	for i, p := range params {
 		if i > 0 {
 			w.write(", ")
 		}
-		w.write("%s %s", name(p), w.typ(p.obj.Type))
+		name := w.name(p.obj.Name)
+		vars[p] = name
+		w.write("%s %s", name, w.typ(p.obj.Type))
 	}
 	w.write(") (")
+	existing := map[string]string{} // support for connections from outer blocks to func literal results
 	for i, p := range f.outputsNode.ins {
 		if i > 0 {
 			w.write(", ")
 		}
-		w.write("%s %s", vars[p], w.typ(p.obj.Type))
+		name := w.name(p.obj.Name)
+		if v, ok := vars[p]; ok {
+			existing[name] = v
+		}
+		vars[p] = name
+		w.write("%s %s", name, w.typ(p.obj.Type))
 	}
 	w.write(") {\n")
 	w.nindent++
@@ -187,6 +193,7 @@ func (w *writer) fun(f *funcNode, vars map[*port]string) {
 	w.indent("}\n")
 }
 
+// vars maps inputs to variable names.  additionally, it stores the ouputs corresponding to func args and loops vars for special handling.
 func (w *writer) block(b *block, vars map[*port]string) {
 	order := b.nodeOrder()
 
@@ -198,11 +205,14 @@ func (w *writer) block(b *block, vars map[*port]string) {
 	w.nindent++
 
 	for c := range b.conns {
-		// TODO: declare vars for multi-connected outports (pass-by-value semantics): (len(c.src.conns) > 1 || c.src.node.block() != b) && c.dst.obj.Type != seqType
-		if _, ok := vars[c.dst]; !ok && c.src.node.block() != b {
+		if _, ok := vars[c.dst]; ok {
+			continue
+		}
+		t := c.dst.obj.Type
+		if p, ok := c.src.obj.Type.(*types.Pointer); ok && types.IsIdentical(p.Base, t) || c.src.node.block() != b {
+			w.collectPkgs(t)
 			name := w.name("v")
-			// TODO: import packages for types named in var decls
-			w.indent("var %s %s\n", name, w.typ(c.dst.obj.Type))
+			w.indent("var %s %s\n", name, w.typ(t))
 			vars[c.dst] = name
 		}
 	}
@@ -219,6 +229,9 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			}
 			results, existing := w.results(n, vars)
 			switch n := n.(type) {
+			case *portsNode:
+				// only inputsNodes are in the order (1st)
+				// portsNode is included here so that assignExisting is called for it, to handle assignments of func args and loop vars
 			case *callNode:
 				if !(n.obj == nil && len(args) == 0) {
 					f := ""
@@ -275,7 +288,11 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				if n.set {
 					w.indent("%s[%s] = %s", args[0], args[1], args[2])
 				} else if len(results) > 0 {
-					w.indent("%s := %s[%s]", strings.Join(results, ", "), args[0], args[1])
+					amp := ""
+					if n.addressable {
+						amp = "&"
+					}
+					w.indent("%s := %s%s[%s]", strings.Join(results, ", "), amp, args[0], args[1])
 				}
 				w.seq(n)
 			case *basicLiteralNode:
@@ -291,32 +308,31 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				}
 			case *valueNode:
 				if n.set || len(results) > 0 {
-					val := ""
-					switch {
-					case n.addr:
-						val = "&"
-					case n.indirect:
-						val = "*"
-					}
-					if n.obj != nil {
-						if _, ok := n.obj.(field); ok {
-							val += args[0] + "." + n.obj.GetName()
-							args = args[1:]
-						} else {
-							val += w.qualifiedName(n.obj)
-						}
-					} else {
-						val += args[0]
+					name := ""
+					addr := true
+					switch n.obj.(type) {
+					default:
+						name = w.qualifiedName(n.obj)
+					case field:
+						name = args[0] + "." + n.obj.GetName()
 						args = args[1:]
+						// TODO: use indirect result of types.LookupFieldOrMethod, or types.Selection.Indirect()
+						_, addr = n.x.obj.Type.(*types.Pointer)
+					case nil:
+						name = "*" + args[0]
+						args = args[1:]
+						addr = false
 					}
 					if n.set {
-						w.indent("%s = %s", val, args[0])
+						w.indent("%s = %s", name, args[0])
 					} else {
-						switch n.obj.(type) {
-						default:
-							w.indent("%s := %s", results[0], val)
-						case *types.Const:
-							w.indent("const %s = %s", results[0], val)
+						if _, ok := n.obj.(*types.Const); ok {
+							w.indent("const %s = %s", results[0], name)
+						} else {
+							if addr {
+								name = "&" + name
+							}
+							w.indent("%s := %s", results[0], name)
 						}
 					}
 					w.seq(n)
@@ -358,7 +374,6 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				w.write("}\n")
 				w.assignExisting(existing)
 			}
-		case *portsNode:
 		case *ifNode:
 			w.indent("if ")
 			if len(n.input.conns) > 0 {
@@ -375,37 +390,62 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			w.indent("}")
 			w.seq(n)
 		case *loopNode:
-			w.indent("for")
-			results, existing := w.results(n.inputsNode, vars)
-			if t := n.input.obj.Type; t != nil {
-				switch t.(type) {
-				case *types.Basic, *types.NamedType:
-					i := ""
-					if len(results) > 0 {
-						i = results[0]
-					} else {
-						i = w.name("i")
-					}
-					w.write(" %s := %s(0); %s < %s; %s++", i, w.typ(t), i, vars[n.input], i)
-				case *types.Array, *types.Slice, *types.Map, *types.Chan:
-					if len(results) == 0 {
-						w.write(" _ =")
-					} else {
-						w.write(" " + results[0])
-						if len(results) == 2 {
-							w.write(", " + results[1])
-						}
-						w.write(" :=")
-					}
-					w.write(" range " + vars[n.input])
-				}
-			} else if len(results) > 0 {
-				w.write(" %s := 0;; %s++", results[0], results[0])
+			w.indent("for ")
+			key, val := "_", "_"
+			kv := n.inputsNode.outs
+			if len(kv[0].conns) > 0 {
+				key = w.name("k")
 			}
-			w.write(" {\n")
-			w.nindent++
-			w.assignExisting(existing)
-			w.nindent--
+			if len(kv) == 2 && len(kv[1].conns) > 0 {
+				val = w.name("v")
+			}
+			switch t := underlying(n.input.obj.Type).(type) {
+			case *types.Basic:
+				if key == "_" {
+					key = w.name("i")
+				}
+				w.write("%s := %s(0); %s < %s; %s++ {\n", key, w.typ(n.input.obj.Type), key, vars[n.input], key)
+			case *types.Array, *types.Pointer, *types.Slice:
+				if val != "_" && key == "_" {
+					key = w.name("i")
+				}
+				w.write(key)
+				if key == "_" {
+					w.write(" =")
+				} else {
+					w.write(" :=")
+				}
+				w.write(" range %s {\n", vars[n.input])
+				if val != "_" {
+					amp := "&"
+					if _, ok := t.(*types.Array); ok {
+						amp = ""
+					}
+					w.indent("\tvar %s = %s%s[%s]\n", val, amp, vars[n.input], key)
+				}
+			case *types.Map, *types.Chan:
+				w.write(key)
+				if val != "_" {
+					w.write(", " + val)
+				}
+				if key == "_" && val == "_" {
+					w.write(" =")
+				} else {
+					w.write(" :=")
+				}
+				w.write(" range %s {\n", vars[n.input])
+			default:
+				if key != "_" {
+					w.write("%s := 0;; %s++ ", key, key)
+				}
+				w.write("{\n")
+			}
+			if key != "_" {
+				vars[kv[0]] = key
+			}
+			if val != "_" {
+				vars[kv[1]] = val
+			}
 			w.block(n.loopblk, vars)
 			w.indent("}")
 			w.seq(n)
@@ -425,10 +465,18 @@ func (w *writer) results(n node, vars map[*port]string) (results []string, exist
 		name := "_"
 		if len(p.conns) > 0 {
 			any = true
-			name = w.name(p.obj.GetName())
+			if n, ok := vars[p]; ok { // inputsNodes' outputs are already named (func args, loops vars)
+				name = n
+			} else {
+				name = w.name(p.obj.GetName())
+			}
 			for _, c := range p.conns {
 				if v, ok := vars[c.dst]; ok {
-					existing[v] = name
+					if p, ok := c.src.obj.Type.(*types.Pointer); ok && types.IsIdentical(p.Base, c.dst.obj.Type) {
+						existing[v] = "*" + name
+					} else {
+						existing[v] = name
+					}
 				} else {
 					vars[c.dst] = name
 				}

@@ -1,10 +1,7 @@
 TODO
 
-- pass by value semantics: every connection makes a copy.
-- automatically address addressable outputs, i.e. slice index, ptr-to-array index, field of ptr-to-struct.  automatically indirect inputs, never automatically address inputs (as if all nodes were expressions).  addrNode (valueNode with addr==true) is the only way to get *T from T.
 - wireless connections
 - don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.
-- bug:  a connection from inside a conditional block out to a node's inport modifies the variable associated with that inport; but that variable may be used elsewhere also -- other inports will receive the modified value even if they don't have a connection from the conditional block.  solution: each inport gets its own variable.  (this was observed when the variable originated as a func param; but does it work this way in general?)
 - make connectionBundles to reduce wire clutter?  each port has at most one connectionBundle that branches off connections near each port it connects to.  or don't add a new object, just draw connections coincident that originate at the same port.  especially bundle coincident connections that cross block boundaries.
 - GcImport yields parameter and result names like name·1, which is invalid in Go source.  fix go/types or strip these chars.
 - fix bug in indexNode and loopNode:  crash when changing/deleting input connection (something to do with outputs changing)?  might have to do with trying to connect the input to the 2nd inputsNode output, which disappears before the connection is made.
@@ -12,7 +9,6 @@ TODO
   - type T big.Int, e.g.,  shows up as the struct{} that big.Int is
 - hide unexported struct fields and interface methods in browser's typeView
 - in browser, by default don't show non-Go dirs; toggle visibility with a key
-- browser bug:  right arrow two levels deep, left arrow to root, scroll up or down several items; everything disappears
 - prefix names with pkg name in browser and typeView
 - manage code flux:  names, signatures, types, etc.
   - update objects currently being edited

@@ -100,7 +100,7 @@ func (m method) GetPkg() *types.Package { return m.Pkg }
 type field struct {
 	types.Object
 	*types.Field
-	recv *types.NamedType
+	recv types.Type
 }
 
 func (f field) GetName() string        { return f.Name }
@@ -234,6 +234,7 @@ func (b browser) filteredObjs() (objs []types.Object) {
 
 	addPkgs := func(dir string) {
 		if file, err := os.Open(dir); err == nil {
+			defer file.Close()
 			if fileInfos, err := file.Readdir(-1); err == nil {
 				for _, fileInfo := range fileInfos {
 					name := fileInfo.Name()
@@ -254,7 +255,7 @@ func (b browser) filteredObjs() (objs []types.Object) {
 
 	if len(b.path) == 0 {
 		if b.mode == browse {
-			for _, name := range []string{"[]", "[]=", "addr", "break", "call", "continue", "convert", "func", "if", "indirect", "loop", "typeAssert"} {
+			for _, name := range []string{"=", "[]", "[]=", "break", "call", "continue", "convert", "func", "if", "indirect", "loop", "typeAssert"} {
 				objs = append(objs, special{name: name})
 			}
 		}
