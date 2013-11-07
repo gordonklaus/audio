@@ -578,7 +578,7 @@ func (b *block) KeyPress(event KeyEvent) {
 				browser.Move(Center(b))
 				browser.accepted = func(obj types.Object) {
 					browser.Close()
-					newNode(b, obj)
+					newNode(b, obj, browser.funcAsVal)
 				}
 				browser.canceled = func() {
 					browser.Close()
@@ -618,7 +618,7 @@ func (b *block) KeyPress(event KeyEvent) {
 	}
 }
 
-func newNode(b *block, obj types.Object) {
+func newNode(b *block, obj types.Object, funcAsVal bool) {
 	var n node
 	switch obj := obj.(type) {
 	case special:
@@ -647,10 +647,12 @@ func newNode(b *block, obj types.Object) {
 			n = newTypeAssertNode()
 		}
 	case *types.Func, method:
-		if unicode.IsLetter([]rune(obj.GetName())[0]) {
-			n = newCallNode(obj)
-		} else {
+		if !unicode.IsLetter([]rune(obj.GetName())[0]) {
 			n = newOperatorNode(obj)
+		} else if funcAsVal && obj.GetPkg() != nil { //Pkg==nil == builtin
+			n = newValueNode(obj, false)
+		} else {
+			n = newCallNode(obj)
 		}
 	case *types.Var, *types.Const, field:
 		n = newValueNode(obj, false)

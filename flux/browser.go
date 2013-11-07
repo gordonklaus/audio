@@ -32,6 +32,7 @@ type browser struct {
 	text                 *nodeNameText
 	typeView             *typeView
 	pkgNameText          *TextBase
+	funcAsVal            bool
 }
 
 type browserMode int
@@ -473,7 +474,7 @@ ok:
 	for i, activeIndex := range b.indices {
 		obj := objs[activeIndex]
 		l := NewText(obj.GetName())
-		l.SetTextColor(getTextColor(obj, .7))
+		l.SetTextColor(color(obj, false, b.funcAsVal))
 		l.SetBackgroundColor(Color{0, 0, 0, .7})
 		b.Add(l)
 		b.nameTexts = append(b.nameTexts, l)
@@ -503,7 +504,7 @@ ok:
 		Hide(b.pkgNameText)
 	}
 	if cur != nil {
-		b.text.SetTextColor(getTextColor(cur, 1))
+		b.text.SetTextColor(color(cur, true, b.funcAsVal))
 		switch cur := cur.(type) {
 		case *types.TypeName:
 			if t, ok := cur.Type.(*types.NamedType); ok {
@@ -528,6 +529,10 @@ ok:
 func (t *nodeNameText) LostKeyFocus() { t.b.cancel() }
 func (t *nodeNameText) KeyPress(event KeyEvent) {
 	b := t.b
+	if b.mode == browse && event.Shift != b.funcAsVal {
+		b.funcAsVal = event.Shift
+		t.SetText(t.GetText())
+	}
 	switch event.Key {
 	case KeyUp:
 		if b.newObj == nil {
@@ -658,7 +663,7 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 					sep = "."
 				}
 				pathText := NewText(obj.GetName() + sep)
-				pathText.SetTextColor(getTextColor(obj, 1))
+				pathText.SetTextColor(color(obj, true, b.funcAsVal))
 				pathText.SetBackgroundColor(Color{0, 0, 0, .7})
 				b.Add(pathText)
 				x := 0.0
@@ -723,7 +728,19 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 	}
 }
 
-func getTextColor(obj types.Object, alpha float64) Color {
+func (t *nodeNameText) KeyRelease(event KeyEvent) {
+	b := t.b
+	if b.mode == browse && event.Shift != b.funcAsVal {
+		b.funcAsVal = event.Shift
+		t.SetText(t.GetText())
+	}
+}
+
+func color(obj types.Object, bright, funcAsVal bool) Color {
+	alpha := .7
+	if bright {
+		alpha = 1
+	}
 	switch obj.(type) {
 	case special:
 		return Color{1, 1, .6, alpha}
@@ -732,11 +749,14 @@ func getTextColor(obj types.Object, alpha float64) Color {
 	case *types.TypeName:
 		return Color{.6, 1, .6, alpha}
 	case *types.Func, method:
+		if funcAsVal && obj.GetPkg() != nil { //Pkg==nil == builtin
+			return color(&types.Var{}, bright, funcAsVal)
+		}
 		return Color{1, .6, .6, alpha}
 	case *types.Var, *types.Const, field:
 		return Color{.6, .6, 1, alpha}
 	}
-	return Color{}
+	panic(fmt.Sprintf("unknown object %#v", obj))
 }
 
 var (

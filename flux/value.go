@@ -17,10 +17,12 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 	n := &valueNode{obj: obj, set: set}
 	n.nodeBase = newNodeBase(n)
 	text := ""
-	if _, ok := obj.(field); ok || obj == nil {
+	switch obj.(type) {
+	case field, method, nil:
 		n.x = n.newInput(&types.Var{})
 		n.x.connsChanged = n.reform
 		text = "."
+	default:
 	}
 	if obj != nil {
 		text += obj.GetName()
@@ -31,8 +33,10 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 	} else {
 		n.y = n.newOutput(&types.Var{})
 	}
-	if _, ok := n.obj.(*types.Const); !ok {
+	switch obj.(type) {
+	case *types.Var, field:
 		n.addSeqPorts()
+	default:
 	}
 	n.reform()
 	return n
@@ -53,14 +57,21 @@ func (n *valueNode) reform() {
 	var yt types.Type
 	if n.obj != nil {
 		yt = n.obj.GetType()
-		if _, ok := n.obj.(*types.Const); !ok {
+		switch n.obj.(type) {
+		case *types.Var, field:
 			yt = &types.Pointer{yt}
+		default:
 		}
 	}
 	if n.x != nil {
 		var xt types.Type
 		if n.obj != nil {
-			xt = n.obj.(field).recv
+			switch obj := n.obj.(type) {
+			case field:
+				xt = obj.recv
+			case method:
+				xt = obj.Type.Recv.Type
+			}
 			// TODO: use indirect result of types.LookupFieldOrMethod, or types.Selection.Indirect()
 			if n.set {
 				xt = &types.Pointer{xt}

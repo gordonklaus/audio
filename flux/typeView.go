@@ -24,7 +24,7 @@ func newTypeView(t *types.Type) *typeView {
 	v := &typeView{typ: t, mode: typesOnly}
 	v.ViewBase = NewView(v)
 	v.text = NewText("")
-	v.text.SetTextColor(getTextColor(&types.TypeName{}, .7))
+	v.text.SetTextColor(color(&types.TypeName{}, false, false))
 	v.text.SetBackgroundColor(Color{0, 0, 0, .3})
 	v.Add(v.text)
 	v.setType(*t)
@@ -48,7 +48,7 @@ func newValueView(val types.Object) *typeView {
 	}
 	v := newTypeView(t)
 	v.nameText = NewText(*name)
-	v.nameText.SetTextColor(getTextColor(val, .7))
+	v.nameText.SetTextColor(color(val, false, false))
 	v.nameText.SetBackgroundColor(Color{0, 0, 0, .3})
 	v.nameText.TextChanged = func(text string) {
 		*name = text

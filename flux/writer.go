@@ -62,7 +62,7 @@ func saveFunc(f *funcNode) {
 	for p := range f.pkgRefs {
 		w.pkgNames[p] = w.name(p.Name)
 	}
-	
+
 	// some package names are collected during w.fun, so delay w.imports
 	buf := bytes.Buffer{}
 	src := w.src
@@ -72,7 +72,7 @@ func saveFunc(f *funcNode) {
 	}{&buf, nil}
 	w.fun(f, map[*port]string{})
 	w.src = src
-	
+
 	w.imports()
 	w.src.Write(buf.Bytes())
 }
@@ -309,19 +309,24 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			case *valueNode:
 				if n.set || len(results) > 0 {
 					name := ""
-					addr := true
+					addr := false
 					switch n.obj.(type) {
-					default:
+					case *types.Var, *types.Const:
+						name = w.qualifiedName(n.obj)
+						addr = true
+					case *types.Func:
 						name = w.qualifiedName(n.obj)
 					case field:
 						name = args[0] + "." + n.obj.GetName()
 						args = args[1:]
 						// TODO: use indirect result of types.LookupFieldOrMethod, or types.Selection.Indirect()
 						_, addr = n.x.obj.Type.(*types.Pointer)
+					case method:
+						name = args[0] + "." + n.obj.GetName()
+						args = args[1:]
 					case nil:
 						name = "*" + args[0]
 						args = args[1:]
-						addr = false
 					}
 					if n.set {
 						w.indent("%s = %s", name, args[0])
