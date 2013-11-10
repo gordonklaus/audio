@@ -5,6 +5,35 @@ import (
 	. "code.google.com/p/gordon-go/gui"
 )
 
+type appendNode struct {
+	*nodeBase
+}
+
+func newAppendNode() *appendNode {
+	n := &appendNode{}
+	n.nodeBase = newNodeBase(n)
+	n.text.SetText("append")
+	slice := n.newInput(&types.Var{Type: generic{}})
+	val := n.newInput(&types.Var{Type: generic{}})
+	out := n.newOutput(&types.Var{Type: generic{}})
+	slice.connsChanged = func() {
+		if len(slice.conns) > 0 {
+			t, _ := indirect(slice.conns[0].src.obj.Type)
+			if t, ok := t.(*types.Slice); ok {
+				slice.setType(t)
+				val.setType(t.Elt)
+				out.setType(t)
+			}
+		} else {
+			slice.setType(generic{})
+			val.setType(generic{})
+			out.setType(generic{})
+		}
+	}
+	n.addSeqPorts()
+	return n
+}
+
 type deleteNode struct {
 	*nodeBase
 }

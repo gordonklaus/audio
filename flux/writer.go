@@ -252,6 +252,11 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.write("%s(%s)", f, strings.Join(args, ", "))
 					w.seq(n)
 				}
+			case *appendNode:
+				if len(n.ins[0].conns) > 0 && len(n.outs[0].conns) > 0 {
+					w.indent("%s := append(%s, %s)", results[0], args[0], args[1])
+				}
+				w.seq(n)
 			case *deleteNode:
 				if len(n.ins[0].conns) > 0 {
 					w.indent("delete(%s, %s)", args[0], args[1])

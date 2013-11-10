@@ -25,6 +25,8 @@ func newCallNode(obj types.Object) node {
 		}
 
 		switch obj.GetName() {
+		case "append":
+			return newAppendNode()
 		case "delete":
 			return newDeleteNode()
 		case "len":
