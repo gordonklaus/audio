@@ -54,46 +54,45 @@ func (n *valueNode) reform() {
 			n.y = n.newOutput(&types.Var{})
 		}
 	}
-	var yt types.Type
+	var xt, yt types.Type
 	if n.obj != nil {
 		yt = n.obj.GetType()
-		switch n.obj.(type) {
-		case *types.Var, field:
-			yt = &types.Pointer{yt}
-		default:
-		}
 	}
-	if n.x != nil {
-		var xt types.Type
-		if n.obj != nil {
-			switch obj := n.obj.(type) {
-			case field:
-				xt = obj.recv
-			case method:
-				xt = obj.Type.Recv.Type
-			}
-			// TODO: use indirect result of types.LookupFieldOrMethod, or types.Selection.Indirect()
-			if n.set {
-				xt = &types.Pointer{xt}
-			} else {
-				if len(n.x.conns) > 0 {
-					xt = n.x.conns[0].src.obj.Type
-				}
-				if _, ok := xt.(*types.Pointer); !ok {
-					yt = n.obj.GetType()
-				}
-			}
+	switch obj := n.obj.(type) {
+	case *types.Const:
+	case *types.Var:
+		if !n.set {
+			yt = &types.Pointer{yt}
+		}
+	case *types.Func:
+	case field:
+		xt = obj.recv
+		// TODO: use indirect result of types.LookupFieldOrMethod, or types.Selection.Indirect()
+		if n.set {
+			xt = &types.Pointer{xt}
 		} else {
 			if len(n.x.conns) > 0 {
 				xt = n.x.conns[0].src.obj.Type
-				yt, _ = indirect(xt)
 			}
-			if n.set {
-				n.text.SetText("=")
-			} else {
-				n.text.SetText("indirect")
+			if _, ok := xt.(*types.Pointer); ok {
+				yt = &types.Pointer{yt}
 			}
 		}
+	case method:
+		xt = obj.Type.Recv.Type
+		// TODO: remove Recv? (from copy)
+	case nil:
+		if len(n.x.conns) > 0 {
+			xt = n.x.conns[0].src.obj.Type
+			yt, _ = indirect(xt)
+		}
+		if n.set {
+			n.text.SetText("=")
+		} else {
+			n.text.SetText("indirect")
+		}
+	}
+	if n.x != nil {
 		n.x.setType(xt)
 	}
 	n.y.setType(yt)
