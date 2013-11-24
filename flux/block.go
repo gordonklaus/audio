@@ -18,7 +18,9 @@ type block struct {
 	nodes   map[node]bool
 	conns   map[*connection]bool
 	focused bool
-	vel     map[node]Point
+
+	g    map[node]*Point
+	step map[node]*Point
 }
 
 func newBlock(n node) *block {
@@ -27,7 +29,8 @@ func newBlock(n node) *block {
 	b.node = n
 	b.nodes = map[node]bool{}
 	b.conns = map[*connection]bool{}
-	b.vel = map[node]Point{}
+	b.g = make(map[node]*Point)
+	b.step = make(map[node]*Point)
 	return b
 }
 
@@ -54,6 +57,7 @@ func func_(n node) *funcNode {
 func (b *block) addNode(n node) {
 	if !b.nodes[n] {
 		b.Add(n)
+		n.Move(Pt(100*rand.NormFloat64(), 100*rand.NormFloat64()))
 		b.nodes[n] = true
 		n.setBlock(b)
 		switch n := n.(type) {
@@ -62,6 +66,8 @@ func (b *block) addNode(n node) {
 				b.func_().addPkgRef(n.obj)
 			}
 		}
+		b.g[n] = &Point{}
+		b.step[n] = &Point{.01, .01}
 		if f := b.func_(); f != nil {
 			f.wakeUp()
 		}
@@ -72,13 +78,14 @@ func (b *block) removeNode(n node) {
 	if b.nodes[n] {
 		b.Remove(n)
 		delete(b.nodes, n)
-		delete(b.vel, n)
 		switch n := n.(type) {
 		case *callNode:
 			if _, ok := n.obj.(method); !ok && n.obj != nil {
 				b.func_().subPkgRef(n.obj)
 			}
 		}
+		delete(b.g, n)
+		delete(b.step, n)
 		if f := b.func_(); f != nil {
 			f.wakeUp()
 		}
@@ -245,7 +252,7 @@ func srcsInBlock(n node) (srcs []node) {
 		if c.feedback || c.src == nil {
 			continue
 		}
-		if src := parentNodeInBlock(c.src.node, b); src != nil {
+		if src := parentOrSelfInBlock(c.src.node, b); src != nil {
 			srcs = append(srcs, src)
 		}
 	}
@@ -253,7 +260,7 @@ func srcsInBlock(n node) (srcs []node) {
 		if !c.feedback || c.dst == nil {
 			continue
 		}
-		if dst := parentNodeInBlock(c.dst.node, b); dst != nil && dst != n {
+		if dst := parentOrSelfInBlock(c.dst.node, b); dst != nil && dst != n {
 			srcs = append(srcs, dst)
 		}
 	}
@@ -266,7 +273,7 @@ func dstsInBlock(n node) (dsts []node) {
 		if c.feedback || c.dst == nil {
 			continue
 		}
-		if dst := parentNodeInBlock(c.dst.node, b); dst != nil {
+		if dst := parentOrSelfInBlock(c.dst.node, b); dst != nil {
 			dsts = append(dsts, dst)
 		}
 	}
@@ -274,14 +281,14 @@ func dstsInBlock(n node) (dsts []node) {
 		if !c.feedback || c.src == nil {
 			continue
 		}
-		if src := parentNodeInBlock(c.src.node, b); src != nil && src != n {
+		if src := parentOrSelfInBlock(c.src.node, b); src != nil && src != n {
 			dsts = append(dsts, src)
 		}
 	}
 	return
 }
 
-func parentNodeInBlock(n node, blk *block) node {
+func parentOrSelfInBlock(n node, blk *block) node {
 	for b := n.block(); b != nil; n, b = b.node, b.outer() {
 		if b == blk {
 			return n
@@ -290,86 +297,92 @@ func parentNodeInBlock(n node, blk *block) node {
 	return nil
 }
 
-// TODO: consider not repositioning portsNodes, as doing so may contribute to poor convergence and poor measure of meanSpeed
-// TODO: consider using an EA to lay out nodes
-func (b *block) update() (updated bool) {
+// TODO: treat conns as curves, not lines (or make them more linear?)
+func (b *block) arrange() bool {
+	done := true
+	
 	for n := range b.nodes {
 		if n, ok := n.(interface {
-			update() bool
+			arrange() bool
 		}); ok {
-			updated = n.update() || updated
+			if !n.arrange() {
+				done = false
+			}
 		}
 	}
 
 	const (
+		portsNodeCoef   = 1024
 		nodeCenterCoef  = .5
-		nodeSep         = 16
-		nodeSepCoef     = 4
+		nodeSep         = 8
+		nodeSepCoef     = 1024
 		nodeConnSep     = 8
-		nodeConnSepCoef = 1
-		connLen         = 32
+		nodeConnSepCoef = 8
+		connLen         = 16
 		connLenFB       = -256
-		connLenCoef     = .33
+		connLenCoef     = .1
 		connConnSep     = 4
 		connConnSepCoef = 1
-		topSpeed        = 200
-		speedCompress   = 1
-		dragCoef        = .85
+		gMax            = 32
 	)
 
-	addVel := func(n node, dv Point) {
-		n.block().vel[n] = n.block().vel[n].Add(dv)
+	g := make(map[node]*Point)
+	add := func(n node, dv Point) {
+		*g[n] = g[n].Add(dv)
 	}
-	subVel := func(n node, dv Point) {
-		n.block().vel[n] = n.block().vel[n].Sub(dv)
+	sub := func(n node, dv Point) {
+		*g[n] = g[n].Sub(dv)
+	}
+	for n := range b.nodes {
+		g[n] = &Point{}
 	}
 
 	for n1 := range b.nodes {
+		if n1, ok := n1.(*portsNode); ok {
+			p := Center(b)
+			if n1.out {
+				p.X = Rect(b).Max.X - 2
+			} else {
+				p.X = Rect(b).Min.X + 2
+			}
+			dir := p.Sub(MapToParent(n1, ZP))
+			dir.X *= math.Abs(dir.X)
+			if len(n1.ins)+len(n1.outs) == 0 {
+				dir.Y *= math.Abs(dir.Y)
+			} else {
+				dir.Y = 0
+			}
+			add(n1, dir.Mul(portsNodeCoef))
+		}
 		for n2 := range b.nodes {
 			if n2 == n1 {
 				continue
 			}
 			dir := CenterInParent(n1).Sub(CenterInParent(n2))
-			if dir == ZP {
-				dir = Pt(rand.NormFloat64(), rand.NormFloat64())
-			}
-			d := dir.Len() - Size(n1).Add(Size(n2)).Len()/2 - nodeSep
-			if d >= 0 {
+			r1, r2 := RectInParent(n1).Inset(-nodeSep/2), RectInParent(n2).Inset(-nodeSep/2)
+			sep := math.Min(r1.Intersect(r2).Size().XY())
+			add(n1, dir.Mul(nodeSepCoef*math.Min(1, sep/nodeSep)/dir.Len()))
+		}
+		for c := range b.conns {
+			if c.src == nil || c.dst == nil {
 				continue
 			}
-			addVel(n1, dir.Mul(-nodeSepCoef*d/dir.Len()))
-		}
-		for b := b; b != nil; b = b.outer() {
-		conns:
-			for c := range b.conns {
-				if c.src == nil || c.dst == nil {
-					continue
-				}
-				for n := c.src.node; n.block() != nil; n = n.block().node {
-					if n == n1 {
-						continue conns
-					}
-				}
-				for n := c.dst.node; n.block() != nil; n = n.block().node {
-					if n == n1 {
-						continue conns
-					}
-				}
-				x := MapToParent(c, c.srcPt)
-				y := MapToParent(c, c.dstPt)
-				p := CenterInParent(n1)
-				dir := p.Sub(PointToLine(p, x, y))
-				if dir == ZP {
-					dir = Pt(rand.NormFloat64(), rand.NormFloat64())
-				}
-				d := dir.Len() - Size(n1).Len()/2 - nodeConnSep
-				if d > 0 {
-					continue
-				}
-				delta := dir.Mul(-nodeConnSepCoef * d / dir.Len())
-				addVel(n1, delta)
-				subVel(c.src.node, delta)
-				subVel(c.dst.node, delta)
+			srcNode := parentOrSelfInBlock(c.src.node, b)
+			dstNode := parentOrSelfInBlock(c.dst.node, b)
+			if srcNode == n1 || dstNode == n1 {
+				continue
+			}
+			p := CenterInParent(n1)
+			x := MapToParent(c, c.srcPt)
+			y := MapToParent(c, c.dstPt)
+			dir := p.Sub(PointToLine(p, x, y))
+			maxSep := Size(n1).Len()/2 + nodeConnSep
+			sep := dir.Len()
+			if sep < maxSep {
+				d := dir.Mul(nodeConnSepCoef * (maxSep/sep - 1))
+				add(n1, d)
+				sub(srcNode, d)
+				sub(dstNode, d)
 			}
 		}
 	}
@@ -391,40 +404,44 @@ func (b *block) update() (updated bool) {
 		// 			d = c.MapToParent(c.Center()).Sub(c2.MapToParent(c2.Center()))
 		// 			if d.Len() == 0 { continue }
 		// 			d = d.Mul(connConnSepCoef / d.Len())
-		// 			addVel(c.src.node, d)
-		// 			addVel(c.dst.node, d)
-		// 			subVel(c2.src.node, d)
-		// 			subVel(c2.dst.node, d)
+		// 			add(c.src.node, d)
+		// 			add(c.dst.node, d)
+		// 			sub(c2.src.node, d)
+		// 			sub(c2.dst.node, d)
 		// 		} else if l < connConnSep {
 		// 			d = d.Mul((connConnSep - l) / l)
-		// 			addVel(c.src.node, d)
-		// 			addVel(c.dst.node, d)
-		// 			subVel(c2.src.node, d)
-		// 			subVel(c2.dst.node, d)
+		// 			add(c.src.node, d)
+		// 			add(c.dst.node, d)
+		// 			sub(c2.src.node, d)
+		// 			sub(c2.dst.node, d)
 		// 		}
 		// 	}
 		// }
-		d := c.dstPt.Sub(c.srcPt)
-		connLen := float64(connLen)
-		if c.feedback {
-			connLen = connLenFB
-		}
-		d.X -= connLen + math.Abs(d.Y)/2 // the nonlinearity abs(d.Y) can contribute to oscillations
-		if d.X < 0 {
-			d.X *= -d.X
-		}
-		d = d.Mul(connLenCoef)
 
-		srcNode := c.src.node
-		for srcNode.block() != b {
-			srcNode = srcNode.block().node
+		// TODO: connections that cross block boundaries should be longer.  map src and dst points to the boundaries
+		d := c.dstPt.Sub(c.srcPt)
+		if c.feedback {
+			d.X -= connLenFB
+		} else {
+			d.X -= connLen
 		}
-		dstNode := c.dst.node
-		for dstNode.block() != b {
-			dstNode = dstNode.block().node
+		d.X -= math.Abs(d.Y) / 2
+		if d.X < 0 {
+			d.X *= d.X * d.X
 		}
-		addVel(srcNode, d)
-		subVel(dstNode, d)
+		d.Y *= math.Abs(d.Y) / 16
+		d = d.Mul(connLenCoef)
+		add(parentOrSelfInBlock(c.src.node, b), d)
+		sub(parentOrSelfInBlock(c.dst.node, b), d)
+	}
+
+	avg := ZP
+	for n := range b.nodes {
+		avg = avg.Add(*g[n])
+	}
+	avg = avg.Div(float64(len(b.nodes)))
+	for n := range b.nodes {
+		sub(n, avg)
 	}
 
 	center := ZP
@@ -433,49 +450,18 @@ func (b *block) update() (updated bool) {
 	}
 	center = center.Div(float64(len(b.nodes)))
 	for n := range b.nodes {
-		addVel(n, center.Sub(Pos(n).Mul(nodeCenterCoef)))
-		l := b.vel[n].Len()
+		add(n, center.Sub(Pos(n)).Mul(nodeCenterCoef))
+		l := g[n].Len()
 		if l > 0 {
-			b.vel[n] = b.vel[n].Mul(math.Tanh(speedCompress*l/topSpeed) * topSpeed / l)
+			*g[n] = g[n].Mul(math.Tanh(l/gMax) * gMax / l)
 		}
 	}
 
-	// TODO: compute mean acceleration instead of mean velocity
-	meanVel := ZP
-	nVel := 0.0
 	for n := range b.nodes {
-		if _, ok := n.(*portsNode); ok {
-			continue
-		}
-		b.vel[n] = b.vel[n].Mul(dragCoef)
-		meanVel = meanVel.Add(b.vel[n])
-		nVel++
-	}
-	// if there is only one (non-port) node then it is definitely stationary
-	// but we still have to check if the rect needs updating
-	if nVel > 1 {
-		meanVel = meanVel.Div(nVel)
-		meanSpeed := 0.0
-		for n := range b.nodes {
-			if _, ok := n.(*portsNode); ok {
-				continue
-			}
-			subVel(n, meanVel)
-			meanSpeed += b.vel[n].Len()
-		}
-		meanSpeed /= nVel
-		if meanSpeed < .01 {
-			// NOTE:  meanSpeed is not reliable (probably due to portsNode interactions), which is why we also check rect below
-			b.vel = map[node]Point{}
-			return
-		} else {
-			updated = true
-		}
-
-		dt := math.Min(1.0/fps, 100/meanSpeed) // slow down time at high speeds to avoid oscillation
-		for n := range b.nodes {
-			b.vel[n] = b.vel[n].Mul(.5 + rand.Float64()) // a little noise to break up small oscillations
-			n.Move(Pos(n).Add(b.vel[n].Mul(dt)).Sub(center))
+		d := Pt(rprop(&b.g[n].X, &g[n].X, &b.step[n].X), rprop(&b.g[n].Y, &g[n].Y, &b.step[n].Y))
+		n.Move(Pos(n).Add(d))
+		if d.Len() > .01 {
+			done = false
 		}
 	}
 
@@ -483,7 +469,7 @@ func (b *block) update() (updated bool) {
 	for n := range b.nodes {
 		r := RectInParent(n)
 		if n, ok := n.(*portsNode); ok {
-			// portsNodes are later reposition()ed to the boundary; thus we must adjust for the margin (blockRadius)
+			// portsNodes gravitate to the boundary; thus we must adjust for the margin
 			if n.out {
 				r = r.Sub(Pt(blockRadius-2, 0))
 			} else {
@@ -503,13 +489,26 @@ func (b *block) update() (updated bool) {
 		rect = Rectangle{ZP, Pt(16, 0)}
 	}
 	rect = rect.Inset(-blockRadius)
-	if Rect(b).Size().Sub(rect.Size()).Len() < .01 {
-		b.vel = map[node]Point{}
-		return
+	if Rect(b).Size().Sub(rect.Size()).Len() > .01 {
+		done = false
 	}
 	b.SetRect(rect)
 
-	return true
+	return done
+}
+
+func rprop(g_, g, step *float64) float64 {
+	prod := *g * *g_
+	if prod > 0 {
+		*step *= 1.2
+	} else if prod < 0 {
+		*step *= .5
+		// *g = 0 //seems unnecessary
+	}
+	*step = math.Max(.001, *step)
+	*step = math.Min(1, *step)
+	*g_ = *g
+	return *g * *step
 }
 
 func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) {
@@ -707,16 +706,6 @@ func newPortsNode(out bool) *portsNode {
 	return n
 }
 
-func (n *portsNode) reposition() {
-	b := n.blk
-	y := Center(b).Y
-	if n.out {
-		MoveOrigin(n, Pt(Rect(b).Max.X-2, y))
-	} else {
-		MoveOrigin(n, Pt(Rect(b).Min.X+2, y))
-	}
-}
-
 func (n *portsNode) removePort(p *port) {
 	if n.editable {
 		f := n.blk.node.(*funcNode)
@@ -746,7 +735,9 @@ func (n *portsNode) removePort(p *port) {
 				if f.obj == nil {
 					f.output.setType(f.output.obj.Type)
 				}
-				n.reposition()
+				if f := n.blk.func_(); f != nil {
+					f.wakeUp()
+				}
 				break
 			}
 		}
@@ -771,7 +762,9 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 			p = n.newOutput(v)
 			vars = &sig.Params
 		}
-		n.reposition()
+		if f := n.blk.func_(); f != nil {
+			f.wakeUp()
+		}
 		Show(p.valView)
 		p.valView.edit(func() {
 			if v.Type != nil {
@@ -780,7 +773,9 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 				SetKeyFocus(p)
 			} else {
 				n.removePortBase(p)
-				n.reposition()
+				if f := n.blk.func_(); f != nil {
+					f.wakeUp()
+				}
 				SetKeyFocus(n)
 			}
 			if f.obj == nil {

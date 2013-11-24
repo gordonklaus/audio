@@ -170,7 +170,7 @@ func nodeMoved(n node) {
 		c.reform()
 	}
 	if f := func_(n); f != nil {
-		f.wakeUp()
+		// f.wakeUp() //causes animation to never sleep
 	}
 }
 

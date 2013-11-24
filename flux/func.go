@@ -116,17 +116,17 @@ func (n funcNode) outConns() []*connection {
 const fps = 60
 
 func (n *funcNode) animate() {
-	updated := make(chan bool)
+	done := make(chan bool)
 	for {
 		next := time.After(time.Second / fps)
 		Do(n, func() {
-			updated <- n.update()
+			done <- n.arrange()
 		})
 
-		if <-updated {
-			<-next
-		} else {
+		if <-done {
 			<-n.awaken
+		} else {
+			<-next
 		}
 		select {
 		case <-n.stop:
@@ -143,21 +143,19 @@ func (n *funcNode) wakeUp() {
 	}
 }
 
-func (n *funcNode) update() bool {
+func (n *funcNode) arrange() bool {
 	b := n.funcblk
-	if !b.update() {
-		return false
+	if b.arrange() {
+		return true
 	}
 	b.Move(Pt(-Width(b)-portSize/2, -Height(b)/2))
 	if n.lit() {
 		MoveCenter(n.output, Pt(portSize/2, 0))
 	}
-	n.inputsNode.reposition()
-	n.outputsNode.reposition()
 	c := CenterInParent(n)
 	ResizeToFit(n, 0)
 	MoveCenter(n, c)
-	return true
+	return false
 }
 
 func (n *funcNode) Move(p Point) {

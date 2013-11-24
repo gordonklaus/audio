@@ -108,19 +108,17 @@ func (n *loopNode) updateInputType() {
 		in.outs[1].setType(elt)
 	}
 	in.reform()
-	in.reposition()
 }
 
-func (n *loopNode) update() bool {
+func (n *loopNode) arrange() bool {
 	b := n.loopblk
-	if !b.update() {
-		return false
+	if b.arrange() {
+		return true
 	}
 	b.Move(Pt(portSize/2, -Height(b)/2))
-	n.inputsNode.reposition()
 	MoveCenter(n.seqOut, Pt(portSize/2+Width(b), 0))
 	ResizeToFit(n, 0)
-	return true
+	return false
 }
 
 func (n *loopNode) Move(p Point) {

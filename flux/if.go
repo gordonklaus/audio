@@ -35,7 +35,7 @@ func newIfNode() *ifNode {
 	n.Add(n.seqOut)
 
 	MoveCenter(n.input, Pt(-2*portSize, 0))
-	n.update()
+	n.arrange()
 	return n
 }
 
@@ -52,15 +52,15 @@ func (n ifNode) outConns() []*connection {
 	return append(append(n.seqOut.conns, n.falseblk.outConns()...), n.trueblk.outConns()...)
 }
 
-func (n *ifNode) update() bool {
-	f, t := !n.falseblk.update(), !n.trueblk.update()
+func (n *ifNode) arrange() bool {
+	f, t := n.falseblk.arrange(), n.trueblk.arrange()
 	if f && t {
-		return false
+		return true
 	}
 	n.falseblk.Move(Pt(-blockRadius, -4-Height(n.falseblk)))
 	n.trueblk.Move(Pt(-blockRadius, 4))
 	ResizeToFit(n, 0)
-	return true
+	return false
 }
 
 func (n *ifNode) Move(p Point) {

@@ -59,13 +59,13 @@ func canConnect(src, dst *port, feedback bool) bool {
 	}
 
 	// TODO: recursive func literals
-	// if f, ok := src.node.(*funcNode); ok && parentNodeInBlock(dst.node, f.funcblk) != nil {
+	// if f, ok := src.node.(*funcNode); ok && parentOrSelfInBlock(dst.node, f.funcblk) != nil {
 	// 	return true
 	// }
 
 	n1, n2 := src.node, dst.node
 	for b := n1.block(); ; n1, b = b.node, b.outer() {
-		if n := parentNodeInBlock(n2, b); n != nil {
+		if n := parentOrSelfInBlock(n2, b); n != nil {
 			n2 = n
 			break
 		}
