@@ -81,6 +81,14 @@ func (w *Window) run() {
 	)
 
 	w.w.OnClose(func() {
+		// callbacks are still called after OnClose (https://github.com/glfw/glfw/issues/190) so here I unregister them to avoid deadlock
+		w.w.OnResize(nil)
+		w.w.OnFramebufferResize(nil)
+		w.w.OnKey(nil)
+		w.w.OnChar(nil)
+		w.w.OnMouseMove(nil)
+		w.w.OnMouseButton(nil)
+		w.w.OnScroll(nil)
 		w.control <- close(w)
 	})
 	w.w.OnResize(func(width, height int) {
