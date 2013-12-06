@@ -91,7 +91,7 @@ func (c *connection) reblock() {
 		newblk = c.src.node.block()
 	default:
 		for b := c.src.node.block(); ; b = b.outer() {
-			if parentOrSelfInBlock(c.dst.node, b) != nil {
+			if b.find(c.dst.node) != nil {
 				newblk = b
 				break
 			}

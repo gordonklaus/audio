@@ -14,10 +14,11 @@ const blockRadius = 16
 
 type block struct {
 	*ViewBase
-	node    node
-	nodes   map[node]bool
-	conns   map[*connection]bool
-	focused bool
+	node      node
+	nodes     map[node]bool
+	conns     map[*connection]bool
+	localVars map[*localVar]bool
+	focused   bool
 
 	g    map[node]*Point
 	step map[node]*Point
@@ -29,6 +30,7 @@ func newBlock(n node) *block {
 	b.node = n
 	b.nodes = map[node]bool{}
 	b.conns = map[*connection]bool{}
+	b.localVars = map[*localVar]bool{}
 	b.g = make(map[node]*Point)
 	b.step = make(map[node]*Point)
 	return b
@@ -65,6 +67,10 @@ func (b *block) addNode(n node) {
 			if _, ok := n.obj.(method); !ok && n.obj != nil {
 				b.func_().addPkgRef(n.obj)
 			}
+		case *valueNode:
+			if v, ok := n.obj.(*localVar); ok {
+				v.addref(n)
+			}
 		}
 		b.g[n] = &Point{}
 		b.step[n] = &Point{.01, .01}
@@ -82,6 +88,10 @@ func (b *block) removeNode(n node) {
 		case *callNode:
 			if _, ok := n.obj.(method); !ok && n.obj != nil {
 				b.func_().subPkgRef(n.obj)
+			}
+		case *valueNode:
+			if v, ok := n.obj.(*localVar); ok {
+				v.subref(n)
 			}
 		}
 		delete(b.g, n)
@@ -252,7 +262,7 @@ func srcsInBlock(n node) (srcs []node) {
 		if c.feedback || c.src == nil {
 			continue
 		}
-		if src := parentOrSelfInBlock(c.src.node, b); src != nil {
+		if src := b.find(c.src.node); src != nil {
 			srcs = append(srcs, src)
 		}
 	}
@@ -260,7 +270,7 @@ func srcsInBlock(n node) (srcs []node) {
 		if !c.feedback || c.dst == nil {
 			continue
 		}
-		if dst := parentOrSelfInBlock(c.dst.node, b); dst != nil && dst != n {
+		if dst := b.find(c.dst.node); dst != nil && dst != n {
 			srcs = append(srcs, dst)
 		}
 	}
@@ -273,7 +283,7 @@ func dstsInBlock(n node) (dsts []node) {
 		if c.feedback || c.dst == nil {
 			continue
 		}
-		if dst := parentOrSelfInBlock(c.dst.node, b); dst != nil {
+		if dst := b.find(c.dst.node); dst != nil {
 			dsts = append(dsts, dst)
 		}
 	}
@@ -281,16 +291,16 @@ func dstsInBlock(n node) (dsts []node) {
 		if !c.feedback || c.src == nil {
 			continue
 		}
-		if src := parentOrSelfInBlock(c.src.node, b); src != nil && src != n {
+		if src := b.find(c.src.node); src != nil && src != n {
 			dsts = append(dsts, src)
 		}
 	}
 	return
 }
 
-func parentOrSelfInBlock(n node, blk *block) node {
-	for b := n.block(); b != nil; n, b = b.node, b.outer() {
-		if b == blk {
+func (b *block) find(n node) node {
+	for b2 := n.block(); b2 != nil; n, b2 = b2.node, b2.outer() {
+		if b2 == b {
 			return n
 		}
 	}
@@ -300,7 +310,7 @@ func parentOrSelfInBlock(n node, blk *block) node {
 // TODO: treat conns as curves, not lines (or make them more linear?)
 func (b *block) arrange() bool {
 	done := true
-	
+
 	for n := range b.nodes {
 		if n, ok := n.(interface {
 			arrange() bool
@@ -367,8 +377,8 @@ func (b *block) arrange() bool {
 			if c.src == nil || c.dst == nil {
 				continue
 			}
-			srcNode := parentOrSelfInBlock(c.src.node, b)
-			dstNode := parentOrSelfInBlock(c.dst.node, b)
+			srcNode := b.find(c.src.node)
+			dstNode := b.find(c.dst.node)
 			if srcNode == n1 || dstNode == n1 {
 				continue
 			}
@@ -431,8 +441,8 @@ func (b *block) arrange() bool {
 		}
 		d.Y *= math.Abs(d.Y) / 16
 		d = d.Mul(connLenCoef)
-		add(parentOrSelfInBlock(c.src.node, b), d)
-		sub(parentOrSelfInBlock(c.dst.node, b), d)
+		add(b.find(c.src.node), d)
+		sub(b.find(c.dst.node), d)
 	}
 
 	avg := ZP
@@ -568,23 +578,29 @@ func (b *block) KeyPress(event KeyEvent) {
 			b.func_().Close()
 		}
 	default:
+		openBrowser := func() {
+			browser := newBrowser(browse, b.func_())
+			b.Add(browser)
+			browser.Move(Center(b))
+			browser.accepted = func(obj types.Object) {
+				browser.Close()
+				newNode(b, obj, browser.funcAsVal)
+			}
+			browser.canceled = func() {
+				browser.Close()
+				SetKeyFocus(b)
+			}
+			browser.text.KeyPress(event)
+			SetKeyFocus(browser.text)
+		}
+		if event.Command && event.Text == "0" {
+			openBrowser()
+			return
+		}
 		if !(event.Ctrl || event.Alt || event.Super) {
 			switch event.Text {
 			default:
-				f := b.func_()
-				browser := newBrowser(browse, f.pkg(), f.imports())
-				b.Add(browser)
-				browser.Move(Center(b))
-				browser.accepted = func(obj types.Object) {
-					browser.Close()
-					newNode(b, obj, browser.funcAsVal)
-				}
-				browser.canceled = func() {
-					browser.Close()
-					SetKeyFocus(b)
-				}
-				browser.text.KeyPress(event)
-				SetKeyFocus(browser.text)
+				openBrowser()
 			case "\"", "'", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
 				text := event.Text
 				kind := token.INT
@@ -653,7 +669,7 @@ func newNode(b *block, obj types.Object, funcAsVal bool) {
 		} else {
 			n = newCallNode(obj)
 		}
-	case *types.Var, *types.Const, field:
+	case *types.Var, *types.Const, field, *localVar:
 		n = newValueNode(obj, false)
 	}
 	b.addNode(n)
@@ -784,5 +800,43 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 		})
 	} else {
 		n.nodeBase.KeyPress(event)
+	}
+}
+
+type localVar struct {
+	types.Var
+	refs map[*valueNode]bool
+	blk  *block
+}
+
+func (v *localVar) addref(n *valueNode) {
+	v.refs[n] = true
+	v.reblock()
+}
+
+func (v *localVar) subref(n *valueNode) {
+	delete(v.refs, n)
+	v.reblock()
+}
+
+func (v *localVar) reblock() {
+	if v.blk != nil {
+		delete(v.blk.localVars, v)
+	}
+	v.blk = nil
+	for n := range v.refs {
+		if v.blk == nil {
+			v.blk = n.blk
+			continue
+		}
+		for b := v.blk; ; b = b.outer() {
+			if b.find(n) != nil {
+				v.blk = b
+				break
+			}
+		}
+	}
+	if v.blk != nil {
+		v.blk.localVars[v] = true
 	}
 }

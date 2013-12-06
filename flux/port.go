@@ -65,7 +65,7 @@ func canConnect(src, dst *port, feedback bool) bool {
 
 	n1, n2 := src.node, dst.node
 	for b := n1.block(); ; n1, b = b.node, b.outer() {
-		if n := parentOrSelfInBlock(n2, b); n != nil {
+		if n := b.find(n2); n != nil {
 			n2 = n
 			break
 		}

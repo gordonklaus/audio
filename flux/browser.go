@@ -17,6 +17,7 @@ import (
 type browser struct {
 	*ViewBase
 	mode       browserMode
+	fun        *funcNode
 	currentPkg *types.Package
 	imports    []*types.Package
 	finished   bool
@@ -46,9 +47,26 @@ const (
 	makeableType
 )
 
-func newBrowser(mode browserMode, currentPkg *types.Package, imports []*types.Package) *browser {
-	b := &browser{mode: mode, currentPkg: currentPkg, imports: imports, accepted: func(types.Object) {}, canceled: func() {}}
+func newBrowser(mode browserMode, context View) *browser {
+	b := &browser{mode: mode, accepted: func(types.Object) {}, canceled: func() {}}
 	b.ViewBase = NewView(b)
+
+	switch v := context.(type) {
+	case *funcNode:
+		b.fun = v
+		b.currentPkg = v.pkg()
+		b.imports = v.imports()
+	case *typeView:
+		// TODO: get pkg and imports for the root of this typeView
+		for v := View(v); v != nil; v = Parent(v) {
+			if blk, ok := v.(*block); ok {
+				f := blk.func_()
+				b.currentPkg = f.pkg()
+				b.imports = f.imports()
+				break
+			}
+		}
+	}
 
 	b.text = newNodeNameText(b)
 	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
@@ -112,57 +130,60 @@ type objects []types.Object
 
 func (o objects) Len() int { return len(o) }
 func (o objects) Less(i, j int) bool {
-	ni, nj := o[i].GetName(), o[j].GetName()
-	switch o[i].(type) {
+	return objLess(o[i], o[j])
+}
+func objLess(o1, o2 types.Object) bool {
+	n1, n2 := o1.GetName(), o2.GetName()
+	switch o1.(type) {
 	case special:
-		switch o[j].(type) {
+		switch o2.(type) {
 		case special:
-			return ni < nj
+			return n1 < n2
 		default:
 			return true
 		}
 	case *types.TypeName:
-		switch o[j].(type) {
+		switch o2.(type) {
 		case special:
 			return false
 		case *types.TypeName:
-			return ni < nj
+			return n1 < n2
 		default:
 			return true
 		}
 	case *types.Func, method:
-		switch o[j].(type) {
+		switch o2.(type) {
 		case special, *types.TypeName:
 			return false
 		case *types.Func, method:
-			return ni < nj
+			return n1 < n2
 		default:
 			return true
 		}
-	case *types.Var, field:
-		switch o[j].(type) {
+	case *types.Var, field, *localVar:
+		switch o2.(type) {
 		default:
 			return false
-		case *types.Var, field:
-			return ni < nj
+		case *types.Var, field, *localVar:
+			return n1 < n2
 		case *types.Const, buildPackage:
 			return true
 		}
 	case *types.Const:
-		switch o[j].(type) {
+		switch o2.(type) {
 		default:
 			return false
 		case *types.Const:
-			return ni < nj
+			return n1 < n2
 		case buildPackage:
 			return true
 		}
 	case buildPackage:
-		switch o[j].(type) {
+		switch o2.(type) {
 		default:
 			return false
 		case buildPackage:
-			return ni < nj
+			return n1 < n2
 		}
 	}
 	panic("unreachable")
@@ -280,6 +301,13 @@ func (b browser) filteredObjs() (objs []types.Object) {
 		}
 		for _, dir := range build.Default.SrcDirs() {
 			addPkgs(dir)
+		}
+		if b.fun != nil {
+			b.fun.funcblk.walk(func(blk *block) {
+				for v := range blk.localVars {
+					add(v)
+				}
+			}, nil, nil)
 		}
 	} else {
 		switch obj := b.path[0].(type) {
@@ -399,28 +427,13 @@ ok:
 			obj.Name = text
 		case *types.Const:
 			obj.Name = text
+		case *localVar:
+			obj.Name = text
 		}
-		newIndex := 0
-		for i, obj := range objs {
-			if obj.GetName() >= b.newObj.GetName() {
-				switch obj.(type) {
-				case buildPackage:
-					if _, ok := b.newObj.(buildPackage); !ok {
-						continue
-					}
-				case *types.Func:
-					if _, ok := b.newObj.(*types.Func); !ok {
-						continue
-					}
-				default:
-					continue
-				}
-				newIndex = i
-				break
-			}
-		}
-		objs = append(objs[:newIndex], append([]types.Object{b.newObj}, objs[newIndex:]...)...)
-		currentIndex = newIndex
+		i := 0
+		for ; i < len(objs) && objLess(objs[i], b.newObj); i++ {}
+		objs = append(objs[:i], append([]types.Object{b.newObj}, objs[i:]...)...)
+		currentIndex = i
 	}
 
 	b.indices = nil
@@ -515,6 +528,9 @@ ok:
 			t := cur.GetType()
 			b.typeView = newTypeView(&t)
 			b.Add(b.typeView)
+		case *localVar:
+			b.typeView = newTypeView(&cur.Type)
+			b.Add(b.typeView)
 		}
 		if b.typeView != nil {
 			b.typeView.Move(Pt(xOffset+width+16, yOffset-(Height(b.typeView)-Height(b.text))/2))
@@ -526,7 +542,7 @@ ok:
 
 	Pan(b, Pt(0, yOffset))
 }
-func (t *nodeNameText) LostKeyFocus() { t.b.cancel() }
+func (t *nodeNameText) LostKeyFocus() { t.b.cancel() } // TODO: implement this differently.  it interferes with var type editing
 func (t *nodeNameText) KeyPress(event KeyEvent) {
 	b := t.b
 	if b.mode == browse && event.Shift != b.funcAsVal {
@@ -624,6 +640,21 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 			case method:
 				t := b.path[0].(*types.TypeName).Type.(*types.NamedType)
 				t.Methods = append(t.Methods, obj.Method)
+			case *localVar:
+				v := b.typeView
+				b.finished = true // hack to avoid cancelling browser when it loses keyboard focus
+				v.edit(func() {
+					b.finished = false
+					if *v.typ == nil {
+						t.SetText("")
+						SetKeyFocus(t)
+					} else {
+						b.finished = true
+						b.accepted(obj)
+					}
+				})
+				b.newObj = nil
+				return
 			}
 
 			b.i = 0
@@ -638,7 +669,7 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 
 		_, isPkg := obj.(buildPackage)
 		_, isType := obj.(*types.TypeName)
-		if !isPkg && !(b.mode == browse && isType) {
+		if !(isPkg || b.mode == browse && isType) {
 			b.finished = true
 			b.accepted(obj)
 			return
@@ -684,6 +715,16 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 			t.SetText("")
 		}
 	default:
+		if b.fun != nil {
+			if event.Command && event.Text == "0" {
+				b.newObj = &localVar{refs: map[*valueNode]bool{}}
+				t.SetText("")
+			} else {
+				t.TextBase.KeyPress(event)
+			}
+			return
+		}
+
 		makeInPkg := false
 		var pkg *types.Package
 		var recv *types.TypeName
@@ -697,9 +738,9 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 				pkg = obj.Pkg
 			}
 		}
-		makeInRoot := len(b.path) == 0 && (b.currentPkg != nil || event.Text == "1")
-		makeInType := recv != nil && event.Text == "3"
-		if b.newObj == nil && b.mode != typesOnly && event.Command && (makeInRoot || makeInPkg || makeInType) {
+		makePkgInRoot := len(b.path) == 0 && event.Text == "1"
+		makeMethod := recv != nil && event.Text == "3"
+		if b.newObj == nil && b.mode != typesOnly && event.Command && (makePkgInRoot || makeInPkg || makeMethod) {
 			switch event.Text {
 			case "1":
 				b.newObj = buildPackage{nil, &build.Package{}}
@@ -753,7 +794,7 @@ func color(obj types.Object, bright, funcAsVal bool) Color {
 			return color(&types.Var{}, bright, funcAsVal)
 		}
 		return Color{1, .6, .6, alpha}
-	case *types.Var, *types.Const, field:
+	case *types.Var, *types.Const, field, *localVar:
 		return Color{.6, .6, 1, alpha}
 	}
 	panic(fmt.Sprintf("unknown object %#v", obj))

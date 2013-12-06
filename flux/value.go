@@ -7,7 +7,7 @@ import (
 
 type valueNode struct {
 	*nodeBase
-	obj types.Object // package var or struct field, or nil if this is an assign (=) or indirect node
+	obj types.Object // var or struct field, or nil if this is an assign (=) or indirect node
 	set bool
 	x   *port // the target of the operation (struct or pointer)
 	y   *port // the result of the read (output) or the argument to write (input)
@@ -34,7 +34,7 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 		n.y = n.newOutput(&types.Var{})
 	}
 	switch obj.(type) {
-	case *types.Var, field:
+	case *types.Var, field, *localVar:
 		n.addSeqPorts()
 	default:
 	}
@@ -60,7 +60,7 @@ func (n *valueNode) reform() {
 	}
 	switch obj := n.obj.(type) {
 	case *types.Const:
-	case *types.Var:
+	case *types.Var, *localVar:
 		if !n.set {
 			yt = &types.Pointer{yt}
 		}
@@ -74,7 +74,10 @@ func (n *valueNode) reform() {
 			if len(n.x.conns) > 0 {
 				xt = n.x.conns[0].src.obj.Type
 			}
-			if _, ok := xt.(*types.Pointer); ok {
+			if p, ok := xt.(*types.Pointer); ok {
+				if !types.IsIdentical(p.Base, obj.recv) {
+					xt = p.Base
+				}
 				yt = &types.Pointer{yt}
 			}
 		}

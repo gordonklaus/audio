@@ -204,6 +204,9 @@ func (w *writer) block(b *block, vars map[*port]string) {
 
 	w.nindent++
 
+	for v := range b.localVars {
+		w.indent("var %s %s//\n", v.Name, w.typ(v.Type))
+	}
 	for c := range b.conns {
 		if _, ok := vars[c.dst]; ok {
 			continue
@@ -316,7 +319,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					name := ""
 					addr := false
 					switch n.obj.(type) {
-					case *types.Var, *types.Const:
+					case *types.Var, *types.Const, *localVar:
 						name = w.qualifiedName(n.obj)
 						addr = true
 					case *types.Func:
@@ -505,7 +508,7 @@ func (w *writer) seq(n node) {
 	in := seqIn != nil && len(seqIn.conns) > 0
 	out := seqOut != nil && len(seqOut.conns) > 0
 	if in || out {
-		w.write(" // ")
+		w.write("//")
 		if in {
 			for i, c := range seqIn.conns {
 				if i > 0 {

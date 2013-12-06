@@ -81,7 +81,7 @@ func (w *Window) run() {
 	)
 
 	w.w.OnClose(func() {
-		// callbacks are still called after OnClose (https://github.com/glfw/glfw/issues/190) so here I unregister them to avoid deadlock
+		// callbacks may still be called after OnClose so they must be unregistered to avoid deadlock
 		w.w.OnResize(nil)
 		w.w.OnFramebufferResize(nil)
 		w.w.OnKey(nil)

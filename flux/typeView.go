@@ -184,19 +184,7 @@ func (v *typeView) edit(done func()) {
 func (v *typeView) editType(done func()) {
 	switch t := (*v.typ).(type) {
 	case nil:
-		var pkg *types.Package
-		var imports []*types.Package
-		for v := View(v); v != nil; v = Parent(v) {
-			if n, ok := v.(node); ok {
-				f := n.block().func_()
-				pkg, imports = f.pkg(), f.imports()
-				break
-			}
-		}
-		if pkg == nil {
-			// TODO: get pkg and imports for the type being edited
-		}
-		b := newBrowser(v.mode, pkg, imports)
+		b := newBrowser(v.mode, v)
 		v.Add(b)
 		b.Move(Center(v))
 		b.accepted = func(obj types.Object) {

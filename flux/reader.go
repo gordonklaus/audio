@@ -19,7 +19,7 @@ func loadFunc(obj types.Object) *funcNode {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, fluxPath(obj), nil, parser.ParseComments)
 	if err == nil {
-		r := &reader{obj.GetPkg(), map[string]*types.Package{}, vars{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
+		r := &reader{obj.GetPkg(), map[string]*types.Package{}, vars{}, map[string]*localVar{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
 		for _, i := range file.Imports {
 			path, _ := strconv.Unquote(i.Path.Value)
 			pkg := r.pkg.Imports[path]
@@ -49,6 +49,7 @@ type reader struct {
 	pkg      *types.Package
 	pkgNames map[string]*types.Package
 	vars     vars
+	localVars map[string]*localVar
 	cmap     ast.CommentMap
 	seqNodes map[int]node
 }
@@ -165,10 +166,17 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			v := decl.Specs[0].(*ast.ValueSpec)
 			switch decl.Tok {
 			case token.VAR:
-				if v.Type != nil {
-					r.vars[v.Names[0].Name] = &var_{typ: r.typ(v.Type)}
+				name := v.Names[0].Name
+				if r.cmap[s] != nil {
+					lv := &localVar{}
+					lv.Name = name
+					lv.Type = r.typ(v.Type)
+					lv.refs = map[*valueNode]bool{}
+					r.localVars[name] = lv
+				} else if v.Type != nil {
+					r.vars[name] = &var_{typ: r.typ(v.Type)}
 				} else {
-					r.addVar(v.Names[0].Name, b.node.(*loopNode).inputsNode.outs[1])
+					r.addVar(name, b.node.(*loopNode).inputsNode.outs[1])
 				}
 			case token.CONST:
 				switch x := v.Values[0].(type) {
@@ -328,6 +336,9 @@ func (r *reader) obj(x ast.Expr) types.Object {
 	// TODO: shouldn't go/types be able to do this for me?
 	switch x := x.(type) {
 	case *ast.Ident:
+		if v, ok := r.localVars[x.Name]; ok {
+			return v
+		}
 		for s := r.pkg.Scope; s != nil; s = s.Outer {
 			if obj := s.Lookup(x.Name); obj != nil {
 				return obj
