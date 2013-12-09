@@ -149,42 +149,10 @@ func (b *block) walk(bf func(*block), nf func(node), cf func(*connection)) {
 	}
 }
 
-func (b *block) allBlocks() (blocks []*block) {
-	b.walk(func(b *block) {
-		blocks = append(blocks, b)
-	}, nil, nil)
-	return
-}
-
 func (b *block) allNodes() (nodes []node) {
 	b.walk(nil, func(n node) {
 		nodes = append(nodes, n)
 	}, nil)
-	return
-}
-
-func (b block) allConns() (conns []*connection) {
-	b.walk(nil, nil, func(c *connection) {
-		conns = append(conns, c)
-	})
-	return
-}
-
-func (b block) allFocusableViews() (views []View) {
-	for _, b := range b.allBlocks() {
-		if len(b.nodes) == 0 {
-			views = append(views, b)
-		}
-	}
-	for _, n := range b.allNodes() {
-		views = append(views, n)
-		for _, p := range append(n.inputs(), n.outputs()...) {
-			views = append(views, p)
-		}
-	}
-	for _, c := range b.allConns() {
-		views = append(views, c)
-	}
 	return
 }
 
@@ -536,7 +504,15 @@ func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) 
 }
 
 func (b *block) focusNearestView(v View, dirKey int) {
-	nearest := nearestView(b, b.allFocusableViews(), MapTo(v, ZP, b), dirKey)
+	b = b.outermost()
+	views := []View{}
+	for _, n := range b.allNodes() {
+		views = append(views, n)
+		if n, ok := n.(*loopNode); ok {
+			views = append(views, seqOut(n))
+		}
+	}
+	nearest := nearestView(b, views, MapTo(v, ZP, b), dirKey)
 	if nearest != nil {
 		SetKeyFocus(nearest)
 	}
@@ -546,15 +522,32 @@ func (b *block) TookKeyFocus() { b.focused = true; Repaint(b) }
 func (b *block) LostKeyFocus() { b.focused = false; Repaint(b) }
 
 func (b *block) KeyPress(event KeyEvent) {
-	switch event.Key {
+	switch k := event.Key; k {
 	case KeyLeft, KeyRight, KeyUp, KeyDown:
-		b.outermost().focusNearestView(KeyFocus(b), event.Key)
+		if event.Alt {
+			b.focusNearestView(KeyFocus(b), k)
+		} else if n, ok := KeyFocus(b).(node); ok {
+			if k == KeyLeft {
+				if seqIn(n) != nil {
+					SetKeyFocus(seqIn(n))
+				} else if len := len(ins(n)); len > 0 {
+					ins(n)[len/2].focusMiddle()
+				}
+			}
+			if k == KeyRight {
+				if seqOut(n) != nil {
+					SetKeyFocus(seqOut(n))
+				} else if len := len(outs(n)); len > 0 {
+					outs(n)[len/2].focusMiddle()
+				}
+			}
+		} else {
+			b.ViewBase.KeyPress(event)
+		}
 	case KeyBackspace, KeyDelete:
 		switch v := KeyFocus(b).(type) {
 		case *block:
-			if v.node != nil {
-				SetKeyFocus(v.node)
-			}
+			SetKeyFocus(v.node)
 		case *portsNode:
 		case node:
 			foc := View(b)
@@ -562,7 +555,7 @@ func (b *block) KeyPress(event KeyEvent) {
 			if len(in) > 0 {
 				foc = in[len(in)-1].src.node
 			}
-			if (len(in) == 0 || event.Key == KeyDelete) && len(out) > 0 {
+			if (len(in) == 0 || k == KeyDelete) && len(out) > 0 {
 				foc = out[len(out)-1].dst.node
 			}
 			for _, c := range append(in, out...) {
@@ -572,10 +565,14 @@ func (b *block) KeyPress(event KeyEvent) {
 			SetKeyFocus(foc)
 		}
 	case KeyEscape:
-		if outer := b.outer(); outer != nil {
-			SetKeyFocus(outer)
+		if n, ok := KeyFocus(b).(node); ok {
+			if f, ok := n.block().node.(*funcNode); ok && !f.lit() {
+				f.Close()
+			} else {
+				SetKeyFocus(n.block().node)
+			}
 		} else {
-			b.func_().Close()
+			SetKeyFocus(b.node)
 		}
 	default:
 		openBrowser := func() {
@@ -586,9 +583,10 @@ func (b *block) KeyPress(event KeyEvent) {
 				browser.Close()
 				newNode(b, obj, browser.funcAsVal)
 			}
+			oldFocus := KeyFocus(b)
 			browser.canceled = func() {
 				browser.Close()
-				SetKeyFocus(b)
+				SetKeyFocus(oldFocus)
 			}
 			browser.text.KeyPress(event)
 			SetKeyFocus(browser.text)
@@ -761,7 +759,11 @@ func (n *portsNode) removePort(p *port) {
 }
 
 func (n *portsNode) KeyPress(event KeyEvent) {
-	if n.editable && event.Text == "," {
+	if l, ok := n.blk.node.(*loopNode); ok && event.Key == KeyLeft {
+		SetKeyFocus(l)
+	} else if f, ok := n.blk.node.(*funcNode); ok && f.lit() && event.Key == KeyRight && n.out {
+		SetKeyFocus(f)
+	} else if n.editable && event.Text == "," {
 		f := n.blk.node.(*funcNode)
 		obj := f.obj
 		if obj == nil {

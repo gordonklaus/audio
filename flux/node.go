@@ -177,15 +177,6 @@ func nodeMoved(n node) {
 func (n *nodeBase) TookKeyFocus() { n.focused = true; Repaint(n) }
 func (n *nodeBase) LostKeyFocus() { n.focused = false; Repaint(n) }
 
-func (n *nodeBase) KeyPress(event KeyEvent) {
-	switch event.Key {
-	case KeyEscape:
-		SetKeyFocus(n.blk)
-	default:
-		n.ViewBase.KeyPress(event)
-	}
-}
-
 func (n nodeBase) Paint() {
 	const DX = 8.0
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])

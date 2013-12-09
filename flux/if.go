@@ -72,9 +72,22 @@ func (n *ifNode) TookKeyFocus() { n.focused = true; Repaint(n) }
 func (n *ifNode) LostKeyFocus() { n.focused = false; Repaint(n) }
 
 func (n *ifNode) KeyPress(event KeyEvent) {
-	switch event.Key {
-	case KeyEscape:
-		SetKeyFocus(n.blk)
+	if b, ok := KeyFocus(n).(*block); ok {
+		if b == n.trueblk && event.Key == KeyDown || b == n.falseblk && event.Key == KeyUp {
+			SetKeyFocus(n)
+		}
+		return
+	}
+	
+	switch k := event.Key; k {
+	case KeyDown, KeyUp:
+		if k == KeyUp && len(n.trueblk.nodes) == 0 {
+			SetKeyFocus(n.trueblk)
+		} else if k == KeyDown && len(n.falseblk.nodes) == 0 {
+			SetKeyFocus(n.falseblk)
+		} else {
+			n.blk.focusNearestView(n, k)
+		}
 	default:
 		n.ViewBase.KeyPress(event)
 	}

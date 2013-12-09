@@ -131,8 +131,8 @@ func (n *loopNode) LostKeyFocus() { n.focused = false; Repaint(n) }
 
 func (n *loopNode) KeyPress(event KeyEvent) {
 	switch event.Key {
-	case KeyEscape:
-		SetKeyFocus(n.blk)
+	case KeyRight:
+		SetKeyFocus(n.inputsNode)
 	default:
 		n.ViewBase.KeyPress(event)
 	}

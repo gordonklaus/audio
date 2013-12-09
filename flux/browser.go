@@ -431,7 +431,9 @@ ok:
 			obj.Name = text
 		}
 		i := 0
-		for ; i < len(objs) && objLess(objs[i], b.newObj); i++ {}
+		for i < len(objs) && objLess(objs[i], b.newObj) {
+			i++
+		}
 		objs = append(objs[:i], append([]types.Object{b.newObj}, objs[i:]...)...)
 		currentIndex = i
 	}

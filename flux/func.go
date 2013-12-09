@@ -163,19 +163,14 @@ func (n *funcNode) Move(p Point) {
 	nodeMoved(n)
 }
 
-func (n *funcNode) TookKeyFocus() {
-	if n.lit() {
-		n.focused = true
-		Repaint(n)
-	} else {
-		SetKeyFocus(n.funcblk)
-	}
-}
+func (n *funcNode) TookKeyFocus() { n.focused = true; Repaint(n) }
 func (n *funcNode) LostKeyFocus() { n.focused = false; Repaint(n) }
 
 func (n *funcNode) KeyPress(event KeyEvent) {
 	if event.Command && event.Key == KeyS && !n.lit() {
 		saveFunc(n)
+	} else if event.Key == KeyLeft && n.lit() {
+		SetKeyFocus(n.outputsNode)
 	} else {
 		n.ViewBase.KeyPress(event)
 	}

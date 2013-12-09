@@ -46,12 +46,12 @@ func loadFunc(obj types.Object) *funcNode {
 }
 
 type reader struct {
-	pkg      *types.Package
-	pkgNames map[string]*types.Package
-	vars     vars
+	pkg       *types.Package
+	pkgNames  map[string]*types.Package
+	vars      vars
 	localVars map[string]*localVar
-	cmap     ast.CommentMap
-	seqNodes map[int]node
+	cmap      ast.CommentMap
+	seqNodes  map[int]node
 }
 
 func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {

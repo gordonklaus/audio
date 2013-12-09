@@ -2,6 +2,7 @@ package main
 
 import (
 	. "code.google.com/p/gordon-go/gui"
+	. "github.com/chsc/gogl/gl21"
 	"math"
 )
 
@@ -13,22 +14,18 @@ type connection struct {
 	dst      *port
 	feedback bool
 
-	srcHandle *connectionSourceHandle
-	dstHandle *connectionDestinationHandle
+	focused, focusSrc bool
+	srcPt             Point
+	dstPt             Point
 
-	focused bool
-	srcPt   Point
-	dstPt   Point
+	savedPort *port
+	editing   bool
 }
 
 func newConnection() *connection {
 	c := &connection{}
 	c.ViewBase = NewView(c)
 	c.AggregateMouser = AggregateMouser{NewClickFocuser(c)}
-	c.srcHandle = newConnectionSourceHandle(c)
-	c.dstHandle = newConnectionDestinationHandle(c)
-	c.Add(c.srcHandle)
-	c.Add(c.dstHandle)
 	return c
 }
 
@@ -143,25 +140,44 @@ func (c *connection) reform() {
 
 	c.Move(pos)
 	c.SetRect(rect)
+}
 
-	handleOffset := c.dstPt.Sub(c.srcPt).Div(4)
-	if c.srcHandle.editing {
-		MoveCenter(c.srcHandle, c.srcPt)
-	} else {
-		MoveCenter(c.srcHandle, c.srcPt.Add(handleOffset))
-	}
-	if c.dstHandle.editing {
-		MoveCenter(c.dstHandle, c.dstPt)
-	} else {
-		MoveCenter(c.dstHandle, c.dstPt.Sub(handleOffset))
-	}
+func (c *connection) focus(focusSrc bool) {
+	c.focusSrc = focusSrc
+	SetKeyFocus(c)
+	Repaint(c)
 }
 
 func (c *connection) startEditing() {
-	if c.src == nil {
-		c.srcHandle.startEditing()
+	if c.focusSrc {
+		c.savedPort = c.src
 	} else {
-		c.dstHandle.startEditing()
+		c.savedPort = c.dst
+	}
+	c.editing = true
+	c.reform()
+}
+
+func (c *connection) cancelEditing() {
+	if c.focusSrc {
+		c.setSrc(c.savedPort)
+	} else {
+		c.setDst(c.savedPort)
+	}
+	c.stopEditing()
+}
+
+func (c *connection) stopEditing() {
+	c.editing = false
+	if c.connected() {
+		c.reform()
+	} else {
+		p := c.src
+		if c.focusSrc {
+			p = c.dst
+		}
+		c.blk.removeConn(c)
+		SetKeyFocus(p)
 	}
 }
 
@@ -169,33 +185,159 @@ func (c *connection) TookKeyFocus() { c.focused = true; Repaint(c) }
 func (c *connection) LostKeyFocus() { c.focused = false; Repaint(c) }
 
 func (c *connection) KeyPress(event KeyEvent) {
-	switch event.Key {
-	case KeyBackslash:
-		if c.src == nil || c.dst == nil {
-			c.feedback = !c.feedback
-			c.reform()
+	if c.editing {
+		switch event.Key {
+		case KeyBackslash:
+			if c.src == nil || c.dst == nil {
+				c.feedback = !c.feedback
+				c.reform()
+			}
+		case KeyLeft, KeyRight, KeyDown, KeyUp:
+			b := c.blk.outermost()
+			ports := []View{}
+			p1 := c.src
+			if c.focusSrc {
+				p1 = c.dst
+			}
+			for _, n := range b.allNodes() {
+				p := n.inputs()
+				if c.focusSrc {
+					p = n.outputs()
+				}
+				for _, p2 := range p {
+					src, dst := p1, p2
+					if c.focusSrc {
+						src, dst = dst, src
+					}
+					if canConnect(src, dst, c.feedback) {
+						ports = append(ports, p2)
+					}
+				}
+			}
+
+			pt := c.dstPt
+			if c.focusSrc {
+				pt = c.srcPt
+			}
+			v := nearestView(b, ports, MapTo(c, pt, b), event.Key)
+			if p, ok := v.(*port); ok {
+				if c.focusSrc {
+					c.setSrc(p)
+				} else {
+					c.setDst(p)
+				}
+			}
+		case KeyEnter:
+			c.stopEditing()
+		case KeyEscape:
+			c.cancelEditing()
 		}
+		return
+	}
+
+	if event.Alt {
+		switch event.Key {
+		case KeyLeft, KeyRight, KeyDown, KeyUp:
+			p := c.dst
+			if c.focusSrc {
+				p = c.src
+			}
+			c.blk.focusNearestView(p, event.Key)
+			return
+		}
+	}
+
+	switch event.Key {
 	case KeyLeft:
-		SetKeyFocus(c.src)
+		if c.focusSrc {
+			ins := ins(c.src.node)
+			if len(ins) > 0 {
+				ins[len(ins)/2].focusMiddle()
+			} else {
+				SetKeyFocus(c.src.node)
+			}
+		} else {
+			c.focus(true)
+		}
 	case KeyRight:
-		SetKeyFocus(c.dst)
+		if c.focusSrc {
+			c.focus(false)
+		} else {
+			outs := outs(c.dst.node)
+			if len(outs) > 0 {
+				outs[len(outs)/2].focusMiddle()
+			} else {
+				SetKeyFocus(c.dst.node)
+			}
+		}
 	case KeyDown, KeyUp:
-		c.blk.outermost().focusNearestView(c, event.Key)
+		p := c.dst
+		if c.focusSrc {
+			p = c.src
+		}
+		p.focusNextConn(c.dstPt.Sub(c.srcPt).Angle(), event.Key)
 	case KeyBackspace:
 		SetKeyFocus(c.src)
 		c.blk.removeConn(c)
 	case KeyDelete:
 		SetKeyFocus(c.dst)
 		c.blk.removeConn(c)
+	case KeyEnter:
+		c.startEditing()
 	case KeyEscape:
-		SetKeyFocus(c.blk)
+		if c.focusSrc {
+			SetKeyFocus(c.src)
+		} else {
+			SetKeyFocus(c.dst)
+		}
 	default:
 		c.ViewBase.KeyPress(event)
 	}
 }
 
+func (c *connection) Mouse(m MouseEvent) {
+	if m.Press {
+		if m.Pos.Sub(c.srcPt).Len() < 2*portSize {
+			c.focus(true)
+			c.startEditing()
+		} else if m.Pos.Sub(c.dstPt).Len() < 2*portSize {
+			c.focus(false)
+			c.startEditing()
+		}
+	}
+	if !c.editing {
+		return
+	}
+
+	p1 := c.src
+	if c.focusSrc {
+		p1 = c.dst
+	}
+	var p *port
+	b := c.blk.outermost()
+	if p2, ok := ViewAt(b, MapTo(c, m.Pos, b)).(*port); ok {
+		src, dst := p1, p2
+		if c.focusSrc {
+			src, dst = dst, src
+		}
+		if src == c.src && dst == c.dst || canConnect(src, dst, c.feedback) {
+			p = p2
+		}
+	}
+	if c.focusSrc {
+		c.srcPt = m.Pos
+		c.setSrc(p)
+	} else {
+		c.dstPt = m.Pos
+		c.setDst(p)
+	}
+
+	if m.Release {
+		c.stopEditing()
+	}
+}
+
 func (c *connection) Paint() {
-	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[c.focused])
 	start, end := c.srcPt, c.dstPt
 	var pts []Point
 	if c.src != nil && c.src.obj.Type == seqType || c.dst != nil && c.dst.obj.Type == seqType {
@@ -212,11 +354,37 @@ func (c *connection) Paint() {
 		p3 := end.Sub(Pt(dx, 0))
 		pts = []Point{start, p1, p2, p3, end}
 	}
-	len := 0.0
+	steps := 0.0
 	for i := range pts {
 		if i > 0 {
-			len += pts[i].Sub(pts[i-1]).Len()
+			steps += pts[i].Sub(pts[i-1]).Len()
 		}
 	}
-	DrawBezier(pts, int(len))
+
+	c1 := Color{.5, .5, .5, 1}
+	if c.focused {
+		c2 := Color{.3, .3, .7, 1}
+		if c.editing {
+			c2 = Color{1, .5, 0, .5}
+		}
+		if c.focusSrc {
+			c1, c2 = c2, c1
+		}
+		ctrlPts := []Double{Double(c1.R), Double(c1.G), Double(c1.B), Double(c1.A), Double(c2.R), Double(c2.G), Double(c2.B), Double(c2.A)}
+		Map1d(MAP1_COLOR_4, 0, 1, 4, 2, &ctrlPts[0])
+		Enable(MAP1_COLOR_4)
+		defer Disable(MAP1_COLOR_4)
+	} else {
+		SetColor(c1)
+	}
+
+	ctrlPts := []Double{}
+	for _, p := range pts {
+		ctrlPts = append(ctrlPts, Double(p.X), Double(p.Y), 0)
+	}
+	Map1d(MAP1_VERTEX_3, 0, 1, 3, Int(len(pts)), &ctrlPts[0])
+	Enable(MAP1_VERTEX_3)
+	defer Disable(MAP1_VERTEX_3)
+	MapGrid1d(Int(steps), 0, 1)
+	EvalMesh1(LINE, 0, Int(steps))
 }

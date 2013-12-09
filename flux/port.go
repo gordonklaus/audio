@@ -3,6 +3,7 @@ package main
 import (
 	"code.google.com/p/go.exp/go/types"
 	. "code.google.com/p/gordon-go/gui"
+	"math"
 )
 
 type port struct {
@@ -108,32 +109,123 @@ func (p *port) disconnect(c *connection) {
 	}
 }
 
+func (p *port) focusMiddle() {
+	var conn *connection
+	dist := 0.0
+	for _, c := range p.conns {
+		d := math.Abs(c.dstPt.Sub(c.srcPt).Angle())
+		if conn == nil || d < dist {
+			conn, dist = c, d
+		}
+	}
+	if conn != nil {
+		conn.focus(p.out)
+	} else {
+		SetKeyFocus(p)
+	}
+}
+
+func (p *port) focusNextConn(curƟ float64, dir int) {
+	less := func(x, y float64) bool { return x < y }
+	if p.out != (dir == KeyUp) {
+		less = func(x, y float64) bool { return x > y }
+	}
+	var conn *connection
+	nearestƟ := 0.0
+	for _, c := range p.conns {
+		Ɵ := c.dstPt.Sub(c.srcPt).Angle()
+		if Ɵ != curƟ && less(curƟ, Ɵ) && (conn == nil || less(Ɵ, nearestƟ)) {
+			conn, nearestƟ = c, Ɵ
+		}
+	}
+	if conn != nil {
+		conn.focus(p.out)
+		return
+	}
+
+	if p := p.next(dir); p != nil {
+		Ɵ := math.Pi
+		if p.out == (dir == KeyUp) {
+			Ɵ = -Ɵ
+		}
+		p.focusNextConn(Ɵ, dir)
+	}
+}
+
+func (p *port) next(dir int) *port {
+	ports := ins(p.node)
+	if p.out {
+		ports = outs(p.node)
+	}
+	i := 0
+	for j, p2 := range ports {
+		if p2 == p {
+			i = j
+			break
+		}
+	}
+	if dir == KeyUp {
+		i--
+	} else {
+		i++
+	}
+	if i >= 0 && i < len(ports) {
+		return ports[i]
+	}
+	return nil
+}
+
 func (p *port) TookKeyFocus() { p.focused = true; Repaint(p); Show(p.valView) }
 func (p *port) LostKeyFocus() { p.focused = false; Repaint(p); Hide(p.valView) }
 
 func (p *port) KeyPress(event KeyEvent) {
-	if p.obj.Type != seqType &&
-		(p.out && event.Key == KeyRight && len(p.conns) > 0 ||
-			!p.out && event.Key == KeyLeft && len(p.conns) > 0) {
-		SetKeyFocus(p.conns[len(p.conns)-1])
-		return
-	}
-	if p.obj.Type == seqType && event.Key == KeyDown && len(p.conns) > 0 {
-		SetKeyFocus(p.conns[len(p.conns)-1])
-		return
+	if event.Alt {
+		switch event.Key {
+		case KeyLeft, KeyRight, KeyDown, KeyUp:
+			p.node.block().focusNearestView(p, event.Key)
+			return
+		}
 	}
 
-	switch event.Key {
+	switch k := event.Key; k {
+	case KeyLeft, KeyRight:
+		if p.out == (k == KeyRight) {
+			if p.obj.Type == seqType {
+				ports := ins(p.node)
+				if p.out {
+					ports = outs(p.node)
+				}
+				if len(ports) > 0 {
+					ports[len(ports)/2].focusMiddle()
+				}
+			} else {
+				p.focusMiddle()
+			}
+		} else {
+			SetKeyFocus(p.node)
+		}
+	case KeyDown:
+		if p.obj.Type == seqType && len(p.conns) > 0 {
+			p.conns[len(p.conns)-1].focus(p.out)
+			return
+		}
+		fallthrough
+	case KeyUp:
+		if p := p.next(k); p != nil {
+			SetKeyFocus(p)
+		}
 	case KeyEnter:
 		c := newConnection()
 		if p.out {
 			c.setSrc(p)
+			c.focus(false)
 		} else {
 			c.setDst(p)
+			c.focus(true)
 		}
 		c.startEditing()
 	case KeyBackspace, KeyDelete:
-		if p.out && event.Key == KeyBackspace || !p.out && event.Key == KeyDelete {
+		if p.out && k == KeyBackspace || !p.out && k == KeyDelete {
 			if n, ok := p.node.(interface {
 				removePort(*port)
 			}); ok {
@@ -156,11 +248,12 @@ func (p *port) Mouse(m MouseEvent) {
 	c := newConnection()
 	if p.out {
 		c.setSrc(p)
-		SetMouser(c.dstHandle, m.Button)
+		c.focus(false)
 	} else {
 		c.setDst(p)
-		SetMouser(c.srcHandle, m.Button)
+		c.focus(true)
 	}
+	SetMouser(c, m.Button)
 	c.startEditing()
 }
 
