@@ -19,9 +19,6 @@ type block struct {
 	conns     map[*connection]bool
 	localVars map[*localVar]bool
 	focused   bool
-
-	g    map[node]*Point
-	step map[node]*Point
 }
 
 func newBlock(n node) *block {
@@ -31,8 +28,6 @@ func newBlock(n node) *block {
 	b.nodes = map[node]bool{}
 	b.conns = map[*connection]bool{}
 	b.localVars = map[*localVar]bool{}
-	b.g = make(map[node]*Point)
-	b.step = make(map[node]*Point)
 	return b
 }
 
@@ -59,7 +54,7 @@ func func_(n node) *funcNode {
 func (b *block) addNode(n node) {
 	if !b.nodes[n] {
 		b.Add(n)
-		n.Move(Pt(100*rand.NormFloat64(), 100*rand.NormFloat64()))
+		n.Move(Pt(rand.NormFloat64(), rand.NormFloat64()))
 		b.nodes[n] = true
 		n.setBlock(b)
 		switch n := n.(type) {
@@ -72,10 +67,8 @@ func (b *block) addNode(n node) {
 				v.addref(n)
 			}
 		}
-		b.g[n] = &Point{}
-		b.step[n] = &Point{.01, .01}
 		if f := b.func_(); f != nil {
-			f.wakeUp()
+			f.rearrange()
 		}
 	}
 }
@@ -94,10 +87,8 @@ func (b *block) removeNode(n node) {
 				v.subref(n)
 			}
 		}
-		delete(b.g, n)
-		delete(b.step, n)
 		if f := b.func_(); f != nil {
-			f.wakeUp()
+			f.rearrange()
 		}
 	}
 }
@@ -111,7 +102,7 @@ func (b *block) addConn(c *connection) {
 	Lower(c)
 	b.conns[c] = true
 	if f := b.func_(); f != nil {
-		f.wakeUp()
+		f.rearrange()
 	}
 }
 
@@ -120,7 +111,7 @@ func (b *block) removeConn(c *connection) {
 	delete(b.conns, c)
 	b.Remove(c)
 	if f := b.func_(); f != nil {
-		f.wakeUp()
+		f.rearrange()
 	}
 }
 
@@ -273,220 +264,6 @@ func (b *block) find(n node) node {
 		}
 	}
 	return nil
-}
-
-// TODO: treat conns as curves, not lines (or make them more linear?)
-func (b *block) arrange() bool {
-	done := true
-
-	for n := range b.nodes {
-		if n, ok := n.(interface {
-			arrange() bool
-		}); ok {
-			if !n.arrange() {
-				done = false
-			}
-		}
-	}
-
-	const (
-		portsNodeCoef   = 1024
-		nodeCenterCoef  = .5
-		nodeSep         = 8
-		nodeSepCoef     = 1024
-		nodeConnSep     = 8
-		nodeConnSepCoef = 8
-		connLen         = 16
-		connLenFB       = -256
-		connLenCoef     = .1
-		connConnSep     = 4
-		connConnSepCoef = 1
-		gMax            = 32
-	)
-
-	g := make(map[node]*Point)
-	add := func(n node, dv Point) {
-		*g[n] = g[n].Add(dv)
-	}
-	sub := func(n node, dv Point) {
-		*g[n] = g[n].Sub(dv)
-	}
-	for n := range b.nodes {
-		g[n] = &Point{}
-	}
-
-	for n1 := range b.nodes {
-		if n1, ok := n1.(*portsNode); ok {
-			p := Center(b)
-			if n1.out {
-				p.X = Rect(b).Max.X - 2
-			} else {
-				p.X = Rect(b).Min.X + 2
-			}
-			dir := p.Sub(MapToParent(n1, ZP))
-			dir.X *= math.Abs(dir.X)
-			if len(n1.ins)+len(n1.outs) == 0 {
-				dir.Y *= math.Abs(dir.Y)
-			} else {
-				dir.Y = 0
-			}
-			add(n1, dir.Mul(portsNodeCoef))
-		}
-		for n2 := range b.nodes {
-			if n2 == n1 {
-				continue
-			}
-			dir := CenterInParent(n1).Sub(CenterInParent(n2))
-			r1, r2 := RectInParent(n1).Inset(-nodeSep/2), RectInParent(n2).Inset(-nodeSep/2)
-			sep := math.Min(r1.Intersect(r2).Size().XY())
-			add(n1, dir.Mul(nodeSepCoef*math.Min(1, sep/nodeSep)/dir.Len()))
-		}
-		for c := range b.conns {
-			if c.src == nil || c.dst == nil {
-				continue
-			}
-			srcNode := b.find(c.src.node)
-			dstNode := b.find(c.dst.node)
-			if srcNode == n1 || dstNode == n1 {
-				continue
-			}
-			p := CenterInParent(n1)
-			x := MapToParent(c, c.srcPt)
-			y := MapToParent(c, c.dstPt)
-			dir := p.Sub(PointToLine(p, x, y))
-			maxSep := Size(n1).Len()/2 + nodeConnSep
-			sep := dir.Len()
-			if sep < maxSep {
-				d := dir.Mul(nodeConnSepCoef * (maxSep/sep - 1))
-				add(n1, d)
-				sub(srcNode, d)
-				sub(dstNode, d)
-			}
-		}
-	}
-	for c := range b.conns {
-		if c.src == nil || c.dst == nil {
-			continue
-		}
-		// FIXME: srcPts and dstPts need to be mapped to a common parent
-		// for b := b; b != nil; b = b.outer() {
-		// 	for c2 := range b.conns {
-		// 		if c == c2 ||
-		// 		   c2.src == nil || c2.dst == nil ||
-		// 		   c.src.node == c2.src.node || c.dst.node == c2.dst.node || c.src.node == c2.dst.node || c.dst.node == c2.src.node {
-		// 			continue
-		// 		}
-		// 		p1, p2 := LineToLine(c.srcPt, c.dstPt, c2.srcPt, c2.dstPt)
-		// 		d := p1.Sub(p2)
-		// 		if l := d.Len(); l == 0 {
-		// 			d = c.MapToParent(c.Center()).Sub(c2.MapToParent(c2.Center()))
-		// 			if d.Len() == 0 { continue }
-		// 			d = d.Mul(connConnSepCoef / d.Len())
-		// 			add(c.src.node, d)
-		// 			add(c.dst.node, d)
-		// 			sub(c2.src.node, d)
-		// 			sub(c2.dst.node, d)
-		// 		} else if l < connConnSep {
-		// 			d = d.Mul((connConnSep - l) / l)
-		// 			add(c.src.node, d)
-		// 			add(c.dst.node, d)
-		// 			sub(c2.src.node, d)
-		// 			sub(c2.dst.node, d)
-		// 		}
-		// 	}
-		// }
-
-		// TODO: connections that cross block boundaries should be longer.  map src and dst points to the boundaries
-		d := c.dstPt.Sub(c.srcPt)
-		if c.feedback {
-			d.X -= connLenFB
-		} else {
-			d.X -= connLen
-		}
-		d.X -= math.Abs(d.Y) / 2
-		if d.X < 0 {
-			d.X *= d.X * d.X
-		}
-		d.Y *= math.Abs(d.Y) / 16
-		d = d.Mul(connLenCoef)
-		add(b.find(c.src.node), d)
-		sub(b.find(c.dst.node), d)
-	}
-
-	avg := ZP
-	for n := range b.nodes {
-		avg = avg.Add(*g[n])
-	}
-	avg = avg.Div(float64(len(b.nodes)))
-	for n := range b.nodes {
-		sub(n, avg)
-	}
-
-	center := ZP
-	for n := range b.nodes {
-		center = center.Add(Pos(n))
-	}
-	center = center.Div(float64(len(b.nodes)))
-	for n := range b.nodes {
-		add(n, center.Sub(Pos(n)).Mul(nodeCenterCoef))
-		l := g[n].Len()
-		if l > 0 {
-			*g[n] = g[n].Mul(math.Tanh(l/gMax) * gMax / l)
-		}
-	}
-
-	for n := range b.nodes {
-		d := Pt(rprop(&b.g[n].X, &g[n].X, &b.step[n].X), rprop(&b.g[n].Y, &g[n].Y, &b.step[n].Y))
-		n.Move(Pos(n).Add(d))
-		if d.Len() > .01 {
-			done = false
-		}
-	}
-
-	rect := ZR
-	for n := range b.nodes {
-		r := RectInParent(n)
-		if n, ok := n.(*portsNode); ok {
-			// portsNodes gravitate to the boundary; thus we must adjust for the margin
-			if n.out {
-				r = r.Sub(Pt(blockRadius-2, 0))
-			} else {
-				r = r.Add(Pt(blockRadius-2, 0))
-			}
-		}
-		if rect == ZR {
-			rect = r
-		} else {
-			rect = rect.Union(r)
-		}
-	}
-	for c := range b.conns {
-		rect = rect.Union(RectInParent(c))
-	}
-	if rect == ZR {
-		rect = Rectangle{ZP, Pt(16, 0)}
-	}
-	rect = rect.Inset(-blockRadius)
-	if Rect(b).Size().Sub(rect.Size()).Len() > .01 {
-		done = false
-	}
-	b.SetRect(rect)
-
-	return done
-}
-
-func rprop(g_, g, step *float64) float64 {
-	prod := *g * *g_
-	if prod > 0 {
-		*step *= 1.2
-	} else if prod < 0 {
-		*step *= .5
-		// *g = 0 //seems unnecessary
-	}
-	*step = math.Max(.001, *step)
-	*step = math.Min(1, *step)
-	*g_ = *g
-	return *g * *step
 }
 
 func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) {
@@ -749,8 +526,8 @@ func (n *portsNode) removePort(p *port) {
 				if f.obj == nil {
 					f.output.setType(f.output.obj.Type)
 				}
-				if f := n.blk.func_(); f != nil {
-					f.wakeUp()
+				if f := n.blk.func_(); f != nil { // TODO: remove me?  already called in removePortBase
+					f.rearrange()
 				}
 				break
 			}
@@ -781,7 +558,7 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 			vars = &sig.Params
 		}
 		if f := n.blk.func_(); f != nil {
-			f.wakeUp()
+			f.rearrange()
 		}
 		Show(p.valView)
 		p.valView.edit(func() {
@@ -792,7 +569,7 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 			} else {
 				n.removePortBase(p)
 				if f := n.blk.func_(); f != nil {
-					f.wakeUp()
+					f.rearrange()
 				}
 				SetKeyFocus(n)
 			}

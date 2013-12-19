@@ -223,6 +223,8 @@ func (v ViewBase) Paint() {}
 func Do(v View, f func()) {
 	if w := v.win(); w != nil {
 		w.do <- f
+	} else {
+		f()
 	}
 }
 

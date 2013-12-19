@@ -16,10 +16,12 @@ type funcNode struct {
 	funcblk                 *block
 	focused                 bool
 
-	obj          types.Object
-	pkgRefs      map[*types.Package]int
-	awaken, stop chan struct{}
-	done         func()
+	obj     types.Object
+	pkgRefs map[*types.Package]int
+	done    func()
+
+	newArrange chan *nodeArrange
+	stop       chan struct{}
 }
 
 func newFuncLiteralNode() *funcNode {
@@ -34,6 +36,10 @@ func newFuncNode() *funcNode {
 	n := &funcNode{}
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
+
+	n.newArrange = make(chan *nodeArrange, 1)
+	n.stop = make(chan struct{})
+
 	n.funcblk = newBlock(n)
 	n.inputsNode = newInputsNode()
 	n.inputsNode.editable = true
@@ -45,13 +51,13 @@ func newFuncNode() *funcNode {
 	return n
 }
 
-func (n funcNode) lit() bool { return n.obj == nil }
+func (n funcNode) lit() bool { return n.obj == nil } // TODO: make field, as this is constant
 
 func (n *funcNode) Close() {
 	if !n.lit() {
 		saveFunc(n)
-		n.stop <- struct{}{}
-		n.wakeUp()
+		close(n.stop)
+		n.rearrange()
 		n.done()
 	}
 	n.ViewBase.Close()
@@ -99,7 +105,7 @@ func (n funcNode) block() *block      { return n.blk }
 func (n *funcNode) setBlock(b *block) { n.blk = b }
 func (n funcNode) inputs() []*port    { return nil }
 func (n funcNode) outputs() (p []*port) {
-	if n.lit() {
+	if n.output != nil {
 		p = append(p, n.output)
 	}
 	return
@@ -107,26 +113,44 @@ func (n funcNode) outputs() (p []*port) {
 func (n funcNode) inConns() []*connection { return n.funcblk.inConns() }
 func (n funcNode) outConns() []*connection {
 	c := n.funcblk.outConns()
-	if n.lit() {
+	if n.output != nil {
 		c = append(c, n.output.conns...)
 	}
 	return c
 }
 
-const fps = 60
+const fps = 60.0
 
 func (n *funcNode) animate() {
-	done := make(chan bool)
+	animate := make(chan *nodeArrange, 1)
+	go n.arrange(animate)
+	a := newNodeArrange(n, nil, map[*port]*portArrange{})
+	done := make(chan bool, 1)
 	for {
 		next := time.After(time.Second / fps)
 		Do(n, func() {
-			done <- n.arrange()
+			c := CenterInParent(n)
+			done <- a.animate()
+			MoveCenter(n, c)
 		})
-
 		if <-done {
-			<-n.awaken
-		} else {
-			<-next
+			next = nil
+		}
+		select {
+		case <-next:
+		case a = <-animate:
+		case <-n.stop:
+			return
+		}
+	}
+}
+
+func (n *funcNode) arrange(animate chan *nodeArrange) {
+	a := newNodeArrange(n, nil, map[*port]*portArrange{})
+	for {
+		if a.arrange() {
+			animate <- a
+			a = <-n.newArrange
 		}
 		select {
 		case <-n.stop:
@@ -136,26 +160,12 @@ func (n *funcNode) animate() {
 	}
 }
 
-func (n *funcNode) wakeUp() {
+func (n *funcNode) rearrange() {
 	select {
-	case n.awaken <- struct{}{}:
+	case <-n.newArrange:
 	default:
 	}
-}
-
-func (n *funcNode) arrange() bool {
-	b := n.funcblk
-	if b.arrange() {
-		return true
-	}
-	b.Move(Pt(-Width(b)-portSize/2, -Height(b)/2))
-	if n.lit() {
-		MoveCenter(n.output, Pt(portSize/2, 0))
-	}
-	c := CenterInParent(n)
-	ResizeToFit(n, 0)
-	MoveCenter(n, c)
-	return false
+	n.newArrange <- newNodeArrange(n, nil, map[*port]*portArrange{})
 }
 
 func (n *funcNode) Move(p Point) {

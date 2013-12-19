@@ -175,6 +175,13 @@ func (p *port) next(dir int) *port {
 	return nil
 }
 
+func (p *port) Move(pt Point) {
+	p.ViewBase.Move(pt)
+	for _, c := range p.conns {
+		c.reform()
+	}
+}
+
 func (p *port) TookKeyFocus() { p.focused = true; Repaint(p); Show(p.valView) }
 func (p *port) LostKeyFocus() { p.focused = false; Repaint(p); Hide(p.valView) }
 

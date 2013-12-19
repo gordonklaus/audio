@@ -110,17 +110,6 @@ func (n *loopNode) updateInputType() {
 	in.reform()
 }
 
-func (n *loopNode) arrange() bool {
-	b := n.loopblk
-	if b.arrange() {
-		return true
-	}
-	b.Move(Pt(portSize/2, -Height(b)/2))
-	MoveCenter(n.seqOut, Pt(portSize/2+Width(b), 0))
-	ResizeToFit(n, 0)
-	return false
-}
-
 func (n *loopNode) Move(p Point) {
 	n.ViewBase.Move(p)
 	nodeMoved(n)

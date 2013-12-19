@@ -56,7 +56,6 @@ func newFluxWindow() *fluxWindow {
 			}
 		case *types.Func, method:
 			f := loadFunc(obj)
-			go f.animate()
 			Hide(w.browser)
 			w.Add(f)
 			f.Move(Center(w))

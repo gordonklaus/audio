@@ -13,8 +13,6 @@ func loadFunc(obj types.Object) *funcNode {
 	f := newFuncNode()
 	f.obj = obj
 	f.pkgRefs = map[*types.Package]int{}
-	f.awaken = make(chan struct{}, 1)
-	f.stop = make(chan struct{}, 1)
 
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, fluxPath(obj), nil, parser.ParseComments)
@@ -42,6 +40,7 @@ func loadFunc(obj types.Object) *funcNode {
 		saveFunc(f)
 	}
 
+	go f.animate()
 	return f
 }
 
