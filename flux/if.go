@@ -16,16 +16,14 @@ type ifNode struct {
 	focused       bool
 }
 
-func newIfNode() *ifNode {
+func newIfNode(arranged blockchan) *ifNode {
 	n := &ifNode{}
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
 	n.input = newInput(n, &types.Var{Type: types.Typ[types.Bool]})
-	n.falseblk = newBlock(n)
-	n.trueblk = newBlock(n)
 	n.Add(n.input)
-	n.Add(n.falseblk)
-	n.Add(n.trueblk)
+	n.falseblk = newBlock(n, arranged)
+	n.trueblk = newBlock(n, arranged)
 
 	n.seqIn = newInput(n, &types.Var{Name: "seq", Type: seqType})
 	MoveCenter(n.seqIn, Pt(-portSize, 0))

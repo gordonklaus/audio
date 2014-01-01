@@ -169,9 +169,6 @@ func nodeMoved(n node) {
 	for _, c := range append(n.inConns(), n.outConns()...) {
 		c.reform()
 	}
-	if f := func_(n); f != nil {
-		// f.rearrange() //causes animation to never sleep
-	}
 }
 
 func (n *nodeBase) TookKeyFocus() { n.focused = true; Repaint(n) }

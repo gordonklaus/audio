@@ -19,16 +19,33 @@ type block struct {
 	conns     map[*connection]bool
 	localVars map[*localVar]bool
 	focused   bool
+
+	arrange, childArranged blockchan
+	stop                   stopchan
 }
 
-func newBlock(n node) *block {
+func newBlock(n node, arranged blockchan) *block {
 	b := &block{}
 	b.ViewBase = NewView(b)
 	b.node = n
 	b.nodes = map[node]bool{}
 	b.conns = map[*connection]bool{}
 	b.localVars = map[*localVar]bool{}
+
+	b.arrange = make(blockchan)
+	b.childArranged = make(blockchan)
+	b.stop = make(stopchan)
+	go arrange(b.arrange, b.childArranged, arranged, b.stop)
+	rearrange(b)
+
+	n.Add(b)
 	return b
+}
+
+func (b *block) close() {
+	b.walk(func(b *block) {
+		close(b.stop)
+	}, nil, nil)
 }
 
 func (b *block) outer() *block { return b.node.block() }
@@ -67,9 +84,7 @@ func (b *block) addNode(n node) {
 				v.addref(n)
 			}
 		}
-		if f := b.func_(); f != nil {
-			f.rearrange()
-		}
+		rearrange(b)
 	}
 }
 
@@ -86,33 +101,36 @@ func (b *block) removeNode(n node) {
 			if v, ok := n.obj.(*localVar); ok {
 				v.subref(n)
 			}
+		case *ifNode:
+			n.falseblk.close()
+			n.trueblk.close()
+		case *loopNode:
+			n.loopblk.close()
+		case *funcNode:
+			n.funcblk.close()
 		}
-		if f := b.func_(); f != nil {
-			f.rearrange()
-		}
+		rearrange(b)
 	}
 }
 
 func (b *block) addConn(c *connection) {
 	if c.blk != nil {
 		delete(c.blk.conns, c)
+		c.blk.Remove(c)
+		rearrange(c.blk)
 	}
 	c.blk = b
 	b.Add(c)
 	Lower(c)
 	b.conns[c] = true
-	if f := b.func_(); f != nil {
-		f.rearrange()
-	}
+	rearrange(b)
 }
 
 func (b *block) removeConn(c *connection) {
 	c.disconnect()
 	delete(b.conns, c)
 	b.Remove(c)
-	if f := b.func_(); f != nil {
-		f.rearrange()
-	}
+	rearrange(b)
 }
 
 func (b *block) walk(bf func(*block), nf func(node), cf func(*connection)) {
@@ -426,13 +444,13 @@ func newNode(b *block, obj types.Object, funcAsVal bool) {
 		case "convert":
 			n = newConvertNode()
 		case "func":
-			n = newFuncLiteralNode()
+			n = newFuncNode(nil, b.childArranged)
 		case "if":
-			n = newIfNode()
+			n = newIfNode(b.childArranged)
 		case "indirect":
 			n = newValueNode(nil, false)
 		case "loop":
-			n = newLoopNode()
+			n = newLoopNode(b.childArranged)
 		case "typeAssert":
 			n = newTypeAssertNode()
 		}
@@ -526,9 +544,7 @@ func (n *portsNode) removePort(p *port) {
 				if f.obj == nil {
 					f.output.setType(f.output.obj.Type)
 				}
-				if f := n.blk.func_(); f != nil { // TODO: remove me?  already called in removePortBase
-					f.rearrange()
-				}
+				rearrange(n.blk)
 				break
 			}
 		}
@@ -557,9 +573,7 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 			p = n.newOutput(v)
 			vars = &sig.Params
 		}
-		if f := n.blk.func_(); f != nil {
-			f.rearrange()
-		}
+		rearrange(n.blk)
 		Show(p.valView)
 		p.valView.edit(func() {
 			if v.Type != nil {
@@ -568,9 +582,7 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 				SetKeyFocus(p)
 			} else {
 				n.removePortBase(p)
-				if f := n.blk.func_(); f != nil {
-					f.rearrange()
-				}
+				rearrange(n.blk)
 				SetKeyFocus(n)
 			}
 			if f.obj == nil {

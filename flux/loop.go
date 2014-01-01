@@ -11,12 +11,12 @@ type loopNode struct {
 	blk           *block
 	input         *port
 	seqIn, seqOut *port
-	inputsNode    *portsNode
 	loopblk       *block
+	inputsNode    *portsNode
 	focused       bool
 }
 
-func newLoopNode() *loopNode {
+func newLoopNode(arranged blockchan) *loopNode {
 	n := &loopNode{}
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
@@ -24,11 +24,6 @@ func newLoopNode() *loopNode {
 	n.input.connsChanged = n.updateInputType
 	MoveCenter(n.input, Pt(-portSize/2, 0))
 	n.Add(n.input)
-	n.loopblk = newBlock(n)
-	n.inputsNode = newInputsNode()
-	n.inputsNode.newOutput(&types.Var{})
-	n.loopblk.addNode(n.inputsNode)
-	n.Add(n.loopblk)
 
 	n.seqIn = newInput(n, &types.Var{Name: "seq", Type: seqType})
 	MoveCenter(n.seqIn, Pt(portSize/2, 0))
@@ -36,6 +31,10 @@ func newLoopNode() *loopNode {
 	n.seqOut = newOutput(n, &types.Var{Name: "seq", Type: seqType})
 	n.Add(n.seqOut)
 
+	n.loopblk = newBlock(n, arranged)
+	n.inputsNode = newInputsNode()
+	n.inputsNode.newOutput(&types.Var{})
+	n.loopblk.addNode(n.inputsNode)
 	n.updateInputType()
 	return n
 }
@@ -108,6 +107,7 @@ func (n *loopNode) updateInputType() {
 		in.outs[1].setType(elt)
 	}
 	in.reform()
+	rearrange(n.loopblk)
 }
 
 func (n *loopNode) Move(p Point) {

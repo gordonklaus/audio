@@ -10,10 +10,7 @@ import (
 )
 
 func loadFunc(obj types.Object) *funcNode {
-	f := newFuncNode()
-	f.obj = obj
-	f.pkgRefs = map[*types.Package]int{}
-
+	f := newFuncNode(obj, nil)
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, fluxPath(obj), nil, parser.ParseComments)
 	if err == nil {
@@ -39,8 +36,6 @@ func loadFunc(obj types.Object) *funcNode {
 		}
 		saveFunc(f)
 	}
-
-	go f.animate()
 	return f
 }
 
@@ -134,7 +129,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					r.addVar(name(s.Lhs[0]), n.outs[0])
 					r.addVar(name(s.Lhs[1]), n.outs[1])
 				case *ast.FuncLit:
-					n := newFuncLiteralNode()
+					n := newFuncNode(nil, b.childArranged)
 					b.addNode(n)
 					n.output.setType(r.typ(x.Type))
 					r.addVar(name(s.Lhs[0]), n.output)
@@ -197,7 +192,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 				}
 			}
 		case *ast.ForStmt:
-			n := newLoopNode()
+			n := newLoopNode(b.childArranged)
 			b.addNode(n)
 			if s.Cond != nil {
 				r.connect(name(s.Cond.(*ast.BinaryExpr).Y), n.input)
@@ -208,7 +203,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			r.block(n.loopblk, s.Body.List)
 			r.seq(n, s)
 		case *ast.IfStmt:
-			n := newIfNode()
+			n := newIfNode(b.childArranged)
 			b.addNode(n)
 			r.connect(name(s.Cond), n.input)
 			r.block(n.trueblk, s.Body.List)
@@ -217,7 +212,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			}
 			r.seq(n, s)
 		case *ast.RangeStmt:
-			n := newLoopNode()
+			n := newLoopNode(b.childArranged)
 			b.addNode(n)
 			r.connect(name(s.X), n.input)
 			r.addVar(name(s.Key), n.inputsNode.outs[0])

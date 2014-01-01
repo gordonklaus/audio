@@ -4,9 +4,11 @@ import (
 	"code.google.com/p/go.exp/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	. "code.google.com/p/gordon-go/util"
+	"runtime"
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	newFluxWindow()
 	Run()
 }
@@ -55,9 +57,10 @@ func newFluxWindow() *fluxWindow {
 				SetKeyFocus(v)
 			}
 		case *types.Func, method:
-			f := loadFunc(obj)
 			Hide(w.browser)
+			f := loadFunc(obj)
 			w.Add(f)
+			go animate(f.animate, f.stop)
 			f.Move(Center(w))
 			f.done = func() {
 				Show(w.browser)

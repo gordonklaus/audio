@@ -4,7 +4,6 @@ import (
 	"code.google.com/p/go.exp/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	"fmt"
-	"time"
 )
 
 type funcNode struct {
@@ -12,42 +11,38 @@ type funcNode struct {
 	AggregateMouser
 	blk                     *block
 	output                  *port
-	inputsNode, outputsNode *portsNode
 	funcblk                 *block
+	inputsNode, outputsNode *portsNode
 	focused                 bool
 
 	obj     types.Object
 	pkgRefs map[*types.Package]int
 	done    func()
 
-	newArrange chan *nodeArrange
-	stop       chan struct{}
+	animate blockchan
+	stop    stopchan
 }
 
-func newFuncLiteralNode() *funcNode {
-	n := newFuncNode()
-	n.output = newOutput(n, &types.Var{Type: &types.Signature{}})
-	n.Add(n.output)
-	return n
-}
-
-// helper constructor -- does not produce a complete funcNode
-func newFuncNode() *funcNode {
-	n := &funcNode{}
+func newFuncNode(obj types.Object, arranged blockchan) *funcNode {
+	n := &funcNode{obj: obj}
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
-
-	n.newArrange = make(chan *nodeArrange, 1)
-	n.stop = make(chan struct{})
-
-	n.funcblk = newBlock(n)
+	if obj == nil {
+		n.output = newOutput(n, &types.Var{Type: &types.Signature{}})
+		n.Add(n.output)
+	} else {
+		n.pkgRefs = map[*types.Package]int{}
+		n.animate = make(blockchan)
+		n.stop = make(stopchan)
+		arranged = n.animate
+	}
+	n.funcblk = newBlock(n, arranged)
 	n.inputsNode = newInputsNode()
 	n.inputsNode.editable = true
 	n.funcblk.addNode(n.inputsNode)
 	n.outputsNode = newOutputsNode()
 	n.outputsNode.editable = true
 	n.funcblk.addNode(n.outputsNode)
-	n.Add(n.funcblk)
 	return n
 }
 
@@ -55,9 +50,9 @@ func (n funcNode) lit() bool { return n.obj == nil } // TODO: make field, as thi
 
 func (n *funcNode) Close() {
 	if !n.lit() {
-		saveFunc(n)
+		n.funcblk.close()
 		close(n.stop)
-		n.rearrange()
+		saveFunc(n)
 		n.done()
 	}
 	n.ViewBase.Close()
@@ -117,55 +112,6 @@ func (n funcNode) outConns() []*connection {
 		c = append(c, n.output.conns...)
 	}
 	return c
-}
-
-const fps = 60.0
-
-func (n *funcNode) animate() {
-	animate := make(chan *nodeArrange, 1)
-	go n.arrange(animate)
-	a := newNodeArrange(n, nil, map[*port]*portArrange{})
-	done := make(chan bool, 1)
-	for {
-		next := time.After(time.Second / fps)
-		Do(n, func() {
-			c := CenterInParent(n)
-			done <- a.animate()
-			MoveCenter(n, c)
-		})
-		if <-done {
-			next = nil
-		}
-		select {
-		case <-next:
-		case a = <-animate:
-		case <-n.stop:
-			return
-		}
-	}
-}
-
-func (n *funcNode) arrange(animate chan *nodeArrange) {
-	a := newNodeArrange(n, nil, map[*port]*portArrange{})
-	for {
-		if a.arrange() {
-			animate <- a
-			a = <-n.newArrange
-		}
-		select {
-		case <-n.stop:
-			return
-		default:
-		}
-	}
-}
-
-func (n *funcNode) rearrange() {
-	select {
-	case <-n.newArrange:
-	default:
-	}
-	n.newArrange <- newNodeArrange(n, nil, map[*port]*portArrange{})
 }
 
 func (n *funcNode) Move(p Point) {
