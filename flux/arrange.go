@@ -267,10 +267,12 @@ func arrange(arrange, childArranged, arranged blockchan, stop stopchan) {
 			})
 			if cross < minCross {
 				minCross = cross
+				stagnant = 0
 				arranged <- b.copy(nil, portmap{})
+			} else {
+				stagnant++
 			}
 			if stagnant < 100 {
-				stagnant++
 				b.uncross()
 			} else {
 				stagnant = 0
