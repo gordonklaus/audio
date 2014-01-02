@@ -2,14 +2,13 @@ package gui
 
 import (
 	"code.google.com/p/gordon-go/ftgl"
-	"code.google.com/p/gordon-go/gui/rsrc"
 	gl "github.com/chsc/gogl/gl21"
 )
 
 var font ftgl.Font
 
 func initFont() {
-	font = ftgl.NewTextureFontFromBuffer(rsrc.FreeSerif_otf)
+	font = ftgl.NewTextureFont("/Library/Fonts/Times New Roman.ttf")
 	font.SetFaceSize(18, 1)
 }
 
