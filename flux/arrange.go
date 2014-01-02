@@ -139,7 +139,7 @@ func arrange(arrange, childArranged, arranged blockchan, stop stopchan) {
 	b := <-arrange
 	minCross := math.MaxInt32
 	stagnant := 0
-	for {
+	for iter := 0; ; iter++ {
 		const (
 			portsNodeCoef   = 1024
 			nodeCenterCoef  = .5
@@ -259,7 +259,8 @@ func arrange(arrange, childArranged, arranged blockchan, stop stopchan) {
 		b.setRect()
 
 		always := make(chan bool, 1)
-		if converged {
+		if converged || iter > 5000 {
+			iter = 0
 			cross := 0
 			b.forCross(func(src1, dst1, src2, dst2 *nodeArrange, srcP1, dstP1, srcP2, dstP2 Point) {
 				cross++
