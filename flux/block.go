@@ -365,7 +365,7 @@ func (b *block) KeyPress(event KeyEvent) {
 		}
 	case KeyEscape:
 		if n, ok := KeyFocus(b).(node); ok {
-			if f, ok := n.block().node.(*funcNode); ok && !f.lit() {
+			if f, ok := n.block().node.(*funcNode); ok && !f.literal {
 				f.Close()
 			} else {
 				SetKeyFocus(n.block().node)
@@ -558,7 +558,7 @@ func (n *portsNode) removePort(p *port) {
 func (n *portsNode) KeyPress(event KeyEvent) {
 	if l, ok := n.blk.node.(*loopNode); ok && event.Key == KeyLeft {
 		SetKeyFocus(l)
-	} else if f, ok := n.blk.node.(*funcNode); ok && f.lit() && event.Key == KeyRight && n.out {
+	} else if f, ok := n.blk.node.(*funcNode); ok && f.literal && event.Key == KeyRight && n.out {
 		SetKeyFocus(f)
 	} else if n.editable && event.Text == "," {
 		f := n.blk.node.(*funcNode)

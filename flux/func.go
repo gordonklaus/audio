@@ -20,6 +20,7 @@ type funcNode struct {
 	focused                 bool
 
 	obj     types.Object
+	literal bool
 	pkgRefs map[*types.Package]int
 	done    func()
 
@@ -28,10 +29,10 @@ type funcNode struct {
 }
 
 func newFuncNode(obj types.Object, arranged blockchan) *funcNode {
-	n := &funcNode{obj: obj}
+	n := &funcNode{obj: obj, literal: obj == nil}
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
-	if obj == nil {
+	if n.literal {
 		n.output = newOutput(n, &types.Var{Type: &types.Signature{}})
 		n.Add(n.output)
 	} else {
@@ -50,10 +51,8 @@ func newFuncNode(obj types.Object, arranged blockchan) *funcNode {
 	return n
 }
 
-func (n funcNode) lit() bool { return n.obj == nil } // TODO: make field, as this is constant
-
 func (n *funcNode) Close() {
-	if !n.lit() {
+	if !n.literal {
 		n.funcblk.close()
 		close(n.stop)
 		saveFunc(n)
@@ -127,9 +126,9 @@ func (n *funcNode) TookKeyFocus() { n.focused = true; Repaint(n) }
 func (n *funcNode) LostKeyFocus() { n.focused = false; Repaint(n) }
 
 func (n *funcNode) KeyPress(event KeyEvent) {
-	if event.Command && event.Key == KeyS && !n.lit() {
+	if event.Command && event.Key == KeyS && !n.literal {
 		saveFunc(n)
-	} else if event.Key == KeyLeft && n.lit() {
+	} else if event.Key == KeyLeft && n.literal {
 		SetKeyFocus(n.outputsNode)
 	} else {
 		n.ViewBase.KeyPress(event)
@@ -138,7 +137,7 @@ func (n *funcNode) KeyPress(event KeyEvent) {
 
 func (n funcNode) Paint() {
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
-	if n.lit() {
+	if n.literal {
 		DrawLine(Pt(-portSize/2, 0), Pt(portSize/2, 0))
 	}
 }

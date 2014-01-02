@@ -92,7 +92,7 @@ func (n *nodeArrange) arrange() {
 	case *funcNode:
 		b := n.blocks[0]
 		b.Move(Pt(-Width(b)-portSize/2, -Height(b)/2))
-		if node.lit() {
+		if node.literal {
 			output := n.ports[0]
 			MoveCenter(output, Pt(portSize/2, 0))
 		}
