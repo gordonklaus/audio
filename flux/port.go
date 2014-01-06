@@ -250,7 +250,15 @@ func (p *port) KeyPress(event KeyEvent) {
 	case KeyEscape:
 		SetKeyFocus(p.node)
 	default:
-		p.ViewBase.KeyPress(event)
+		if pn, ok := p.node.(*portsNode); ok && p.out && pn.outs[0] == p && event.Text == "*" {
+			if t, ok := p.obj.Type.(*types.Pointer); ok {
+				p.setType(t.Base)
+			} else {
+				p.setType(&types.Pointer{p.obj.Type})
+			}
+		} else {
+			p.ViewBase.KeyPress(event)
+		}
 	}
 }
 
