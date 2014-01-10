@@ -120,7 +120,7 @@ func (w *writer) close() {
 
 func (w *writer) collectPkgs(t types.Type) {
 	walkType(t, func(n *types.NamedType) {
-		if p := n.Obj.Pkg; p != w.pkg {
+		if p := n.Obj.Pkg; p != nil && p != w.pkg {
 			if _, ok := w.pkgNames[p]; !ok {
 				w.pkgNames[p] = w.name(p.Name)
 			}
@@ -215,8 +215,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 		if _, ok := vars[c.dst]; ok {
 			continue
 		}
-		t := c.dst.obj.Type
-		if p, ok := c.src.obj.Type.(*types.Pointer); ok && types.IsIdentical(p.Base, t) || c.src.node.block() != b {
+		if t := c.dst.obj.Type; t != seqType {
 			w.collectPkgs(t)
 			name := w.name("v")
 			w.indent("var %s %s\n", name, w.typ(t))
@@ -228,11 +227,20 @@ func (w *writer) block(b *block, vars map[*port]string) {
 		default:
 			args := []string{}
 			for _, in := range ins(n) {
-				if len(in.conns) > 0 {
-					args = append(args, vars[in])
-				} else if in.obj.Type != nil {
-					args = append(args, w.zero(in.obj.Type))
+				name, ok := vars[in]
+				if !ok {
+					if n, ok := n.(*makeNode); ok && len(n.ins) > 1 && in == n.ins[1] {
+						continue //ignore unconnected slice capacity
+					}
+					switch t := in.obj.Type.(type) {
+					case *types.Slice, *types.Map, *types.Signature:
+						name = "nil" //must use untyped nil in case this value is used in equality comparison
+					default:
+						name = w.name("v")
+						w.indent("var %s %s\n", name, w.typ(t))
+					}
 				}
+				args = append(args, name)
 			}
 			results, existing := w.results(n, vars)
 			switch n := n.(type) {
@@ -276,9 +284,6 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				w.seq(n)
 			case *makeNode:
 				if len(results) > 0 {
-					if len(args) == 2 && len(n.ins[1].conns) == 0 { // array capacity input unconnected
-						args = args[:1]
-					}
 					w.indent("%s := make(%s, %s)\n", results[0], w.typ(*n.typ.typ), strings.Join(args, ", "))
 				}
 			case *operatorNode:
@@ -488,15 +493,14 @@ func (w *writer) results(n node, vars map[*port]string) (results []string, exist
 				name = w.name(p.obj.GetName())
 			}
 			for _, c := range p.conns {
-				if v, ok := vars[c.dst]; ok {
-					if p, ok := c.src.obj.Type.(*types.Pointer); ok && types.IsIdentical(p.Base, c.dst.obj.Type) {
-						existing[v] = "*" + name
-					} else {
-						existing[v] = name
-					}
-				} else {
-					vars[c.dst] = name
+				v := name
+				if p, ok := c.src.obj.Type.(*types.Pointer); ok && types.IsIdentical(p.Base, c.dst.obj.Type) {
+					v = "*" + v
 				}
+				if c.hidden {
+					v += "//" + c.src.conntxt.GetText()
+				}
+				existing[vars[c.dst]] = v
 			}
 		}
 		results = append(results, name)
@@ -533,13 +537,8 @@ func (w *writer) seq(n node) {
 }
 
 func (w *writer) assignExisting(m map[string]string) {
-	if len(m) > 0 {
-		var existingNames, sourceNames []string
-		for v1, v2 := range m {
-			existingNames = append(existingNames, v1)
-			sourceNames = append(sourceNames, v2)
-		}
-		w.indent("%s = %s\n", strings.Join(existingNames, ", "), strings.Join(sourceNames, ", "))
+	for v1, v2 := range m {
+		w.indent("%s = %s\n", v1, v2)
 	}
 }
 
@@ -641,33 +640,6 @@ func (w writer) params(params []*types.Var) string {
 		s += w.typ(p.Type)
 	}
 	return s + ")"
-}
-
-func (w writer) zero(t types.Type) string {
-	switch t := t.(type) {
-	case *types.Basic:
-		switch {
-		case t.Info&types.IsBoolean != 0:
-			return "false"
-		case t.Info&types.IsNumeric != 0:
-			return "0"
-		case t.Info&types.IsString != 0:
-			return `""`
-		default:
-			return "nil"
-		}
-	case *types.Pointer, *types.Slice, *types.Map, *types.Chan, *types.Signature, *types.Interface:
-		return "nil"
-	case *types.Array, *types.Struct:
-		return w.typ(t) + "{}"
-	case *types.NamedType:
-		switch t.Underlying.(type) {
-		case *types.Array, *types.Struct:
-			return w.typ(t) + "{}"
-		}
-		return w.zero(t.Underlying)
-	}
-	panic(fmt.Sprintf("unexpected type %#v\n", t))
 }
 
 func walkType(t types.Type, op func(*types.NamedType)) {

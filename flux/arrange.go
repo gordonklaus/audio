@@ -19,12 +19,16 @@ func animate(animate blockchan, stop stopchan) {
 	converged := make(chan bool, 1)
 	for {
 		next := time.After(time.Second / fps)
-		Do(n, func() {
+		select {
+		case Do(n) <- func() {
 			c := CenterInParent(n)
 			converged <- b.animate()
 			ResizeToFit(n, 0)
 			MoveCenter(n, c)
-		})
+		}:
+		case <-stop:
+			return
+		}
 		if <-converged {
 			next = nil
 		}
@@ -148,7 +152,6 @@ func arrange(arrange, childArranged, arranged blockchan, stop stopchan) {
 			nodeConnSep     = 8
 			nodeConnSepCoef = 8
 			connLen         = 16
-			connLenFB       = -256
 			connLenCoef     = .1
 			gMax            = 32
 		)
@@ -181,7 +184,7 @@ func arrange(arrange, childArranged, arranged blockchan, stop stopchan) {
 				n1.add(dir.Mul(nodeSepCoef * math.Min(1, sep/nodeSep) / dir.Len()))
 			}
 			for _, c := range b.conns {
-				if c.src == nil || c.dst == nil {
+				if c.hidden {
 					continue
 				}
 				srcNode := c.src.node.in(b)
@@ -203,25 +206,33 @@ func arrange(arrange, childArranged, arranged blockchan, stop stopchan) {
 				}
 			}
 		}
+		// TODO: feedback conns are in an outer block, so arranging them has no effect.  do something
 		for _, c := range b.conns {
-			if c.src == nil || c.dst == nil {
-				continue
-			}
 			// TODO: connections that cross block boundaries should be longer.  map src and dst points to the boundaries
+			srcNode := c.src.node.in(b)
+			dstNode := c.dst.node.in(b)
 			d := c.dst.centerIn(b).Sub(c.src.centerIn(b))
 			if c.conn.feedback {
-				d.X -= connLenFB
+				d.X = -d.X
+				d.X -= connLen + Width(srcNode) + Width(dstNode)
 			} else {
 				d.X -= connLen
 			}
-			d.X -= math.Abs(d.Y) / 2
+			if c.hidden {
+				d.Y = 0
+			} else {
+				d.X -= math.Abs(d.Y) / 2
+				d.Y *= math.Abs(d.Y) / 16
+			}
 			if d.X < 0 {
 				d.X *= d.X * d.X
 			}
-			d.Y *= math.Abs(d.Y) / 16
+			if c.conn.feedback {
+				d.X = -d.X
+			}
 			d = d.Mul(connLenCoef)
-			c.src.node.in(b).add(d)
-			c.dst.node.in(b).sub(d)
+			srcNode.add(d)
+			dstNode.sub(d)
 		}
 
 		avg := ZP
@@ -395,8 +406,11 @@ func (b *blockArrange) replace(b2 *blockArrange) {
 
 func (b *blockArrange) forCross(f func(src1, dst1, src2, dst2 *nodeArrange, srcP1, dstP1, srcP2, dstP2 Point)) {
 	for i, c1 := range b.conns {
+		if c1.hidden {
+			continue
+		}
 		for _, c2 := range b.conns[i+1:] {
-			if c1.src == c2.src || c1.dst == c2.dst {
+			if c2.hidden || c1.src == c2.src || c1.dst == c2.dst {
 				continue
 			}
 			src1 := c1.src.node.in(b)
@@ -465,6 +479,7 @@ type connArrange struct {
 	*ViewBase
 	conn     *connection
 	src, dst *portArrange
+	hidden   bool
 }
 
 func newBlockArrange(block *block, n *nodeArrange, ports portmap) *blockArrange {
@@ -534,6 +549,7 @@ func newConnArrange(conn *connection, ports portmap) *connArrange {
 	c.ViewBase = NewView(c)
 	c.src = ports[conn.src]
 	c.dst = ports[conn.dst]
+	c.hidden = conn.hidden
 	return c
 }
 
@@ -588,7 +604,7 @@ func (p *portArrange) copy(n *nodeArrange) *portArrange {
 }
 
 func (c *connArrange) copy(ports portmap) *connArrange {
-	c2 := &connArrange{conn: c.conn}
+	c2 := &connArrange{conn: c.conn, hidden: c.hidden}
 	c2.ViewBase = NewView(c2)
 	c2.src = ports[c.src.port]
 	c2.dst = ports[c.dst.port]
@@ -602,3 +618,7 @@ type portmap map[*port]*portArrange
 
 type blockchan chan *blockArrange
 type stopchan chan struct{}
+
+func (c stopchan) stop() {
+	c <- struct{}{}
+}

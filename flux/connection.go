@@ -8,6 +8,8 @@ import (
 	. "code.google.com/p/gordon-go/gui"
 	. "github.com/chsc/gogl/gl21"
 	"math"
+	"sort"
+	"strings"
 )
 
 type connection struct {
@@ -21,6 +23,7 @@ type connection struct {
 	focused, focusSrc bool
 	srcPt             Point
 	dstPt             Point
+	hidden            bool
 
 	savedPort *port
 	editing   bool
@@ -35,22 +38,17 @@ func newConnection() *connection {
 
 func (c connection) connected() bool { return c.src != nil && c.dst != nil }
 func (c *connection) disconnect() {
-	if c.src != nil {
-		c.src.disconnect(c)
-		c.src.connsChanged()
-		c.src = nil
-	}
-	if c.dst != nil {
-		c.dst.disconnect(c)
-		c.dst.connsChanged()
-		c.dst = nil
-	}
+	c.setSrc(nil)
+	c.setDst(nil)
 }
 
 func (c *connection) setSrc(src *port) {
+	txt := ""
 	if c.src != nil {
 		c.src.disconnect(c)
 		c.src.connsChanged()
+		txt = c.src.conntxt.GetText()
+		c.updateSrcTxt("")
 	}
 	c.src = src
 	if src != nil {
@@ -59,6 +57,7 @@ func (c *connection) setSrc(src *port) {
 			c.src.connsChanged()
 			c.dst.connsChanged()
 		}
+		c.updateSrcTxt(txt)
 	}
 	c.reblock()
 	c.reform()
@@ -68,6 +67,7 @@ func (c *connection) setDst(dst *port) {
 	if c.dst != nil {
 		c.dst.disconnect(c)
 		c.dst.connsChanged()
+		c.updateDstTxt()
 	}
 	c.dst = dst
 	if dst != nil {
@@ -76,6 +76,7 @@ func (c *connection) setDst(dst *port) {
 			c.src.connsChanged()
 			c.dst.connsChanged()
 		}
+		c.updateDstTxt()
 	}
 	c.reblock()
 	c.reform()
@@ -148,6 +149,7 @@ func (c *connection) reform() {
 
 func (c *connection) focus(focusSrc bool) {
 	c.focusSrc = focusSrc
+	c.updateTextColors()
 	SetKeyFocus(c)
 	Repaint(c)
 }
@@ -159,34 +161,150 @@ func (c *connection) startEditing() {
 		c.savedPort = c.dst
 	}
 	c.editing = true
+	c.updateTextColors()
 	c.reform()
 }
 
 func (c *connection) cancelEditing() {
-	if c.focusSrc {
-		c.setSrc(c.savedPort)
-	} else {
-		c.setDst(c.savedPort)
+	if c.editing {
+		if c.focusSrc {
+			c.setSrc(c.savedPort)
+		} else {
+			c.setDst(c.savedPort)
+		}
+		c.stopEditing()
 	}
-	c.stopEditing()
 }
 
 func (c *connection) stopEditing() {
-	c.editing = false
-	if c.connected() {
-		c.reform()
-	} else {
-		p := c.src
-		if c.focusSrc {
-			p = c.dst
+	if c.editing {
+		c.editing = false
+		if c.connected() {
+			c.reform()
+		} else {
+			p := c.src
+			if c.focusSrc {
+				p = c.dst
+			}
+			c.blk.removeConn(c)
+			SetKeyFocus(p)
 		}
-		c.blk.removeConn(c)
-		SetKeyFocus(p)
+		c.updateTextColors()
 	}
 }
 
-func (c *connection) TookKeyFocus() { c.focused = true; Repaint(c) }
-func (c *connection) LostKeyFocus() { c.focused = false; Repaint(c) }
+func (c *connection) toggleHidden() {
+	c.hidden = !c.hidden
+	rearrange(c.blk)
+	if c.hidden {
+		Hide(c)
+		if srctxt := c.src.conntxt; srctxt.GetText() == "" {
+			srctxt.TextChanged = func(string) {
+				for _, c := range c.src.conns {
+					if c.hidden {
+						c.updateDstTxt()
+					}
+				}
+			}
+			srctxt.Accept = func(text string) {
+				// TODO: reject duplicate names
+				if text == "" {
+					SetKeyFocus(srctxt)
+				} else {
+					c.focus(c.focusSrc)
+				}
+			}
+			srctxt.Reject = func() {
+				c.toggleHidden()
+				c.focus(c.focusSrc)
+			}
+			SetKeyFocus(srctxt)
+		}
+	} else {
+		Show(c)
+	}
+	c.updateSrcTxt("")
+	c.updateDstTxt()
+}
+
+func (c *connection) updateSrcTxt(txt string) {
+	anyHidden := false
+	for _, c := range c.src.conns {
+		if c.hidden {
+			anyHidden = true
+		}
+	}
+	if !anyHidden {
+		c.src.conntxt.SetText("")
+	} else if txt != "" {
+		c.src.conntxt.SetText(txt)
+	}
+	c.src.updateTextColor()
+}
+
+func (c *connection) updateDstTxt() {
+	if c.dst == nil {
+		return
+	}
+	nameset := map[string]bool{}
+	for _, c := range c.dst.conns {
+		if c.hidden {
+			nameset[c.src.conntxt.GetText()] = true
+		}
+	}
+	names := []string{}
+	for n := range nameset {
+		names = append(names, n)
+	}
+	sort.StringSlice(names).Sort()
+	dsttxt := c.dst.conntxt
+	dsttxt.SetText(strings.Join(names, ","))
+	dsttxt.Move(Pt(-Width(dsttxt), -Height(dsttxt)/2))
+	c.dst.updateTextColor()
+}
+
+func (p *port) updateTextColor() {
+	if p == nil {
+		return
+	}
+	var focused, focusSrc, editing bool
+	for _, c := range p.conns {
+		if c.focused && c.hidden {
+			focused = true
+			focusSrc = c.focusSrc
+			editing = c.editing
+		}
+	}
+	c := Color{.6, .6, .6, 1}
+	if focused {
+		c = Color{.5, .5, .8, 1}
+		if p.out == focusSrc {
+			c = Color{.3, .3, .7, 1}
+			if editing {
+				c = Color{1, .5, 0, .5}
+			}
+		}
+	}
+	p.conntxt.SetTextColor(c)
+}
+
+func (c *connection) updateTextColors() {
+	c.src.updateTextColor()
+	c.dst.updateTextColor()
+}
+
+func (c *connection) TookKeyFocus() {
+	c.focused = true
+	c.updateTextColors()
+	Repaint(c)
+}
+
+func (c *connection) LostKeyFocus() {
+	c.cancelEditing()
+	c.focused = false
+	c.updateTextColors()
+	Repaint(c)
+}
 
 func (c *connection) KeyPress(event KeyEvent) {
 	if c.editing {
@@ -213,7 +331,7 @@ func (c *connection) KeyPress(event KeyEvent) {
 					if c.focusSrc {
 						src, dst = dst, src
 					}
-					if canConnect(src, dst, c.feedback) {
+					if canConnect(src, dst, c) {
 						ports = append(ports, p2)
 					}
 				}
@@ -295,7 +413,13 @@ func (c *connection) KeyPress(event KeyEvent) {
 			SetKeyFocus(c.dst)
 		}
 	default:
-		c.ViewBase.KeyPress(event)
+		if event.Text == "_" {
+			if c.src.obj.Type != seqType {
+				c.toggleHidden()
+			}
+		} else {
+			c.ViewBase.KeyPress(event)
+		}
 	}
 }
 
@@ -324,7 +448,7 @@ func (c *connection) Mouse(m MouseEvent) {
 		if c.focusSrc {
 			src, dst = dst, src
 		}
-		if src == c.src && dst == c.dst || canConnect(src, dst, c.feedback) {
+		if src == c.src && dst == c.dst || canConnect(src, dst, c) {
 			p = p2
 		}
 	}

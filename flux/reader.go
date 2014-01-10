@@ -18,7 +18,7 @@ func loadFunc(obj types.Object) *funcNode {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, fluxPath(obj), nil, parser.ParseComments)
 	if err == nil {
-		r := &reader{obj.GetPkg(), map[string]*types.Package{}, vars{}, map[string]*localVar{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
+		r := &reader{obj.GetPkg(), map[string]*types.Package{}, map[string]*port{}, map[string][]*connection{}, map[string]*localVar{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
 		for _, i := range file.Imports {
 			path, _ := strconv.Unquote(i.Path.Value)
 			pkg := r.pkg.Imports[path]
@@ -30,7 +30,7 @@ func loadFunc(obj types.Object) *funcNode {
 		}
 		decl := file.Decls[len(file.Decls)-1].(*ast.FuncDecl) // get param and result var names from the source, as the obj names might not match
 		if decl.Recv != nil {
-			r.addVar(decl.Recv.List[0].Names[0].Name, f.inputsNode.newOutput(obj.GetType().(*types.Signature).Recv))
+			r.src(decl.Recv.List[0].Names[0], f.inputsNode.newOutput(obj.GetType().(*types.Signature).Recv))
 		}
 		r.fun(f, decl.Type, decl.Body)
 	} else {
@@ -46,7 +46,8 @@ func loadFunc(obj types.Object) *funcNode {
 type reader struct {
 	pkg       *types.Package
 	pkgNames  map[string]*types.Package
-	vars      vars
+	ports     map[string]*port
+	conns     map[string][]*connection
 	localVars map[string]*localVar
 	cmap      ast.CommentMap
 	seqNodes  map[int]node
@@ -63,7 +64,7 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 
 	for i, p := range typ.Params.List {
 		v := sig.Params[i]
-		r.addVar(p.Names[0].Name, n.inputsNode.newOutput(v))
+		r.src(p.Names[0], n.inputsNode.newOutput(v))
 		f.addPkgRef(v.Type)
 	}
 	var results []*ast.Field
@@ -71,19 +72,16 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 		results = r.List
 	}
 	for i, p := range results {
-		r.vars[p.Names[0].Name] = &var_{}
+		r.conns[p.Names[0].Name] = []*connection{}
 		f.addPkgRef(sig.Results[i].Type)
 	}
 	r.block(n.funcblk, body.List)
 	for i, p := range results {
-		r.connect(p.Names[0].Name, n.outputsNode.newInput(sig.Results[i]))
+		r.dst(p.Names[0], n.outputsNode.newInput(sig.Results[i]))
 	}
 }
 
 func (r *reader) block(b *block, s []ast.Stmt) {
-	oldvars := r.vars
-	r.vars = r.vars.copy()
-
 	for _, s := range s {
 		switch s := s.(type) {
 		case *ast.AssignStmt:
@@ -97,7 +95,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					n := r.callOrConvert(b, x)
 					outs := outs(n)
 					for i, lhs := range s.Lhs {
-						r.addVar(name(lhs), outs[i])
+						r.src(lhs, outs[i])
 					}
 					r.seq(n, s)
 				case *ast.IndexExpr:
@@ -116,46 +114,50 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					case token.NOT:
 						n := newOperatorNode(&types.Func{Name: x.Op.String()})
 						b.addNode(n)
-						r.connect(name(x.X), n.ins[0])
-						r.addVar(name(s.Lhs[0]), n.outs[0])
+						r.dst(x.X, n.ins[0])
+						r.src(s.Lhs[0], n.outs[0])
 					}
 				case *ast.BinaryExpr:
 					n := newOperatorNode(&types.Func{Name: x.Op.String()})
 					b.addNode(n)
-					r.connect(name(x.X), n.ins[0])
-					r.connect(name(x.Y), n.ins[1])
-					r.addVar(name(s.Lhs[0]), n.outs[0])
+					r.dst(x.X, n.ins[0])
+					r.dst(x.Y, n.ins[1])
+					r.src(s.Lhs[0], n.outs[0])
 				case *ast.TypeAssertExpr:
 					n := newTypeAssertNode()
 					b.addNode(n)
 					n.setType(r.typ(x.Type))
-					r.connect(name(x.X), n.ins[0])
-					r.addVar(name(s.Lhs[0]), n.outs[0])
-					r.addVar(name(s.Lhs[1]), n.outs[1])
+					r.dst(x.X, n.ins[0])
+					r.src(s.Lhs[0], n.outs[0])
+					r.src(s.Lhs[1], n.outs[1])
 				case *ast.FuncLit:
 					n := newFuncNode(nil, b.childArranged)
 					b.addNode(n)
 					n.output.setType(r.typ(x.Type))
-					r.addVar(name(s.Lhs[0]), n.output)
+					r.src(s.Lhs[0], n.output)
 					r.fun(n, x.Type, x.Body)
 				}
 			} else {
-				if x, ok := s.Lhs[0].(*ast.IndexExpr); ok {
-					r.index(b, x, s.Rhs[0], true, s)
-				} else if id, ok := s.Lhs[0].(*ast.Ident); !ok || r.vars[id.Name] == nil {
-					r.value(b, s.Lhs[0], s.Rhs[0], true, s)
+				lh := s.Lhs[0]
+				rh := s.Rhs[0]
+				if x, ok := lh.(*ast.IndexExpr); ok {
+					r.index(b, x, rh, true, s)
+				} else if id, ok := lh.(*ast.Ident); !ok || r.conns[id.Name] == nil {
+					r.value(b, lh, rh, true, s)
 				} else {
-					for i := range s.Lhs {
-						lh := name(s.Lhs[i])
-						rh := name(s.Rhs[i])
-						if dst := r.vars[lh].dst; dst != nil {
-							c := newConnection()
-							c.feedback = true
-							c.setSrc(r.vars[rh].srcs[0])
-							c.setDst(dst)
-						} else {
-							r.vars[lh].srcs = append(r.vars[lh].srcs, r.vars[rh].srcs[0])
-						}
+					c := newConnection()
+					lh := name(lh)
+					rh := name(rh)
+					c.setSrc(r.ports[rh])
+					if cmt, ok := r.cmap[s]; ok {
+						c.src.conntxt.SetText(cmt[0].List[0].Text[2:])
+						c.toggleHidden()
+					}
+					if p, ok := r.ports[lh]; ok {
+						c.feedback = true
+						c.setDst(p)
+					} else {
+						r.conns[lh] = append(r.conns[lh], c)
 					}
 				}
 			}
@@ -172,9 +174,9 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					lv.refs = map[*valueNode]bool{}
 					r.localVars[name] = lv
 				} else if v.Type != nil {
-					r.vars[name] = &var_{typ: r.typ(v.Type)}
+					r.conns[name] = []*connection{}
 				} else {
-					r.addVar(name, b.node.(*loopNode).inputsNode.outs[1])
+					r.src(v.Names[0], b.node.(*loopNode).inputsNode.outs[1])
 				}
 			case token.CONST:
 				switch x := v.Values[0].(type) {
@@ -190,7 +192,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 						text, _ := strconv.Unquote(x.Value)
 						n.text.SetText(text)
 					}
-					r.addVar(name(v.Names[0]), n.outs[0])
+					r.src(v.Names[0], n.outs[0])
 				case *ast.Ident, *ast.SelectorExpr:
 					r.value(b, x, v.Names[0], false, s)
 				}
@@ -199,17 +201,17 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			n := newLoopNode(b.childArranged)
 			b.addNode(n)
 			if s.Cond != nil {
-				r.connect(name(s.Cond.(*ast.BinaryExpr).Y), n.input)
+				r.dst(s.Cond.(*ast.BinaryExpr).Y, n.input)
 			}
 			if s.Init != nil {
-				r.addVar(name(s.Init.(*ast.AssignStmt).Lhs[0]), n.inputsNode.outs[0])
+				r.src(s.Init.(*ast.AssignStmt).Lhs[0], n.inputsNode.outs[0])
 			}
 			r.block(n.loopblk, s.Body.List)
 			r.seq(n, s)
 		case *ast.IfStmt:
 			n := newIfNode(b.childArranged)
 			b.addNode(n)
-			r.connect(name(s.Cond), n.input)
+			r.dst(s.Cond, n.input)
 			r.block(n.trueblk, s.Body.List)
 			if s.Else != nil {
 				r.block(n.falseblk, s.Else.(*ast.BlockStmt).List)
@@ -218,10 +220,10 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 		case *ast.RangeStmt:
 			n := newLoopNode(b.childArranged)
 			b.addNode(n)
-			r.connect(name(s.X), n.input)
-			r.addVar(name(s.Key), n.inputsNode.outs[0])
+			r.dst(s.X, n.input)
+			r.src(s.Key, n.inputsNode.outs[0])
 			if s.Value != nil {
-				r.addVar(name(s.Value), n.inputsNode.outs[1])
+				r.src(s.Value, n.inputsNode.outs[1])
 			}
 			r.block(n.loopblk, s.Body.List)
 			r.seq(n, s)
@@ -233,8 +235,6 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			r.seq(n, s)
 		}
 	}
-
-	r.vars = oldvars
 }
 
 func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
@@ -245,14 +245,14 @@ func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
 	b.addNode(n)
 	switch x := x.(type) {
 	case *ast.SelectorExpr:
-		r.connect(name(x.X), n.x)
+		r.dst(x.X, n.x)
 	case *ast.StarExpr:
-		r.connect(name(x.X), n.x)
+		r.dst(x.X, n.x)
 	}
 	if set {
-		r.connect(name(y), n.y)
+		r.dst(y, n.y)
 	} else {
-		r.addVar(name(y), n.y)
+		r.src(y, n.y)
 	}
 	r.seq(n, an)
 }
@@ -262,7 +262,7 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
 		n := newConvertNode()
 		b.addNode(n)
 		n.setType(r.typ(p.X))
-		r.connect(name(x.Args[0]), n.ins[0])
+		r.dst(x.Args[0], n.ins[0])
 		return n
 	}
 
@@ -285,7 +285,7 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
 	for i, arg := range args {
 		// ins(n) must be called on each iteration because making a connection may
 		// cause inputs to change, in particular in the case of calling a func value
-		r.connect(name(arg), ins(n)[i])
+		r.dst(arg, ins(n)[i])
 	}
 	return n
 }
@@ -302,30 +302,29 @@ elts:
 	for _, elt := range x.Elts {
 		elt := elt.(*ast.KeyValueExpr)
 		field := name(elt.Key)
-		val := name(elt.Value)
 		for _, in := range n.ins {
 			if in.obj.GetName() == field {
-				r.connect(val, in)
+				r.dst(elt.Value, in)
 				continue elts
 			}
 		}
 		panic("no field matching " + field)
 	}
-	r.addVar(name(s.Lhs[0]), n.outs[0])
+	r.src(s.Lhs[0], n.outs[0])
 }
 
 func (r *reader) index(b *block, x *ast.IndexExpr, y ast.Expr, set bool, s *ast.AssignStmt) {
 	n := newIndexNode(set)
 	b.addNode(n)
-	r.connect(name(x.X), n.x)
-	r.connect(name(x.Index), n.key)
+	r.dst(x.X, n.x)
+	r.dst(x.Index, n.key)
 	if set {
-		r.connect(name(y), n.inVal)
+		r.dst(y, n.inVal)
 	} else {
-		r.addVar(name(y), n.outVal)
+		r.src(y, n.outVal)
 	}
 	if len(s.Lhs) == 2 {
-		r.addVar(name(s.Lhs[1]), n.ok)
+		r.src(s.Lhs[1], n.ok)
 	}
 	r.seq(n, s)
 }
@@ -350,7 +349,7 @@ func (r *reader) obj(x ast.Expr) types.Object {
 			return pkg.Scope.Lookup(n2)
 		}
 		// TODO: use types.LookupFieldOrMethod()
-		t := r.vars[n1].typ
+		t := r.conns[n1][0].src.obj.Type
 		for {
 			if p, ok := t.(*types.Pointer); ok {
 				t = p.Base
@@ -424,27 +423,21 @@ func (r *reader) typ(x ast.Expr) types.Type {
 	panic("not yet implemented")
 }
 
-func (r *reader) connect(name string, dst *port) {
-	if v, ok := r.vars[name]; ok { // ignore literals (0, nil, "")
-		for _, src := range v.srcs {
-			c := newConnection()
-			c.setSrc(src)
-			c.setDst(dst)
-		}
-		v.dst = dst
-	}
+func (r *reader) src(x ast.Expr, src *port) {
+	r.ports[name(x)] = src
 }
 
-func (r *reader) addVar(name string, out *port) {
-	if name != "" && name != "_" {
-		r.vars[name] = &var_{[]*port{out}, out.obj.Type, nil}
+func (r *reader) dst(x ast.Expr, dst *port) {
+	name := name(x)
+	for _, c := range r.conns[name] {
+		c.setDst(dst)
 	}
+	r.ports[name] = dst //for feedback conns
 }
 
 func (r *reader) seq(n node, an ast.Node) {
 	if c, ok := r.cmap[an]; ok {
-		txt := c[0].Text()
-		s := strings.Split(txt[:len(txt)-1], ";")
+		s := strings.Split(c[0].List[0].Text[2:], ";")
 		seqIn := seqIn(n)
 		for _, s := range strings.Split(s[0], ",") {
 			if id, err := strconv.Atoi(s); err == nil {
@@ -467,19 +460,4 @@ func name(x ast.Expr) string {
 		return name(x.X)
 	}
 	return ""
-}
-
-type vars map[string]*var_
-type var_ struct {
-	srcs []*port
-	typ  types.Type
-	dst  *port
-}
-
-func (v vars) copy() vars {
-	v2 := vars{}
-	for n, x := range v {
-		v2[n] = x
-	}
-	return v2
 }

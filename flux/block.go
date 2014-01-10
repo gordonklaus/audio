@@ -132,6 +132,7 @@ func (b *block) addConn(c *connection) {
 
 func (b *block) removeConn(c *connection) {
 	c.disconnect()
+	b = c.blk //disconnect might change c.blk
 	delete(b.conns, c)
 	b.Remove(c)
 	rearrange(b)

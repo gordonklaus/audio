@@ -1,11 +1,12 @@
 TODO
 
-- wireless connections
 - consider handling addressability as Go does:  addressable expressions don't return a pointer (but the implementation takes the address and automatically dereferences as necessary).  would make for cleaner UI (not pointers everywhere) and avoid the issue of having to know whether to automatically dereference when comparing with untyped nil.
 - shortcuts:
   - on an out port, press '.' to select a field or method
   - on an in port, press '{' to create a composite literal of the port's type
   - on a node or connection, press cmd-R(cmd-I?) to bring up a browser with funcs and ops suitable to insert, i.e., having a signature compatible with the existing node's connections
+- make gui.Text change its appearance based on content when a validator is present.  give validator 3 states:  Acceptable, Intermediate, Invalid.
+- use go/parser and go/ast to validate basic literals
 - dimly highlight connected ports when a port is focused (or only when a key, e.g. Shift, is pressed) (but always for wireless conns)
 - don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.
 - make connectionBundles to reduce wire clutter?  each port has at most one connectionBundle that branches off connections near each port it connects to.  or don't add a new object, just draw connections coincident that originate at the same port.  especially bundle coincident connections that cross block boundaries.

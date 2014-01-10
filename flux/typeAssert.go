@@ -17,7 +17,12 @@ type typeAssertNode struct {
 func newTypeAssertNode() *typeAssertNode {
 	n := &typeAssertNode{}
 	n.nodeBase = newNodeBase(n)
-	n.newInput(&types.Var{})
+	in := n.newInput(&types.Var{})
+	in.connsChanged = func() {
+		if len(in.conns) > 0 {
+			in.setType(in.conns[0].src.obj.Type)
+		}
+	}
 	v := &types.Var{}
 	n.newOutput(v)
 	n.newOutput(&types.Var{Name: "ok", Type: types.Typ[types.Bool]})

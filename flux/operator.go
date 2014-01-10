@@ -29,6 +29,7 @@ func newOperatorNode(obj types.Object) *operatorNode {
 	case "+", "-", "*", "/", "%", "&", "|", "^", "&^", "&&", "||":
 		f := func() {
 			t := combineInputTypes(ins(n))
+			t = untypedToTyped(t)
 			for _, p := range ins(n) {
 				p.setType(t)
 			}
@@ -78,4 +79,27 @@ func combineInputTypes(p []*port) (t types.Type) {
 func isUntyped(t types.Type) bool {
 	b, ok := t.(*types.Basic)
 	return ok && b.Info&types.IsUntyped != 0
+}
+
+func untypedToTyped(t types.Type) types.Type {
+	b, ok := t.(*types.Basic)
+	if !ok {
+		return t
+	}
+	switch b.Kind {
+	case types.UntypedBool:
+		return types.Typ[types.Bool]
+	case types.UntypedInt:
+		return types.Typ[types.Int]
+	case types.UntypedRune:
+		return types.Typ[types.Rune]
+	case types.UntypedFloat:
+		return types.Typ[types.Float64]
+	case types.UntypedComplex:
+		return types.Typ[types.Complex128]
+	case types.UntypedString:
+		return types.Typ[types.String]
+	default:
+		return t
+	}
 }

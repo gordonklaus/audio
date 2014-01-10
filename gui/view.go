@@ -220,9 +220,9 @@ func (v *ViewBase) paint() {
 }
 func (v ViewBase) Paint() {}
 
-func Do(v View, f func()) {
+func Do(v View) chan<- func() {
 	if w := v.win(); w != nil {
-		go func() { w.do <- f }()
+		return w.do
 	} else {
 		panic("Do called on windowless View")
 	}

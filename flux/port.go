@@ -7,6 +7,8 @@ package main
 import (
 	"code.google.com/p/go.exp/go/types"
 	. "code.google.com/p/gordon-go/gui"
+	"go/ast"
+	"go/parser"
 	"math"
 )
 
@@ -19,6 +21,8 @@ type port struct {
 	conns        []*connection
 	focused      bool
 	connsChanged func()
+
+	conntxt *TextBase
 }
 
 const portSize = 11.0
@@ -34,7 +38,19 @@ func newPort(out bool, n node, v *types.Var) *port {
 	p.Add(p.valView)
 	p.SetRect(ZR.Inset(-portSize / 2))
 	p.setType(*p.valView.typ)
+
+	p.conntxt = NewText("")
+	p.conntxt.Move(Pt(0, -Height(p.conntxt)/2))
+	p.conntxt.SetBackgroundColor(Color{0, 0, 0, 0})
+	p.conntxt.SetValidator(validateID)
+	p.Add(p.conntxt)
 	return p
+}
+
+func validateID(text *string) bool {
+	x, err := parser.ParseExpr(*text)
+	_, ok := x.(*ast.Ident)
+	return *text == "" || err == nil && ok
 }
 
 func (p *port) setType(t types.Type) {
@@ -46,12 +62,19 @@ func (p *port) setType(t types.Type) {
 	}
 }
 
-func canConnect(src, dst *port, feedback bool) bool {
+func canConnect(src, dst *port, c *connection) bool {
 	if src.out == dst.out {
 		return false
 	}
 	for _, c := range src.conns {
 		if c.dst == dst {
+			return false
+		}
+	}
+	if c.hidden && src != c.src && c.src != nil {
+		oldtxt := c.src.conntxt.GetText()
+		newtxt := src.conntxt.GetText()
+		if newtxt != "" && newtxt != oldtxt {
 			return false
 		}
 	}
@@ -75,7 +98,7 @@ func canConnect(src, dst *port, feedback bool) bool {
 			break
 		}
 	}
-	if feedback {
+	if c.feedback {
 		for b := n1.block(); ; b = b.outer() {
 			if b == nil {
 				return false

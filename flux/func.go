@@ -54,7 +54,7 @@ func newFuncNode(obj types.Object, arranged blockchan) *funcNode {
 func (n *funcNode) Close() {
 	if !n.literal {
 		n.funcblk.close()
-		close(n.stop)
+		n.stop.stop()
 		saveFunc(n)
 		n.done()
 	}
