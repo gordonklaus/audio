@@ -71,13 +71,6 @@ func canConnect(src, dst *port, c *connection) bool {
 			return false
 		}
 	}
-	if c.hidden && src != c.src && c.src != nil {
-		oldtxt := c.src.conntxt.GetText()
-		newtxt := src.conntxt.GetText()
-		if newtxt != "" && newtxt != oldtxt {
-			return false
-		}
-	}
 	// TODO: types.IsAssignableTo(src.obj.Type, dst.obj.Type) (handles seqType, too?)
 	if (src.obj.Type == seqType) != (dst.obj.Type == seqType) {
 		return false

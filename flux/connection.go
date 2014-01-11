@@ -156,6 +156,9 @@ func (c *connection) focus(focusSrc bool) {
 
 func (c *connection) startEditing() {
 	if c.focusSrc {
+		if c.hidden {
+			return // TODO: alternately, edit all hidden connections simultaneously?
+		}
 		c.savedPort = c.src
 	} else {
 		c.savedPort = c.dst
@@ -206,9 +209,14 @@ func (c *connection) toggleHidden() {
 					}
 				}
 			}
-			srctxt.Accept = func(text string) {
-				// TODO: reject duplicate names
-				if text == "" {
+			srctxt.Accept = func(name string) {
+				names := map[string]bool{"": true}
+				c.blk.outermost().walk(nil, nil, func(conn *connection) {
+					if conn != c {
+						names[conn.src.conntxt.GetText()] = true
+					}
+				})
+				if names[name] {
 					SetKeyFocus(srctxt)
 				} else {
 					c.focus(c.focusSrc)
