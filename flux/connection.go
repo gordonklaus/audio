@@ -212,7 +212,7 @@ func (c *connection) toggleHidden() {
 			srctxt.Accept = func(name string) {
 				names := map[string]bool{"": true}
 				c.blk.outermost().walk(nil, nil, func(conn *connection) {
-					if conn != c {
+					if conn.src != c.src {
 						names[conn.src.conntxt.GetText()] = true
 					}
 				})
