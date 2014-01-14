@@ -108,7 +108,7 @@ func (w *Window) run() {
 		keyEvent.Alt = mods&glfw.ModAlt != 0
 		keyEvent.Super = mods&glfw.ModSuper != 0
 		keyEvent.Command = commandKey(keyEvent)
-		if key >= KeyEscape || action == Release {
+		if key >= KeyEscape || action == glfw.Release {
 			keyEvent.Text = ""
 			w.key <- keyEvent
 		}
@@ -173,7 +173,7 @@ func (w *Window) run() {
 				}
 			case k := <-w.key:
 				if w.keyFocus != nil {
-					if k.action != Release {
+					if k.action != glfw.Release {
 						w.keyFocus.KeyPress(k)
 					} else {
 						w.keyFocus.KeyRelease(k)

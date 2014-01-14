@@ -1,13 +1,5 @@
 package gui
 
-import "code.google.com/p/gordon-go/glfw"
-
-const (
-	Release = glfw.Release
-	Press   = glfw.Press
-	Repeat  = glfw.Repeat
-)
-
 const (
 	KeySpace        = 32
 	KeyApostrophe   = 39
