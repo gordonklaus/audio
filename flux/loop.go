@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 )
 
@@ -29,10 +29,10 @@ func newLoopNode(arranged blockchan) *loopNode {
 	MoveCenter(n.input, Pt(-portSize/2, 0))
 	n.Add(n.input)
 
-	n.seqIn = newInput(n, &types.Var{Name: "seq", Type: seqType})
+	n.seqIn = newInput(n, newVar("seq", seqType))
 	MoveCenter(n.seqIn, Pt(portSize/2, 0))
 	n.Add(n.seqIn)
-	n.seqOut = newOutput(n, &types.Var{Name: "seq", Type: seqType})
+	n.seqOut = newOutput(n, newVar("seq", seqType))
 	n.Add(n.seqOut)
 
 	n.loopblk = newBlock(n, arranged)
@@ -63,8 +63,8 @@ func (n *loopNode) updateInputType() {
 			ptr := false
 			t, ptr = indirect(p.obj.Type)
 			u = t
-			if n, ok := t.(*types.NamedType); ok {
-				u = n.Underlying
+			if n, ok := t.(*types.Named); ok {
+				u = n.UnderlyingT
 			}
 			switch u := u.(type) {
 			case *types.Basic:
@@ -74,17 +74,17 @@ func (n *loopNode) updateInputType() {
 					key = u
 				}
 			case *types.Array:
-				elt = u.Elt
+				elt = u.Elem
 				if ptr {
 					t = p.obj.Type
-					elt = &types.Pointer{elt}
+					elt = &types.Pointer{Elem: elt}
 				}
 			case *types.Slice:
-				elt = &types.Pointer{u.Elt}
+				elt = &types.Pointer{Elem: u.Elem}
 			case *types.Map:
-				key, elt = u.Key, u.Elt
+				key, elt = u.Key, u.Elem
 			case *types.Chan:
-				key = u.Elt
+				key = u.Elem
 			}
 		}
 	}

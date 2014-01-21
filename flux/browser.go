@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	"fmt"
 	"go/ast"
@@ -111,24 +111,10 @@ func (p buildPackage) GetName() string {
 	return path.Base(p.Dir)
 }
 
-type method struct {
-	types.Object
-	*types.Method
-}
-
-func (m method) GetName() string        { return m.Name }
-func (m method) GetType() types.Type    { return m.Type }
-func (m method) GetPkg() *types.Package { return m.Pkg }
-
 type field struct {
-	types.Object
-	*types.Field
+	*types.Var
 	recv types.Type
 }
-
-func (f field) GetName() string        { return f.Name }
-func (f field) GetType() types.Type    { return f.Type }
-func (f field) GetPkg() *types.Package { return f.Pkg }
 
 type objects []types.Object
 
@@ -155,11 +141,11 @@ func objLess(o1, o2 types.Object) bool {
 		default:
 			return true
 		}
-	case *types.Func, method:
+	case *types.Func, *types.Builtin:
 		switch o2.(type) {
 		case special, *types.TypeName:
 			return false
-		case *types.Func, method:
+		case *types.Func, *types.Builtin:
 			return n1 < n2
 		default:
 			return true
@@ -170,14 +156,14 @@ func objLess(o1, o2 types.Object) bool {
 			return false
 		case *types.Var, field, *localVar:
 			return n1 < n2
-		case *types.Const, buildPackage:
+		case *types.Const, *types.Nil, buildPackage:
 			return true
 		}
-	case *types.Const:
+	case *types.Const, *types.Nil:
 		switch o2.(type) {
 		default:
 			return false
-		case *types.Const:
+		case *types.Const, *types.Nil:
 			return n1 < n2
 		case buildPackage:
 			return true
@@ -215,11 +201,11 @@ func (b browser) filteredObjs() (objs []types.Object) {
 					if !ok {
 						return
 					}
-					t, ok := obj.Type.(*types.NamedType)
+					t, ok := obj.GetType().(*types.Named)
 					if !ok {
 						return
 					}
-					switch t.Underlying.(type) {
+					switch t.UnderlyingT.(type) {
 					default:
 						return
 					case *types.Array, *types.Slice, *types.Map, *types.Struct:
@@ -237,11 +223,11 @@ func (b browser) filteredObjs() (objs []types.Object) {
 					if !ok {
 						return
 					}
-					t, ok := obj.Type.(*types.NamedType)
+					t, ok := obj.GetType().(*types.Named)
 					if !ok {
 						return
 					}
-					switch t.Underlying.(type) {
+					switch t.UnderlyingT.(type) {
 					default:
 						return
 					case *types.Slice, *types.Map, *types.Chan:
@@ -290,15 +276,15 @@ func (b browser) filteredObjs() (objs []types.Object) {
 			pkgs = append(pkgs, b.currentPkg)
 		}
 		for _, p := range pkgs {
-			for _, obj := range p.Scope.Entries {
+			for _, obj := range p.Scope().Objects {
 				add(obj)
 			}
 		}
-		for _, obj := range types.Universe.Entries {
+		for _, obj := range types.Universe.Objects {
 			add(obj)
 		}
-		for _, s := range []string{"+", "-", "*", "/", "%", "&", "|", "^", "&^", "&&", "||", "!", "==", "!=", "<", "<=", ">", ">="} {
-			add(&types.Func{Name: s})
+		for _, op := range []string{"+", "-", "*", "/", "%", "&", "|", "^", "&^", "&&", "||", "!", "==", "!=", "<", "<=", ">", ">="} {
+			add(types.NewFunc(0, nil, op, nil))
 		}
 		for _, t := range []*types.TypeName{protoPointer, protoArray, protoSlice, protoMap, protoChan, protoFunc, protoInterface, protoStruct} {
 			add(t)
@@ -317,31 +303,31 @@ func (b browser) filteredObjs() (objs []types.Object) {
 		switch obj := b.path[0].(type) {
 		case buildPackage:
 			if pkg, err := getPackage(obj.ImportPath); err == nil {
-				for _, obj := range pkg.Scope.Entries {
+				for _, obj := range pkg.Scope().Objects {
 					add(obj)
 				}
 			} else {
 				if _, ok := err.(*build.NoGoError); !ok {
 					fmt.Println(err)
 				}
-				pkgs[obj.ImportPath] = &types.Package{Name: obj.GetName(), Path: obj.ImportPath, Scope: &types.Scope{}}
+				pkgs[obj.ImportPath] = types.NewPackage(obj.ImportPath, obj.GetName(), &types.Scope{})
 			}
 			addPkgs(obj.Dir)
 		case *types.TypeName:
 			// TODO: use types.NewMethodSet to get the entire method set
 			// TODO: shouldn't go/types also have a NewFieldSet?
-			if nt, ok := obj.Type.(*types.NamedType); ok {
+			if nt, ok := obj.Type.(*types.Named); ok {
 				for _, m := range nt.Methods {
-					add(method{nil, m})
+					add(m)
 				}
-				switch ut := nt.Underlying.(type) {
+				switch ut := nt.UnderlyingT.(type) {
 				case *types.Struct:
 					for _, f := range ut.Fields {
-						add(field{nil, f, nt})
+						add(field{f, nt})
 					}
 				case *types.Interface:
 					for _, m := range ut.Methods {
-						add(method{nil, m})
+						add(m)
 					}
 				}
 			}
@@ -424,8 +410,6 @@ ok:
 		case *types.TypeName:
 			obj.Name = text
 		case *types.Func:
-			obj.Name = text
-		case method:
 			obj.Name = text
 		case *types.Var:
 			obj.Name = text
@@ -514,7 +498,7 @@ ok:
 		t := b.pkgNameText
 		t.SetText(pkg.Name)
 		t.Move(Pt(xOffset+width+16, yOffset-(Height(t)-Height(b.text))/2))
-		if pkg.Name != path.Base(pkg.Dir) {
+		if pkg.Name != pkg.GetName() {
 			Show(t)
 		} else {
 			Hide(t)
@@ -526,11 +510,11 @@ ok:
 		b.text.SetTextColor(color(cur, true, b.funcAsVal))
 		switch cur := cur.(type) {
 		case *types.TypeName:
-			if t, ok := cur.Type.(*types.NamedType); ok {
-				b.typeView = newTypeView(&t.Underlying)
+			if t, ok := cur.GetType().(*types.Named); ok {
+				b.typeView = newTypeView(&t.UnderlyingT)
 				b.Add(b.typeView)
 			}
-		case *types.Func, method, *types.Var, *types.Const, field:
+		case *types.Func, *types.Var, *types.Const, field:
 			t := cur.GetType()
 			b.typeView = newTypeView(&t)
 			b.Add(b.typeView)
@@ -636,16 +620,18 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 					panic(err)
 				}
 			case *types.TypeName, *types.Func, *types.Var, *types.Const:
+				if isMethod(obj) {
+					recv := b.path[0].(*types.TypeName).Type.(*types.Named)
+					recv.Methods = append(recv.Methods, obj.(*types.Func))
+					break
+				}
 				pkg := b.currentPkg
 				if len(b.path) > 0 {
 					pkg = pkgs[b.path[0].(buildPackage).ImportPath]
 				}
 				if pkg != nil {
-					pkg.Scope.Insert(obj)
+					pkg.Scope().Insert(obj)
 				}
-			case method:
-				t := b.path[0].(*types.TypeName).Type.(*types.NamedType)
-				t.Methods = append(t.Methods, obj.Method)
 			case *localVar:
 				v := b.typeView
 				b.finished = true // hack to avoid cancelling browser when it loses keyboard focus
@@ -751,19 +737,19 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 			case "1":
 				b.newObj = buildPackage{nil, &build.Package{}}
 			case "2":
-				t := &types.TypeName{Pkg: pkg}
-				t.Type = &types.NamedType{Obj: t}
+				t := types.NewTypeName(0, pkg, "", nil)
+				t.Type = &types.Named{Obj: t}
 				b.newObj = t
 			case "3":
+				sig := &types.Signature{}
 				if recv != nil {
-					b.newObj = method{nil, &types.Method{QualifiedName: types.QualifiedName{Pkg: pkg}, Type: &types.Signature{Recv: &types.Var{Type: &types.Pointer{recv.Type}}}}}
-				} else {
-					b.newObj = &types.Func{Pkg: pkg, Type: &types.Signature{}}
+					sig.Recv = newVar("", &types.Pointer{Elem: recv.Type})
 				}
+				b.newObj = types.NewFunc(0, pkg, "", sig)
 			case "4":
-				b.newObj = &types.Var{Pkg: pkg}
+				b.newObj = types.NewVar(0, pkg, "", nil)
 			case "5":
-				b.newObj = &types.Const{Pkg: pkg}
+				b.newObj = types.NewConst(0, pkg, "", nil, nil)
 			default:
 				t.TextBase.KeyPress(event)
 				return
@@ -795,26 +781,26 @@ func color(obj types.Object, bright, funcAsVal bool) Color {
 		return Color{1, 1, 1, alpha}
 	case *types.TypeName:
 		return Color{.6, 1, .6, alpha}
-	case *types.Func, method:
+	case *types.Func, *types.Builtin:
 		if funcAsVal && obj.GetPkg() != nil { //Pkg==nil == builtin
 			return color(&types.Var{}, bright, funcAsVal)
 		}
 		return Color{1, .6, .6, alpha}
-	case *types.Var, *types.Const, field, *localVar:
+	case *types.Var, *types.Const, *types.Nil, field, *localVar:
 		return Color{.6, .6, 1, alpha}
 	}
-	panic(fmt.Sprintf("unknown object %#v", obj))
+	panic(fmt.Sprintf("unknown object type %T", obj))
 }
 
 var (
-	protoPointer   = &types.TypeName{Name: "pointer"}
-	protoArray     = &types.TypeName{Name: "array"}
-	protoSlice     = &types.TypeName{Name: "slice"}
-	protoMap       = &types.TypeName{Name: "map"}
-	protoChan      = &types.TypeName{Name: "chan"}
-	protoFunc      = &types.TypeName{Name: "func"}
-	protoInterface = &types.TypeName{Name: "interface"}
-	protoStruct    = &types.TypeName{Name: "struct"}
+	protoPointer   = types.NewTypeName(0, nil, "pointer", nil)
+	protoArray     = types.NewTypeName(0, nil, "array", nil)
+	protoSlice     = types.NewTypeName(0, nil, "slice", nil)
+	protoMap       = types.NewTypeName(0, nil, "map", nil)
+	protoChan      = types.NewTypeName(0, nil, "chan", nil)
+	protoFunc      = types.NewTypeName(0, nil, "func", nil)
+	protoInterface = types.NewTypeName(0, nil, "interface", nil)
+	protoStruct    = types.NewTypeName(0, nil, "struct", nil)
 )
 
 func newProtoType(t *types.TypeName) (p types.Type) {
@@ -828,7 +814,7 @@ func newProtoType(t *types.TypeName) (p types.Type) {
 	case protoMap:
 		p = &types.Map{}
 	case protoChan:
-		p = &types.Chan{Dir: ast.SEND | ast.RECV}
+		p = &types.Chan{Dir: types.SendRecv}
 	case protoFunc:
 		p = &types.Signature{}
 	case protoInterface:

@@ -5,10 +5,9 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	. "code.google.com/p/gordon-go/util"
-	"go/ast"
 	"go/token"
 	"math"
 	"strconv"
@@ -93,9 +92,9 @@ func (n *nodeBase) newOutput(v *types.Var) *port {
 }
 
 func (n *nodeBase) addSeqPorts() {
-	seqIn := n.newInput(&types.Var{Name: "seq", Type: seqType})
+	seqIn := n.newInput(newVar("seq", seqType))
 	MoveCenter(seqIn, Pt(-8, 0))
-	seqOut := n.newOutput(&types.Var{Name: "seq", Type: seqType})
+	seqOut := n.newOutput(newVar("seq", seqType))
 	MoveCenter(seqOut, Pt(8, 0))
 }
 
@@ -342,15 +341,15 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 		n.blk.func_().addPkgRef(t)
 		t, _ = indirect(t)
 		local := true
-		if nt, ok := t.(*types.NamedType); ok {
-			t = nt.Underlying
+		if nt, ok := t.(*types.Named); ok {
+			t = nt.UnderlyingT
 			local = nt.Obj.Pkg == n.blk.func_().pkg()
 		}
 		switch t := t.(type) {
 		case *types.Struct:
 			for _, f := range t.Fields {
-				if local || fieldIsExported(f) {
-					n.newInput(&types.Var{Pkg: f.Pkg, Name: f.Name, Type: f.Type})
+				if local || f.IsExported() {
+					n.newInput(f)
 				}
 			}
 		case *types.Slice:
@@ -361,14 +360,4 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 		MoveCenter(n.typ, Pt(0, Rect(n).Max.Y+Height(n.typ)/2))
 		SetKeyFocus(n)
 	}
-}
-
-// TODO: go/types will do this for me
-func fieldIsExported(f *types.Field) bool {
-	name := f.Name
-	if name == "" {
-		t, _ := indirect(f.Type)
-		name = t.(*types.NamedType).Obj.Name
-	}
-	return ast.IsExported(name)
 }

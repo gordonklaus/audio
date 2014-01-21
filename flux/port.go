@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	"go/ast"
 	"go/parser"
@@ -268,9 +268,9 @@ func (p *port) KeyPress(event KeyEvent) {
 	default:
 		if pn, ok := p.node.(*portsNode); ok && p.out && pn.outs[0] == p && event.Text == "*" {
 			if t, ok := p.obj.Type.(*types.Pointer); ok {
-				p.setType(t.Base)
+				p.setType(t.Elem)
 			} else {
-				p.setType(&types.Pointer{p.obj.Type})
+				p.setType(&types.Pointer{Elem: p.obj.Type})
 			}
 		} else {
 			p.ViewBase.KeyPress(event)

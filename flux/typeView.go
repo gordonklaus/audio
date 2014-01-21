@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	"fmt"
 	"math"
@@ -41,12 +41,14 @@ func newValueView(val types.Object) *typeView {
 	switch val := val.(type) {
 	case *types.Var:
 		t, name = &val.Type, &val.Name
-	case method:
-		m := types.Type(val.Type)
-		t, name = &m, &val.Name
+	case *types.Func:
+		if isMethod(val) {
+			m := types.Type(val.Type)
+			t, name = &m, &val.Name
+		}
 	case field:
 		t = &val.Type
-		if !val.IsAnonymous {
+		if !val.Anonymous {
 			name = &val.Name
 		}
 	}
@@ -72,28 +74,28 @@ func (v *typeView) setType(t types.Type) {
 		s = "<T>"
 	case *types.Basic:
 		s = t.Name
-	case *types.NamedType:
+	case *types.Named:
 		s = t.Obj.Name
 	case *types.Pointer:
 		s = "*"
-		v.childTypes.right = []*typeView{newTypeView(&t.Base)}
+		v.childTypes.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Array:
 		s = fmt.Sprintf("[%d]", t.Len)
-		v.childTypes.right = []*typeView{newTypeView(&t.Elt)}
+		v.childTypes.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Slice:
 		s = "[]"
-		v.childTypes.right = []*typeView{newTypeView(&t.Elt)}
+		v.childTypes.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Chan:
 		s = "chan"
-		v.childTypes.right = []*typeView{newTypeView(&t.Elt)}
+		v.childTypes.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Map:
 		s = ":"
 		v.childTypes.left = []*typeView{newTypeView(&t.Key)}
-		v.childTypes.right = []*typeView{newTypeView(&t.Elt)}
+		v.childTypes.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Struct:
 		s = "struct"
 		for _, f := range t.Fields {
-			v.childTypes.right = append(v.childTypes.right, newValueView(field{nil, f, nil}))
+			v.childTypes.right = append(v.childTypes.right, newValueView(field{f, nil}))
 		}
 	case *types.Signature:
 		s = "func"
@@ -106,7 +108,7 @@ func (v *typeView) setType(t types.Type) {
 	case *types.Interface:
 		s = "interface"
 		for _, m := range t.Methods {
-			v.childTypes.right = append(v.childTypes.right, newValueView(method{nil, m}))
+			v.childTypes.right = append(v.childTypes.right, newValueView(m))
 		}
 	}
 	v.text.SetText(s)
@@ -206,7 +208,7 @@ func (v *typeView) editType(done func()) {
 			done()
 		}
 		SetKeyFocus(b.text)
-	case *types.Basic, *types.NamedType:
+	case *types.Basic, *types.Named:
 		done()
 	case *types.Pointer, *types.Array, *types.Slice, *types.Chan:
 		if elt := v.childTypes.right[0]; *elt.typ == nil {
@@ -241,7 +243,7 @@ func (v *typeView) editType(done func()) {
 			done()
 		}
 	case *types.Struct:
-		v.addFields(&t.Fields, &v.childTypes.right, done)
+		v.addVars(&t.Fields, &v.childTypes.right, done)
 	case *types.Signature:
 		v.addVars(&t.Params, &v.childTypes.left, func() {
 			v.addVars(&t.Results, &v.childTypes.right, done)
@@ -249,41 +251,6 @@ func (v *typeView) editType(done func()) {
 	case *types.Interface:
 		v.addMethods(&t.Methods, &v.childTypes.right, done)
 	}
-}
-
-func (v *typeView) insertField(f *[]*types.Field, childTypes *[]*typeView, before bool, i int, success, fail func()) {
-	if !before {
-		i++
-	}
-	*f = append((*f)[:i], append([]*types.Field{{}}, (*f)[i:]...)...)
-	v.setType(*v.typ)
-	t := (*childTypes)[i]
-	t.edit(func() {
-		if *t.typ == nil {
-			*f = append((*f)[:i], (*f)[i+1:]...)
-			v.setType(*v.typ)
-			if fail != nil {
-				fail()
-			} else {
-				if !before {
-					i--
-				}
-				SetKeyFocus((*childTypes)[i])
-			}
-		} else {
-			if success != nil {
-				success()
-			} else {
-				SetKeyFocus(t)
-			}
-		}
-	})
-}
-
-func (v *typeView) addFields(f *[]*types.Field, childTypes *[]*typeView, done func()) {
-	v.insertField(f, childTypes, true, len(*f), func() {
-		v.addFields(f, childTypes, done)
-	}, done)
 }
 
 func (v *typeView) insertVar(vs *[]*types.Var, childTypes *[]*typeView, before bool, i int, success, fail func()) {
@@ -321,11 +288,11 @@ func (v *typeView) addVars(vs *[]*types.Var, childTypes *[]*typeView, done func(
 	}, done)
 }
 
-func (v *typeView) insertMethod(m *[]*types.Method, childTypes *[]*typeView, before bool, i int, success, fail func()) {
+func (v *typeView) insertMethod(m *[]*types.Func, childTypes *[]*typeView, before bool, i int, success, fail func()) {
 	if !before {
 		i++
 	}
-	*m = append((*m)[:i], append([]*types.Method{{Type: &types.Signature{}}}, (*m)[i:]...)...)
+	*m = append((*m)[:i], append([]*types.Func{types.NewFunc(0, nil, "", &types.Signature{})}, (*m)[i:]...)...)
 	v.setType(*v.typ)
 	t := (*childTypes)[i]
 	t.edit(func() {
@@ -350,7 +317,7 @@ func (v *typeView) insertMethod(m *[]*types.Method, childTypes *[]*typeView, bef
 	})
 }
 
-func (v *typeView) addMethods(m *[]*types.Method, childTypes *[]*typeView, done func()) {
+func (v *typeView) addMethods(m *[]*types.Func, childTypes *[]*typeView, done func()) {
 	v.insertMethod(m, childTypes, true, len(*m), func() {
 		v.addMethods(m, childTypes, done)
 	}, done)
@@ -486,7 +453,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 			case *types.Struct:
 				for i, c := range p.childTypes.right {
 					if c == v {
-						p.insertField(&t.Fields, &p.childTypes.right, event.Shift, i, nil, nil)
+						p.insertVar(&t.Fields, &p.childTypes.right, event.Shift, i, nil, nil)
 						break
 					}
 				}
@@ -592,15 +559,15 @@ func (v *typeView) Paint() {
 type generic struct{ types.Type }
 
 func underlying(t types.Type) types.Type {
-	if nt, ok := t.(*types.NamedType); ok {
-		return nt.Underlying
+	if nt, ok := t.(*types.Named); ok {
+		return nt.UnderlyingT
 	}
 	return t
 }
 
 func indirect(t types.Type) (types.Type, bool) {
 	if p, ok := underlying(t).(*types.Pointer); ok {
-		return p.Base, true
+		return p.Elem, true
 	}
 	return t, false
 }

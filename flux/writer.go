@@ -6,9 +6,8 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	"fmt"
-	"go/ast"
 	"go/build"
 	"go/parser"
 	"go/token"
@@ -48,11 +47,11 @@ func savePackageName(p *build.Package) {
 	// TODO: update all uses?  could get messy with name conflicts.  not that everything has work perfectly.
 }
 
-func saveType(t *types.NamedType) {
+func saveType(t *types.Named) {
 	w := newWriter(t.Obj)
 	defer w.close()
 
-	u := t.Underlying
+	u := t.UnderlyingT
 	w.collectPkgs(u)
 	w.imports()
 
@@ -100,8 +99,8 @@ func newWriter(obj types.Object) *writer {
 	fluxObjs[obj] = true
 
 	w.write("package %s\n\n", w.pkg.Name)
-	for _, obj := range append(types.Universe.Entries, w.pkg.Scope.Entries...) {
-		w.name(obj.GetName())
+	for _, name := range append(types.Universe.Names(), w.pkg.Scope().Names()...) {
+		w.name(name)
 	}
 	return w
 }
@@ -119,7 +118,7 @@ func (w *writer) close() {
 }
 
 func (w *writer) collectPkgs(t types.Type) {
-	walkType(t, func(n *types.NamedType) {
+	walkType(t, func(n *types.Named) {
 		if p := n.Obj.Pkg; p != nil && p != w.pkg {
 			if _, ok := w.pkgNames[p]; !ok {
 				w.pkgNames[p] = w.name(p.Name)
@@ -157,7 +156,7 @@ func (w *writer) fun(f *funcNode, vars map[*port]string) {
 	}
 
 	params := f.inputsNode.outs
-	if _, ok := obj.(method); ok {
+	if isMethod(obj) {
 		p := params[0]
 		params = params[1:]
 		name := w.name(p.obj.Name)
@@ -250,13 +249,13 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			case *callNode:
 				if !(n.obj == nil && len(args) == 0) {
 					f := ""
-					switch obj := n.obj.(type) {
+					switch {
 					default:
-						f = w.qualifiedName(obj)
-					case method:
-						f = args[0] + "." + obj.Name
+						f = w.qualifiedName(n.obj)
+					case isMethod(n.obj):
+						f = args[0] + "." + n.obj.GetName()
 						args = args[1:]
-					case nil:
+					case n.obj == nil:
 						f = args[0]
 						args = args[1:]
 					}
@@ -332,15 +331,17 @@ func (w *writer) block(b *block, vars map[*port]string) {
 						name = w.qualifiedName(n.obj)
 						addr = true
 					case *types.Func:
-						name = w.qualifiedName(n.obj)
+						if isMethod(n.obj) {
+							name = args[0] + "." + n.obj.GetName()
+							args = args[1:]
+						} else {
+							name = w.qualifiedName(n.obj)
+						}
 					case field:
 						name = args[0] + "." + n.obj.GetName()
 						args = args[1:]
 						// TODO: use indirect result of types.LookupFieldOrMethod, or types.Selection.Indirect()
 						_, addr = n.x.obj.Type.(*types.Pointer)
-					case method:
-						name = args[0] + "." + n.obj.GetName()
-						args = args[1:]
 					case nil:
 						name = "*" + args[0]
 						args = args[1:]
@@ -494,7 +495,7 @@ func (w *writer) results(n node, vars map[*port]string) (results []string, exist
 			}
 			for _, c := range p.conns {
 				v := name
-				if p, ok := c.src.obj.Type.(*types.Pointer); ok && types.IsIdentical(p.Base, c.dst.obj.Type) {
+				if p, ok := c.src.obj.Type.(*types.Pointer); ok && types.IsIdentical(p.Elem, c.dst.obj.Type) {
 					v = "*" + v
 				}
 				if c.hidden {
@@ -566,27 +567,27 @@ func (w writer) typ(t types.Type) string {
 	switch t := t.(type) {
 	case *types.Basic:
 		return t.Name
-	case *types.NamedType:
+	case *types.Named:
 		return w.qualifiedName(t.Obj)
 	case *types.Pointer:
-		return "*" + w.typ(t.Base)
+		return "*" + w.typ(t.Elem)
 	case *types.Array:
-		return fmt.Sprintf("[%d]%s", t.Len, w.typ(t.Elt))
+		return fmt.Sprintf("[%d]%s", t.Len, w.typ(t.Elem))
 	case *types.Slice:
-		return "[]" + w.typ(t.Elt)
+		return "[]" + w.typ(t.Elem)
 	case *types.Map:
-		return fmt.Sprintf("map[%s]%s", w.typ(t.Key), w.typ(t.Elt))
+		return fmt.Sprintf("map[%s]%s", w.typ(t.Key), w.typ(t.Elem))
 	case *types.Chan:
 		s := ""
 		switch t.Dir {
-		case ast.SEND:
+		case types.SendOnly:
 			s = "chan<- "
-		case ast.RECV:
+		case types.RecvOnly:
 			s = "<-chan "
-		default:
+		case types.SendRecv:
 			s = "chan "
 		}
-		return s + w.typ(t.Elt)
+		return s + w.typ(t.Elem)
 	case *types.Signature:
 		return "func" + w.signature(t)
 	case *types.Interface:
@@ -595,7 +596,7 @@ func (w writer) typ(t types.Type) string {
 			if i > 0 {
 				s += "; "
 			}
-			s += m.Name + w.signature(m.Type)
+			s += m.Name + w.signature(m.Type.(*types.Signature))
 		}
 		return s + "}"
 	case *types.Struct:
@@ -604,7 +605,7 @@ func (w writer) typ(t types.Type) string {
 			if i > 0 {
 				s += "; "
 			}
-			if !f.IsAnonymous && f.Name != "" {
+			if !f.Anonymous && f.Name != "" {
 				s += f.Name + " "
 			}
 			s += w.typ(f.Type)
@@ -642,22 +643,22 @@ func (w writer) params(params []*types.Var) string {
 	return s + ")"
 }
 
-func walkType(t types.Type, op func(*types.NamedType)) {
+func walkType(t types.Type, op func(*types.Named)) {
 	switch t := t.(type) {
 	case *types.Basic:
-	case *types.NamedType:
+	case *types.Named:
 		op(t)
 	case *types.Pointer:
-		walkType(t.Base, op)
+		walkType(t.Elem, op)
 	case *types.Array:
-		walkType(t.Elt, op)
+		walkType(t.Elem, op)
 	case *types.Slice:
-		walkType(t.Elt, op)
+		walkType(t.Elem, op)
 	case *types.Map:
 		walkType(t.Key, op)
-		walkType(t.Elt, op)
+		walkType(t.Elem, op)
 	case *types.Chan:
-		walkType(t.Elt, op)
+		walkType(t.Elem, op)
 	case *types.Signature:
 		for _, v := range append(t.Params, t.Results...) {
 			walkType(v.Type, op)
@@ -676,23 +677,28 @@ func walkType(t types.Type, op func(*types.NamedType)) {
 }
 
 func fluxPath(obj types.Object) string {
-	pkg := obj.GetPkg()
-	bp, err := build.Import(pkg.Path, "", build.FindOnly)
+	pkg, err := build.Import(obj.GetPkg().Path, "", build.FindOnly)
 	if err != nil {
 		panic(err)
 	}
 
 	name := obj.GetName()
-	if !ast.IsExported(name) { // unexported names are suffixed with "-" to avoid possible conflicts on case-insensitive systems
+	if !obj.IsExported() { // unexported names are suffixed with "-" to avoid possible conflicts on case-insensitive systems
 		name += "-"
 	}
-	if m, ok := obj.(method); ok {
-		t, _ := indirect(m.Type.Recv.Type)
-		typeName := t.(*types.NamedType).Obj.Name
-		if !ast.IsExported(typeName) {
+	if isMethod(obj) {
+		t, _ := indirect(obj.GetType().(*types.Signature).Recv.Type)
+		recv := t.(*types.Named).Obj
+		typeName := recv.Name
+		if !recv.IsExported() {
 			typeName += "-"
 		}
 		name = typeName + "." + name
 	}
-	return filepath.Join(bp.Dir, name+".flux.go")
+	return filepath.Join(pkg.Dir, name+".flux.go")
+}
+
+func isMethod(obj types.Object) bool {
+	f, ok := obj.(*types.Func)
+	return ok && f.Type.(*types.Signature).Recv != nil
 }

@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 )
 
@@ -25,7 +25,7 @@ func newTypeAssertNode() *typeAssertNode {
 	}
 	v := &types.Var{}
 	n.newOutput(v)
-	n.newOutput(&types.Var{Name: "ok", Type: types.Typ[types.Bool]})
+	n.newOutput(newVar("ok", types.Typ[types.Bool]))
 	n.typ = newTypeView(&v.Type)
 	n.typ.mode = typesOnly
 	n.Add(n.typ)

@@ -5,9 +5,8 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
-	. "code.google.com/p/gordon-go/util"
 	"runtime"
 )
 
@@ -33,7 +32,7 @@ func newFluxWindow() *fluxWindow {
 	w.browser.accepted = func(obj types.Object) {
 		switch obj := obj.(type) {
 		case *types.TypeName:
-			typ := obj.Type.(*types.NamedType)
+			typ := obj.Type.(*types.Named)
 			Hide(w.browser)
 			v := w.browser.typeView
 			w.Add(v)
@@ -44,10 +43,10 @@ func newFluxWindow() *fluxWindow {
 				w.browser.text.SetText("")
 				SetKeyFocus(w.browser.text)
 			}
-			if typ.Underlying == nil {
+			if typ.UnderlyingT == nil {
 				v.edit(func() {
-					if typ.Underlying == nil {
-						SliceRemove(&obj.Pkg.Scope.Entries, obj) // this won't remove it from Scope.map if it has one (Scope needs a Remove() method)
+					if typ.UnderlyingT == nil {
+						delete(obj.Pkg.Scope().Objects, obj.Name)
 					} else {
 						saveType(typ)
 					}
@@ -60,7 +59,7 @@ func newFluxWindow() *fluxWindow {
 				}
 				SetKeyFocus(v)
 			}
-		case *types.Func, method:
+		case *types.Func:
 			Hide(w.browser)
 			f := loadFunc(obj)
 			w.Add(f)

@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -13,15 +13,20 @@ import (
 	"strings"
 )
 
+// Flux code is stored in a subset of the Go language because this makes it fully interoperable with pure Go projects.  If instead it were stored in a custom Flux file format then, in order to share Flux code with non-Flux projects, generated Go files would also have to be saved in addition to Flux files, whereas in the normal build process these Go files would be temporary artifacts.
+
 func loadFunc(obj types.Object) *funcNode {
 	f := newFuncNode(obj, nil)
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, fluxPath(obj), nil, parser.ParseComments)
 	if err == nil {
-		r := &reader{obj.GetPkg(), map[string]*types.Package{}, map[string]*port{}, map[string][]*connection{}, map[string]*localVar{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
+		r := &reader{obj, map[string]*types.Package{}, map[string]*port{}, map[string][]*connection{}, map[string]*localVar{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
 		for _, i := range file.Imports {
 			path, _ := strconv.Unquote(i.Path.Value)
-			pkg := r.pkg.Imports[path]
+			pkg, err := getPackage(path)
+			if err != nil {
+				panic(err)
+			}
 			name := pkg.Name
 			if i.Name != nil {
 				name = i.Name.Name
@@ -35,8 +40,8 @@ func loadFunc(obj types.Object) *funcNode {
 		r.fun(f, decl.Type, decl.Body)
 	} else {
 		// this is a new func; save it
-		if m, ok := obj.(method); ok {
-			f.inputsNode.newOutput(m.Type.Recv)
+		if isMethod(obj) {
+			f.inputsNode.newOutput(obj.GetType().(*types.Signature).Recv)
 		}
 		saveFunc(f)
 	}
@@ -44,7 +49,7 @@ func loadFunc(obj types.Object) *funcNode {
 }
 
 type reader struct {
-	pkg       *types.Package
+	object    types.Object
 	pkgNames  map[string]*types.Package
 	ports     map[string]*port
 	conns     map[string][]*connection
@@ -112,13 +117,13 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 							r.value(b, x, s.Lhs[0], false, s)
 						}
 					case token.NOT:
-						n := newOperatorNode(&types.Func{Name: x.Op.String()})
+						n := newOperatorNode(types.NewFunc(0, nil, x.Op.String(), nil))
 						b.addNode(n)
 						r.dst(x.X, n.ins[0])
 						r.src(s.Lhs[0], n.outs[0])
 					}
 				case *ast.BinaryExpr:
-					n := newOperatorNode(&types.Func{Name: x.Op.String()})
+					n := newOperatorNode(types.NewFunc(0, nil, x.Op.String(), nil))
 					b.addNode(n)
 					r.dst(x.X, n.ins[0])
 					r.dst(x.Y, n.ins[1])
@@ -271,9 +276,11 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
 	b.addNode(n)
 	args := x.Args
 	switch obj.(type) {
-	case method:
-		recv := x.Fun.(*ast.SelectorExpr).X
-		args = append([]ast.Expr{recv}, args...)
+	case *types.Func:
+		if isMethod(obj) {
+			recv := x.Fun.(*ast.SelectorExpr).X
+			args = append([]ast.Expr{recv}, args...)
+		}
 	case nil: // func value call
 		args = append([]ast.Expr{x.Fun}, args...)
 	}
@@ -293,7 +300,7 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
 func (r *reader) compositeLit(b *block, x *ast.CompositeLit, ptr bool, s *ast.AssignStmt) {
 	t := r.typ(x.Type)
 	if ptr {
-		t = &types.Pointer{t}
+		t = &types.Pointer{Elem: t}
 	}
 	n := newCompositeLiteralNode()
 	b.addNode(n)
@@ -330,50 +337,48 @@ func (r *reader) index(b *block, x *ast.IndexExpr, y ast.Expr, set bool, s *ast.
 }
 
 func (r *reader) obj(x ast.Expr) types.Object {
-	// TODO: shouldn't go/types be able to do this for me?
+	// TODO: go/types should be able to do this for me.  see http://golang.org/issue/7151
 	switch x := x.(type) {
 	case *ast.Ident:
 		if v, ok := r.localVars[x.Name]; ok {
 			return v
 		}
-		for s := r.pkg.Scope; s != nil; s = s.Outer {
-			if obj := s.Lookup(x.Name); obj != nil {
-				return obj
-			}
+		if obj := r.object.GetPkg().Scope().LookupParent(x.Name); obj != nil {
+			return obj
 		}
 	case *ast.SelectorExpr:
 		// TODO: Type.Method and pkg.Type.Method
 		n1 := name(x.X)
 		n2 := x.Sel.Name
 		if pkg, ok := r.pkgNames[n1]; ok {
-			return pkg.Scope.Lookup(n2)
+			return pkg.Scope().Lookup(n2)
 		}
 		// TODO: use types.LookupFieldOrMethod()
 		t := r.conns[n1][0].src.obj.Type
 		for {
 			if p, ok := t.(*types.Pointer); ok {
-				t = p.Base
+				t = p.Elem
 			} else {
 				break
 			}
 		}
-		recv := t.(*types.NamedType)
+		recv := t.(*types.Named)
 		for _, m := range recv.Methods {
 			if m.Name == n2 {
-				return method{nil, m}
+				return m
 			}
 		}
-		if it, ok := recv.Underlying.(*types.Interface); ok {
+		if it, ok := recv.UnderlyingT.(*types.Interface); ok {
 			for _, m := range it.Methods {
 				if m.Name == n2 {
-					return method{nil, m}
+					return m
 				}
 			}
 		}
-		if st, ok := recv.Underlying.(*types.Struct); ok {
+		if st, ok := recv.UnderlyingT.(*types.Struct); ok {
 			for _, f := range st.Fields {
 				if f.Name == n2 {
-					return field{nil, f, recv}
+					return field{f, recv}
 				}
 			}
 		}
@@ -382,45 +387,15 @@ func (r *reader) obj(x ast.Expr) types.Object {
 }
 
 func (r *reader) typ(x ast.Expr) types.Type {
-	// TODO: replace with types.EvalNode()
-	switch x := x.(type) {
-	case *ast.Ident, *ast.SelectorExpr:
-		return r.obj(x).GetType()
-	case *ast.StarExpr:
-		return &types.Pointer{r.typ(x.X)}
-	case *ast.ArrayType:
-		if x.Len == nil {
-			return &types.Slice{r.typ(x.Elt)}
-		}
-	case *ast.MapType:
-		return &types.Map{r.typ(x.Key), r.typ(x.Value)}
-	case *ast.StructType:
-		return &types.Struct{}
-	case *ast.InterfaceType:
-		return &types.Interface{}
-	case *ast.FuncType:
-		t := &types.Signature{}
-		if x.Params != nil {
-			for _, f := range x.Params.List {
-				name := ""
-				if len(f.Names) > 0 {
-					name = f.Names[0].Name
-				}
-				t.Params = append(t.Params, &types.Var{Name: name, Type: r.typ(f.Type)})
-			}
-		}
-		if x.Results != nil {
-			for _, f := range x.Results.List {
-				name := ""
-				if len(f.Names) > 0 {
-					name = f.Names[0].Name
-				}
-				t.Results = append(t.Results, &types.Var{Name: name, Type: r.typ(f.Type)})
-			}
-		}
-		return t
+	s := r.object.Parent()
+	if isMethod(r.object) {
+		s = r.object.GetType().(*types.Signature).Recv.Parent()
 	}
-	panic("not yet implemented")
+	t, _, err := types.EvalNode(nil, x, r.object.GetPkg(), s)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }
 
 func (r *reader) src(x ast.Expr, src *port) {

@@ -5,8 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
-	"fmt"
+	"code.google.com/p/gordon-go/go/types"
 	"go/ast"
 	"go/build"
 	"go/parser"
@@ -15,7 +14,7 @@ import (
 	"strings"
 )
 
-var pkgs = map[string]*types.Package{"unsafe": types.Unsafe, "C": &types.Package{Name: "C", Path: "C", Scope: &types.Scope{}}}
+var pkgs = map[string]*types.Package{"unsafe": types.Unsafe}
 
 var fluxObjs = map[types.Object]bool{}
 
@@ -43,47 +42,25 @@ func getPackage(path string) (*types.Package, error) {
 			fluxFiles = append(fluxFiles, fileName[:len(fileName)-8])
 		}
 	}
-	ctx := types.Context{Import: srcImport}
-	pkg, err := ctx.Check(fset, files)
+	cfg := types.Config{IgnoreFuncBodies: true, FakeImportC: true, Import: srcImport}
+	pkg, err := cfg.Check(path, fset, files, nil)
 	if err != nil {
-		fmt.Printf("Error typechecking package %s:\n%v\n", path, err)
-		// types.Check doesn't handle cgo packages, so we fall back to GcImport here.
-		// TODO:  Is there any other reason to do GcImport if the source doesn't check?
-		// If not, we should only do GcImport specifically if there are only cgo related
-		// errors, otherwise we risk importing a stale binary.
-		origErr := err
-		pkg, err = types.GcImport(pkgs, path)
-		if err != nil {
-			fmt.Printf("Error GcImporting package %s:\n%v.\n", path, err)
-			return nil, origErr
-		}
-	}
-	// go/types forgot to set the receiver on interface methods
-	for _, obj := range pkg.Scope.Entries {
-		if t, ok := obj.(*types.TypeName); ok {
-			if it, ok := t.Type.(*types.NamedType).Underlying.(*types.Interface); ok {
-				for _, m := range it.Methods {
-					if m.Type.Recv == nil {
-						m.Type.Recv = &types.Var{Type: t.Type}
-					}
-				}
-			}
-		}
+		return nil, err
 	}
 	pkg.Path = buildPkg.ImportPath
 	pkgs[path] = pkg
-
+	
 	for _, file := range fluxFiles {
 		n := strings.Split(file, ".")
 		for i := range n {
 			n[i] = strings.TrimRight(n[i], "-")
 		}
 		if len(n) == 1 {
-			fluxObjs[pkg.Scope.Lookup(n[0])] = true
+			fluxObjs[pkg.Scope().Lookup(n[0])] = true
 		} else {
-			for _, m := range pkg.Scope.Lookup(n[0]).GetType().(*types.NamedType).Methods {
+			for _, m := range pkg.Scope().Lookup(n[0]).GetType().(*types.Named).Methods {
 				if m.Name == n[1] {
-					fluxObjs[method{nil, m}] = true
+					fluxObjs[m] = true
 				}
 			}
 		}

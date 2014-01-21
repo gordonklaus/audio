@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 )
 
@@ -17,15 +17,15 @@ func newAppendNode() *appendNode {
 	n := &appendNode{}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText("append")
-	slice := n.newInput(&types.Var{Type: generic{}})
-	val := n.newInput(&types.Var{Type: generic{}})
-	out := n.newOutput(&types.Var{Type: generic{}})
+	slice := n.newInput(newVar("", generic{}))
+	val := n.newInput(newVar("", generic{}))
+	out := n.newOutput(newVar("", generic{}))
 	slice.connsChanged = func() {
 		if len(slice.conns) > 0 {
 			t, _ := indirect(slice.conns[0].src.obj.Type)
 			if t, ok := t.(*types.Slice); ok {
 				slice.setType(t)
-				val.setType(t.Elt)
+				val.setType(t.Elem)
 				out.setType(t)
 			}
 		} else {
@@ -46,8 +46,8 @@ func newDeleteNode() *deleteNode {
 	n := &deleteNode{}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText("delete")
-	m := n.newInput(&types.Var{Name: "map", Type: generic{}})
-	key := n.newInput(&types.Var{Name: "key", Type: generic{}})
+	m := n.newInput(newVar("map", generic{}))
+	key := n.newInput(newVar("key", generic{}))
 	m.connsChanged = func() {
 		if len(m.conns) > 0 {
 			t, _ := indirect(m.conns[0].src.obj.Type)
@@ -72,8 +72,8 @@ func newLenNode() *lenNode {
 	n := &lenNode{}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText("len")
-	in := n.newInput(&types.Var{Type: generic{}})
-	n.newOutput(&types.Var{Type: types.Typ[types.Int]})
+	in := n.newInput(newVar("", generic{}))
+	n.newOutput(newVar("", types.Typ[types.Int]))
 	in.connsChanged = func() {
 		if len(in.conns) > 0 {
 			t := in.conns[0].src.obj.Type
@@ -123,14 +123,18 @@ func (n *makeNode) setType(t types.Type) {
 	n.outs[0].setType(t)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
-		if nt, ok := t.(*types.NamedType); ok {
-			t = nt.Underlying
+		if nt, ok := t.(*types.Named); ok {
+			t = nt.UnderlyingT
 		}
-		n.newInput(&types.Var{Name: "len", Type: types.Typ[types.Int]})
+		n.newInput(newVar("len", types.Typ[types.Int]))
 		if _, ok := t.(*types.Slice); ok {
-			n.newInput(&types.Var{Name: "cap", Type: types.Typ[types.Int]})
+			n.newInput(newVar("cap", types.Typ[types.Int]))
 		}
 		MoveCenter(n.typ, Pt(0, Rect(n).Max.Y+Height(n.typ)/2))
 		SetKeyFocus(n)
 	}
+}
+
+func newVar(name string, typ types.Type) *types.Var {
+	return types.NewVar(0, nil, name, typ)
 }

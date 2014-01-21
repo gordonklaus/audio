@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 )
 
@@ -22,10 +22,12 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 	n.nodeBase = newNodeBase(n)
 	text := ""
 	switch obj.(type) {
-	case field, method, nil:
-		n.x = n.newInput(&types.Var{})
-		n.x.connsChanged = n.reform
-		text = "."
+	case field, *types.Func, nil:
+		if _, ok := obj.(*types.Func); !ok || isMethod(obj) {
+			n.x = n.newInput(&types.Var{})
+			n.x.connsChanged = n.reform
+			text = "."
+		}
 	default:
 	}
 	if obj != nil {
@@ -66,28 +68,29 @@ func (n *valueNode) reform() {
 	case *types.Const:
 	case *types.Var, *localVar:
 		if !n.set {
-			yt = &types.Pointer{yt}
+			yt = &types.Pointer{Elem: yt}
 		}
 	case *types.Func:
+		if isMethod(obj) {
+			xt = obj.Type.(*types.Signature).Recv.Type
+			// TODO: remove Recv? (from copy)
+		}
 	case field:
 		xt = obj.recv
 		// TODO: use indirect result of types.LookupFieldOrMethod, or types.Selection.Indirect()
 		if n.set {
-			xt = &types.Pointer{xt}
+			xt = &types.Pointer{Elem: xt}
 		} else {
 			if len(n.x.conns) > 0 {
 				xt = n.x.conns[0].src.obj.Type
 			}
 			if p, ok := xt.(*types.Pointer); ok {
-				if !types.IsIdentical(p.Base, obj.recv) {
-					xt = p.Base
+				if !types.IsIdentical(p.Elem, obj.recv) {
+					xt = p.Elem
 				}
-				yt = &types.Pointer{yt}
+				yt = &types.Pointer{Elem: yt}
 			}
 		}
-	case method:
-		xt = obj.Type.Recv.Type
-		// TODO: remove Recv? (from copy)
 	case nil:
 		if len(n.x.conns) > 0 {
 			xt = n.x.conns[0].src.obj.Type

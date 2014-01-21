@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	. "code.google.com/p/gordon-go/util"
 	"go/token"
@@ -80,7 +80,7 @@ func (b *block) addNode(n node) {
 		n.setBlock(b)
 		switch n := n.(type) {
 		case *callNode:
-			if _, ok := n.obj.(method); !ok && n.obj != nil {
+			if n.obj != nil && !isMethod(n.obj) {
 				b.func_().addPkgRef(n.obj)
 			}
 		case *valueNode:
@@ -98,7 +98,7 @@ func (b *block) removeNode(n node) {
 		delete(b.nodes, n)
 		switch n := n.(type) {
 		case *callNode:
-			if _, ok := n.obj.(method); !ok && n.obj != nil {
+			if n.obj != nil && !isMethod(n.obj) {
 				b.func_().subPkgRef(n.obj)
 			}
 		case *valueNode:
@@ -459,7 +459,7 @@ func newNode(b *block, obj types.Object, funcAsVal bool) {
 		case "typeAssert":
 			n = newTypeAssertNode()
 		}
-	case *types.Func, method:
+	case *types.Func, *types.Builtin:
 		if !unicode.IsLetter([]rune(obj.GetName())[0]) {
 			n = newOperatorNode(obj)
 		} else if funcAsVal && obj.GetPkg() != nil { //Pkg==nil == builtin
@@ -532,7 +532,7 @@ func (n *portsNode) removePort(p *port) {
 		var vars *[]*types.Var
 		if p.out {
 			ports = n.outs
-			if _, ok := obj.(method); ok { // don't remove receiver
+			if isMethod(obj) { // don't remove receiver
 				ports = ports[1:]
 			}
 			vars = &sig.Params

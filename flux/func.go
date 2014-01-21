@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	"fmt"
 )
@@ -33,7 +33,7 @@ func newFuncNode(obj types.Object, arranged blockchan) *funcNode {
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
 	if n.literal {
-		n.output = newOutput(n, &types.Var{Type: &types.Signature{}})
+		n.output = newOutput(n, newVar("", &types.Signature{}))
 		n.Add(n.output)
 	} else {
 		n.pkgRefs = map[*types.Package]int{}
@@ -79,7 +79,7 @@ func (n *funcNode) addPkgRef(x interface{}) {
 			n.pkgRefs[p]++
 		}
 	case types.Type:
-		walkType(x, func(t *types.NamedType) { n.addPkgRef(t.Obj) })
+		walkType(x, func(t *types.Named) { n.addPkgRef(t.Obj) })
 	default:
 		panic(fmt.Sprintf("can't addPkgRef for %#v\n", x))
 	}
@@ -93,7 +93,7 @@ func (n *funcNode) subPkgRef(x interface{}) {
 			delete(n.pkgRefs, p)
 		}
 	case types.Type:
-		walkType(x, func(t *types.NamedType) { n.subPkgRef(t.Obj) })
+		walkType(x, func(t *types.Named) { n.subPkgRef(t.Obj) })
 	default:
 		panic(fmt.Sprintf("can't subPkgRef for %#v\n", x))
 	}

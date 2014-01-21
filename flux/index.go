@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 )
 
 type indexNode struct {
@@ -46,26 +46,26 @@ func (n *indexNode) updateInputType() {
 			var ptr bool
 			t, ptr = indirect(p.obj.Type)
 			u := t
-			if n, ok := t.(*types.NamedType); ok {
-				u = n.Underlying
+			if n, ok := t.(*types.Named); ok {
+				u = n.UnderlyingT
 			}
 			key = types.Typ[types.Int]
 			switch u := u.(type) {
 			case *types.Array:
-				elt = u.Elt
+				elt = u.Elem
 				if ptr && !n.set {
 					t = p.obj.Type
-					elt = &types.Pointer{elt}
+					elt = &types.Pointer{Elem: elt}
 					n.addressable = true
 				}
 			case *types.Slice:
-				elt = u.Elt
+				elt = u.Elem
 				if !n.set {
-					elt = &types.Pointer{elt}
+					elt = &types.Pointer{Elem: elt}
 					n.addressable = true
 				}
 			case *types.Map:
-				key, elt = u.Key, u.Elt
+				key, elt = u.Key, u.Elem
 			}
 		}
 	} else {
@@ -103,7 +103,7 @@ func (n *indexNode) updateInputType() {
 			}
 		case *types.Map:
 			if n.ok == nil {
-				n.ok = n.newOutput(&types.Var{Name: "ok", Type: types.Typ[types.Bool]})
+				n.ok = n.newOutput(newVar("ok", types.Typ[types.Bool]))
 			}
 		}
 	}

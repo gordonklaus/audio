@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/go/types"
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 )
 
@@ -24,15 +24,15 @@ func newIfNode(arranged blockchan) *ifNode {
 	n := &ifNode{}
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
-	n.input = newInput(n, &types.Var{Type: types.Typ[types.Bool]})
+	n.input = newInput(n, newVar("", types.Typ[types.Bool]))
 	n.Add(n.input)
 	n.falseblk = newBlock(n, arranged)
 	n.trueblk = newBlock(n, arranged)
 
-	n.seqIn = newInput(n, &types.Var{Name: "seq", Type: seqType})
+	n.seqIn = newInput(n, newVar("seq", seqType))
 	MoveCenter(n.seqIn, Pt(-portSize, 0))
 	n.Add(n.seqIn)
-	n.seqOut = newOutput(n, &types.Var{Name: "seq", Type: seqType})
+	n.seqOut = newOutput(n, newVar("seq", seqType))
 	MoveCenter(n.seqOut, Pt(portSize, 0))
 	n.Add(n.seqOut)
 
