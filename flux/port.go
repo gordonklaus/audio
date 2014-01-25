@@ -252,16 +252,12 @@ func (p *port) KeyPress(event KeyEvent) {
 		}
 		c.startEditing()
 	case KeyBackspace, KeyDelete:
-		if p.out && k == KeyBackspace || !p.out && k == KeyDelete {
-			if n, ok := p.node.(interface {
-				removePort(*port)
-			}); ok {
-				n.removePort(p)
-			} else {
-				SetKeyFocus(p.node)
-			}
-		} else if len(p.conns) > 0 {
-			SetKeyFocus(p.conns[len(p.conns)-1])
+		if n, ok := p.node.(interface {
+			removePort(*port)
+		}); ok {
+			n.removePort(p)
+		} else {
+			SetKeyFocus(p.node)
 		}
 	case KeyEscape:
 		SetKeyFocus(p.node)

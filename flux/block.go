@@ -561,7 +561,7 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 		SetKeyFocus(l)
 	} else if f, ok := n.blk.node.(*funcNode); ok && f.literal && event.Key == KeyRight && n.out {
 		SetKeyFocus(f)
-	} else if n.editable && event.Text == "," {
+	} else if n.editable && event.Key == KeyComma {
 		f := n.blk.node.(*funcNode)
 		obj := f.obj
 		if obj == nil {
@@ -569,20 +569,43 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 		}
 		sig := obj.GetType().(*types.Signature)
 		var p *port
+		var ports *[]*port
 		var vars *[]*types.Var
 		v := &types.Var{}
 		if n.out {
-			p = n.newInput(v)
+			p = newInput(n, v)
+			ports = &n.ins
 			vars = &sig.Results
 		} else {
-			p = n.newOutput(v)
+			p = newOutput(n, v)
+			ports = &n.outs
 			vars = &sig.Params
 		}
+
+		i := len(*ports)
+		if focus, ok := KeyFocus(n).(*port); ok {
+			for j, p := range *ports {
+				if p == focus {
+					i = j
+					break
+				}
+			}
+			if !event.Shift || i == 0 && p.out && sig.Recv != nil {
+				i++
+			}
+		}
+
+		n.Add(p)
+		*ports = append((*ports)[:i], append([]*port{p}, (*ports)[i:]...)...)
+		n.reform()
 		rearrange(n.blk)
 		Show(p.valView)
 		p.valView.edit(func() {
 			if v.Type != nil {
-				*vars = append(*vars, v)
+				if p.out && sig.Recv != nil {
+					i--
+				}
+				*vars = append((*vars)[:i], append([]*types.Var{v}, (*vars)[i:]...)...)
 				n.blk.func_().addPkgRef(v.Type)
 				SetKeyFocus(p)
 			} else {

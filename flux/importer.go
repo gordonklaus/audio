@@ -49,7 +49,7 @@ func getPackage(path string) (*types.Package, error) {
 	}
 	pkg.Path = buildPkg.ImportPath
 	pkgs[path] = pkg
-	
+
 	for _, file := range fluxFiles {
 		n := strings.Split(file, ".")
 		for i := range n {

@@ -35,7 +35,7 @@ A method value node with an unconnected receiver is treated as a method expressi
 
 To create a numeric, string, or character literal node, type a digit, double quote, or single quote character, respectively, followed by the value and Enter.  To create a composite literal node, type a left curly brace character and select the desired type from the browser.
 
-A function block always has at least two nodes, one for parameters and another for results.  To add a parameter or result, focus the appropriate node and press Comma, type the name and Enter, then select the type from the browser.  To delete a parameter, focus the port and press Backspace.  To delete a result, focus the port and press Delete.
+A function block always has at least two nodes, one for parameters and another for results.  To add a parameter or result, focus the appropriate node or port and press Comma (hold Shift to insert before a port), type the name and Enter, then select the type from the browser.  To delete a parameter or result, focus the port and press Backspace or Delete.
 
 To create a new connection, move the focus to a port and press Enter to start editing.  Use the arrow keys to move the other end of the connection and press Enter to stop editing.  To edit an existing connection, move the focus to one of its ends and press Enter.
 
