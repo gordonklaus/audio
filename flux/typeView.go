@@ -292,7 +292,7 @@ func (v *typeView) insertMethod(m *[]*types.Func, childTypes *[]*typeView, befor
 	if !before {
 		i++
 	}
-	*m = append((*m)[:i], append([]*types.Func{types.NewFunc(0, nil, "", &types.Signature{})}, (*m)[i:]...)...)
+	*m = append((*m)[:i], append([]*types.Func{types.NewFunc(0, nil, "", &types.Signature{Recv: newVar("", *v.typ)})}, (*m)[i:]...)...)
 	v.setType(*v.typ)
 	t := (*childTypes)[i]
 	t.edit(func() {
