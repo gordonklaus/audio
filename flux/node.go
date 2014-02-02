@@ -7,7 +7,6 @@ package main
 import (
 	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
-	. "code.google.com/p/gordon-go/util"
 	"go/token"
 	"math"
 	"strconv"
@@ -102,13 +101,28 @@ func (n *nodeBase) removePortBase(p *port) { // intentionally named to not imple
 	for _, c := range p.conns {
 		c.blk.removeConn(c)
 	}
+	ports := &n.ins
 	if p.out {
-		SliceRemove(&n.outs, p)
-	} else {
-		SliceRemove(&n.ins, p)
+		ports = &n.outs
 	}
-	n.Remove(p)
-	n.reform()
+	for i, p2 := range *ports {
+		if p2 == p {
+			*ports = append((*ports)[:i], (*ports)[i+1:]...)
+			n.Remove(p)
+			n.reform()
+			rearrange(n.blk)
+
+			if i > 0 && (*ports)[i-1].obj.Type != seqType { // assumes sequencing port, if present, is at index 0
+				i--
+			}
+			if i < len(*ports) {
+				SetKeyFocus((*ports)[i])
+			} else {
+				SetKeyFocus(n.self)
+			}
+			break
+		}
+	}
 }
 
 func (n *nodeBase) reform() {

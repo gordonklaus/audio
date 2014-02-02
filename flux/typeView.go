@@ -102,6 +102,9 @@ func (v *typeView) setType(t types.Type) {
 		for _, val := range t.Params {
 			v.childTypes.left = append(v.childTypes.left, newValueView(val))
 		}
+		if t.IsVariadic {
+			v.childTypes.left[len(v.childTypes.left)-1].setVariadic()
+		}
 		for _, val := range t.Results {
 			v.childTypes.right = append(v.childTypes.right, newValueView(val))
 		}
@@ -128,6 +131,11 @@ func (v *typeView) setType(t types.Type) {
 		v.childTypes.right[0].mode = compositeType
 	}
 
+	v.reform()
+}
+
+func (v *typeView) setVariadic() {
+	v.text.SetText("…")
 	v.reform()
 }
 
@@ -258,12 +266,12 @@ func (v *typeView) insertVar(vs *[]*types.Var, childTypes *[]*typeView, before b
 		i++
 	}
 	*vs = append((*vs)[:i], append([]*types.Var{{}}, (*vs)[i:]...)...)
-	v.setType(*v.typ)
+	v.refresh()
 	t := (*childTypes)[i]
 	t.edit(func() {
 		if *t.typ == nil {
 			*vs = append((*vs)[:i], (*vs)[i+1:]...)
-			v.setType(*v.typ)
+			v.refresh()
 			if fail != nil {
 				fail()
 			} else {
@@ -293,12 +301,12 @@ func (v *typeView) insertMethod(m *[]*types.Func, childTypes *[]*typeView, befor
 		i++
 	}
 	*m = append((*m)[:i], append([]*types.Func{types.NewFunc(0, nil, "", &types.Signature{Recv: newVar("", *v.typ)})}, (*m)[i:]...)...)
-	v.setType(*v.typ)
+	v.refresh()
 	t := (*childTypes)[i]
 	t.edit(func() {
 		if *t.typ == nil || len(t.nameText.GetText()) == 0 {
 			*m = append((*m)[:i], (*m)[i+1:]...)
-			v.setType(*v.typ)
+			v.refresh()
 			if fail != nil {
 				fail()
 			} else {
@@ -323,15 +331,8 @@ func (v *typeView) addMethods(m *[]*types.Func, childTypes *[]*typeView, done fu
 	}, done)
 }
 
-func (v *typeView) focusNearest(child *typeView, dirKey int) {
-	var views []View
-	for _, v := range append(v.childTypes.left, v.childTypes.right...) {
-		views = append(views, v)
-	}
-	nearest := nearestView(v, views, MapTo(child, Center(child), v), dirKey)
-	if nearest != nil {
-		SetKeyFocus(nearest)
-	}
+func (v *typeView) refresh() {
+	v.setType(*v.typ)
 }
 
 func (v *typeView) TookKeyFocus() { v.focused = true; Repaint(v) }
@@ -486,7 +487,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 				for i, c := range p.childTypes.right {
 					if c == v {
 						t.Fields = append(t.Fields[:i], t.Fields[i+1:]...)
-						p.setType(*p.typ)
+						p.refresh()
 						if len := len(t.Fields); len > 0 {
 							if i == len {
 								i--
@@ -502,7 +503,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 				for i, c := range p.childTypes.left {
 					if c == v {
 						t.Params = append(t.Params[:i], t.Params[i+1:]...)
-						p.setType(*p.typ)
+						p.refresh()
 						if len := len(t.Params); len > 0 {
 							if i == len {
 								i--
@@ -517,7 +518,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 				for i, c := range p.childTypes.right {
 					if c == v {
 						t.Results = append(t.Results[:i], t.Results[i+1:]...)
-						p.setType(*p.typ)
+						p.refresh()
 						if len := len(t.Results); len > 0 {
 							if i == len {
 								i--
@@ -533,7 +534,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 				for i, c := range p.childTypes.right {
 					if c == v {
 						t.Methods = append(t.Methods[:i], t.Methods[i+1:]...)
-						p.setType(*p.typ)
+						p.refresh()
 						if len := len(t.Methods); len > 0 {
 							if i == len {
 								i--

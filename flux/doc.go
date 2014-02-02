@@ -10,9 +10,9 @@ Packages and directories are displayed in white, types in green, functions and m
 
 To create a new item, hold Command and press 1 (package or directory), 2 (type), 3 (func or method), 4 (var or struct field), or 5 (const); then, type the new item's name followed by Enter.  The new item will be opened for editing.
 
-To delete an item, hold Command and press Delete (not yet implemented).
+To delete an item, press Command-Delete (not yet implemented).
 
-To change the name of a package, hold Shift and press Enter, then edit the name and press Enter.
+To change the name of a package, press Shift-Enter, then edit the name and press Enter.
 
 The browser behaves differently depending on the context in which it is opened.  In the context of program start, it displays only objects created in Flux and it allows you to create, delete, or open them for editing.  When opened in the context of editing a type or function, a relevant subset of objects is displayed from which one can be selected.
 
@@ -33,9 +33,11 @@ A struct field node can be toggled between read and write using the Equals key.
 
 A method value node with an unconnected receiver is treated as a method expression.
 
+A variadic function or method call node can have inputs added by pressing the Comma key, and can be toggled between multiple element input and single slice input modes by pressing Control-Period.
+
 To create a numeric, string, or character literal node, type a digit, double quote, or single quote character, respectively, followed by the value and Enter.  To create a composite literal node, type a left curly brace character and select the desired type from the browser.
 
-A function block always has at least two nodes, one for parameters and another for results.  To add a parameter or result, focus the appropriate node or port and press Comma (hold Shift to insert before a port), type the name and Enter, then select the type from the browser.  To delete a parameter or result, focus the port and press Backspace or Delete.
+A function block always has at least two nodes, one for parameters and another for results.  To add a parameter or result, focus the appropriate node or port and press Comma (hold Shift to insert before a port), type the name and Enter, then select the type from the browser.  To delete a parameter or result, focus the port and press Backspace or Delete.  To toggle the signature's variadicity, focus the final parameter's port and press Control-Period.
 
 To create a new connection, move the focus to a port and press Enter to start editing.  Use the arrow keys to move the other end of the connection and press Enter to stop editing.  To edit an existing connection, move the focus to one of its ends and press Enter.
 

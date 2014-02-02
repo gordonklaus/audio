@@ -61,6 +61,14 @@ func (n *funcNode) Close() {
 	n.ViewBase.Close()
 }
 
+func (n *funcNode) sig() *types.Signature {
+	obj := n.obj
+	if obj == nil {
+		obj = n.output.obj
+	}
+	return obj.GetType().(*types.Signature)
+}
+
 func (n funcNode) pkg() *types.Package {
 	return n.obj.GetPkg()
 }

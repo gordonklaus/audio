@@ -1,7 +1,7 @@
 TODO
 
 - fix new func object creation (currently panics when new func inserted at beginning or end of current objects).  clean up browser!
-- variadic parameters
+- use types.IsAssignableTo in canConnect
 - make all fields and methods available in browser.  use types.Selection for fields and methods.  use types.LookupFieldOrMethod.
 - consider handling addressability as Go does:  addressable expressions don't return a pointer (but the implementation takes the address and automatically dereferences as necessary).  would make for cleaner UI (not pointers everywhere) and avoid the issue of having to know whether to automatically dereference when comparing with untyped nil.
 - shortcuts:
@@ -9,6 +9,7 @@ TODO
   - on an in port, press '{' to create a composite literal of the port's type
   - on a node or connection, press cmd-R(cmd-I?) to bring up a browser with funcs and ops suitable to insert, i.e., having a signature compatible with the existing node's connections
 - make gui.Text change its appearance based on content when a validator is present.  give validator 3 states:  Acceptable, Intermediate, Invalid.
+- consider not lumping sequencing ports and connections in with the normal ones.  they can be annoying.  don't forget to consider them in the topological sorting order.
 - use go/parser and go/ast to validate basic literals
 - dimly highlight connected ports when a port is focused (or only when a key, e.g. Shift, is pressed) (but always for wireless conns)
 - don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.

@@ -20,7 +20,7 @@ func loadFunc(obj types.Object) *funcNode {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, fluxPath(obj), nil, parser.ParseComments)
 	if err == nil {
-		r := &reader{obj, map[string]*types.Package{}, map[string]*port{}, map[string][]*connection{}, map[string]*localVar{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
+		r := &reader{fset, obj.GetPkg(), types.NewScope(obj.GetPkg().Scope()), map[string]*port{}, map[string][]*connection{}, map[string]*localVar{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
 		for _, i := range file.Imports {
 			path, _ := strconv.Unquote(i.Path.Value)
 			pkg, err := getPackage(path)
@@ -31,7 +31,7 @@ func loadFunc(obj types.Object) *funcNode {
 			if i.Name != nil {
 				name = i.Name.Name
 			}
-			r.pkgNames[name] = pkg
+			r.scope.Insert(types.NewPkgName(0, pkg, name))
 		}
 		decl := file.Decls[len(file.Decls)-1].(*ast.FuncDecl) // get param and result var names from the source, as the obj names might not match
 		if decl.Recv != nil {
@@ -49,8 +49,9 @@ func loadFunc(obj types.Object) *funcNode {
 }
 
 type reader struct {
-	object    types.Object
-	pkgNames  map[string]*types.Package
+	fset      *token.FileSet
+	pkg       *types.Package
+	scope     *types.Scope
 	ports     map[string]*port
 	conns     map[string][]*connection
 	localVars map[string]*localVar
@@ -71,6 +72,9 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 		v := sig.Params[i]
 		r.src(p.Names[0], n.inputsNode.newOutput(v))
 		f.addPkgRef(v.Type)
+	}
+	if sig.IsVariadic {
+		n.inputsNode.outs[len(n.inputsNode.outs)-1].valView.setVariadic()
 	}
 	var results []*ast.Field
 	if r := typ.Results; r != nil {
@@ -275,23 +279,37 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
 	n := newCallNode(obj)
 	b.addNode(n)
 	args := x.Args
-	switch obj.(type) {
-	case *types.Func:
-		if isMethod(obj) {
-			recv := x.Fun.(*ast.SelectorExpr).X
-			args = append([]ast.Expr{recv}, args...)
-		}
-	case nil: // func value call
+	switch {
+	case isMethod(obj):
+		recv := x.Fun.(*ast.SelectorExpr).X
+		args = append([]ast.Expr{recv}, args...)
+	case obj == nil: // func value call
 		args = append([]ast.Expr{x.Fun}, args...)
 	}
-	switch n := n.(type) {
-	case *makeNode:
+	if n, ok := n.(*makeNode); ok {
 		n.setType(r.typ(args[0]))
 		args = args[1:]
 	}
 	for i, arg := range args {
-		// ins(n) must be called on each iteration because making a connection may
-		// cause inputs to change, in particular in the case of calling a func value
+		if i >= len(ins(n)) {
+			var newInput func(*types.Var) *port
+			var v *types.Var
+			switch n := n.(type) {
+			case *callNode:
+				newInput = n.newInput
+				_, v = n.variadic()
+			case *appendNode:
+				newInput = n.newInput
+				v = ins(n)[0].obj
+			}
+			if x.Ellipsis == 0 {
+				v = newVar(v.Name, v.Type.(*types.Slice).Elem)
+			}
+			in := newInput(v)
+			if x.Ellipsis != 0 {
+				in.valView.setVariadic()
+			}
+		}
 		r.dst(arg, ins(n)[i])
 	}
 	return n
@@ -343,15 +361,15 @@ func (r *reader) obj(x ast.Expr) types.Object {
 		if v, ok := r.localVars[x.Name]; ok {
 			return v
 		}
-		if obj := r.object.GetPkg().Scope().LookupParent(x.Name); obj != nil {
+		if obj := r.scope.LookupParent(x.Name); obj != nil {
 			return obj
 		}
 	case *ast.SelectorExpr:
 		// TODO: Type.Method and pkg.Type.Method
 		n1 := name(x.X)
 		n2 := x.Sel.Name
-		if pkg, ok := r.pkgNames[n1]; ok {
-			return pkg.Scope().Lookup(n2)
+		if p, ok := r.scope.LookupParent(n1).(*types.PkgName); ok {
+			return p.Pkg.Scope().Lookup(n2)
 		}
 		// TODO: use types.LookupFieldOrMethod()
 		t := r.conns[n1][0].src.obj.Type
@@ -387,11 +405,7 @@ func (r *reader) obj(x ast.Expr) types.Object {
 }
 
 func (r *reader) typ(x ast.Expr) types.Type {
-	s := r.object.Parent()
-	if isMethod(r.object) {
-		s = r.object.GetType().(*types.Signature).Recv.Parent()
-	}
-	t, _, err := types.EvalNode(nil, x, r.object.GetPkg(), s)
+	t, _, err := types.EvalNode(r.fset, x, r.pkg, r.scope)
 	if err != nil {
 		panic(err)
 	}

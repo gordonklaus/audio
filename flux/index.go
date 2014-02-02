@@ -98,7 +98,7 @@ func (n *indexNode) updateInputType() {
 					c.blk.removeConn(c)
 				}
 				n.Remove(n.ok)
-				n.outs = n.outs[:1]
+				n.outs = n.outs[:1] // TODO: this removes seqOut.  don't do that
 				n.ok = nil
 			}
 		case *types.Map:

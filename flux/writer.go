@@ -170,7 +170,11 @@ func (w *writer) fun(f *funcNode, vars map[*port]string) {
 		}
 		name := w.name(p.obj.Name)
 		vars[p] = name
-		w.write("%s %s", name, w.typ(p.obj.Type))
+		t := w.typ(p.obj.Type)
+		if f.sig().IsVariadic && i == len(params)-1 {
+			t = "..." + w.typ(p.obj.Type.(*types.Slice).Elem)
+		}
+		w.write("%s %s", name, t)
 	}
 	w.write(") (")
 	existing := map[string]string{} // support for connections from outer blocks to func literal results
@@ -225,10 +229,11 @@ func (w *writer) block(b *block, vars map[*port]string) {
 		switch n := n.(type) {
 		default:
 			args := []string{}
-			for _, in := range ins(n) {
+			ins := ins(n)
+			for _, in := range ins {
 				name, ok := vars[in]
 				if !ok {
-					if n, ok := n.(*makeNode); ok && len(n.ins) > 1 && in == n.ins[1] {
+					if _, ok := n.(*makeNode); ok && len(ins) > 1 && in == ins[1] {
 						continue //ignore unconnected slice capacity
 					}
 					switch t := in.obj.Type.(type) {
@@ -259,6 +264,9 @@ func (w *writer) block(b *block, vars map[*port]string) {
 						f = args[0]
 						args = args[1:]
 					}
+					if n.ellipsis() {
+						args[len(args)-1] += "..."
+					}
 					w.indent("")
 					if len(results) > 0 {
 						w.write(strings.Join(results, ", ") + " := ")
@@ -267,17 +275,20 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.seq(n)
 				}
 			case *appendNode:
-				if len(n.ins[0].conns) > 0 && len(n.outs[0].conns) > 0 {
-					w.indent("%s := append(%s, %s)", results[0], args[0], args[1])
+				if len(ins[0].conns) > 0 && len(outs(n)[0].conns) > 0 {
+					if n.ellipsis() {
+						args[1] += "..."
+					}
+					w.indent("%s := append(%s)", results[0], strings.Join(args, ", "))
 				}
 				w.seq(n)
 			case *deleteNode:
-				if len(n.ins[0].conns) > 0 {
+				if len(ins[0].conns) > 0 {
 					w.indent("delete(%s, %s)", args[0], args[1])
 				}
 				w.seq(n)
 			case *lenNode:
-				if len(results) > 0 && len(n.ins[0].conns) > 0 {
+				if len(results) > 0 && len(ins[0].conns) > 0 {
 					w.indent("%s := len(%s)", results[0], args[0])
 				}
 				w.seq(n)
@@ -287,7 +298,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				}
 			case *operatorNode:
 				c := 0
-				for _, p := range n.ins {
+				for _, p := range ins {
 					c += len(p.conns)
 				}
 				if c > 0 && len(results) > 0 {
@@ -361,11 +372,11 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.seq(n)
 				}
 			case *convertNode:
-				if len(n.ins[0].conns) > 0 && len(results) > 0 {
+				if len(ins[0].conns) > 0 && len(results) > 0 {
 					w.indent("%s := (%s)(%s)\n", results[0], w.typ(*n.typ.typ), args[0]) // parenthesize type for easy recognition in reader
 				}
 			case *typeAssertNode:
-				if len(n.ins[0].conns) > 0 && len(results) > 0 {
+				if len(ins[0].conns) > 0 && len(results) > 0 {
 					w.indent("%s := %s.(%s)\n", strings.Join(results, ", "), args[0], w.typ(*n.typ.typ))
 				}
 			case *funcNode:
@@ -616,29 +627,33 @@ func (w writer) typ(t types.Type) string {
 }
 
 func (w writer) signature(f *types.Signature) string {
-	s := w.params(f.Params)
+	s := w.vars(f.Params, f.IsVariadic)
 	if len(f.Results) > 0 {
 		s += " "
 		if len(f.Results) == 1 && f.Results[0].Name == "" {
 			return s + w.typ(f.Results[0].Type)
 		}
-		return s + w.params(f.Results)
+		return s + w.vars(f.Results, false)
 	}
 	return s
 }
 
-func (w writer) params(params []*types.Var) string {
+func (w writer) vars(vars []*types.Var, variadic bool) string {
 	s := "("
-	for i, p := range params {
+	for i, v := range vars {
 		if i > 0 {
 			s += ", "
 		}
-		name := p.Name
+		name := v.Name
 		if name == "" {
 			name = "_"
 		}
 		s += name + " "
-		s += w.typ(p.Type)
+		if variadic && i == len(vars)-1 {
+			s += "..." + w.typ(v.Type.(*types.Slice).Elem)
+		} else {
+			s += w.typ(v.Type)
+		}
 	}
 	return s + ")"
 }

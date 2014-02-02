@@ -523,33 +523,29 @@ func newPortsNode(out bool) *portsNode {
 func (n *portsNode) removePort(p *port) {
 	if n.editable {
 		f := n.blk.node.(*funcNode)
-		obj := f.obj
-		if obj == nil {
-			obj = f.output.obj
-		}
-		sig := obj.GetType().(*types.Signature)
-		var ports []*port
-		var vars *[]*types.Var
+		sig := f.sig()
+
+		ports := n.ins
+		vars := &sig.Results
 		if p.out {
 			ports = n.outs
-			if isMethod(obj) { // don't remove receiver
+			if sig.Recv != nil { // don't remove receiver
 				ports = ports[1:]
 			}
 			vars = &sig.Params
-		} else {
-			ports = n.ins
-			vars = &sig.Results
 		}
+
 		for i, q := range ports {
 			if q == p {
 				n.blk.func_().subPkgRef((*vars)[i].Type)
 				*vars = append((*vars)[:i], (*vars)[i+1:]...)
 				n.removePortBase(p)
-				SetKeyFocus(n)
-				if f.obj == nil {
-					f.output.setType(f.output.obj.Type)
+				if i == len(*vars) {
+					sig.IsVariadic = false
 				}
-				rearrange(n.blk)
+				if f.obj == nil {
+					f.output.valView.refresh()
+				}
 				break
 			}
 		}
@@ -563,24 +559,19 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 		SetKeyFocus(f)
 	} else if n.editable && event.Key == KeyComma {
 		f := n.blk.node.(*funcNode)
-		obj := f.obj
-		if obj == nil {
-			obj = f.output.obj
-		}
-		sig := obj.GetType().(*types.Signature)
-		var p *port
-		var ports *[]*port
-		var vars *[]*types.Var
-		v := &types.Var{}
+		sig := f.sig()
+
+		newPort := newOutput
+		ports := &n.outs
+		vars := &sig.Params
 		if n.out {
-			p = newInput(n, v)
+			newPort = newInput
 			ports = &n.ins
 			vars = &sig.Results
-		} else {
-			p = newOutput(n, v)
-			ports = &n.outs
-			vars = &sig.Params
 		}
+
+		v := &types.Var{}
+		p := newPort(n, v)
 
 		i := len(*ports)
 		if focus, ok := KeyFocus(n).(*port); ok {
@@ -606,17 +597,41 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 					i--
 				}
 				*vars = append((*vars)[:i], append([]*types.Var{v}, (*vars)[i:]...)...)
+				if i == len(*vars)-1 {
+					sig.IsVariadic = false
+				}
 				n.blk.func_().addPkgRef(v.Type)
 				SetKeyFocus(p)
 			} else {
 				n.removePortBase(p)
-				rearrange(n.blk)
-				SetKeyFocus(n)
 			}
 			if f.obj == nil {
-				f.output.setType(f.output.obj.Type)
+				f.output.valView.refresh()
 			}
 		})
+	} else if n.editable && !n.out && event.Key == KeyPeriod && event.Ctrl {
+		f := n.blk.node.(*funcNode)
+		sig := f.sig()
+		len := len(n.outs)
+		if len > 0 && (sig.Recv == nil || len > 1) {
+			p := n.outs[len-1]
+			if KeyFocus(n) != p {
+				return
+			}
+			sig.IsVariadic = !sig.IsVariadic
+			if sig.IsVariadic {
+				p.obj.Type = &types.Slice{p.obj.Type}
+			} else {
+				p.obj.Type = p.obj.Type.(*types.Slice).Elem
+			}
+			p.valView.refresh()
+			if sig.IsVariadic {
+				p.valView.setVariadic()
+			}
+			if f.obj == nil {
+				f.output.valView.refresh()
+			}
+		}
 	} else {
 		n.nodeBase.KeyPress(event)
 	}

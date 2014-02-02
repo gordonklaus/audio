@@ -17,25 +17,75 @@ func newAppendNode() *appendNode {
 	n := &appendNode{}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText("append")
-	slice := n.newInput(newVar("", generic{}))
-	val := n.newInput(newVar("", generic{}))
+	n.addSeqPorts()
+	in := n.newInput(newVar("", generic{}))
 	out := n.newOutput(newVar("", generic{}))
-	slice.connsChanged = func() {
-		if len(slice.conns) > 0 {
-			t, _ := indirect(slice.conns[0].src.obj.Type)
-			if t, ok := t.(*types.Slice); ok {
-				slice.setType(t)
-				val.setType(t.Elem)
+	in.connsChanged = func() {
+		if len(in.conns) > 0 {
+			t, _ := indirect(in.conns[0].src.obj.Type)
+			if t, ok := t.(*types.Slice); ok { // TODO: remove ok (always true) after canConnect checks types
+				in.setType(t)
+				if n.ellipsis() {
+					in := ins(n)[1]
+					in.setType(t)
+					in.valView.setVariadic()
+				} else {
+					for _, in := range ins(n)[1:] {
+						in.setType(t.Elem)
+					}
+				}
 				out.setType(t)
 			}
 		} else {
-			slice.setType(generic{})
-			val.setType(generic{})
+			in.setType(generic{})
+			for _, in := range ins(n)[1:] {
+				in.setType(generic{})
+			}
 			out.setType(generic{})
 		}
 	}
-	n.addSeqPorts()
 	return n
+}
+
+func (n *appendNode) KeyPress(event KeyEvent) {
+	ins := ins(n)
+	v := ins[0].obj
+	t, ok := v.Type.(*types.Slice)
+	if ok && event.Key == KeyComma {
+		if n.ellipsis() {
+			n.removePortBase(ins[1])
+		}
+		SetKeyFocus(n.newInput(newVar("", t.Elem)))
+		rearrange(n.blk)
+	} else if ok && event.Key == KeyPeriod && event.Ctrl {
+		if n.ellipsis() {
+			n.removePortBase(ins[1])
+		} else {
+			for _, in := range ins[1:] {
+				n.removePortBase(in)
+			}
+			in := n.newInput(v)
+			in.valView.setVariadic()
+			SetKeyFocus(in)
+			rearrange(n.blk)
+		}
+	} else {
+		n.ViewBase.KeyPress(event)
+	}
+}
+
+func (n *appendNode) removePort(p *port) {
+	for _, p2 := range ins(n)[1:] {
+		if p2 == p {
+			n.removePortBase(p)
+			break
+		}
+	}
+}
+
+func (n *appendNode) ellipsis() bool {
+	ins := ins(n)
+	return len(ins) == 2 && ins[1].obj == ins[0].obj
 }
 
 type deleteNode struct {
