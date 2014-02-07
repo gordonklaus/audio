@@ -11,7 +11,6 @@ import (
 	"go/token"
 	"math"
 	"math/rand"
-	"unicode"
 )
 
 const blockRadius = 16
@@ -460,7 +459,7 @@ func newNode(b *block, obj types.Object, funcAsVal bool) {
 			n = newTypeAssertNode()
 		}
 	case *types.Func, *types.Builtin:
-		if !unicode.IsLetter([]rune(obj.GetName())[0]) {
+		if isOperator(obj) {
 			n = newOperatorNode(obj)
 		} else if funcAsVal && obj.GetPkg() != nil { //Pkg==nil == builtin
 			n = newValueNode(obj, false)

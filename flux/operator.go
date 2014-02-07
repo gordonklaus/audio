@@ -6,6 +6,7 @@ package main
 
 import (
 	"code.google.com/p/gordon-go/go/types"
+	"unicode"
 )
 
 type operatorNode struct {
@@ -102,4 +103,9 @@ func untypedToTyped(t types.Type) types.Type {
 	default:
 		return t
 	}
+}
+
+func isOperator(obj types.Object) bool {
+	name := obj.GetName()
+	return len(name) > 0 && !unicode.IsLetter([]rune(name)[0])
 }

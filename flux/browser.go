@@ -35,8 +35,8 @@ type browser struct {
 
 	pathTexts, nameTexts []Text
 	text                 *nodeNameText
-	typeView             *typeView
-	pkgNameText          *TextBase
+	typ                  *typeView
+	pkgName              *TextBase
 	funcAsVal            bool
 }
 
@@ -71,14 +71,17 @@ func newBrowser(mode browserMode, context View) *browser {
 			}
 		}
 	}
+	
+	b.typ = newTypeView(new(types.Type))
+	b.Add(b.typ)
 
 	b.text = newNodeNameText(b)
 	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	b.Add(b.text)
 
-	b.pkgNameText = NewText("")
-	b.pkgNameText.SetBackgroundColor(Color{0, 0, 0, .7})
-	b.Add(b.pkgNameText)
+	b.pkgName = NewText("")
+	b.pkgName.SetBackgroundColor(Color{0, 0, 0, .7})
+	b.Add(b.pkgName)
 
 	b.text.SetText("")
 
@@ -381,15 +384,14 @@ func newNodeNameText(b *browser) *nodeNameText {
 }
 func (t *nodeNameText) SetText(text string) {
 	b := t.b
-	if b.newObj == nil {
-		if objs := b.filteredObjs(); len(objs) > 0 {
-			for _, obj := range objs {
-				if strings.HasPrefix(strings.ToLower(obj.GetName()), strings.ToLower(text)) {
-					goto ok
-				}
+	objs := b.filteredObjs()
+	if len(objs) > 0 && b.newObj == nil {
+		for _, obj := range objs {
+			if strings.HasPrefix(strings.ToLower(obj.GetName()), strings.ToLower(text)) {
+				goto ok
 			}
-			return
 		}
+		return
 	}
 ok:
 	currentIndex := 0
@@ -402,7 +404,6 @@ ok:
 		currentIndex = b.indices[b.i]
 	}
 
-	objs := b.filteredObjs()
 	if b.newObj != nil {
 		switch obj := b.newObj.(type) {
 		case buildPackage:
@@ -454,25 +455,23 @@ ok:
 	}
 	t.TextBase.SetText(text)
 
-	if t, ok := b.lastPathText(); ok && cur != nil {
-		sep := ""
-		if _, ok := cur.(buildPackage); ok {
-			sep = "/"
-		} else {
-			sep = "."
-		}
-		text := t.GetText()
-		t.SetText(text[:len(text)-1] + sep)
-	}
 	xOffset := 0.0
 	if t, ok := b.lastPathText(); ok {
+		if cur != nil {
+			sep := "."
+			if _, ok := cur.(buildPackage); ok {
+				sep = "/"
+			}
+			text := t.GetText()
+			t.SetText(text[:len(text)-1] + sep)
+		}
 		xOffset = Pos(t).X + Width(t)
 	}
 
 	for _, l := range b.nameTexts {
 		l.Close()
 	}
-	b.nameTexts = []Text{}
+	b.nameTexts = nil
 	width := 0.0
 	for i, activeIndex := range b.indices {
 		obj := objs[activeIndex]
@@ -491,40 +490,31 @@ ok:
 
 	yOffset := float64(n-b.i-1) * Height(b.text)
 	b.text.Move(Pt(xOffset, yOffset))
-	if b.typeView != nil {
-		b.typeView.Close()
-	}
+	Hide(b.pkgName)
 	if pkg, ok := cur.(buildPackage); ok {
-		t := b.pkgNameText
+		t := b.pkgName
 		t.SetText(pkg.Name)
 		t.Move(Pt(xOffset+width+16, yOffset-(Height(t)-Height(b.text))/2))
 		if pkg.Name != pkg.GetName() {
 			Show(t)
-		} else {
-			Hide(t)
 		}
-	} else {
-		Hide(b.pkgNameText)
 	}
+	Hide(b.typ)
 	if cur != nil {
 		b.text.SetTextColor(color(cur, true, b.funcAsVal))
 		switch cur := cur.(type) {
 		case *types.TypeName:
-			if t, ok := cur.GetType().(*types.Named); ok {
-				b.typeView = newTypeView(&t.UnderlyingT)
-				b.Add(b.typeView)
+			if t, ok := cur.Type.(*types.Named); ok {
+				b.typ.setType(t.UnderlyingT)
+				Show(b.typ)
 			}
-		case *types.Func, *types.Var, *types.Const, field:
-			t := cur.GetType()
-			b.typeView = newTypeView(&t)
-			b.Add(b.typeView)
-		case *localVar:
-			b.typeView = newTypeView(&cur.Type)
-			b.Add(b.typeView)
+		case *types.Func, *types.Var, *types.Const, field, *localVar:
+			if !isOperator(cur) {
+				b.typ.setType(cur.GetType())
+				Show(b.typ)
+			}
 		}
-		if b.typeView != nil {
-			b.typeView.Move(Pt(xOffset+width+16, yOffset-(Height(b.typeView)-Height(b.text))/2))
-		}
+		b.typ.Move(Pt(xOffset+width+16, yOffset-(Height(b.typ)-Height(b.text))/2))
 	}
 	for _, p := range b.pathTexts {
 		p.Move(Pt(Pos(p).X, yOffset))
@@ -580,7 +570,7 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 			return
 		}
 		if pkg, ok := cur.(buildPackage); ok && event.Shift {
-			t := b.pkgNameText
+			t := b.pkgName
 			Show(t)
 			t.Accept = func(s string) {
 				if s != pkg.Name {
@@ -623,26 +613,26 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 				if isMethod(obj) {
 					recv := b.path[0].(*types.TypeName).Type.(*types.Named)
 					recv.Methods = append(recv.Methods, obj.(*types.Func))
-					break
-				}
-				pkg := b.currentPkg
-				if len(b.path) > 0 {
-					pkg = pkgs[b.path[0].(buildPackage).ImportPath]
-				}
-				if pkg != nil {
-					pkg.Scope().Insert(obj)
+				} else {
+					pkg := b.currentPkg
+					if len(b.path) > 0 {
+						pkg = pkgs[b.path[0].(buildPackage).ImportPath]
+					}
+					if pkg != nil {
+						pkg.Scope().Insert(obj)
+					}
 				}
 			case *localVar:
-				v := b.typeView
 				b.finished = true // hack to avoid cancelling browser when it loses keyboard focus
-				v.edit(func() {
+				b.typ.edit(func() {
 					b.finished = false
-					if *v.typ == nil {
-						t.SetText("")
-						SetKeyFocus(t)
-					} else {
+					if *b.typ.typ != nil {
+						obj.Type = *b.typ.typ
 						b.finished = true
 						b.accepted(obj)
+					} else {
+						t.SetText("")
+						SetKeyFocus(t)
 					}
 				})
 				b.newObj = nil
@@ -679,11 +669,9 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 				b.path = append([]types.Object{obj}, b.path...)
 				b.indices = nil
 
-				sep := ""
+				sep := "."
 				if _, ok := obj.(buildPackage); ok {
 					sep = "/"
-				} else {
-					sep = "."
 				}
 				pathText := NewText(obj.GetName() + sep)
 				pathText.SetTextColor(color(obj, true, b.funcAsVal))
