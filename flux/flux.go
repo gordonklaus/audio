@@ -41,8 +41,8 @@ func newFluxWindow() *fluxWindow {
 			reset := func() {
 				w.Remove(v)
 				Show(w.browser)
-				w.browser.text.SetText("")
-				SetKeyFocus(w.browser.text)
+				w.browser.clearText()
+				SetKeyFocus(w.browser)
 			}
 			if typ.UnderlyingT == nil {
 				v.edit(func() {
@@ -68,13 +68,14 @@ func newFluxWindow() *fluxWindow {
 			f.Move(Center(w))
 			f.done = func() {
 				Show(w.browser)
-				w.browser.text.SetText("")
-				SetKeyFocus(w.browser.text)
+				w.browser.clearText()
+				SetKeyFocus(w.browser)
 			}
 			SetKeyFocus(f.inputsNode)
 		}
 	}
-	SetKeyFocus(w.browser.text)
+	w.browser.canceled = func() {}
+	SetKeyFocus(w.browser)
 	return w
 }
 

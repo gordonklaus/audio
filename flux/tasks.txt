@@ -1,6 +1,5 @@
 TODO
 
-- fix new func object creation (currently panics when new func inserted at beginning or end of current objects).  clean up browser!
 - use types.IsAssignableTo in canConnect
 - make all fields and methods available in browser.  use types.Selection for fields and methods.  use types.LookupFieldOrMethod.
 - consider handling addressability as Go does:  addressable expressions don't return a pointer (but the implementation takes the address and automatically dereferences as necessary).  would make for cleaner UI (not pointers everywhere) and avoid the issue of having to know whether to automatically dereference when comparing with untyped nil.

@@ -19,7 +19,8 @@ import (
 	"strings"
 )
 
-func savePackageName(p *build.Package) {
+func savePackageName(pkg *pkgObject) {
+	p, _ := build.Import(pkg.importPath, "", build.AllowBinary)
 	for _, name := range append(append(append(p.GoFiles, p.IgnoredGoFiles...), p.CgoFiles...), p.TestGoFiles...) {
 		path := filepath.Join(p.Dir, name)
 		b, err := ioutil.ReadFile(path)

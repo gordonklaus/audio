@@ -46,7 +46,6 @@ func NewTextBase(self Text, text string) *TextBase {
 	t.ViewBase = NewView(t)
 	t.textColor = Color{1, 1, 1, 1}
 	t.backgroundColor = Color{0, 0, 0, 1}
-	t.Accept, t.Reject, t.TextChanged = func(string) {}, func() {}, func(string) {}
 	t.SetText(text)
 	t.Self = self
 	t.ViewBase.Self = self
@@ -57,7 +56,9 @@ func (t TextBase) GetText() string { return t.text }
 func (t *TextBase) SetText(text string) {
 	t.text = text
 	Resize(t, Pt(2*t.frameSize+font.Advance(t.text), 2*t.frameSize-font.Descender()+font.Ascender()))
-	t.TextChanged(text)
+	if t.TextChanged != nil {
+		t.TextChanged(text)
+	}
 }
 
 func (t TextBase) GetTextColor() Color { return t.textColor }
@@ -101,9 +102,13 @@ func (t *TextBase) KeyPress(event KeyEvent) {
 			}
 		}
 	case KeyEnter:
-		t.Accept(t.text)
+		if t.Accept != nil {
+			t.Accept(t.text)
+		}
 	case KeyEscape:
-		t.Reject()
+		if t.Reject != nil {
+			t.Reject()
+		}
 	}
 }
 

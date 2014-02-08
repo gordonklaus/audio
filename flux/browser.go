@@ -28,16 +28,15 @@ type browser struct {
 	accepted   func(types.Object)
 	canceled   func()
 
-	path    []types.Object
-	indices []int
-	i       int
-	newObj  types.Object
+	path, objs objects
+	i          int
+	newObj     types.Object
 
-	pathTexts, nameTexts []Text
-	text                 *nodeNameText
-	typ                  *typeView
-	pkgName              *TextBase
-	funcAsVal            bool
+	pathTexts, objTexts []Text
+	text                *TextBase
+	typ                 *typeView
+	pkgName             *TextBase
+	funcAsVal           bool
 }
 
 type browserMode int
@@ -52,7 +51,7 @@ const (
 )
 
 func newBrowser(mode browserMode, context View) *browser {
-	b := &browser{mode: mode, accepted: func(types.Object) {}, canceled: func() {}}
+	b := &browser{mode: mode}
 	b.ViewBase = NewView(b)
 
 	switch v := context.(type) {
@@ -71,19 +70,21 @@ func newBrowser(mode browserMode, context View) *browser {
 			}
 		}
 	}
-	
+
+	b.text = NewText("")
+	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
+	b.text.SetValidator(b.validateText)
+	b.text.TextChanged = b.textChanged
+	b.Add(b.text)
+
 	b.typ = newTypeView(new(types.Type))
 	b.Add(b.typ)
-
-	b.text = newNodeNameText(b)
-	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
-	b.Add(b.text)
 
 	b.pkgName = NewText("")
 	b.pkgName.SetBackgroundColor(Color{0, 0, 0, .7})
 	b.Add(b.pkgName)
 
-	b.text.SetText("")
+	b.clearText()
 
 	return b
 }
@@ -95,99 +96,170 @@ func (b *browser) cancel() {
 	}
 }
 
-type special struct {
-	types.Object
-	name string
-}
+func (b *browser) clearText() { b.text.SetText("") }
 
-func (s special) GetName() string { return s.name }
-
-type buildPackage struct {
-	types.Object
-	*build.Package
-}
-
-func (p buildPackage) GetName() string {
-	if p.Dir == "" {
-		return ""
+func (b browser) currentObj() types.Object {
+	if len(b.objs) > 0 {
+		return b.objs[b.i]
 	}
-	return path.Base(p.Dir)
+	return nil
 }
 
-type field struct {
-	*types.Var
-	recv types.Type
+func (b *browser) makeCurrent(obj types.Object) {
+	for i, o := range b.objs {
+		if o == obj {
+			b.i = i
+			b.refresh()
+			break
+		}
+	}
 }
 
-type objects []types.Object
-
-func (o objects) Len() int { return len(o) }
-func (o objects) Less(i, j int) bool {
-	return objLess(o[i], o[j])
+func (b browser) lastPathText() (Text, bool) {
+	if np := len(b.pathTexts); np > 0 {
+		return b.pathTexts[np-1], true
+	}
+	return nil, false
 }
-func objLess(o1, o2 types.Object) bool {
-	n1, n2 := o1.GetName(), o2.GetName()
-	switch o1.(type) {
-	case special:
-		switch o2.(type) {
-		case special:
-			return n1 < n2
-		default:
+
+func (b *browser) validateText(text *string) bool {
+	if b.newObj != nil {
+		// TODO: unique id
+		return true
+	}
+	for _, obj := range b.filteredObjs() {
+		name := obj.GetName()
+		if strings.HasPrefix(strings.ToLower(name), strings.ToLower(*text)) {
+			*text = name[:len(*text)]
 			return true
 		}
-	case *types.TypeName:
-		switch o2.(type) {
-		case special:
-			return false
+	}
+	return false
+}
+
+func (b *browser) textChanged(text string) {
+	objs := objects{}
+	i := 0
+
+	for _, obj := range b.filteredObjs() {
+		if strings.HasPrefix(strings.ToLower(obj.GetName()), strings.ToLower(text)) {
+			objs = append(objs, obj)
+			if obj == b.currentObj() {
+				i = len(objs) - 1
+			}
+		}
+	}
+
+	if b.newObj != nil {
+		switch obj := b.newObj.(type) {
+		case *pkgObject:
+			obj.name = text
 		case *types.TypeName:
-			return n1 < n2
-		default:
-			return true
+			obj.Name = text
+		case *types.Func:
+			obj.Name = text
+		case *types.Var:
+			obj.Name = text
+		case *types.Const:
+			obj.Name = text
+		case *localVar:
+			obj.Name = text
 		}
-	case *types.Func, *types.Builtin:
-		switch o2.(type) {
-		case special, *types.TypeName:
-			return false
-		case *types.Func, *types.Builtin:
-			return n1 < n2
-		default:
-			return true
+		i = 0
+		for i < len(objs) && objLess(objs[i], b.newObj) {
+			i++
 		}
-	case *types.Var, field, *localVar:
-		switch o2.(type) {
-		default:
-			return false
-		case *types.Var, field, *localVar:
-			return n1 < n2
-		case *types.Const, *types.Nil, buildPackage:
-			return true
+		objs = append(objs[:i], append(objects{b.newObj}, objs[i:]...)...)
+	}
+
+	b.objs = objs
+	b.i = i
+	b.refresh()
+}
+
+func (b *browser) refresh() {
+	cur := b.currentObj()
+
+	if cur != nil {
+		f := b.text.TextChanged
+		b.text.TextChanged = nil
+		b.text.SetText(cur.GetName()[:len(b.text.GetText())])
+		b.text.TextChanged = f
+	}
+
+	xOffset := 0.0
+	if t, ok := b.lastPathText(); ok {
+		if cur != nil {
+			sep := "."
+			if _, ok := cur.(*pkgObject); ok {
+				sep = "/"
+			}
+			text := t.GetText()
+			t.SetText(text[:len(text)-1] + sep)
 		}
-	case *types.Const, *types.Nil:
-		switch o2.(type) {
-		default:
-			return false
-		case *types.Const, *types.Nil:
-			return n1 < n2
-		case buildPackage:
-			return true
-		}
-	case buildPackage:
-		switch o2.(type) {
-		default:
-			return false
-		case buildPackage:
-			return n1 < n2
+		xOffset = Pos(t).X + Width(t)
+	}
+
+	n := len(b.objs)
+	for _, l := range b.objTexts {
+		l.Close()
+	}
+	b.objTexts = nil
+	width := 0.0
+	for i, obj := range b.objs {
+		l := NewText(obj.GetName())
+		l.SetTextColor(color(obj, false, b.funcAsVal))
+		l.SetBackgroundColor(Color{0, 0, 0, .7})
+		b.Add(l)
+		b.objTexts = append(b.objTexts, l)
+		l.Move(Pt(xOffset, float64(n-i-1)*Height(l)))
+		if Width(l) > width {
+			width = Width(l)
 		}
 	}
-	panic("unreachable")
+	Raise(b.text)
+	Resize(b, Pt(xOffset+width, float64(n)*Height(b.text)))
+
+	yOffset := float64(n-b.i-1) * Height(b.text)
+	b.text.Move(Pt(xOffset, yOffset))
+	Hide(b.pkgName)
+	if pkg, ok := cur.(*pkgObject); ok {
+		t := b.pkgName
+		t.SetText(pkg.name)
+		t.Move(Pt(xOffset+width+16, yOffset-(Height(t)-Height(b.text))/2))
+		if pkg.name != pkg.GetName() {
+			Show(t)
+		}
+	}
+	Hide(b.typ)
+	if cur != nil {
+		b.text.SetTextColor(color(cur, true, b.funcAsVal))
+		switch cur := cur.(type) {
+		case *types.TypeName:
+			if t, ok := cur.Type.(*types.Named); ok && t.UnderlyingT != nil {
+				b.typ.setType(t.UnderlyingT)
+				Show(b.typ)
+			}
+		case *types.Func, *types.Var, *types.Const, field, *localVar:
+			if !isOperator(cur) {
+				b.typ.setType(cur.GetType())
+				Show(b.typ)
+			}
+		}
+		b.typ.Move(Pt(xOffset+width+16, yOffset-(Height(b.typ)-Height(b.text))/2))
+	}
+	for _, p := range b.pathTexts {
+		p.Move(Pt(Pos(p).X, yOffset))
+	}
+
+	Pan(b, Pt(0, yOffset))
 }
-func (o objects) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
-var buildPackages = map[string]buildPackage{}
+var pkgObjects = map[string]*pkgObject{}
 
-func (b browser) filteredObjs() (objs []types.Object) {
+func (b browser) filteredObjs() (objs objects) {
 	add := func(obj types.Object) {
-		if _, ok := obj.(buildPackage); !ok {
+		if _, ok := obj.(*pkgObject); !ok {
 			switch b.mode {
 			case fluxSourceOnly:
 				if !fluxObjs[obj] {
@@ -247,28 +319,71 @@ func (b browser) filteredObjs() (objs []types.Object) {
 		objs = append(objs, obj)
 	}
 
-	addPkgs := func(dir string) {
-		if file, err := os.Open(dir); err == nil {
+	addSubPkgs := func(importPath string) {
+		seen := map[string]bool{}
+		for _, srcDir := range build.Default.SrcDirs() {
+			file, err := os.Open(filepath.Join(srcDir, importPath))
+			if err != nil {
+				continue
+			}
 			defer file.Close()
-			if fileInfos, err := file.Readdir(-1); err == nil {
-				for _, fileInfo := range fileInfos {
-					name := fileInfo.Name()
-					if fileInfo.IsDir() && unicode.IsLetter([]rune(name)[0]) && name != "testdata" {
-						fullPath := filepath.Join(dir, name)
-						buildPkg, ok := buildPackages[fullPath]
-						if !ok {
-							pkg, _ := build.ImportDir(fullPath, build.AllowBinary)
-							buildPkg = buildPackage{nil, pkg}
-							buildPackages[fullPath] = buildPkg
-						}
-						add(buildPkg)
-					}
+			fileInfos, err := file.Readdir(-1)
+			if err != nil {
+				continue
+			}
+			for _, fileInfo := range fileInfos {
+				name := fileInfo.Name()
+				if !fileInfo.IsDir() || !unicode.IsLetter([]rune(name)[0]) || name == "testdata" || seen[name] {
+					continue
 				}
+				seen[name] = true
+
+				importPath := path.Join(importPath, name)
+				pkgObj, ok := pkgObjects[importPath]
+				if !ok {
+					pkg, _ := build.Import(importPath, "", build.AllowBinary)
+					pkgObj = &pkgObject{nil, importPath, pkg.Name, srcDir}
+					pkgObjects[importPath] = pkgObj
+				}
+				add(pkgObj)
 			}
 		}
 	}
 
-	if len(b.path) == 0 {
+	if len(b.path) > 0 {
+		switch obj := b.path[0].(type) {
+		case *pkgObject:
+			if pkg, err := getPackage(obj.importPath); err == nil {
+				for _, obj := range pkg.Scope().Objects {
+					add(obj)
+				}
+			} else {
+				if _, ok := err.(*build.NoGoError); !ok {
+					fmt.Println(err)
+				}
+				pkgs[obj.importPath] = types.NewPackage(obj.importPath, obj.name, &types.Scope{})
+			}
+			addSubPkgs(obj.importPath)
+		case *types.TypeName:
+			// TODO: use types.NewMethodSet to get the entire method set
+			// TODO: shouldn't go/types also have a NewFieldSet?
+			if nt, ok := obj.Type.(*types.Named); ok {
+				for _, m := range nt.Methods {
+					add(m)
+				}
+				switch ut := nt.UnderlyingT.(type) {
+				case *types.Struct:
+					for _, f := range ut.Fields {
+						add(field{f, nt})
+					}
+				case *types.Interface:
+					for _, m := range ut.Methods {
+						add(m)
+					}
+				}
+			}
+		}
+	} else {
 		if b.mode == browse {
 			for _, name := range []string{"=", "[]", "[]=", "break", "call", "continue", "convert", "func", "if", "indirect", "loop", "typeAssert"} {
 				objs = append(objs, special{name: name})
@@ -292,9 +407,7 @@ func (b browser) filteredObjs() (objs []types.Object) {
 		for _, t := range []*types.TypeName{protoPointer, protoArray, protoSlice, protoMap, protoChan, protoFunc, protoInterface, protoStruct} {
 			add(t)
 		}
-		for _, dir := range build.Default.SrcDirs() {
-			addPkgs(dir)
-		}
+		addSubPkgs("")
 		if b.fun != nil {
 			b.fun.funcblk.walk(func(blk *block) {
 				for v := range blk.localVars {
@@ -302,311 +415,93 @@ func (b browser) filteredObjs() (objs []types.Object) {
 				}
 			}, nil, nil)
 		}
-	} else {
-		switch obj := b.path[0].(type) {
-		case buildPackage:
-			if pkg, err := getPackage(obj.ImportPath); err == nil {
-				for _, obj := range pkg.Scope().Objects {
-					add(obj)
-				}
-			} else {
-				if _, ok := err.(*build.NoGoError); !ok {
-					fmt.Println(err)
-				}
-				pkgs[obj.ImportPath] = types.NewPackage(obj.ImportPath, obj.GetName(), &types.Scope{})
-			}
-			addPkgs(obj.Dir)
-		case *types.TypeName:
-			// TODO: use types.NewMethodSet to get the entire method set
-			// TODO: shouldn't go/types also have a NewFieldSet?
-			if nt, ok := obj.Type.(*types.Named); ok {
-				for _, m := range nt.Methods {
-					add(m)
-				}
-				switch ut := nt.UnderlyingT.(type) {
-				case *types.Struct:
-					for _, f := range ut.Fields {
-						add(field{f, nt})
-					}
-				case *types.Interface:
-					for _, m := range ut.Methods {
-						add(m)
-					}
-				}
-			}
-		}
 	}
-
-	// TODO: merge duplicate directories across srcDirs (warn if there is package shadowing)
 
 	sort.Sort(objects(objs))
 	return
 }
 
-func (b browser) currentObj() types.Object {
-	objs := b.filteredObjs()
-	if len(b.indices) == 0 || len(objs) == 0 {
-		return nil
-	}
-	return objs[b.indices[b.i]]
-}
+func (b *browser) LostKeyFocus() { b.cancel() } // TODO: implement this differently.  it interferes with localVar type editing
 
-func (b browser) lastPathText() (Text, bool) {
-	if np := len(b.pathTexts); np > 0 {
-		return b.pathTexts[np-1], true
-	}
-	return nil, false
-}
-
-func (b *browser) Paint() {
-	rect := ZR
-	if b.newObj == nil && len(b.nameTexts) > 0 {
-		cur := b.nameTexts[b.i]
-		rect = Rectangle{Pt(0, Pos(cur).Y), Pos(cur).Add(Size(cur))}
-	} else {
-		rect = RectInParent(b.text)
-		rect.Min.X = 0
-	}
-	SetColor(Color{1, 1, 1, .7})
-	FillRect(rect)
-}
-
-type nodeNameText struct {
-	*TextBase
-	b *browser
-}
-
-func newNodeNameText(b *browser) *nodeNameText {
-	t := &nodeNameText{}
-	t.TextBase = NewTextBase(t, "")
-	t.b = b
-	return t
-}
-func (t *nodeNameText) SetText(text string) {
-	b := t.b
-	objs := b.filteredObjs()
-	if len(objs) > 0 && b.newObj == nil {
-		for _, obj := range objs {
-			if strings.HasPrefix(strings.ToLower(obj.GetName()), strings.ToLower(text)) {
-				goto ok
-			}
-		}
-		return
-	}
-ok:
-	currentIndex := 0
-	n := len(b.indices)
-	if n > 0 {
-		b.i %= n
-		if b.i < 0 {
-			b.i += n
-		}
-		currentIndex = b.indices[b.i]
-	}
-
-	if b.newObj != nil {
-		switch obj := b.newObj.(type) {
-		case buildPackage:
-			obj.Dir = text
-		case *types.TypeName:
-			obj.Name = text
-		case *types.Func:
-			obj.Name = text
-		case *types.Var:
-			obj.Name = text
-		case *types.Const:
-			obj.Name = text
-		case *localVar:
-			obj.Name = text
-		}
-		i := 0
-		for i < len(objs) && objLess(objs[i], b.newObj) {
-			i++
-		}
-		objs = append(objs[:i], append([]types.Object{b.newObj}, objs[i:]...)...)
-		currentIndex = i
-	}
-
-	b.indices = nil
-	for i, obj := range objs {
-		if strings.HasPrefix(strings.ToLower(obj.GetName()), strings.ToLower(text)) {
-			b.indices = append(b.indices, i)
-		}
-	}
-	n = len(b.indices)
-	for i, index := range b.indices {
-		if index >= currentIndex {
-			b.i = i
-			break
-		}
-	}
-	if b.i >= n {
-		b.i = n - 1
-	}
-
-	var cur types.Object
-	if n > 0 {
-		cur = objs[b.indices[b.i]]
-	}
-	if cur != nil {
-		text = cur.GetName()[:len(text)]
-	} else {
-		text = ""
-	}
-	t.TextBase.SetText(text)
-
-	xOffset := 0.0
-	if t, ok := b.lastPathText(); ok {
-		if cur != nil {
-			sep := "."
-			if _, ok := cur.(buildPackage); ok {
-				sep = "/"
-			}
-			text := t.GetText()
-			t.SetText(text[:len(text)-1] + sep)
-		}
-		xOffset = Pos(t).X + Width(t)
-	}
-
-	for _, l := range b.nameTexts {
-		l.Close()
-	}
-	b.nameTexts = nil
-	width := 0.0
-	for i, activeIndex := range b.indices {
-		obj := objs[activeIndex]
-		l := NewText(obj.GetName())
-		l.SetTextColor(color(obj, false, b.funcAsVal))
-		l.SetBackgroundColor(Color{0, 0, 0, .7})
-		b.Add(l)
-		b.nameTexts = append(b.nameTexts, l)
-		l.Move(Pt(xOffset, float64(n-i-1)*Height(l)))
-		if Width(l) > width {
-			width = Width(l)
-		}
-	}
-	Raise(b.text)
-	Resize(b, Pt(xOffset+width, float64(len(b.nameTexts))*Height(b.text)))
-
-	yOffset := float64(n-b.i-1) * Height(b.text)
-	b.text.Move(Pt(xOffset, yOffset))
-	Hide(b.pkgName)
-	if pkg, ok := cur.(buildPackage); ok {
-		t := b.pkgName
-		t.SetText(pkg.Name)
-		t.Move(Pt(xOffset+width+16, yOffset-(Height(t)-Height(b.text))/2))
-		if pkg.Name != pkg.GetName() {
-			Show(t)
-		}
-	}
-	Hide(b.typ)
-	if cur != nil {
-		b.text.SetTextColor(color(cur, true, b.funcAsVal))
-		switch cur := cur.(type) {
-		case *types.TypeName:
-			if t, ok := cur.Type.(*types.Named); ok {
-				b.typ.setType(t.UnderlyingT)
-				Show(b.typ)
-			}
-		case *types.Func, *types.Var, *types.Const, field, *localVar:
-			if !isOperator(cur) {
-				b.typ.setType(cur.GetType())
-				Show(b.typ)
-			}
-		}
-		b.typ.Move(Pt(xOffset+width+16, yOffset-(Height(b.typ)-Height(b.text))/2))
-	}
-	for _, p := range b.pathTexts {
-		p.Move(Pt(Pos(p).X, yOffset))
-	}
-
-	Pan(b, Pt(0, yOffset))
-}
-func (t *nodeNameText) LostKeyFocus() { t.b.cancel() } // TODO: implement this differently.  it interferes with var type editing
-func (t *nodeNameText) KeyPress(event KeyEvent) {
-	b := t.b
+func (b *browser) KeyPress(event KeyEvent) {
 	if b.mode == browse && event.Shift != b.funcAsVal {
 		b.funcAsVal = event.Shift
-		t.SetText(t.GetText())
+		b.refresh()
 	}
 	switch event.Key {
 	case KeyUp:
 		if b.newObj == nil {
 			b.i--
-			t.SetText(t.GetText())
+			if b.i < 0 {
+				b.i += len(b.objs)
+			}
+			b.refresh()
 		}
 	case KeyDown:
 		if b.newObj == nil {
 			b.i++
-			t.SetText(t.GetText())
+			if b.i >= len(b.objs) {
+				b.i -= len(b.objs)
+			}
+			b.refresh()
 		}
 	case KeyBackspace:
-		if len(t.GetText()) > 0 {
-			t.TextBase.KeyPress(event)
+		if len(b.text.GetText()) > 0 {
+			b.text.KeyPress(event)
 			break
 		}
 		fallthrough
 	case KeyLeft:
 		if len(b.path) > 0 && b.newObj == nil {
-			previous := b.path[0]
+			parent := b.path[0]
 			b.path = b.path[1:]
-			b.i = 0
-			for i, obj := range b.filteredObjs() {
-				if obj == previous {
-					b.indices = []int{i}
-					break
-				}
-			}
 
 			i := len(b.pathTexts) - 1
 			b.pathTexts[i].Close()
 			b.pathTexts = b.pathTexts[:i]
 
-			t.SetText("")
+			b.clearText()
+			b.makeCurrent(parent)
 		}
 	case KeyEnter:
-		cur := b.currentObj()
-		if cur == nil && b.newObj == nil {
+		obj := b.currentObj()
+		if obj == nil {
 			return
 		}
-		if pkg, ok := cur.(buildPackage); ok && event.Shift {
-			t := b.pkgName
-			Show(t)
-			t.Accept = func(s string) {
-				if s != pkg.Name {
-					pkg.Name = s
-					savePackageName(pkg.Package)
+		if pkg, ok := obj.(*pkgObject); ok && event.Shift && b.newObj == nil {
+			Show(b.pkgName)
+			b.pkgName.Accept = func(name string) {
+				if pkg.name != name {
+					pkg.name = name
+					savePackageName(pkg)
 				}
-				b.text.SetText("")
-				SetKeyFocus(b.text)
+				b.refresh()
+				SetKeyFocus(b)
 			}
-			t.Reject = func() {
-				b.text.SetText(b.text.GetText())
-				SetKeyFocus(b.text)
+			b.pkgName.Reject = func() {
+				b.refresh()
+				SetKeyFocus(b)
 			}
-			SetKeyFocus(t)
+			SetKeyFocus(b.pkgName)
 			return
 		}
 
-		obj := b.newObj
-		existing := false
-		if obj == nil {
-			obj = cur
-		} else if cur != nil && obj.GetName() == cur.GetName() {
-			obj = cur
-			existing = true
-		}
-		if b.newObj != nil && !existing {
-			switch obj := obj.(type) {
-			case buildPackage:
-				path := ""
+		if b.newObj != nil {
+			switch obj := b.newObj.(type) {
+			case *pkgObject:
+				// all fields are blank except name which represents the final path element, not the package name.
+				// fill in srcDir and importPath based on name and, if present, parent.
 				if len(b.path) > 0 {
-					path = b.path[0].(buildPackage).Dir
+					parent := b.path[0].(*pkgObject)
+					obj.srcDir = parent.srcDir
+					obj.importPath = path.Join(parent.importPath, obj.name)
 				} else {
-					d := build.Default.SrcDirs()
-					path = d[len(d)-1]
+					dirs := build.Default.SrcDirs()
+					obj.srcDir = dirs[len(dirs)-1]
+					obj.importPath = obj.name
 				}
-				if err := os.Mkdir(filepath.Join(path, obj.GetName()), 0777); err != nil {
+				pkgObjects[obj.importPath] = obj
+				if err := os.Mkdir(filepath.Join(obj.srcDir, obj.importPath), 0777); err != nil {
 					panic(err)
 				}
 			case *types.TypeName, *types.Func, *types.Var, *types.Const:
@@ -616,14 +511,12 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 				} else {
 					pkg := b.currentPkg
 					if len(b.path) > 0 {
-						pkg = pkgs[b.path[0].(buildPackage).ImportPath]
+						pkg = pkgs[b.path[0].(*pkgObject).importPath]
 					}
-					if pkg != nil {
-						pkg.Scope().Insert(obj)
-					}
+					pkg.Scope().Insert(obj)
 				}
 			case *localVar:
-				b.finished = true // hack to avoid cancelling browser when it loses keyboard focus
+				b.finished = true // hack to avoid cancelling browser when it loses keyboard focus to typeView
 				b.typ.edit(func() {
 					b.finished = false
 					if *b.typ.typ != nil {
@@ -631,25 +524,19 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 						b.finished = true
 						b.accepted(obj)
 					} else {
-						t.SetText("")
-						SetKeyFocus(t)
+						b.clearText()
+						SetKeyFocus(b)
 					}
 				})
 				b.newObj = nil
 				return
 			}
 
-			b.i = 0
-			for i, child := range b.filteredObjs() {
-				if child == obj {
-					b.indices = []int{i}
-					break
-				}
-			}
+			b.makeCurrent(b.newObj)
+			b.newObj = nil
 		}
-		b.newObj = nil
 
-		_, isPkg := obj.(buildPackage)
+		_, isPkg := obj.(*pkgObject)
 		_, isType := obj.(*types.TypeName)
 		if !(isPkg || b.mode == browse && isType) {
 			b.finished = true
@@ -660,47 +547,49 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 	case KeyRight:
 		if b.newObj == nil {
 			switch obj := b.currentObj().(type) {
-			case buildPackage, *types.TypeName:
+			case *pkgObject, *types.TypeName:
 				if t, ok := obj.(*types.TypeName); ok {
 					if _, ok = t.Type.(*types.Basic); ok || t.Type == nil {
 						break
 					}
 				}
-				b.path = append([]types.Object{obj}, b.path...)
-				b.indices = nil
+				b.path = append(objects{obj}, b.path...)
 
 				sep := "."
-				if _, ok := obj.(buildPackage); ok {
+				if _, ok := obj.(*pkgObject); ok {
 					sep = "/"
 				}
-				pathText := NewText(obj.GetName() + sep)
-				pathText.SetTextColor(color(obj, true, b.funcAsVal))
-				pathText.SetBackgroundColor(Color{0, 0, 0, .7})
-				b.Add(pathText)
+				t := NewText(obj.GetName() + sep)
+				t.SetTextColor(color(obj, true, b.funcAsVal))
+				t.SetBackgroundColor(Color{0, 0, 0, .7})
+				b.Add(t)
 				x := 0.0
 				if t, ok := b.lastPathText(); ok {
 					x = Pos(t).X + Width(t)
 				}
-				pathText.Move(Pt(x, 0))
-				b.pathTexts = append(b.pathTexts, pathText)
+				t.Move(Pt(x, 0))
+				b.pathTexts = append(b.pathTexts, t)
 
-				t.SetText("")
+				b.clearText()
 			}
 		}
 	case KeyEscape:
-		if b.newObj == nil {
-			b.cancel()
-		} else {
+		if b.newObj != nil {
 			b.newObj = nil
-			t.SetText("")
+			if b.i < len(b.objs)-1 {
+				b.i++
+			}
+			b.clearText()
+		} else {
+			b.cancel()
 		}
 	default:
 		if b.fun != nil {
 			if event.Command && event.Text == "0" {
 				b.newObj = &localVar{refs: map[*valueNode]bool{}}
-				t.SetText("")
+				b.clearText()
 			} else {
-				t.TextBase.KeyPress(event)
+				b.text.KeyPress(event)
 			}
 			return
 		}
@@ -710,9 +599,9 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 		var recv *types.TypeName
 		if len(b.path) > 0 {
 			switch obj := b.path[0].(type) {
-			case buildPackage:
+			case *pkgObject:
 				makeInPkg = true
-				pkg = pkgs[obj.ImportPath]
+				pkg = pkgs[obj.importPath]
 			case *types.TypeName:
 				recv = obj
 				pkg = obj.Pkg
@@ -723,7 +612,7 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 		if b.newObj == nil && b.mode != typesOnly && event.Command && (makePkgInRoot || makeInPkg || makeMethod) {
 			switch event.Text {
 			case "1":
-				b.newObj = buildPackage{nil, &build.Package{}}
+				b.newObj = &pkgObject{}
 			case "2":
 				t := types.NewTypeName(0, pkg, "", nil)
 				t.Type = &types.Named{Obj: t}
@@ -739,22 +628,34 @@ func (t *nodeNameText) KeyPress(event KeyEvent) {
 			case "5":
 				b.newObj = types.NewConst(0, pkg, "", nil, nil)
 			default:
-				t.TextBase.KeyPress(event)
+				b.text.KeyPress(event)
 				return
 			}
-			t.SetText("")
+			b.clearText()
 		} else {
-			t.TextBase.KeyPress(event)
+			b.text.KeyPress(event)
 		}
 	}
 }
 
-func (t *nodeNameText) KeyRelease(event KeyEvent) {
-	b := t.b
+func (b *browser) KeyRelease(event KeyEvent) {
 	if b.mode == browse && event.Shift != b.funcAsVal {
 		b.funcAsVal = event.Shift
-		t.SetText(t.GetText())
+		b.refresh()
 	}
+}
+
+func (b *browser) Paint() {
+	rect := ZR
+	if b.newObj == nil && len(b.objTexts) > 0 {
+		cur := b.objTexts[b.i]
+		rect = Rectangle{Pt(0, Pos(cur).Y), Pos(cur).Add(Size(cur))}
+	} else {
+		rect = RectInParent(b.text)
+		rect.Min.X = 0
+	}
+	SetColor(Color{1, 1, 1, .7})
+	FillRect(rect)
 }
 
 func color(obj types.Object, bright, funcAsVal bool) Color {
@@ -765,7 +666,7 @@ func color(obj types.Object, bright, funcAsVal bool) Color {
 	switch obj.(type) {
 	case special:
 		return Color{1, 1, .6, alpha}
-	case buildPackage:
+	case *pkgObject:
 		return Color{1, 1, 1, alpha}
 	case *types.TypeName:
 		return Color{.6, 1, .6, alpha}
@@ -780,6 +681,19 @@ func color(obj types.Object, bright, funcAsVal bool) Color {
 	panic(fmt.Sprintf("unknown object type %T", obj))
 }
 
+type pkgObject struct {
+	types.Object
+	importPath, name, srcDir string
+}
+
+func (p pkgObject) GetName() string {
+	if p.importPath == "" {
+		// during object creation, all fields are blank except p.name which is being edited
+		return p.name
+	}
+	return path.Base(p.importPath)
+}
+
 var (
 	protoPointer   = types.NewTypeName(0, nil, "pointer", nil)
 	protoArray     = types.NewTypeName(0, nil, "array", nil)
@@ -791,26 +705,100 @@ var (
 	protoStruct    = types.NewTypeName(0, nil, "struct", nil)
 )
 
-func newProtoType(t *types.TypeName) (p types.Type) {
+func newProtoType(t *types.TypeName) types.Type {
 	switch t {
 	case protoPointer:
-		p = &types.Pointer{}
+		return &types.Pointer{}
 	case protoArray:
-		p = &types.Array{}
+		return &types.Array{}
 	case protoSlice:
-		p = &types.Slice{}
+		return &types.Slice{}
 	case protoMap:
-		p = &types.Map{}
+		return &types.Map{}
 	case protoChan:
-		p = &types.Chan{Dir: types.SendRecv}
+		return &types.Chan{Dir: types.SendRecv}
 	case protoFunc:
-		p = &types.Signature{}
+		return &types.Signature{}
 	case protoInterface:
-		p = &types.Interface{}
+		return &types.Interface{}
 	case protoStruct:
-		p = &types.Struct{}
-	default:
-		panic(fmt.Sprintf("not a proto type %#v", t))
+		return &types.Struct{}
 	}
-	return
+	panic(fmt.Sprintf("not a proto type %#v", t))
 }
+
+type special struct {
+	types.Object
+	name string
+}
+
+func (s special) GetName() string { return s.name }
+
+type field struct {
+	*types.Var
+	recv types.Type
+}
+
+type objects []types.Object
+
+func (o objects) Len() int { return len(o) }
+func (o objects) Less(i, j int) bool {
+	return objLess(o[i], o[j])
+}
+func objLess(o1, o2 types.Object) bool {
+	n1, n2 := o1.GetName(), o2.GetName()
+	switch o1.(type) {
+	case special:
+		switch o2.(type) {
+		case special:
+			return n1 < n2
+		default:
+			return true
+		}
+	case *types.TypeName:
+		switch o2.(type) {
+		case special:
+			return false
+		case *types.TypeName:
+			return n1 < n2
+		default:
+			return true
+		}
+	case *types.Func, *types.Builtin:
+		switch o2.(type) {
+		case special, *types.TypeName:
+			return false
+		case *types.Func, *types.Builtin:
+			return n1 < n2
+		default:
+			return true
+		}
+	case *types.Var, field, *localVar:
+		switch o2.(type) {
+		default:
+			return false
+		case *types.Var, field, *localVar:
+			return n1 < n2
+		case *types.Const, *types.Nil, *pkgObject:
+			return true
+		}
+	case *types.Const, *types.Nil:
+		switch o2.(type) {
+		default:
+			return false
+		case *types.Const, *types.Nil:
+			return n1 < n2
+		case *pkgObject:
+			return true
+		}
+	case *pkgObject:
+		switch o2.(type) {
+		default:
+			return false
+		case *pkgObject:
+			return n1 < n2
+		}
+	}
+	panic("unreachable")
+}
+func (o objects) Swap(i, j int) { o[i], o[j] = o[j], o[i] }

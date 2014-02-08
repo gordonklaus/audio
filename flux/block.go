@@ -387,8 +387,8 @@ func (b *block) KeyPress(event KeyEvent) {
 				browser.Close()
 				SetKeyFocus(oldFocus)
 			}
-			browser.text.KeyPress(event)
-			SetKeyFocus(browser.text)
+			browser.KeyPress(event)
+			SetKeyFocus(browser)
 		}
 		if event.Command && event.Text == "0" {
 			openBrowser()

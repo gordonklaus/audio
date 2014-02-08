@@ -215,7 +215,7 @@ func (v *typeView) editType(done func()) {
 			b.Close()
 			done()
 		}
-		SetKeyFocus(b.text)
+		SetKeyFocus(b)
 	case *types.Basic, *types.Named:
 		done()
 	case *types.Pointer, *types.Array, *types.Slice, *types.Chan:
