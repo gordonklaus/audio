@@ -17,16 +17,15 @@ type typeAssertNode struct {
 func newTypeAssertNode() *typeAssertNode {
 	n := &typeAssertNode{}
 	n.nodeBase = newNodeBase(n)
-	in := n.newInput(&types.Var{})
+	in := n.newInput(nil)
 	in.connsChanged = func() {
 		if len(in.conns) > 0 {
 			in.setType(in.conns[0].src.obj.Type)
 		}
 	}
-	v := &types.Var{}
-	n.newOutput(v)
+	out := n.newOutput(nil)
 	n.newOutput(newVar("ok", types.Typ[types.Bool]))
-	n.typ = newTypeView(&v.Type)
+	n.typ = newTypeView(&out.obj.Type)
 	n.typ.mode = typesOnly
 	n.Add(n.typ)
 	return n

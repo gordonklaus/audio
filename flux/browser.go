@@ -53,6 +53,7 @@ func newBrowser(mode browserMode, parent View) *browser {
 	b := &browser{mode: mode}
 	b.ViewBase = NewView(b)
 
+	// not a very beautiful way to get context but the most comprehensible I could find
 loop:
 	for v := parent; v != nil; v = Parent(v) {
 		switch v := v.(type) {

@@ -17,7 +17,7 @@ type convertNode struct {
 func newConvertNode() *convertNode {
 	n := &convertNode{}
 	n.nodeBase = newNodeBase(n)
-	in := n.newInput(&types.Var{})
+	in := n.newInput(nil)
 	in.connsChanged = func() {
 		// TODO: this is just wrong.  use types.Convertible
 		if len(in.conns) > 0 {
@@ -25,9 +25,8 @@ func newConvertNode() *convertNode {
 			in.setType(t)
 		}
 	}
-	v := &types.Var{}
-	n.newOutput(v)
-	n.typ = newTypeView(&v.Type)
+	out := n.newOutput(nil)
+	n.typ = newTypeView(&out.obj.Type)
 	n.typ.mode = typesOnly
 	n.Add(n.typ)
 	return n

@@ -24,7 +24,7 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 	switch obj.(type) {
 	case field, *types.Func, nil:
 		if _, ok := obj.(*types.Func); !ok || isMethod(obj) {
-			n.x = n.newInput(&types.Var{})
+			n.x = n.newInput(nil)
 			n.x.connsChanged = n.reform
 			text = "."
 		}
@@ -35,9 +35,9 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 		n.text.SetText(text)
 	}
 	if set {
-		n.y = n.newInput(&types.Var{})
+		n.y = n.newInput(nil)
 	} else {
-		n.y = n.newOutput(&types.Var{})
+		n.y = n.newOutput(nil)
 	}
 	switch obj.(type) {
 	case *types.Var, field, *localVar:
@@ -52,12 +52,12 @@ func (n *valueNode) reform() {
 	if n.set {
 		if n.y.out {
 			n.removePortBase(n.y)
-			n.y = n.newInput(&types.Var{})
+			n.y = n.newInput(nil)
 		}
 	} else {
 		if !n.y.out {
 			n.removePortBase(n.y)
-			n.y = n.newOutput(&types.Var{})
+			n.y = n.newOutput(nil)
 		}
 	}
 	var xt, yt types.Type

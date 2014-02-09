@@ -149,9 +149,8 @@ type makeNode struct {
 func newMakeNode() *makeNode {
 	n := &makeNode{}
 	n.nodeBase = newNodeBase(n)
-	v := &types.Var{}
-	n.newOutput(v)
-	n.typ = newTypeView(&v.Type)
+	out := n.newOutput(nil)
+	n.typ = newTypeView(&out.obj.Type)
 	n.typ.mode = makeableType
 	n.Add(n.typ)
 	return n

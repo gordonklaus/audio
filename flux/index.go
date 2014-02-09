@@ -20,16 +20,16 @@ func newIndexNode(set bool) *indexNode {
 	n := &indexNode{set: set}
 	n.nodeBase = newNodeBase(n)
 	up := n.updateInputType
-	n.x = n.newInput(&types.Var{})
+	n.x = n.newInput(nil)
 	n.x.connsChanged = up
-	n.key = n.newInput(&types.Var{})
+	n.key = n.newInput(nil)
 	n.key.connsChanged = up
 	if set {
-		n.inVal = n.newInput(&types.Var{})
+		n.inVal = n.newInput(nil)
 		n.inVal.connsChanged = up
 		n.text.SetText("[]=")
 	} else {
-		n.outVal = n.newOutput(&types.Var{})
+		n.outVal = n.newOutput(nil)
 		n.text.SetText("[]")
 	}
 	n.addSeqPorts()

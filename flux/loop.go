@@ -24,7 +24,7 @@ func newLoopNode(arranged blockchan) *loopNode {
 	n := &loopNode{}
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
-	n.input = newInput(n, &types.Var{})
+	n.input = newInput(n, nil)
 	n.input.connsChanged = n.updateInputType
 	MoveCenter(n.input, Pt(-portSize/2, 0))
 	n.Add(n.input)
@@ -37,7 +37,7 @@ func newLoopNode(arranged blockchan) *loopNode {
 
 	n.loopblk = newBlock(n, arranged)
 	n.inputsNode = newInputsNode()
-	n.inputsNode.newOutput(&types.Var{})
+	n.inputsNode.newOutput(nil)
 	n.loopblk.addNode(n.inputsNode)
 	n.updateInputType()
 	return n
@@ -101,7 +101,7 @@ func (n *loopNode) updateInputType() {
 		}
 	case *types.Array, *types.Slice, *types.Map:
 		if len(in.outs) == 1 {
-			in.newOutput(&types.Var{})
+			in.newOutput(nil)
 		}
 	}
 

@@ -30,6 +30,10 @@ const portSize = 11.0
 func newInput(n node, v *types.Var) *port  { return newPort(false, n, v) }
 func newOutput(n node, v *types.Var) *port { return newPort(true, n, v) }
 func newPort(out bool, n node, v *types.Var) *port {
+	if v == nil {
+		v = &types.Var{}
+	}
+
 	p := &port{out: out, node: n, obj: v}
 	p.ViewBase = NewView(p)
 	p.valView = newValueView(v)

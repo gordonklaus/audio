@@ -46,7 +46,7 @@ func newCallNode(obj types.Object) node {
 		n.nodeBase = newNodeBase(n)
 		n.text.SetText("call")
 		n.addSeqPorts()
-		in := n.newInput(&types.Var{})
+		in := n.newInput(nil)
 		in.connsChanged = func() {
 			for _, p := range append(ins(n), outs(n)...) {
 				if p != in {

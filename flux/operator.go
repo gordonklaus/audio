@@ -19,9 +19,9 @@ func newOperatorNode(obj types.Object) *operatorNode {
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText(n.op)
 
-	n.newInput(&types.Var{})
-	n.newInput(&types.Var{})
-	n.newOutput(&types.Var{})
+	n.newInput(nil)
+	n.newInput(nil)
+	n.newOutput(nil)
 
 	switch n.op {
 	case "!":

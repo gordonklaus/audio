@@ -261,7 +261,7 @@ type basicLiteralNode struct {
 func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 	n := &basicLiteralNode{kind: kind}
 	n.nodeBase = newNodeBase(n)
-	out := n.newOutput(&types.Var{})
+	out := n.newOutput(nil)
 	switch kind {
 	case token.INT, token.FLOAT:
 		if kind == token.INT {
@@ -331,9 +331,8 @@ type compositeLiteralNode struct {
 func newCompositeLiteralNode() *compositeLiteralNode {
 	n := &compositeLiteralNode{}
 	n.nodeBase = newNodeBase(n)
-	v := &types.Var{}
-	n.newOutput(v)
-	n.typ = newTypeView(&v.Type)
+	out := n.newOutput(nil)
+	n.typ = newTypeView(&out.obj.Type)
 	n.typ.mode = compositeOrPtrType
 	n.Add(n.typ)
 	return n
