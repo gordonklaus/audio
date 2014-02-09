@@ -375,7 +375,7 @@ func (b *block) KeyPress(event KeyEvent) {
 		}
 	default:
 		openBrowser := func() {
-			browser := newBrowser(browse, b.func_())
+			browser := newBrowser(browse, b)
 			b.Add(browser)
 			browser.Move(Center(b))
 			browser.accepted = func(obj types.Object) {
@@ -569,7 +569,7 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 			vars = &sig.Results
 		}
 
-		v := &types.Var{}
+		v := types.NewVar(0, n.blk.func_().pkg(), "", nil)
 		p := newPort(n, v)
 
 		i := len(*ports)

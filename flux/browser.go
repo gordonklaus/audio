@@ -8,7 +8,6 @@ import (
 	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	"fmt"
-	"go/ast"
 	"go/build"
 	"os"
 	"path"
@@ -50,25 +49,26 @@ const (
 	makeableType
 )
 
-func newBrowser(mode browserMode, context View) *browser {
+func newBrowser(mode browserMode, parent View) *browser {
 	b := &browser{mode: mode}
 	b.ViewBase = NewView(b)
 
-	switch v := context.(type) {
-	case *funcNode:
-		b.fun = v
-		b.currentPkg = v.pkg()
-		b.imports = v.imports()
-	case *typeView:
-		// TODO: get pkg and imports for the root of this typeView
-		for v := View(v); v != nil; v = Parent(v) {
-			if blk, ok := v.(*block); ok {
-				f := blk.func_()
-				b.currentPkg = f.pkg()
-				b.imports = f.imports()
-				break
-			}
+loop:
+	for v := parent; v != nil; v = Parent(v) {
+		switch v := v.(type) {
+		case *block: // must use blk.func_() instead of going directly to *funcNode so we don't grab a func literal node
+			b.fun = v.func_()
+			break loop
+		case *fluxWindow:
+			t := v.browser.currentObj().(*types.TypeName)
+			b.currentPkg = t.Pkg
+			b.imports = imports(t)
+			break loop
 		}
+	}
+	if b.fun != nil {
+		b.currentPkg = b.fun.pkg()
+		b.imports = b.fun.imports()
 	}
 
 	b.text = NewText("")
@@ -78,6 +78,7 @@ func newBrowser(mode browserMode, context View) *browser {
 	b.Add(b.text)
 
 	b.typ = newTypeView(new(types.Type))
+	b.typ.pkg = b.currentPkg
 	b.Add(b.typ)
 
 	b.pkgName = NewText("")
@@ -87,6 +88,17 @@ func newBrowser(mode browserMode, context View) *browser {
 	b.clearText()
 
 	return b
+}
+
+func imports(t *types.TypeName) (x []*types.Package) {
+	seen := map[*types.Package]bool{}
+	walkType(t.Type.(*types.Named).UnderlyingT, func(n *types.Named) {
+		if p := n.Obj.Pkg; p != nil && p != t.Pkg && !seen[p] {
+			seen[p] = true
+			x = append(x, p)
+		}
+	})
+	return
 }
 
 func (b *browser) cancel() {
@@ -310,10 +322,8 @@ func (b browser) filteredObjs() (objs objects) {
 				case protoSlice, protoMap, protoChan:
 				}
 			}
-			if b.currentPkg != nil {
-				if p := obj.GetPkg(); p != nil && p != b.currentPkg && !ast.IsExported(obj.GetName()) {
-					return
-				}
+			if invisible(obj, b.currentPkg) {
+				return
 			}
 		}
 		objs = append(objs, obj)

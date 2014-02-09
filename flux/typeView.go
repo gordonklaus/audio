@@ -13,15 +13,16 @@ import (
 
 type typeView struct {
 	*ViewBase
-	typ     *types.Type
-	mode    browserMode
-	text    Text
-	elems   struct{ left, right []*typeView }
-	focused bool
-	done    func()
+	typ  *types.Type
+	pkg  *types.Package
+	mode browserMode
+	done func()
 
-	// typeView is also used as a valueView, in which case this is non-nil
-	nameText *TextBase
+	name       *TextBase // non-nil if this is a valueView
+	text       Text
+	elems      struct{ left, right []*typeView }
+	unexported Text
+	focused    bool
 }
 
 func newTypeView(t *types.Type) *typeView {
@@ -53,14 +54,15 @@ func newValueView(val types.Object) *typeView {
 		}
 	}
 	v := newTypeView(t)
-	v.nameText = NewText(*name)
-	v.nameText.SetTextColor(color(val, false, false))
-	v.nameText.SetBackgroundColor(Color{0, 0, 0, .3})
-	v.nameText.TextChanged = func(text string) {
+	v.pkg = val.GetPkg()
+	v.name = NewText(*name)
+	v.name.SetTextColor(color(val, false, false))
+	v.name.SetBackgroundColor(Color{0, 0, 0, .3})
+	v.name.TextChanged = func(text string) {
 		*name = text
 		v.reform()
 	}
-	v.Add(v.nameText)
+	v.Add(v.name)
 	v.reform()
 	return v
 }
@@ -70,12 +72,13 @@ func (v *typeView) setType(t types.Type) {
 
 	v.elems.left = nil
 	v.elems.right = nil
+	v.unexported = nil
 	for NumChildren(v) > 0 {
 		v.Remove(Child(v, 0))
 	}
 	v.Add(v.text)
-	if v.nameText != nil {
-		v.Add(v.nameText)
+	if v.name != nil {
+		v.Add(v.name)
 	}
 
 	s := ""
@@ -105,6 +108,10 @@ func (v *typeView) setType(t types.Type) {
 	case *types.Struct:
 		s = "struct"
 		for _, f := range t.Fields {
+			if invisible(f, v.pkg) {
+				v.unexported = NewText("contains unexported fields")
+				continue
+			}
 			v.elems.right = append(v.elems.right, newValueView(field{f, nil}))
 		}
 	case *types.Signature:
@@ -121,11 +128,23 @@ func (v *typeView) setType(t types.Type) {
 	case *types.Interface:
 		s = "interface"
 		for _, m := range t.Methods {
+			if invisible(m, v.pkg) {
+				v.unexported = NewText("contains unexported methods")
+				continue
+			}
 			v.elems.right = append(v.elems.right, newValueView(m))
 		}
 	}
 	v.text.SetText(s)
+	if v.unexported != nil {
+		// TODO: small font
+		v.unexported.SetTextColor(Color{.3, .3, .3, 1})
+		v.unexported.SetBackgroundColor(Color{0, 0, 0, .3})
+		v.Add(v.unexported)
+	}
 	for _, c := range append(v.elems.left, v.elems.right...) {
+		c.pkg = v.pkg
+		c.refresh()
 		v.Add(c)
 	}
 
@@ -134,6 +153,11 @@ func (v *typeView) setType(t types.Type) {
 	}
 
 	v.reform()
+}
+
+func invisible(obj types.Object, p *types.Package) bool {
+	p2 := obj.GetPkg()
+	return !(p2 == nil || p == nil || p2 == p || obj.IsExported())
 }
 
 func (v *typeView) setVariadic() {
@@ -161,10 +185,16 @@ func (v *typeView) reform() {
 			h2 += spacing
 		}
 	}
+	if v.unexported != nil {
+		if h2 > 0 {
+			h2 += spacing
+		}
+		h2 += Height(v.unexported)
+	}
 	x := 0.0
-	if v.nameText != nil {
-		v.nameText.Move(Pt(0, (math.Max(h1, h2)-Height(v.nameText))/2))
-		x += Width(v.nameText) + spacing
+	if v.name != nil {
+		v.name.Move(Pt(0, (math.Max(h1, h2)-Height(v.name))/2))
+		x += Width(v.name) + spacing
 	}
 	y := math.Max(0, h2-h1) / 2
 	for i := len(v.elems.left) - 1; i >= 0; i-- {
@@ -176,6 +206,10 @@ func (v *typeView) reform() {
 	v.text.Move(Pt(x, (math.Max(h1, h2)-Height(v.text))/2))
 	x += Width(v.text) + spacing
 	y = math.Max(0, h1-h2) / 2
+	if v.unexported != nil {
+		v.unexported.Move(Pt(x, y))
+		y += Height(v.unexported) + spacing
+	}
 	for i := len(v.elems.right) - 1; i >= 0; i-- {
 		c := v.elems.right[i]
 		c.Move(Pt(x, y))
@@ -189,10 +223,10 @@ func (v *typeView) reform() {
 }
 
 func (v *typeView) edit(done func()) {
-	if v.nameText != nil {
-		v.nameText.Accept = func(string) { v.editType(done) }
-		v.nameText.Reject = done
-		SetKeyFocus(v.nameText)
+	if v.name != nil {
+		v.name.Accept = func(string) { v.editType(done) }
+		v.name.Reject = done
+		SetKeyFocus(v.name)
 		return
 	}
 	v.editType(done)
@@ -267,7 +301,7 @@ func (v *typeView) insertVar(vs *[]*types.Var, elems *[]*typeView, before bool, 
 	if !before {
 		i++
 	}
-	*vs = append((*vs)[:i], append([]*types.Var{{}}, (*vs)[i:]...)...)
+	*vs = append((*vs)[:i], append([]*types.Var{types.NewVar(0, v.pkg, "", nil)}, (*vs)[i:]...)...)
 	v.refresh()
 	t := (*elems)[i]
 	t.edit(func() {
@@ -302,11 +336,12 @@ func (v *typeView) insertMethod(m *[]*types.Func, elems *[]*typeView, before boo
 	if !before {
 		i++
 	}
-	*m = append((*m)[:i], append([]*types.Func{types.NewFunc(0, nil, "", &types.Signature{Recv: newVar("", *v.typ)})}, (*m)[i:]...)...)
+	sig := &types.Signature{Recv: types.NewVar(0, v.pkg, "", *v.typ)}
+	*m = append((*m)[:i], append([]*types.Func{types.NewFunc(0, v.pkg, "", sig)}, (*m)[i:]...)...)
 	v.refresh()
 	t := (*elems)[i]
 	t.edit(func() {
-		if *t.typ == nil || len(t.nameText.GetText()) == 0 {
+		if *t.typ == nil || len(t.name.GetText()) == 0 {
 			*m = append((*m)[:i], (*m)[i+1:]...)
 			v.refresh()
 			if fail != nil {
@@ -436,16 +471,16 @@ func (v *typeView) KeyPress(event KeyEvent) {
 			}
 		}
 		oldTyp, oldName := *v.typ, ""
-		if v.nameText != nil {
-			oldName = v.nameText.GetText()
-			v.nameText.SetText("")
+		if v.name != nil {
+			oldName = v.name.GetText()
+			v.name.SetText("")
 		}
 		v.setType(nil)
 		v.edit(func() {
 			if *v.typ == nil {
 				v.setType(oldTyp)
-				if v.nameText != nil && len(v.nameText.GetText()) == 0 {
-					v.nameText.SetText(oldName)
+				if v.name != nil && len(v.name.GetText()) == 0 {
+					v.name.SetText(oldName)
 				}
 			}
 			SetKeyFocus(v)

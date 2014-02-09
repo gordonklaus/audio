@@ -687,6 +687,7 @@ func walkType(t types.Type, op func(*types.Named)) {
 		for _, v := range t.Fields {
 			walkType(v.Type, op)
 		}
+	case nil:
 	default:
 		panic(fmt.Sprintf("unexpected type %#v\n", t))
 	}

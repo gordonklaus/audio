@@ -6,6 +6,8 @@ TODO
   - on an out port, press '.' to select a field or method
   - on an in port, press '{' to create a composite literal of the port's type
   - on a node or connection, press cmd-R(cmd-I?) to bring up a browser with funcs and ops suitable to insert, i.e., having a signature compatible with the existing node's connections
+- don't unnecessarily draw borders around typeViews
+- use graphics instead of text to identify pointers, slices, funcs, maps, etc in typeView
 - make gui.Text change its appearance based on content when a validator is present.  give validator 3 states:  Acceptable, Intermediate, Invalid.
 - consider not lumping sequencing ports and connections in with the normal ones.  they can be annoying.  don't forget to consider them in the topological sorting order.
 - use go/parser and go/ast to validate basic literals
@@ -13,7 +15,6 @@ TODO
 - don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.
 - make connectionBundles to reduce wire clutter?  each port has at most one connectionBundle that branches off connections near each port it connects to.  or don't add a new object, just draw connections coincident that originate at the same port.  especially bundle coincident connections that cross block boundaries.
 - consider drawing nodes as circles/ellipses.  this is the easiest way to treat them when arranging, and it might even be visually ok.  loopNode will work fine, as its loopblk can be drawn as a circle; but ifNode, switchNode, and selectNode will be harder, having multiple blocks.
-- give typeView context (currentPkg, imports); hide unexported struct fields and interface methods not in currentPkg; pass context to browser when editing
 - in browser, by default don't show non-Go dirs (and don't show non-Flux dirs in fluxSourceOnly mode); show them when Shift is pressed
 - prefix names with pkg name in browser and typeView
 - manage code flux:  names, signatures, types, etc.
