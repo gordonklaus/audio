@@ -2,7 +2,6 @@ TODO
 
 - use types.IsAssignableTo in canConnect
 - make all fields and methods available in browser.  use types.Selection for fields and methods.  use types.LookupFieldOrMethod.
-- consider handling addressability as Go does:  addressable expressions don't return a pointer (but the implementation takes the address and automatically dereferences as necessary).  would make for cleaner UI (not pointers everywhere) and avoid the issue of having to know whether to automatically dereference when comparing with untyped nil.
 - shortcuts:
   - on an out port, press '.' to select a field or method
   - on an in port, press '{' to create a composite literal of the port's type
@@ -14,11 +13,7 @@ TODO
 - don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.
 - make connectionBundles to reduce wire clutter?  each port has at most one connectionBundle that branches off connections near each port it connects to.  or don't add a new object, just draw connections coincident that originate at the same port.  especially bundle coincident connections that cross block boundaries.
 - consider drawing nodes as circles/ellipses.  this is the easiest way to treat them when arranging, and it might even be visually ok.  loopNode will work fine, as its loopblk can be drawn as a circle; but ifNode, switchNode, and selectNode will be harder, having multiple blocks.
-- GcImport yields parameter and result names like name·1, which is invalid in Go source.  fix go/types or strip these chars.
-- fix bug in indexNode and loopNode:  crash when changing/deleting input connection (something to do with outputs changing)?  might have to do with trying to connect the input to the 2nd inputsNode output, which disappears before the connection is made.
-- fix typeView bug(s):
-  - type T big.Int, e.g.,  shows up as the struct{} that big.Int is
-- hide unexported struct fields and interface methods in browser's typeView
+- give typeView context (currentPkg, imports); hide unexported struct fields and interface methods not in currentPkg; pass context to browser when editing
 - in browser, by default don't show non-Go dirs (and don't show non-Flux dirs in fluxSourceOnly mode); show them when Shift is pressed
 - prefix names with pkg name in browser and typeView
 - manage code flux:  names, signatures, types, etc.

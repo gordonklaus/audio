@@ -13,12 +13,12 @@ import (
 
 type typeView struct {
 	*ViewBase
-	typ        *types.Type
-	mode       browserMode
-	text       Text
-	childTypes struct{ left, right []*typeView }
-	focused    bool
-	done       func()
+	typ     *types.Type
+	mode    browserMode
+	text    Text
+	elems   struct{ left, right []*typeView }
+	focused bool
+	done    func()
 
 	// typeView is also used as a valueView, in which case this is non-nil
 	nameText *TextBase
@@ -67,8 +67,18 @@ func newValueView(val types.Object) *typeView {
 
 func (v *typeView) setType(t types.Type) {
 	*v.typ = t
+
+	v.elems.left = nil
+	v.elems.right = nil
+	for NumChildren(v) > 0 {
+		v.Remove(Child(v, 0))
+	}
+	v.Add(v.text)
+	if v.nameText != nil {
+		v.Add(v.nameText)
+	}
+
 	s := ""
-	v.childTypes.left, v.childTypes.right = nil, nil
 	switch t := t.(type) {
 	case generic:
 		s = "<T>"
@@ -78,57 +88,49 @@ func (v *typeView) setType(t types.Type) {
 		s = t.Obj.Name
 	case *types.Pointer:
 		s = "*"
-		v.childTypes.right = []*typeView{newTypeView(&t.Elem)}
+		v.elems.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Array:
 		s = fmt.Sprintf("[%d]", t.Len)
-		v.childTypes.right = []*typeView{newTypeView(&t.Elem)}
+		v.elems.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Slice:
 		s = "[]"
-		v.childTypes.right = []*typeView{newTypeView(&t.Elem)}
+		v.elems.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Chan:
 		s = "chan"
-		v.childTypes.right = []*typeView{newTypeView(&t.Elem)}
+		v.elems.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Map:
 		s = ":"
-		v.childTypes.left = []*typeView{newTypeView(&t.Key)}
-		v.childTypes.right = []*typeView{newTypeView(&t.Elem)}
+		v.elems.left = []*typeView{newTypeView(&t.Key)}
+		v.elems.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Struct:
 		s = "struct"
 		for _, f := range t.Fields {
-			v.childTypes.right = append(v.childTypes.right, newValueView(field{f, nil}))
+			v.elems.right = append(v.elems.right, newValueView(field{f, nil}))
 		}
 	case *types.Signature:
 		s = "func"
 		for _, val := range t.Params {
-			v.childTypes.left = append(v.childTypes.left, newValueView(val))
+			v.elems.left = append(v.elems.left, newValueView(val))
 		}
 		if t.IsVariadic {
-			v.childTypes.left[len(v.childTypes.left)-1].setVariadic()
+			v.elems.left[len(v.elems.left)-1].setVariadic()
 		}
 		for _, val := range t.Results {
-			v.childTypes.right = append(v.childTypes.right, newValueView(val))
+			v.elems.right = append(v.elems.right, newValueView(val))
 		}
 	case *types.Interface:
 		s = "interface"
 		for _, m := range t.Methods {
-			v.childTypes.right = append(v.childTypes.right, newValueView(m))
+			v.elems.right = append(v.elems.right, newValueView(m))
 		}
 	}
 	v.text.SetText(s)
-
-	for NumChildren(v) > 0 {
-		v.Remove(Child(v, 0))
-	}
-	v.Add(v.text)
-	for _, c := range append(v.childTypes.left, v.childTypes.right...) {
+	for _, c := range append(v.elems.left, v.elems.right...) {
 		v.Add(c)
-	}
-	if v.nameText != nil {
-		v.Add(v.nameText)
 	}
 
 	if _, ok := t.(*types.Pointer); ok && v.mode == compositeOrPtrType {
-		v.childTypes.right[0].mode = compositeType
+		v.elems.right[0].mode = compositeType
 	}
 
 	v.reform()
@@ -143,7 +145,7 @@ func (v *typeView) reform() {
 	const spacing = 2
 	maxWidth := float64(0)
 	h1 := float64(0)
-	for i, c := range v.childTypes.left {
+	for i, c := range v.elems.left {
 		h1 += Height(c)
 		if i > 0 {
 			h1 += spacing
@@ -153,7 +155,7 @@ func (v *typeView) reform() {
 		}
 	}
 	h2 := float64(0)
-	for i, c := range v.childTypes.right {
+	for i, c := range v.elems.right {
 		h2 += Height(c)
 		if i > 0 {
 			h2 += spacing
@@ -165,8 +167,8 @@ func (v *typeView) reform() {
 		x += Width(v.nameText) + spacing
 	}
 	y := math.Max(0, h2-h1) / 2
-	for i := len(v.childTypes.left) - 1; i >= 0; i-- {
-		c := v.childTypes.left[i]
+	for i := len(v.elems.left) - 1; i >= 0; i-- {
+		c := v.elems.left[i]
 		c.Move(Pt(x+maxWidth-Width(c), y))
 		y += Height(c) + spacing
 	}
@@ -174,8 +176,8 @@ func (v *typeView) reform() {
 	v.text.Move(Pt(x, (math.Max(h1, h2)-Height(v.text))/2))
 	x += Width(v.text) + spacing
 	y = math.Max(0, h1-h2) / 2
-	for i := len(v.childTypes.right) - 1; i >= 0; i-- {
-		c := v.childTypes.right[i]
+	for i := len(v.elems.right) - 1; i >= 0; i-- {
+		c := v.elems.right[i]
 		c.Move(Pt(x, y))
 		y += Height(c) + spacing
 	}
@@ -219,7 +221,7 @@ func (v *typeView) editType(done func()) {
 	case *types.Basic, *types.Named:
 		done()
 	case *types.Pointer, *types.Array, *types.Slice, *types.Chan:
-		if elt := v.childTypes.right[0]; *elt.typ == nil {
+		if elt := v.elems.right[0]; *elt.typ == nil {
 			elt.editType(func() {
 				if *elt.typ == nil {
 					v.setType(nil)
@@ -230,8 +232,8 @@ func (v *typeView) editType(done func()) {
 			done()
 		}
 	case *types.Map:
-		key := v.childTypes.left[0]
-		val := v.childTypes.right[0]
+		key := v.elems.left[0]
+		val := v.elems.right[0]
 		switch types.Type(nil) {
 		case *key.typ:
 			key.editType(func() {
@@ -251,23 +253,23 @@ func (v *typeView) editType(done func()) {
 			done()
 		}
 	case *types.Struct:
-		v.addVars(&t.Fields, &v.childTypes.right, done)
+		v.addVars(&t.Fields, &v.elems.right, done)
 	case *types.Signature:
-		v.addVars(&t.Params, &v.childTypes.left, func() {
-			v.addVars(&t.Results, &v.childTypes.right, done)
+		v.addVars(&t.Params, &v.elems.left, func() {
+			v.addVars(&t.Results, &v.elems.right, done)
 		})
 	case *types.Interface:
-		v.addMethods(&t.Methods, &v.childTypes.right, done)
+		v.addMethods(&t.Methods, &v.elems.right, done)
 	}
 }
 
-func (v *typeView) insertVar(vs *[]*types.Var, childTypes *[]*typeView, before bool, i int, success, fail func()) {
+func (v *typeView) insertVar(vs *[]*types.Var, elems *[]*typeView, before bool, i int, success, fail func()) {
 	if !before {
 		i++
 	}
 	*vs = append((*vs)[:i], append([]*types.Var{{}}, (*vs)[i:]...)...)
 	v.refresh()
-	t := (*childTypes)[i]
+	t := (*elems)[i]
 	t.edit(func() {
 		if *t.typ == nil {
 			*vs = append((*vs)[:i], (*vs)[i+1:]...)
@@ -278,7 +280,7 @@ func (v *typeView) insertVar(vs *[]*types.Var, childTypes *[]*typeView, before b
 				if !before {
 					i--
 				}
-				SetKeyFocus((*childTypes)[i])
+				SetKeyFocus((*elems)[i])
 			}
 		} else {
 			if success != nil {
@@ -290,19 +292,19 @@ func (v *typeView) insertVar(vs *[]*types.Var, childTypes *[]*typeView, before b
 	})
 }
 
-func (v *typeView) addVars(vs *[]*types.Var, childTypes *[]*typeView, done func()) {
-	v.insertVar(vs, childTypes, true, len(*vs), func() {
-		v.addVars(vs, childTypes, done)
+func (v *typeView) addVars(vs *[]*types.Var, elems *[]*typeView, done func()) {
+	v.insertVar(vs, elems, true, len(*vs), func() {
+		v.addVars(vs, elems, done)
 	}, done)
 }
 
-func (v *typeView) insertMethod(m *[]*types.Func, childTypes *[]*typeView, before bool, i int, success, fail func()) {
+func (v *typeView) insertMethod(m *[]*types.Func, elems *[]*typeView, before bool, i int, success, fail func()) {
 	if !before {
 		i++
 	}
 	*m = append((*m)[:i], append([]*types.Func{types.NewFunc(0, nil, "", &types.Signature{Recv: newVar("", *v.typ)})}, (*m)[i:]...)...)
 	v.refresh()
-	t := (*childTypes)[i]
+	t := (*elems)[i]
 	t.edit(func() {
 		if *t.typ == nil || len(t.nameText.GetText()) == 0 {
 			*m = append((*m)[:i], (*m)[i+1:]...)
@@ -313,7 +315,7 @@ func (v *typeView) insertMethod(m *[]*types.Func, childTypes *[]*typeView, befor
 				if !before {
 					i--
 				}
-				SetKeyFocus((*childTypes)[i])
+				SetKeyFocus((*elems)[i])
 			}
 		} else {
 			if success != nil {
@@ -325,9 +327,9 @@ func (v *typeView) insertMethod(m *[]*types.Func, childTypes *[]*typeView, befor
 	})
 }
 
-func (v *typeView) addMethods(m *[]*types.Func, childTypes *[]*typeView, done func()) {
-	v.insertMethod(m, childTypes, true, len(*m), func() {
-		v.addMethods(m, childTypes, done)
+func (v *typeView) addMethods(m *[]*types.Func, elems *[]*typeView, done func()) {
+	v.insertMethod(m, elems, true, len(*m), func() {
+		v.addMethods(m, elems, done)
 	}, done)
 }
 
@@ -377,48 +379,48 @@ func (v *typeView) KeyPress(event KeyEvent) {
 			}
 			return false
 		}
-		_ = moveFocus(v.childTypes.left, v.childTypes.right, KeyRight) || moveFocus(v.childTypes.right, v.childTypes.left, KeyLeft)
+		_ = moveFocus(v.elems.left, v.elems.right, KeyRight) || moveFocus(v.elems.right, v.elems.left, KeyLeft)
 	case KeyEnter:
 		done := func() { SetKeyFocus(v) }
 		switch t := (*v.typ).(type) {
 		case *types.Pointer, *types.Array, *types.Slice, *types.Chan:
-			SetKeyFocus(v.childTypes.right[0])
+			SetKeyFocus(v.elems.right[0])
 		case *types.Map:
-			SetKeyFocus(v.childTypes.left[0])
+			SetKeyFocus(v.elems.left[0])
 		case *types.Struct:
 			if len(t.Fields) == 0 {
 				v.edit(done)
 			} else {
-				SetKeyFocus(v.childTypes.right[0])
+				SetKeyFocus(v.elems.right[0])
 			}
 		case *types.Signature:
 			switch {
 			case len(t.Params) == 0 && len(t.Results) == 0:
 				v.edit(done)
 			case len(t.Params) == 0:
-				v.addVars(&t.Params, &v.childTypes.left, func() {
+				v.addVars(&t.Params, &v.elems.left, func() {
 					if len(t.Params) == 0 {
-						SetKeyFocus(v.childTypes.right[0])
+						SetKeyFocus(v.elems.right[0])
 					} else {
-						SetKeyFocus(v.childTypes.left[0])
+						SetKeyFocus(v.elems.left[0])
 					}
 				})
 			case len(t.Results) == 0:
-				v.addVars(&t.Results, &v.childTypes.right, func() {
+				v.addVars(&t.Results, &v.elems.right, func() {
 					if len(t.Results) == 0 {
-						SetKeyFocus(v.childTypes.left[0])
+						SetKeyFocus(v.elems.left[0])
 					} else {
-						SetKeyFocus(v.childTypes.right[0])
+						SetKeyFocus(v.elems.right[0])
 					}
 				})
 			default:
-				SetKeyFocus(v.childTypes.left[0])
+				SetKeyFocus(v.elems.left[0])
 			}
 		case *types.Interface:
 			if len(t.Methods) == 0 {
 				v.edit(done)
 			} else {
-				SetKeyFocus(v.childTypes.right[0])
+				SetKeyFocus(v.elems.right[0])
 			}
 		}
 	case KeyEscape:
@@ -452,29 +454,29 @@ func (v *typeView) KeyPress(event KeyEvent) {
 		if p, ok := Parent(v).(*typeView); ok {
 			switch t := (*p.typ).(type) {
 			case *types.Struct:
-				for i, c := range p.childTypes.right {
+				for i, c := range p.elems.right {
 					if c == v {
-						p.insertVar(&t.Fields, &p.childTypes.right, event.Shift, i, nil, nil)
+						p.insertVar(&t.Fields, &p.elems.right, event.Shift, i, nil, nil)
 						break
 					}
 				}
 			case *types.Signature:
-				for i, c := range p.childTypes.left {
+				for i, c := range p.elems.left {
 					if c == v {
-						p.insertVar(&t.Params, &p.childTypes.left, event.Shift, i, nil, nil)
+						p.insertVar(&t.Params, &p.elems.left, event.Shift, i, nil, nil)
 						break
 					}
 				}
-				for i, c := range p.childTypes.right {
+				for i, c := range p.elems.right {
 					if c == v {
-						p.insertVar(&t.Results, &p.childTypes.right, event.Shift, i, nil, nil)
+						p.insertVar(&t.Results, &p.elems.right, event.Shift, i, nil, nil)
 						break
 					}
 				}
 			case *types.Interface:
-				for i, c := range p.childTypes.right {
+				for i, c := range p.elems.right {
 					if c == v {
-						p.insertMethod(&t.Methods, &p.childTypes.right, event.Shift, i, nil, nil)
+						p.insertMethod(&t.Methods, &p.elems.right, event.Shift, i, nil, nil)
 						break
 					}
 				}
@@ -484,7 +486,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 		if p, ok := Parent(v).(*typeView); ok {
 			switch t := (*p.typ).(type) {
 			case *types.Struct:
-				for i, c := range p.childTypes.right {
+				for i, c := range p.elems.right {
 					if c == v {
 						t.Fields = append(t.Fields[:i], t.Fields[i+1:]...)
 						p.refresh()
@@ -492,7 +494,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 							if i == len {
 								i--
 							}
-							SetKeyFocus(p.childTypes.right[i])
+							SetKeyFocus(p.elems.right[i])
 						} else {
 							SetKeyFocus(p)
 						}
@@ -500,7 +502,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 					}
 				}
 			case *types.Signature:
-				for i, c := range p.childTypes.left {
+				for i, c := range p.elems.left {
 					if c == v {
 						t.Params = append(t.Params[:i], t.Params[i+1:]...)
 						p.refresh()
@@ -508,14 +510,14 @@ func (v *typeView) KeyPress(event KeyEvent) {
 							if i == len {
 								i--
 							}
-							SetKeyFocus(p.childTypes.left[i])
+							SetKeyFocus(p.elems.left[i])
 						} else {
 							SetKeyFocus(p)
 						}
 						break
 					}
 				}
-				for i, c := range p.childTypes.right {
+				for i, c := range p.elems.right {
 					if c == v {
 						t.Results = append(t.Results[:i], t.Results[i+1:]...)
 						p.refresh()
@@ -523,7 +525,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 							if i == len {
 								i--
 							}
-							SetKeyFocus(p.childTypes.right[i])
+							SetKeyFocus(p.elems.right[i])
 						} else {
 							SetKeyFocus(p)
 						}
@@ -531,7 +533,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 					}
 				}
 			case *types.Interface:
-				for i, c := range p.childTypes.right {
+				for i, c := range p.elems.right {
 					if c == v {
 						t.Methods = append(t.Methods[:i], t.Methods[i+1:]...)
 						p.refresh()
@@ -539,7 +541,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 							if i == len {
 								i--
 							}
-							SetKeyFocus(p.childTypes.right[i])
+							SetKeyFocus(p.elems.right[i])
 						} else {
 							SetKeyFocus(p)
 						}
