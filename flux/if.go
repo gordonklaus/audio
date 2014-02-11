@@ -26,17 +26,17 @@ func newIfNode(arranged blockchan) *ifNode {
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
 	n.input = newInput(n, newVar("", types.Typ[types.Bool]))
 	n.Add(n.input)
-	n.falseblk = newBlock(n, arranged)
 	n.trueblk = newBlock(n, arranged)
+	n.falseblk = newBlock(n, arranged)
 
 	n.seqIn = newInput(n, newVar("seq", seqType))
-	MoveCenter(n.seqIn, Pt(-portSize, 0))
+	MoveCenter(n.seqIn, Pt(0, portSize))
 	n.Add(n.seqIn)
 	n.seqOut = newOutput(n, newVar("seq", seqType))
-	MoveCenter(n.seqOut, Pt(portSize, 0))
+	MoveCenter(n.seqOut, Pt(0, -portSize))
 	n.Add(n.seqOut)
 
-	MoveCenter(n.input, Pt(-2*portSize, 0))
+	MoveCenter(n.input, Pt(0, 2*portSize))
 	return n
 }
 
@@ -63,17 +63,17 @@ func (n *ifNode) LostKeyFocus() { n.focused = false; Repaint(n) }
 
 func (n *ifNode) KeyPress(event KeyEvent) {
 	if b, ok := KeyFocus(n).(*block); ok {
-		if b == n.trueblk && event.Key == KeyDown || b == n.falseblk && event.Key == KeyUp {
+		if b == n.trueblk && event.Key == KeyRight || b == n.falseblk && event.Key == KeyLeft {
 			SetKeyFocus(n)
 		}
 		return
 	}
 
 	switch k := event.Key; k {
-	case KeyDown, KeyUp:
-		if k == KeyUp && len(n.trueblk.nodes) == 0 {
+	case KeyRight, KeyLeft:
+		if k == KeyLeft && len(n.trueblk.nodes) == 0 {
 			SetKeyFocus(n.trueblk)
-		} else if k == KeyDown && len(n.falseblk.nodes) == 0 {
+		} else if k == KeyRight && len(n.falseblk.nodes) == 0 {
 			SetKeyFocus(n.falseblk)
 		} else {
 			n.blk.focusNearestView(n, k)
@@ -86,5 +86,5 @@ func (n *ifNode) KeyPress(event KeyEvent) {
 func (n ifNode) Paint() {
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
 	DrawLine(CenterInParent(n.input), CenterInParent(n.seqOut))
-	DrawLine(Pt(0, -4), Pt(0, 4))
+	DrawLine(Pt(-4, 0), Pt(4, 0))
 }

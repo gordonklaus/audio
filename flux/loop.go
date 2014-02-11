@@ -26,11 +26,11 @@ func newLoopNode(arranged blockchan) *loopNode {
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
 	n.input = newInput(n, nil)
 	n.input.connsChanged = n.updateInputType
-	MoveCenter(n.input, Pt(-portSize/2, 0))
+	MoveCenter(n.input, Pt(0, portSize/2))
 	n.Add(n.input)
 
 	n.seqIn = newInput(n, newVar("seq", seqType))
-	MoveCenter(n.seqIn, Pt(portSize/2, 0))
+	MoveCenter(n.seqIn, Pt(0, -portSize/2))
 	n.Add(n.seqIn)
 	n.seqOut = newOutput(n, newVar("seq", seqType))
 	n.Add(n.seqOut)
@@ -124,7 +124,7 @@ func (n *loopNode) LostKeyFocus() { n.focused = false; Repaint(n) }
 
 func (n *loopNode) KeyPress(event KeyEvent) {
 	switch event.Key {
-	case KeyRight:
+	case KeyDown:
 		SetKeyFocus(n.inputsNode)
 	default:
 		n.ViewBase.KeyPress(event)
@@ -133,5 +133,5 @@ func (n *loopNode) KeyPress(event KeyEvent) {
 
 func (n loopNode) Paint() {
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
-	DrawLine(Pt(-portSize/2, 0), Pt(portSize/2, 0))
+	DrawLine(Pt(0, -portSize/2), Pt(0, portSize/2))
 }

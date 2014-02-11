@@ -136,7 +136,7 @@ func (n *funcNode) LostKeyFocus() { n.focused = false; Repaint(n) }
 func (n *funcNode) KeyPress(event KeyEvent) {
 	if event.Command && event.Key == KeyS && !n.literal {
 		saveFunc(n)
-	} else if event.Key == KeyLeft && n.literal {
+	} else if event.Key == KeyUp && n.literal {
 		SetKeyFocus(n.outputsNode)
 	} else {
 		n.ViewBase.KeyPress(event)
@@ -144,8 +144,8 @@ func (n *funcNode) KeyPress(event KeyEvent) {
 }
 
 func (n funcNode) Paint() {
-	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
 	if n.literal {
-		DrawLine(Pt(-portSize/2, 0), Pt(portSize/2, 0))
+		SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
+		DrawLine(Pt(0, -portSize/2), Pt(0, portSize/2))
 	}
 }

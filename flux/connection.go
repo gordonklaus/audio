@@ -112,9 +112,9 @@ func (c *connection) reblock() {
 }
 
 func (c *connection) reform() {
-	unconnectedOffset := Pt(32, 0)
+	unconnectedOffset := Pt(0, -32)
 	if c.feedback {
-		unconnectedOffset.X = -96
+		unconnectedOffset.Y = 96
 	}
 	if c.src != nil {
 		c.srcPt = MapTo(c.src, Center(c.src), c.blk)
@@ -130,7 +130,7 @@ func (c *connection) reform() {
 
 	var rect Rectangle
 	if c.src != nil && c.src.obj.Type == seqType || c.dst != nil && c.dst.obj.Type == seqType {
-		rect = Rectangle{Pt(c.srcPt.X, math.Min(c.srcPt.Y, c.dstPt.Y)-25), Pt(c.dstPt.X, math.Max(c.srcPt.Y, c.dstPt.Y))}
+		rect = Rectangle{Pt(math.Min(c.srcPt.X, c.dstPt.X)-25, c.srcPt.Y), Pt(math.Max(c.srcPt.X, c.dstPt.X), c.dstPt.Y)}
 	} else {
 		rect = Rectangle{c.srcPt, c.dstPt}.Canon()
 	}
@@ -242,11 +242,13 @@ func (c *connection) updateSrcTxt(txt string) {
 			anyHidden = true
 		}
 	}
+	srctxt := c.src.conntxt
 	if !anyHidden {
-		c.src.conntxt.SetText("")
+		srctxt.SetText("")
 	} else if txt != "" {
-		c.src.conntxt.SetText(txt)
+		srctxt.SetText(txt)
 	}
+	srctxt.Move(Pt(-Width(srctxt)/2, -Height(srctxt)))
 	c.src.updateTextColor()
 }
 
@@ -267,7 +269,7 @@ func (c *connection) updateDstTxt() {
 	sort.StringSlice(names).Sort()
 	dsttxt := c.dst.conntxt
 	dsttxt.SetText(strings.Join(names, ","))
-	dsttxt.Move(Pt(-Width(dsttxt), -Height(dsttxt)/2))
+	dsttxt.Move(Pt(-Width(dsttxt)/2, 0))
 	c.dst.updateTextColor()
 }
 
@@ -378,7 +380,7 @@ func (c *connection) KeyPress(event KeyEvent) {
 	}
 
 	switch event.Key {
-	case KeyLeft:
+	case KeyUp:
 		if c.focusSrc {
 			ins := ins(c.src.node)
 			if len(ins) > 0 {
@@ -389,7 +391,7 @@ func (c *connection) KeyPress(event KeyEvent) {
 		} else {
 			c.focus(true)
 		}
-	case KeyRight:
+	case KeyDown:
 		if c.focusSrc {
 			c.focus(false)
 		} else {
@@ -400,7 +402,7 @@ func (c *connection) KeyPress(event KeyEvent) {
 				SetKeyFocus(c.dst.node)
 			}
 		}
-	case KeyDown, KeyUp:
+	case KeyRight, KeyLeft:
 		p := c.dst
 		if c.focusSrc {
 			p = c.src
@@ -477,17 +479,17 @@ func (c *connection) Paint() {
 	start, end := c.srcPt, c.dstPt
 	var pts []Point
 	if c.src != nil && c.src.obj.Type == seqType || c.dst != nil && c.dst.obj.Type == seqType {
-		pts = []Point{start, Pt(start.X, start.Y-40), Pt(end.X, end.Y-40), end}
+		pts = []Point{start, Pt(start.X-40, start.Y), Pt(end.X-40, end.Y), end}
 	} else {
 		d := end.Sub(start)
 		mid := start.Add(d.Div(2))
 		if c.feedback {
-			mid.Y = math.Max(start.Y, end.Y) + 128
+			mid.X = math.Max(start.X, end.X) + 128
 		}
-		dx := math.Abs(d.X / 3)
-		p1 := start.Add(Pt(dx, 0))
+		off := Pt(0, math.Abs(d.Y/3))
+		p1 := start.Sub(off)
 		p2 := mid
-		p3 := end.Sub(Pt(dx, 0))
+		p3 := end.Add(off)
 		pts = []Point{start, p1, p2, p3, end}
 	}
 	steps := 0.0

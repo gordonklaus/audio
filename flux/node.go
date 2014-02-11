@@ -24,51 +24,30 @@ type node interface {
 	outConns() []*connection
 }
 
-type nodeText struct {
-	*TextBase
-	node *nodeBase
-}
-
-func newNodeText(node *nodeBase) *nodeText {
-	t := &nodeText{node: node}
-	t.TextBase = NewTextBase(t, "")
-	return t
-}
-func (t *nodeText) KeyPress(event KeyEvent) {
-	switch event.Key {
-	case KeyEnter:
-		SetKeyFocus(t.node.self)
-	default:
-		t.TextBase.KeyPress(event)
-	}
-	t.node.reform()
-}
-func (t nodeText) Paint() {
-	Rotate(1.0 / 12) // this should go in ViewBase; but is good enough for now
-	t.TextBase.Paint()
-}
-
 type nodeBase struct {
 	*ViewBase
 	self node
 	AggregateMouser
-	blk     *block
-	text    *nodeText
-	ins     []*port
-	outs    []*port
-	focused bool
-}
 
-const (
-	nodeMargin = 3
-)
+	blk  *block
+	text *TextBase
+	ins  []*port
+	outs []*port
+
+	focused bool
+	gap     float64
+}
 
 func newNodeBase(self node) *nodeBase {
 	n := &nodeBase{self: self}
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(self), NewMover(self)}
-	n.text = newNodeText(n)
+	n.text = NewText("")
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
+	n.text.TextChanged = func(string) {
+		MoveCenter(n.text, ZP)
+		n.gap = Height(n.text) / 2
+	}
 	n.Add(n.text)
 	n.ViewBase.Self = self
 	return n
@@ -91,10 +70,9 @@ func (n *nodeBase) newOutput(v *types.Var) *port {
 }
 
 func (n *nodeBase) addSeqPorts() {
-	seqIn := n.newInput(newVar("seq", seqType))
-	MoveCenter(seqIn, Pt(-8, 0))
-	seqOut := n.newOutput(newVar("seq", seqType))
-	MoveCenter(seqOut, Pt(8, 0))
+	n.newInput(newVar("seq", seqType))
+	n.newOutput(newVar("seq", seqType))
+	n.reform()
 }
 
 func (n *nodeBase) removePortBase(p *port) { // intentionally named to not implement interface{removePort(*port)}
@@ -130,26 +108,32 @@ func (n *nodeBase) reform() {
 
 	numIn := float64(len(ins))
 	numOut := float64(len(outs))
-	rx, ry := 2.0*portSize, (math.Max(numIn, numOut)+1)*portSize/2
+	rx, ry := (math.Max(numIn, numOut)+1)*portSize/2, 1.0*portSize
 
 	rect := ZR
 	for i, p := range ins {
-		y := -portSize * (float64(i) - (numIn-1)/2)
-		x := -rx * math.Sqrt(ry*ry-y*y) / ry
-		if len(ins) > 1 {
-			x -= 8
+		x := portSize * (float64(i) - (numIn-1)/2)
+		y := n.gap + ry*math.Sqrt(rx*rx-x*x)/rx
+		if numIn > 1 {
+			y += 8
 		}
 		MoveCenter(p, Pt(x, y))
 		rect = rect.Union(RectInParent(p))
 	}
 	for i, p := range outs {
-		y := -portSize * (float64(i) - (numOut-1)/2)
-		x := rx * math.Sqrt(ry*ry-y*y) / ry
-		if len(outs) > 1 {
-			x += 8
+		x := portSize * (float64(i) - (numOut-1)/2)
+		y := -n.gap - ry*math.Sqrt(rx*rx-x*x)/rx
+		if numOut > 1 {
+			y -= 8
 		}
 		MoveCenter(p, Pt(x, y))
 		rect = rect.Union(RectInParent(p))
+	}
+	if p := seqIn(n); p != nil {
+		MoveCenter(p, Pt(0, n.gap))
+	}
+	if p := seqOut(n); p != nil {
+		MoveCenter(p, Pt(0, -n.gap))
 	}
 	n.SetRect(rect)
 }
@@ -188,30 +172,26 @@ func nodeMoved(n node) {
 	}
 }
 
-func (n *nodeBase) TookKeyFocus() { n.focused = true; Repaint(n) }
-func (n *nodeBase) LostKeyFocus() { n.focused = false; Repaint(n) }
+func (n *nodeBase) TookKeyFocus() {
+	n.focused = true
+	n.text.SetTextColor(Color{.5, .5, .9, 1})
+}
 
-func (n nodeBase) Paint() {
-	const DX = 8.0
+func (n *nodeBase) LostKeyFocus() {
+	n.focused = false
+	n.text.SetTextColor(Color{1, 1, 1, 1})
+}
+
+func (n *nodeBase) Paint() {
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
-	for _, p := range append(n.ins, n.outs...) {
+	for _, p := range append(ins(n), outs(n)...) {
 		pt := CenterInParent(p)
-		dx := -DX
+		dy := n.gap
 		if p.out {
-			dx = DX
+			dy = -dy
 		}
-		x := (pt.X-dx)/2 + dx
-		DrawCubic([4]Point{Pt(dx, 0), Pt(x, 0), Pt(x, pt.Y), pt}, int(pt.Len()/2))
-	}
-	in, out := len(n.ins) > 0, len(n.outs) > 0
-	if in {
-		DrawLine(Pt(-DX, 0), ZP)
-	}
-	if out {
-		DrawLine(ZP, Pt(DX, 0))
-	}
-	if !in || !out {
-		DrawLine(Pt(0, -3), Pt(0, 3))
+		y := (pt.Y-dy)/2 + dy
+		DrawCubic([4]Point{Pt(0, dy), Pt(0, y), Pt(pt.X, y), pt}, int(pt.Len()/2))
 	}
 }
 
@@ -317,6 +297,13 @@ func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 func (n *basicLiteralNode) KeyPress(k KeyEvent) {
 	switch k.Key {
 	case KeyEnter:
+		s := n.text.GetText()
+		t := n.outs[0].obj.Type
+		n.text.Reject = func() {
+			n.text.SetText(s)
+			n.outs[0].setType(t)
+			SetKeyFocus(n)
+		}
 		SetKeyFocus(n.text)
 	default:
 		n.nodeBase.KeyPress(k)
@@ -370,7 +357,9 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 		case *types.Map:
 			// TODO: variable number of key/value input pairs?
 		}
-		MoveCenter(n.typ, Pt(0, Rect(n).Max.Y+Height(n.typ)/2))
+		MoveCenter(n.typ, ZP)
+		n.gap = Height(n.typ) / 2
+		n.reform()
 		SetKeyFocus(n)
 	}
 }

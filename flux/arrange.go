@@ -83,22 +83,22 @@ func (n *nodeArrange) animate() bool {
 func (n *nodeArrange) arrange() {
 	switch node := n.node.(type) {
 	case *ifNode:
-		falseblk, trueblk := n.blocks[0], n.blocks[1]
-		falseblk.Move(Pt(-blockRadius, -4-Height(falseblk)))
-		trueblk.Move(Pt(-blockRadius, 4))
+		trueblk, falseblk := n.blocks[0], n.blocks[1]
+		trueblk.Move(Pt(-4-Width(trueblk), -Height(trueblk)+blockRadius))
+		falseblk.Move(Pt(4, -Height(falseblk)+blockRadius))
 		ResizeToFit(n, 0)
 	case *loopNode:
 		b := n.blocks[0]
-		b.Move(Pt(portSize/2, -Height(b)/2))
+		b.Move(Pt(-Width(b)/2, -Height(b)-portSize/2))
 		seqOut := n.ports[2]
-		MoveCenter(seqOut, Pt(portSize/2+Width(b), 0))
+		MoveCenter(seqOut, Pt(0, -Height(b)-portSize/2))
 		ResizeToFit(n, 0)
 	case *funcNode:
 		b := n.blocks[0]
-		b.Move(Pt(-Width(b)-portSize/2, -Height(b)/2))
+		b.Move(Pt(-Width(b)/2, portSize/2))
 		if node.literal {
 			output := n.ports[0]
-			MoveCenter(output, Pt(portSize/2, 0))
+			MoveCenter(output, Pt(0, -portSize/2))
 		}
 		ResizeToFit(n, 0)
 	}
@@ -112,9 +112,9 @@ func (b *blockArrange) setRectReal() {
 		if n, ok := n.node.(*portsNode); ok {
 			// portsNodes gravitate to the boundary; thus we must adjust for the margin
 			if n.out {
-				r = r.Sub(Pt(blockRadius-2, 0))
+				r = r.Add(Pt(0, blockRadius-2))
 			} else {
-				r = r.Add(Pt(blockRadius-2, 0))
+				r = r.Sub(Pt(0, blockRadius-2))
 			}
 		}
 		if rect == ZR {
@@ -124,7 +124,7 @@ func (b *blockArrange) setRectReal() {
 		}
 	}
 	if rect == ZR {
-		rect = Rectangle{ZP, Pt(16, 0)}
+		rect = Rectangle{ZP, Pt(0, 16)}
 	}
 	rect = rect.Inset(-blockRadius)
 	b.SetRect(rect)
@@ -164,13 +164,13 @@ func arrange(arrange, childArranged, arranged blockchan, stop stopchan) {
 			if pn, ok := n1.node.(*portsNode); ok {
 				p := Center(b)
 				if pn.out {
-					p.X = Rect(b).Max.X - 2
+					p.Y = Rect(b).Min.Y + 2
 				} else {
-					p.X = Rect(b).Min.X + 2
+					p.Y = Rect(b).Max.Y - 2
 				}
 				dir := p.Sub(MapToParent(n1, ZP))
 				if n1.hasConns {
-					dir.Y = 0
+					dir.X = 0
 				}
 				n1.add(dir.Mul(portsNodeCoef * dir.Len()))
 			}
@@ -213,22 +213,22 @@ func arrange(arrange, childArranged, arranged blockchan, stop stopchan) {
 			dstNode := c.dst.node.in(b)
 			d := c.dst.centerIn(b).Sub(c.src.centerIn(b))
 			if c.conn.feedback {
-				d.X = -d.X
-				d.X -= connLen + Width(srcNode) + Width(dstNode)
+				d.Y = -d.Y
+				d.Y -= connLen + Height(srcNode) + Height(dstNode)
 			} else {
-				d.X -= connLen
+				d.Y += connLen
 			}
 			if c.hidden {
-				d.Y = 0
+				d.X = 0
 			} else {
-				d.X -= math.Abs(d.Y) / 2
-				d.Y *= math.Abs(d.Y) / 16
+				d.Y += math.Abs(d.X) / 2
+				d.X *= math.Abs(d.X) / 16
 			}
-			if d.X < 0 {
-				d.X *= d.X * d.X
+			if d.Y > 0 {
+				d.Y *= d.Y * d.Y
 			}
 			if c.conn.feedback {
-				d.X = -d.X
+				d.Y = -d.Y
 			}
 			d = d.Mul(connLenCoef)
 			srcNode.add(d)
@@ -346,9 +346,9 @@ func (b *blockArrange) setRect() {
 		if n, ok := n.node.(*portsNode); ok {
 			// portsNodes gravitate to the boundary; thus we must adjust for the margin
 			if n.out {
-				r = r.Sub(Pt(blockRadius-2, 0))
+				r = r.Add(Pt(0, blockRadius-2))
 			} else {
-				r = r.Add(Pt(blockRadius-2, 0))
+				r = r.Sub(Pt(0, blockRadius-2))
 			}
 		}
 		if rect == ZR {
@@ -358,7 +358,7 @@ func (b *blockArrange) setRect() {
 		}
 	}
 	if rect == ZR {
-		rect = Rectangle{ZP, Pt(16, 0)}
+		rect = Rectangle{ZP, Pt(0, 16)}
 	}
 	rect = rect.Inset(-blockRadius)
 	b.SetRect(rect)
@@ -519,10 +519,10 @@ func newNodeArrange(node node, b *blockArrange, ports portmap) *nodeArrange {
 	}
 	switch node := node.(type) {
 	case *ifNode:
-		f, t := newBlockArrange(node.falseblk, n, ports), newBlockArrange(node.trueblk, n, ports)
-		n.blocks = []*blockArrange{f, t}
-		n.Add(f)
+		t, f := newBlockArrange(node.trueblk, n, ports), newBlockArrange(node.falseblk, n, ports)
+		n.blocks = []*blockArrange{t, f}
 		n.Add(t)
+		n.Add(f)
 	case *loopNode:
 		b := newBlockArrange(node.loopblk, n, ports)
 		n.blocks = []*blockArrange{b}

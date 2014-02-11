@@ -44,7 +44,6 @@ func newPort(out bool, n node, v *types.Var) *port {
 	p.setType(*p.valView.typ)
 
 	p.conntxt = NewText("")
-	p.conntxt.Move(Pt(0, -Height(p.conntxt)/2))
 	p.conntxt.SetBackgroundColor(Color{0, 0, 0, 0})
 	p.conntxt.SetValidator(validateID)
 	p.Add(p.conntxt)
@@ -60,9 +59,9 @@ func validateID(text *string) bool {
 func (p *port) setType(t types.Type) {
 	p.valView.setType(t)
 	if p.out {
-		p.valView.Move(Pt(12, -Height(p.valView)/2))
+		p.valView.Move(Pt(-Width(p.valView)/2, -Height(p.valView)-12))
 	} else {
-		p.valView.Move(Pt(-Width(p.valView)-12, -Height(p.valView)/2))
+		p.valView.Move(Pt(-Width(p.valView)/2, 12))
 	}
 }
 
@@ -151,7 +150,7 @@ func (p *port) focusMiddle() {
 
 func (p *port) focusNextConn(curƟ float64, dir int) {
 	less := func(x, y float64) bool { return x < y }
-	if p.out != (dir == KeyUp) {
+	if p.out != (dir == KeyRight) {
 		less = func(x, y float64) bool { return x > y }
 	}
 	var conn *connection
@@ -169,7 +168,7 @@ func (p *port) focusNextConn(curƟ float64, dir int) {
 
 	if p := p.next(dir); p != nil {
 		Ɵ := math.Pi
-		if p.out == (dir == KeyUp) {
+		if p.out == (dir == KeyRight) {
 			Ɵ = -Ɵ
 		}
 		p.focusNextConn(Ɵ, dir)
@@ -188,7 +187,7 @@ func (p *port) next(dir int) *port {
 			break
 		}
 	}
-	if dir == KeyUp {
+	if dir == KeyLeft {
 		i--
 	} else {
 		i++
@@ -219,8 +218,8 @@ func (p *port) KeyPress(event KeyEvent) {
 	}
 
 	switch k := event.Key; k {
-	case KeyLeft, KeyRight:
-		if p.out == (k == KeyRight) {
+	case KeyUp, KeyDown:
+		if p.out == (k == KeyDown) {
 			if p.obj.Type == seqType {
 				ports := ins(p.node)
 				if p.out {
@@ -235,13 +234,13 @@ func (p *port) KeyPress(event KeyEvent) {
 		} else {
 			SetKeyFocus(p.node)
 		}
-	case KeyDown:
+	case KeyRight:
 		if p.obj.Type == seqType && len(p.conns) > 0 {
 			p.conns[len(p.conns)-1].focus(p.out)
 			return
 		}
 		fallthrough
-	case KeyUp:
+	case KeyLeft:
 		if p := p.next(k); p != nil {
 			SetKeyFocus(p)
 		}

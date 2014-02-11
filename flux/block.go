@@ -326,14 +326,14 @@ func (b *block) KeyPress(event KeyEvent) {
 		if event.Alt {
 			b.focusNearestView(KeyFocus(b), k)
 		} else if n, ok := KeyFocus(b).(node); ok {
-			if k == KeyLeft {
+			if k == KeyUp {
 				if seqIn(n) != nil {
 					SetKeyFocus(seqIn(n))
 				} else if len := len(ins(n)); len > 0 {
 					ins(n)[len/2].focusMiddle()
 				}
 			}
-			if k == KeyRight {
+			if k == KeyDown {
 				if seqOut(n) != nil {
 					SetKeyFocus(seqOut(n))
 				} else if len := len(outs(n)); len > 0 {
@@ -411,6 +411,9 @@ func (b *block) KeyPress(event KeyEvent) {
 				b.addNode(n)
 				MoveCenter(n, Center(b))
 				n.text.SetText(text)
+				n.text.Accept = func(string) {
+					SetKeyFocus(n)
+				}
 				n.text.Reject = func() {
 					b.removeNode(n)
 					SetKeyFocus(b)
@@ -552,9 +555,9 @@ func (n *portsNode) removePort(p *port) {
 }
 
 func (n *portsNode) KeyPress(event KeyEvent) {
-	if l, ok := n.blk.node.(*loopNode); ok && event.Key == KeyLeft {
+	if l, ok := n.blk.node.(*loopNode); ok && event.Key == KeyUp {
 		SetKeyFocus(l)
-	} else if f, ok := n.blk.node.(*funcNode); ok && f.literal && event.Key == KeyRight && n.out {
+	} else if f, ok := n.blk.node.(*funcNode); ok && f.literal && event.Key == KeyDown && n.out {
 		SetKeyFocus(f)
 	} else if n.editable && event.Key == KeyComma {
 		f := n.blk.node.(*funcNode)
@@ -630,6 +633,13 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 		}
 	} else {
 		n.nodeBase.KeyPress(event)
+	}
+}
+
+func (n *portsNode) Paint() {
+	n.nodeBase.Paint()
+	if len(n.ins)+len(n.outs) == 0 {
+		DrawLine(Pt(-3, 0), Pt(3, 0))
 	}
 }
 

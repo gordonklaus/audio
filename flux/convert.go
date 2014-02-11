@@ -48,7 +48,9 @@ func (n *convertNode) setType(t types.Type) {
 	n.outs[0].setType(t)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
-		MoveCenter(n.typ, Pt(0, Rect(n).Max.Y+Height(n.typ)/2))
+		MoveCenter(n.typ, ZP)
+		n.gap = Height(n.typ) / 2
+		n.reform()
 		SetKeyFocus(n)
 	}
 }

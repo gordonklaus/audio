@@ -588,6 +588,8 @@ func (v *typeView) KeyPress(event KeyEvent) {
 }
 
 func (v *typeView) Paint() {
+	SetColor(Color{0, 0, 0, 1})
+	FillRect(Rect(v))
 	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[v.focused])
 	SetLineWidth(1)
 	DrawRect(Rect(v))

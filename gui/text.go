@@ -32,7 +32,7 @@ type TextBase struct {
 	frameSize           float64
 	frameColor          Color
 	backgroundColor     Color
-	validator           func(*string) bool
+	Validate            func(*string) bool
 	Accept, TextChanged func(string)
 	Reject              func()
 }
@@ -82,14 +82,14 @@ func (t *TextBase) SetFrameSize(size float64) {
 	Resize(t, Pt(2*t.frameSize+font.Advance(t.text), 2*t.frameSize-font.Descender()+font.Ascender()))
 }
 
-func (t *TextBase) SetValidator(validator func(*string) bool) {
-	t.validator = validator
+func (t *TextBase) SetValidator(validate func(*string) bool) {
+	t.Validate = validate
 }
 
 func (t *TextBase) KeyPress(event KeyEvent) {
 	if len(event.Text) > 0 {
 		text := t.text + event.Text
-		if t.validator == nil || t.validator(&text) {
+		if t.Validate == nil || t.Validate(&text) {
 			t.Self.SetText(text)
 		}
 	}
@@ -97,7 +97,7 @@ func (t *TextBase) KeyPress(event KeyEvent) {
 	case KeyBackspace:
 		if len(t.text) > 0 {
 			text := t.text[:len(t.text)-1]
-			if t.validator == nil || t.validator(&text) {
+			if t.Validate == nil || t.Validate(&text) {
 				t.Self.SetText(text)
 			}
 		}
