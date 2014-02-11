@@ -74,7 +74,7 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 		f.addPkgRef(v.Type)
 	}
 	if sig.IsVariadic {
-		n.inputsNode.outs[len(n.inputsNode.outs)-1].valView.setVariadic()
+		n.inputsNode.outs[len(n.inputsNode.outs)-1].valView.ellipsis = true
 	}
 	var results []*ast.Field
 	if r := typ.Results; r != nil {
@@ -307,7 +307,7 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
 			}
 			in := newInput(v)
 			if x.Ellipsis != 0 {
-				in.valView.setVariadic()
+				in.valView.ellipsis = true
 			}
 		}
 		r.dst(arg, ins(n)[i])
