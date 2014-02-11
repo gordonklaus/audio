@@ -22,6 +22,7 @@ type typeView struct {
 	text       Text
 	elems      struct{ left, right []*typeView }
 	unexported Text
+	ellipsis   bool
 	focused    bool
 }
 
@@ -97,6 +98,9 @@ func (v *typeView) setType(t types.Type) {
 		v.elems.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Slice:
 		s = "[]"
+		if v.ellipsis {
+			s = "…"
+		}
 		v.elems.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Chan:
 		s = "chan"
@@ -120,7 +124,7 @@ func (v *typeView) setType(t types.Type) {
 			v.elems.left = append(v.elems.left, newValueView(val))
 		}
 		if t.IsVariadic {
-			v.elems.left[len(v.elems.left)-1].setVariadic()
+			v.elems.left[len(v.elems.left)-1].ellipsis = true
 		}
 		for _, val := range t.Results {
 			v.elems.right = append(v.elems.right, newValueView(val))
@@ -158,11 +162,6 @@ func (v *typeView) setType(t types.Type) {
 func invisible(obj types.Object, p *types.Package) bool {
 	p2 := obj.GetPkg()
 	return !(p2 == nil || p == nil || p2 == p || obj.IsExported())
-}
-
-func (v *typeView) setVariadic() {
-	v.text.SetText("…")
-	v.reform()
 }
 
 func (v *typeView) reform() {

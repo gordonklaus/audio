@@ -618,14 +618,11 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 				return
 			}
 			sig.IsVariadic = !sig.IsVariadic
+			p.valView.ellipsis = sig.IsVariadic
 			if sig.IsVariadic {
-				p.obj.Type = &types.Slice{p.obj.Type}
+				p.setType(&types.Slice{p.obj.Type})
 			} else {
-				p.obj.Type = p.obj.Type.(*types.Slice).Elem
-			}
-			p.valView.refresh()
-			if sig.IsVariadic {
-				p.valView.setVariadic()
+				p.setType(p.obj.Type.(*types.Slice).Elem)
 			}
 			if f.obj == nil {
 				f.output.valView.refresh()

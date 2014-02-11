@@ -27,8 +27,8 @@ func newAppendNode() *appendNode {
 				in.setType(t)
 				if n.ellipsis() {
 					in := ins(n)[1]
+					in.valView.ellipsis = true
 					in.setType(t)
-					in.valView.setVariadic()
 				} else {
 					for _, in := range ins(n)[1:] {
 						in.setType(t.Elem)
@@ -65,7 +65,8 @@ func (n *appendNode) KeyPress(event KeyEvent) {
 				n.removePortBase(in)
 			}
 			in := n.newInput(v)
-			in.valView.setVariadic()
+			in.valView.ellipsis = true
+			in.valView.refresh()
 			SetKeyFocus(in)
 			rearrange(n.blk)
 		}
