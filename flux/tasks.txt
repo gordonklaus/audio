@@ -1,9 +1,9 @@
 TODO
 
-- don't include sequencing ports in normal keyboard navigation.  access them by special keystrokes (Command-{Semicolon, Quote}?).  (update focusNearestView to ignore sequencing ports, too)
 - automatically dereference a pointer only if it originates from an addressable expression?
 - use types.IsAssignableTo in canConnect
 - make all fields and methods available in browser.  use types.Selection for fields and methods.  use types.LookupFieldOrMethod.
+- don't include sequencing ports in normal keyboard navigation.  access them by special keystrokes (Command-{Semicolon, Quote}?).  (update focusNearestView to ignore sequencing ports, too)
 - shortcuts:
   - on an out port, press '.' to select a field or method
   - on an in port, press '{' to create a composite literal of the port's type

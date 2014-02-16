@@ -44,9 +44,7 @@ func (n *ifNode) newBlock() (b *block, cond *port) {
 	n.cond = append(n.cond, cond)
 	n.Add(cond)
 
-	if n.blk != nil {
-		rearrange(n.blk)
-	}
+	rearrange(n.blk)
 	return
 }
 

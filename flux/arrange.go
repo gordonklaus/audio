@@ -142,6 +142,9 @@ func (b *blockArrange) setRectReal() {
 }
 
 func rearrange(b *block) {
+	if b == nil {
+		return
+	}
 	ba := newBlockArrange(b, nil, portmap{})
 	go func() {
 		b.arrange <- ba
