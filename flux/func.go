@@ -53,9 +53,9 @@ func newFuncNode(obj types.Object, arranged blockchan) *funcNode {
 
 func (n *funcNode) Close() {
 	if !n.literal {
+		saveFunc(n)
 		n.funcblk.close()
 		n.stop.stop()
-		saveFunc(n)
 		n.done()
 	}
 	n.ViewBase.Close()

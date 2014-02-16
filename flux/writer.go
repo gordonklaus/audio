@@ -410,19 +410,24 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				w.assignExisting(existing)
 			}
 		case *ifNode:
-			w.indent("if ")
-			if len(n.input.conns) > 0 {
-				w.write(vars[n.input])
-			} else {
-				w.write("false")
+			w.indent("")
+			for i, b := range n.blocks {
+				if i > 0 {
+					w.write(" else ")
+				}
+				cond := n.cond[i]
+				if i == 0 || i < len(n.blocks)-1 || len(cond.conns) > 0 {
+					w.write("if ")
+					if len(cond.conns) > 0 {
+						w.write(vars[cond])
+					} else {
+						w.write("false")
+					}
+				}
+				w.write(" {\n")
+				w.block(b, vars)
+				w.indent("}")
 			}
-			w.write(" {\n")
-			w.block(n.trueblk, vars)
-			if len(n.falseblk.nodes) > 0 {
-				w.indent("} else {\n")
-				w.block(n.falseblk, vars)
-			}
-			w.indent("}")
 			w.seq(n)
 		case *loopNode:
 			w.indent("for ")

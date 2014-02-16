@@ -220,7 +220,7 @@ func (p *port) KeyPress(event KeyEvent) {
 	switch k := event.Key; k {
 	case KeyUp, KeyDown:
 		if p.out == (k == KeyDown) {
-			if p.obj.Type == seqType {
+			if p.obj.Type == seqType { // TODO: fix me (should be under KeyLeft)
 				ports := ins(p.node)
 				if p.out {
 					ports = outs(p.node)
@@ -232,7 +232,11 @@ func (p *port) KeyPress(event KeyEvent) {
 				p.focusMiddle()
 			}
 		} else {
-			SetKeyFocus(p.node)
+			if n, ok := p.node.(*ifNode); ok {
+				n.focusFrom(p)
+			} else {
+				SetKeyFocus(p.node)
+			}
 		}
 	case KeyRight:
 		if p.obj.Type == seqType && len(p.conns) > 0 {

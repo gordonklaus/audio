@@ -45,6 +45,7 @@ func newOperatorNode(obj types.Object) *operatorNode {
 	case "==", "!=", "<", "<=", ">", ">=":
 		f := func() {
 			t := combineInputTypes(ins(n))
+			t = untypedToTyped(t)
 			for _, p := range ins(n) {
 				p.setType(t)
 			}

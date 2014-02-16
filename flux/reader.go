@@ -220,10 +220,17 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 		case *ast.IfStmt:
 			n := newIfNode(b.childArranged)
 			b.addNode(n)
-			r.dst(s.Cond, n.input)
-			r.block(n.trueblk, s.Body.List)
-			if s.Else != nil {
-				r.block(n.falseblk, s.Else.(*ast.BlockStmt).List)
+			for s := ast.Stmt(s); s != nil; {
+				b, cond := n.newBlock()
+				switch s2 := s.(type) {
+				case *ast.IfStmt:
+					r.dst(s2.Cond, cond)
+					r.block(b, s2.Body.List)
+					s = s2.Else
+				case *ast.BlockStmt:
+					r.block(b, s2.List)
+					s = nil
+				}
 			}
 			r.seq(n, s)
 		case *ast.RangeStmt:

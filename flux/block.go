@@ -46,9 +46,10 @@ func newBlock(n node, arranged blockchan) *block {
 }
 
 func (b *block) close() {
-	b.walk(func(b *block) {
-		close(b.stop)
-	}, nil, nil)
+	close(b.stop)
+	for n := range b.nodes {
+		b.removeNode(n)
+	}
 }
 
 func (b *block) outer() *block { return b.node.block() }
@@ -82,6 +83,8 @@ func (b *block) addNode(n node) {
 			if n.obj != nil && !isMethod(n.obj) {
 				b.func_().addPkgRef(n.obj)
 			}
+		case *compositeLiteralNode:
+			// handled in compositeLiteralNode.setType
 		case *valueNode:
 			if v, ok := n.obj.(*localVar); ok {
 				v.addref(n)
@@ -93,6 +96,9 @@ func (b *block) addNode(n node) {
 
 func (b *block) removeNode(n node) {
 	if b.nodes[n] {
+		for _, c := range append(n.inConns(), n.outConns()...) {
+			c.blk.removeConn(c)
+		}
 		b.Remove(n)
 		delete(b.nodes, n)
 		switch n := n.(type) {
@@ -100,13 +106,16 @@ func (b *block) removeNode(n node) {
 			if n.obj != nil && !isMethod(n.obj) {
 				b.func_().subPkgRef(n.obj)
 			}
+		case *compositeLiteralNode:
+			b.func_().subPkgRef(*n.typ.typ)
 		case *valueNode:
 			if v, ok := n.obj.(*localVar); ok {
 				v.subref(n)
 			}
 		case *ifNode:
-			n.falseblk.close()
-			n.trueblk.close()
+			for _, b := range n.blocks {
+				b.close()
+			}
 		case *loopNode:
 			n.loopblk.close()
 		case *funcNode:
@@ -147,8 +156,9 @@ func (b *block) walk(bf func(*block), nf func(node), cf func(*connection)) {
 		}
 		switch n := n.(type) {
 		case *ifNode:
-			n.falseblk.walk(bf, nf, cf)
-			n.trueblk.walk(bf, nf, cf)
+			for _, b := range n.blocks {
+				b.walk(bf, nf, cf)
+			}
 		case *loopNode:
 			n.loopblk.walk(bf, nf, cf)
 		case *funcNode:
@@ -302,16 +312,27 @@ func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) 
 	return
 }
 
-func (b *block) focusNearestView(v View, dirKey int) {
-	b = b.outermost()
+func (b *block) focusNearestView(viewOrPoint interface{}, dirKey int) {
+	p, _ := viewOrPoint.(Point)
+	if v, ok := viewOrPoint.(View); ok {
+		p = MapTo(v, ZP, b)
+	}
+
+	b2 := b.outermost()
+	p = MapTo(b, p, b2)
+	b = b2
+
 	views := []View{}
 	for _, n := range b.allNodes() {
 		views = append(views, n)
-		if n, ok := n.(*loopNode); ok {
+		switch n.(type) {
+		case *ifNode:
+			views = append(views, seqIn(n), seqOut(n))
+		case *loopNode:
 			views = append(views, seqOut(n))
 		}
 	}
-	nearest := nearestView(b, views, MapTo(v, ZP, b), dirKey)
+	nearest := nearestView(b, views, p, dirKey)
 	if nearest != nil {
 		SetKeyFocus(nearest)
 	}
@@ -356,9 +377,6 @@ func (b *block) KeyPress(event KeyEvent) {
 			}
 			if (len(in) == 0 || k == KeyDelete) && len(out) > 0 {
 				foc = out[len(out)-1].dst.node
-			}
-			for _, c := range append(in, out...) {
-				c.blk.removeConn(c)
 			}
 			b.removeNode(v)
 			SetKeyFocus(foc)
@@ -453,7 +471,9 @@ func newNode(b *block, obj types.Object, funcAsVal bool) {
 		case "func":
 			n = newFuncNode(nil, b.childArranged)
 		case "if":
-			n = newIfNode(b.childArranged)
+			i := newIfNode(b.childArranged)
+			i.newBlock()
+			n = i
 		case "indirect":
 			n = newValueNode(nil, false)
 		case "loop":

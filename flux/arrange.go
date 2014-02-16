@@ -83,9 +83,19 @@ func (n *nodeArrange) animate() bool {
 func (n *nodeArrange) arrange() {
 	switch node := n.node.(type) {
 	case *ifNode:
-		trueblk, falseblk := n.blocks[0], n.blocks[1]
-		trueblk.Move(Pt(-4-Width(trueblk), -Height(trueblk)+blockRadius))
-		falseblk.Move(Pt(4, -Height(falseblk)+blockRadius))
+		x := 0.0
+		for i, b := range n.blocks {
+			cond := n.ports[i+1]
+			MoveCenter(cond, Pt(x+Width(b)/2, 2*portSize))
+			b.Move(Pt(x, -Height(b)))
+			x += Width(b) + portSize
+		}
+		seqIn := n.ports[0]
+		seqOut := n.ports[len(n.ports)-1]
+		b := n.blocks[0]
+		dx := Size(b).X / 2
+		MoveCenter(seqIn, Pt(dx, 0))
+		MoveCenter(seqOut, Pt(dx, -Height(b)))
 		ResizeToFit(n, 0)
 	case *loopNode:
 		b := n.blocks[0]
@@ -519,10 +529,11 @@ func newNodeArrange(node node, b *blockArrange, ports portmap) *nodeArrange {
 	}
 	switch node := node.(type) {
 	case *ifNode:
-		t, f := newBlockArrange(node.trueblk, n, ports), newBlockArrange(node.falseblk, n, ports)
-		n.blocks = []*blockArrange{t, f}
-		n.Add(t)
-		n.Add(f)
+		for _, b := range node.blocks {
+			b := newBlockArrange(b, n, ports)
+			n.blocks = append(n.blocks, b)
+			n.Add(b)
+		}
 	case *loopNode:
 		b := newBlockArrange(node.loopblk, n, ports)
 		n.blocks = []*blockArrange{b}

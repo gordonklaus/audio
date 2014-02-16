@@ -395,8 +395,9 @@ func (c *connection) KeyPress(event KeyEvent) {
 		if c.focusSrc {
 			c.focus(false)
 		} else {
-			outs := outs(c.dst.node)
-			if len(outs) > 0 {
+			if n, ok := c.dst.node.(*ifNode); ok {
+				n.focusFrom(c.dst)
+			} else if outs := outs(c.dst.node); len(outs) > 0 {
 				outs[len(outs)/2].focusMiddle()
 			} else {
 				SetKeyFocus(c.dst.node)
