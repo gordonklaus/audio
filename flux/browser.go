@@ -376,20 +376,20 @@ func (b browser) filteredObjs() (objs objects) {
 			}
 			addSubPkgs(obj.importPath)
 		case *types.TypeName:
-			// TODO: use types.NewMethodSet to get the entire method set
+			for _, m := range intuitiveMethodSet(obj.Type) {
+				if types.IsIdentical(m.Obj.(*types.Func).Type.(*types.Signature).Recv.Type, m.Recv) {
+					// preserve Object identity for non-inherited methods so that fluxObjs works
+					add(m.Obj)
+				} else {
+					// m.Type() has the correct receiver for inherited methods (m.Obj does not)
+					add(types.NewFunc(0, m.Obj.GetPkg(), m.Obj.GetName(), m.Type().(*types.Signature)))
+				}
+			}
 			// TODO: shouldn't go/types also have a NewFieldSet?
 			if nt, ok := obj.Type.(*types.Named); ok {
-				for _, m := range nt.Methods {
-					add(m)
-				}
-				switch ut := nt.UnderlyingT.(type) {
-				case *types.Struct:
-					for _, f := range ut.Fields {
+				if t, ok := nt.UnderlyingT.(*types.Struct); ok {
+					for _, f := range t.Fields {
 						add(field{f, nt})
-					}
-				case *types.Interface:
-					for _, m := range ut.Methods {
-						add(m)
 					}
 				}
 			}
@@ -813,3 +813,24 @@ func objLess(o1, o2 types.Object) bool {
 	panic("unreachable")
 }
 func (o objects) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+
+// TODO: use the version from ssa or go/types
+func intuitiveMethodSet(T types.Type) []*types.Selection {
+	var result []*types.Selection
+	mset := types.NewMethodSet(T)
+	if _, ok := T.Underlying().(*types.Interface); ok {
+		for i, n := 0, mset.Len(); i < n; i++ {
+			result = append(result, mset.At(i))
+		}
+	} else {
+		pmset := types.NewMethodSet(types.NewPointer(T))
+		for i, n := 0, pmset.Len(); i < n; i++ {
+			meth := pmset.At(i)
+			if m := mset.Lookup(meth.Obj.GetPkg(), meth.Obj.GetName()); m != nil {
+				meth = m
+			}
+			result = append(result, meth)
+		}
+	}
+	return result
+}

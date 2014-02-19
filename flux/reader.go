@@ -183,6 +183,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					lv.refs = map[*valueNode]bool{}
 					r.localVars[name] = lv
 				} else if v.Type != nil {
+					r.scope.Insert(newVar(name, r.typ(v.Type))) // temporary local var has nil Pkg
 					r.conns[name] = []*connection{}
 				} else {
 					r.src(v.Names[0], b.node.(*loopNode).inputsNode.outs[1])
@@ -257,7 +258,7 @@ func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
 	if x2, ok := x.(*ast.UnaryExpr); ok {
 		x = x2.X
 	}
-	n := newValueNode(r.obj(x), set)
+	n := newValueNode(r.obj(x), set) // r.obj returns nil for a *ast.StarExpr, which is what valueNode expects for an assignment (*x = y)
 	b.addNode(n)
 	switch x := x.(type) {
 	case *ast.SelectorExpr:
@@ -369,42 +370,28 @@ func (r *reader) obj(x ast.Expr) types.Object {
 			return v
 		}
 		if obj := r.scope.LookupParent(x.Name); obj != nil {
+			if v, ok := obj.(*types.Var); ok && v.Pkg == nil { // ignore temporary local vars
+				return nil
+			}
 			return obj
 		}
 	case *ast.SelectorExpr:
 		// TODO: Type.Method and pkg.Type.Method
 		n1 := name(x.X)
 		n2 := x.Sel.Name
-		if p, ok := r.scope.LookupParent(n1).(*types.PkgName); ok {
-			return p.Pkg.Scope().Lookup(n2)
-		}
-		// TODO: use types.LookupFieldOrMethod()
-		t := r.conns[n1][0].src.obj.Type
-		for {
-			if p, ok := t.(*types.Pointer); ok {
-				t = p.Elem
-			} else {
-				break
-			}
-		}
-		recv := t.(*types.Named)
-		for _, m := range recv.Methods {
-			if m.Name == n2 {
-				return m
-			}
-		}
-		if it, ok := recv.UnderlyingT.(*types.Interface); ok {
-			for _, m := range it.Methods {
-				if m.Name == n2 {
-					return m
-				}
-			}
-		}
-		if st, ok := recv.UnderlyingT.(*types.Struct); ok {
-			for _, f := range st.Fields {
-				if f.Name == n2 {
-					return field{f, recv}
-				}
+		switch obj := r.scope.LookupParent(n1).(type) {
+		case *types.PkgName:
+			return obj.Pkg.Scope().Lookup(n2)
+		case *types.Var:
+			t := obj.Type
+			fm, _, _ := types.LookupFieldOrMethod(t, r.pkg, n2)
+			switch fm := fm.(type) {
+			case *types.Func:
+				sig := fm.Type.(*types.Signature)
+				return types.NewFunc(0, r.pkg, n2, types.NewSignature(nil, newVar("", t), sig.Params, sig.Results, sig.IsVariadic))
+			case *types.Var:
+				t, _ := indirect(t) // valueNode expects a *types.Named, for now
+				return field{fm, t}
 			}
 		}
 	}
