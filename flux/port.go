@@ -248,6 +248,33 @@ func (p *port) KeyPress(event KeyEvent) {
 		if p := p.next(k); p != nil {
 			SetKeyFocus(p)
 		}
+	case KeyPeriod:
+		if !p.out {
+			break
+		}
+		t := p.obj.Type
+		if pt, ok := indirect(t); ok { // dereference **t if p.node is addressable
+			if _, ok := indirect(pt); ok && addressable(p.node) {
+				t = pt
+			}
+		}
+		b := newSelectionBrowser(t, p)
+		if len(b.objs) == 0 {
+			break
+		}
+		p.Add(b)
+		b.accepted = func(obj types.Object) {
+			b.Close()
+			n := newNode(p.node.block(), obj, b.funcAsVal)
+			c := newConnection()
+			c.setSrc(p)
+			c.setDst(ins(n)[0])
+		}
+		b.canceled = func() {
+			b.Close()
+			SetKeyFocus(p)
+		}
+		SetKeyFocus(b)
 	case KeyEnter:
 		c := newConnection()
 		if p.out {
@@ -301,4 +328,21 @@ func (p port) Paint() {
 		SetPointSize(portSize)
 		DrawPoint(ZP)
 	}
+}
+
+func addressable(n node) bool {
+	switch n := n.(type) {
+	case *valueNode:
+		return n.addressable
+	case *indexNode:
+		return n.addressable
+	case *portsNode:
+		if l, ok := n.blk.node.(*loopNode); ok {
+			switch underlying(l.input.obj.Type).(type) {
+			case *types.Pointer, *types.Slice:
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -451,7 +451,7 @@ func (b *block) KeyPress(event KeyEvent) {
 	}
 }
 
-func newNode(b *block, obj types.Object, funcAsVal bool) {
+func newNode(b *block, obj types.Object, funcAsVal bool) node {
 	var n node
 	switch obj := obj.(type) {
 	case special:
@@ -501,6 +501,7 @@ func newNode(b *block, obj types.Object, funcAsVal bool) {
 	} else {
 		SetKeyFocus(n)
 	}
+	return n
 }
 
 func (b *block) Paint() {

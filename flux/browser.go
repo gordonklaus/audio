@@ -20,6 +20,7 @@ import (
 type browser struct {
 	*ViewBase
 	mode       browserMode
+	typ        types.Type // non-nil if this is a selection browser
 	fun        *funcNode
 	currentPkg *types.Package
 	imports    []*types.Package
@@ -33,7 +34,7 @@ type browser struct {
 
 	pathTexts, objTexts []Text
 	text                *TextBase
-	typ                 *typeView
+	typeView            *typeView
 	pkgName             *TextBase
 	funcAsVal           bool
 }
@@ -41,8 +42,8 @@ type browser struct {
 type browserMode int
 
 const (
-	browse browserMode = iota
-	fluxSourceOnly
+	fluxSourceOnly browserMode = iota
+	browse
 	typesOnly
 	compositeOrPtrType
 	compositeType
@@ -78,9 +79,9 @@ loop:
 	b.text.TextChanged = b.textChanged
 	b.Add(b.text)
 
-	b.typ = newTypeView(new(types.Type))
-	b.typ.pkg = b.currentPkg
-	b.Add(b.typ)
+	b.typeView = newTypeView(new(types.Type))
+	b.typeView.pkg = b.currentPkg
+	b.Add(b.typeView)
 
 	b.pkgName = NewText("")
 	b.pkgName.SetBackgroundColor(Color{0, 0, 0, .7})
@@ -88,6 +89,13 @@ loop:
 
 	b.clearText()
 
+	return b
+}
+
+func newSelectionBrowser(t types.Type, parent View) *browser {
+	b := newBrowser(browse, parent)
+	b.typ = t
+	b.clearText()
 	return b
 }
 
@@ -244,22 +252,22 @@ func (b *browser) refresh() {
 			Show(t)
 		}
 	}
-	Hide(b.typ)
+	Hide(b.typeView)
 	if cur != nil {
 		b.text.SetTextColor(color(cur, true, b.funcAsVal))
 		switch cur := cur.(type) {
 		case *types.TypeName:
 			if t, ok := cur.Type.(*types.Named); ok && t.UnderlyingT != nil {
-				b.typ.setType(t.UnderlyingT)
-				Show(b.typ)
+				b.typeView.setType(t.UnderlyingT)
+				Show(b.typeView)
 			}
 		case *types.Func, *types.Var, *types.Const, field, *localVar:
 			if !isOperator(cur) {
-				b.typ.setType(cur.GetType())
-				Show(b.typ)
+				b.typeView.setType(cur.GetType())
+				Show(b.typeView)
 			}
 		}
-		b.typ.Move(Pt(xOffset+width+16, yOffset-(Height(b.typ)-Height(b.text))/2))
+		b.typeView.Move(Pt(xOffset+width+16, yOffset-(Height(b.typeView)-Height(b.text))/2))
 	}
 	for _, p := range b.pathTexts {
 		p.Move(Pt(Pos(p).X, yOffset))
@@ -361,7 +369,19 @@ func (b browser) filteredObjs() (objs objects) {
 		}
 	}
 
-	if len(b.path) > 0 {
+	if b.typ != nil {
+		mset := types.NewMethodSet(b.typ)
+		for i := 0; i < mset.Len(); i++ {
+			m := mset.At(i)
+			// m.Type() has the correct receiver for inherited methods (m.Obj does not)
+			add(types.NewFunc(0, m.Obj.GetPkg(), m.Obj.GetName(), m.Type().(*types.Signature)))
+		}
+		fset := types.NewFieldSet(b.typ)
+		for i := 0; i < fset.Len(); i++ {
+			f := fset.At(i)
+			add(field{f.Obj.(*types.Var), f.Recv, f.Indirect})
+		}
+	} else if len(b.path) > 0 {
 		switch obj := b.path[0].(type) {
 		case *pkgObject:
 			if pkg, err := getPackage(obj.importPath); err == nil {
@@ -384,11 +404,6 @@ func (b browser) filteredObjs() (objs objects) {
 					// m.Type() has the correct receiver for inherited methods (m.Obj does not)
 					add(types.NewFunc(0, m.Obj.GetPkg(), m.Obj.GetName(), m.Type().(*types.Signature)))
 				}
-			}
-			fset := types.NewFieldSet(obj.Type)
-			for i := 0; i < fset.Len(); i++ {
-				f := fset.At(i)
-				add(field{f.Obj.(*types.Var), f.Recv, f.Indirect})
 			}
 		}
 	} else {
@@ -525,10 +540,10 @@ func (b *browser) KeyPress(event KeyEvent) {
 				}
 			case *localVar:
 				b.finished = true // hack to avoid cancelling browser when it loses keyboard focus to typeView
-				b.typ.edit(func() {
+				b.typeView.edit(func() {
 					b.finished = false
-					if *b.typ.typ != nil {
-						obj.Type = *b.typ.typ
+					if *b.typeView.typ != nil {
+						obj.Type = *b.typeView.typ
 						b.finished = true
 						b.accepted(obj)
 					} else {

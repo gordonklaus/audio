@@ -337,11 +337,9 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			case *valueNode:
 				if n.set || len(results) > 0 {
 					name := ""
-					addr := false
 					switch obj := n.obj.(type) {
 					case *types.Var, *types.Const, *localVar:
 						name = w.qualifiedName(obj)
-						addr = true
 					case *types.Func:
 						if isMethod(obj) {
 							name = args[0] + "." + obj.GetName()
@@ -352,7 +350,6 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					case field:
 						name = args[0] + "." + obj.GetName()
 						args = args[1:]
-						addr = obj.addressable
 					case nil:
 						name = "*" + args[0]
 						args = args[1:]
@@ -363,7 +360,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 						if _, ok := n.obj.(*types.Const); ok {
 							w.indent("const %s = %s", results[0], name)
 						} else {
-							if addr {
+							if n.addressable {
 								name = "&" + name
 							}
 							w.indent("%s := %s", results[0], name)
