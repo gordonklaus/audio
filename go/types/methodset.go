@@ -37,7 +37,7 @@ func (s *MethodSet) String() string {
 // Len returns the number of methods in s.
 func (s *MethodSet) Len() int { return len(s.list) }
 
-// At returns the i'th method in s for 0 <= i < s.Len.
+// At returns the i'th method in s for 0 <= i < s.Len().
 func (s *MethodSet) At(i int) *Selection { return s.list[i] }
 
 // Lookup returns the method with matching package and name, or nil if not found.
@@ -86,19 +86,15 @@ func (c *cachedMethodSet) of(typ Type) *MethodSet {
 	return mset
 }
 
-// NewMethodSet computes the method set for the given type T.
-// It always returns a non-nil method set, even if it is empty.
+// NewMethodSet returns the method set for the given type T.  It
+// always returns a non-nil method set, even if it is empty.
+//
+// A MethodSetCache handles repeat queries more efficiently.
 func NewMethodSet(T Type) *MethodSet {
-	// WARNING: The code in this function is extremely subtle - do not modify casually!
-	//          This function and lookupFieldOrMethod should be kept in sync.
-
-	// method set up to the current depth, allocated lazily
-	var base methodSet
-
 	typ, isPtr := deref(T)
 	named, _ := typ.(*Named)
 
-	// *typ where typ is an interface has no methods.
+	// If typ is an interface then *typ has no methods.
 	if isPtr {
 		utyp := typ
 		if named != nil {
@@ -109,6 +105,114 @@ func NewMethodSet(T Type) *MethodSet {
 		}
 	}
 
+	sel := selections(T)
+
+	if len(sel) == 0 {
+		return &emptyMethodSet
+	}
+
+	// collect methods
+	var list []*Selection
+	for _, s := range sel {
+		if s != nil && s.Kind == MethodVal {
+			s.Recv = T
+			list = append(list, s)
+		}
+	}
+	sort.Sort(byUniqueName(list))
+	return &MethodSet{list}
+}
+
+// A FieldSet is an ordered set of struct fields;
+// a field is a FieldVal selection.
+// The zero value for a FieldSet is a ready-to-use empty field set.
+type FieldSet struct {
+	list []*Selection
+}
+
+func (s *FieldSet) String() string {
+	if s.Len() == 0 {
+		return "FieldSet {}"
+	}
+
+	var buf bytes.Buffer
+	fmt.Fprintln(&buf, "FieldSet {")
+	for _, f := range s.list {
+		fmt.Fprintf(&buf, "\t%s\n", f)
+	}
+	fmt.Fprintln(&buf, "}")
+	return buf.String()
+}
+
+// Len returns the number of fields in s.
+func (s *FieldSet) Len() int { return len(s.list) }
+
+// At returns the i'th field in s for 0 <= i < s.Len().
+func (s *FieldSet) At(i int) *Selection { return s.list[i] }
+
+// Lookup returns the field with matching package and name, or nil if not found.
+func (s *FieldSet) Lookup(pkg *Package, name string) *Selection {
+	if s.Len() == 0 {
+		return nil
+	}
+
+	key := Id(pkg, name)
+	i := sort.Search(len(s.list), func(i int) bool {
+		m := s.list[i]
+		return m.Obj.Id() >= key
+	})
+	if i < len(s.list) {
+		m := s.list[i]
+		if m.Obj.Id() == key {
+			return m
+		}
+	}
+	return nil
+}
+
+// Shared empty field set.
+var emptyFieldSet FieldSet
+
+// NewFieldSet returns the field set for the given type T.  It
+// always returns a non-nil field set, even if it is empty.
+func NewFieldSet(T Type) *FieldSet {
+	sel := selections(T)
+
+	// If T is a named type with underlying type *V then T has all the fields of V but none of its methods.
+	// Furthermore, such a T can have no fields or methods of its own, so no need to worry about shadowing.
+	if t, _ := T.(*Named); t != nil {
+		u := t.UnderlyingT
+		if _, ok := u.(*Pointer); ok {
+			sel = selections(u)
+		}
+	}
+
+	if len(sel) == 0 {
+		return &emptyFieldSet
+	}
+
+	// collect fields
+	var list []*Selection
+	for _, s := range sel {
+		if s != nil && s.Kind == FieldVal {
+			s.Recv = T
+			list = append(list, s)
+		}
+	}
+	sort.Sort(byUniqueName(list))
+	return &FieldSet{list}
+}
+
+func selections(T Type) selectionSet {
+	// WARNING: The code in this function is extremely subtle - do not modify casually!
+	//          This function and lookupFieldOrMethod should be kept in sync.
+
+	// selections up to the current depth, allocated lazily
+	var base selectionSet
+
+	typ, isPtr := deref(T)
+	named, _ := typ.(*Named)
+
 	// Start with typ as single entry at shallowest depth.
 	// If typ is not a named type, insert a nil type instead.
 	current := []embeddedType{{named, nil, isPtr, false}}
@@ -116,13 +220,12 @@ func NewMethodSet(T Type) *MethodSet {
 	// named types that we have seen already, allocated lazily
 	var seen map[*Named]bool
 
-	// collect methods at current depth
+	// collect selections at current depth
 	for len(current) > 0 {
 		var next []embeddedType // embedded types found at current depth
 
-		// field and method sets at current depth, allocated lazily
-		var fset fieldSet
-		var mset methodSet
+		// selections at current depth, allocated lazily
+		var set selectionSet
 
 		for _, e := range current {
 			// The very first time only, e.typ may be nil.
@@ -142,7 +245,7 @@ func NewMethodSet(T Type) *MethodSet {
 				}
 				seen[e.typ] = true
 
-				mset = mset.add(e.typ.Methods, e.index, e.indirect, e.multiples)
+				set = set.addMethods(e.typ.Methods, e.index, e.indirect, e.multiples)
 
 				// continue with underlying type
 				typ = e.typ.UnderlyingT
@@ -151,7 +254,8 @@ func NewMethodSet(T Type) *MethodSet {
 			switch t := typ.(type) {
 			case *Struct:
 				for i, f := range t.Fields {
-					fset = fset.add(f, e.multiples)
+					index := concat(e.index, i)
+					set = set.addField(f, index, e.indirect, e.multiples)
 
 					// Embedded fields are always of the form T or *T where
 					// T is a named type. If typ appeared multiple times at
@@ -162,113 +266,77 @@ func NewMethodSet(T Type) *MethodSet {
 						// named types can have methods or struct fields.
 						typ, isPtr := deref(f.Type)
 						if t, _ := typ.(*Named); t != nil {
-							next = append(next, embeddedType{t, concat(e.index, i), e.indirect || isPtr, e.multiples})
+							next = append(next, embeddedType{t, index, e.indirect || isPtr, e.multiples})
 						}
 					}
 				}
 
 			case *Interface:
-				mset = mset.add(t.allMethods, e.index, true, e.multiples)
+				set = set.addMethods(t.allMethods, e.index, true, e.multiples)
 			}
 		}
 
-		// Add methods and collisions at this depth to base if no entries with matching
+		// Add selections and collisions at this depth to base if no entries with matching
 		// names exist already.
-		for k, m := range mset {
-			if _, found := base[k]; !found {
-				// Fields collide with methods of the same name at this depth.
-				if _, found := fset[k]; found {
-					m = nil // collision
-				}
+		for id, s := range set {
+			if _, found := base[id]; !found {
 				if base == nil {
-					base = make(methodSet)
+					base = make(selectionSet)
 				}
-				base[k] = m
-			}
-		}
-
-		// Multiple fields with matching names collide at this depth and shadow all
-		// entries further down; add them as collisions to base if no entries with
-		// matching names exist already.
-		for k, f := range fset {
-			if f == nil {
-				if _, found := base[k]; !found {
-					if base == nil {
-						base = make(methodSet)
-					}
-					base[k] = nil // collision
-				}
+				base[id] = s
 			}
 		}
 
 		current = consolidateMultiples(next)
 	}
 
-	if len(base) == 0 {
-		return &emptyMethodSet
-	}
-
-	// collect methods
-	var list []*Selection
-	for _, m := range base {
-		if m != nil {
-			m.Recv = T
-			list = append(list, m)
-		}
-	}
-	sort.Sort(byUniqueName(list))
-	return &MethodSet{list}
+	return base
 }
 
-// A fieldSet is a set of fields and name collisions.
-// A collision indicates that multiple fields with the
+// A selectionSet is a set of selections and name collisions.
+// A collision indicates that multiple selections with the
 // same unique id appeared.
-type fieldSet map[string]*Var // a nil entry indicates a name collision
+type selectionSet map[string]*Selection // a nil entry indicates a name collision
 
-// Add adds field f to the field set s.
-// If multiples is set, f appears multiple times
+// AddField adds field v to the set s.
+// If multiples is set, v appears multiple times
 // and is treated as a collision.
-func (s fieldSet) add(f *Var, multiples bool) fieldSet {
+func (s selectionSet) addField(v *Var, index []int, indirect bool, multiples bool) selectionSet {
 	if s == nil {
-		s = make(fieldSet)
+		s = make(selectionSet)
 	}
-	key := f.Id()
-	// if f is not in the set, add it
+	id := v.Id()
+	// if v is not in the set, add it
 	if !multiples {
-		if _, found := s[key]; !found {
-			s[key] = f
+		if _, found := s[id]; !found {
+			s[id] = &Selection{FieldVal, nil, v, index, indirect}
 			return s
 		}
 	}
-	s[key] = nil // collision
+	s[id] = nil // collision
 	return s
 }
 
-// A methodSet is a set of methods and name collisions.
-// A collision indicates that multiple methods with the
-// same unique id appeared.
-type methodSet map[string]*Selection // a nil entry indicates a name collision
-
-// Add adds all functions in list to the method set s.
+// AddMethods adds all functions in list to the method set s.
 // If multiples is set, every function in list appears multiple times
 // and is treated as a collision.
-func (s methodSet) add(list []*Func, index []int, indirect bool, multiples bool) methodSet {
+func (s selectionSet) addMethods(list []*Func, index []int, indirect bool, multiples bool) selectionSet {
 	if len(list) == 0 {
 		return s
 	}
 	if s == nil {
-		s = make(methodSet)
+		s = make(selectionSet)
 	}
 	for i, f := range list {
-		key := f.Id()
+		id := f.Id()
 		// if f is not in the set, add it
 		if !multiples {
-			if _, found := s[key]; !found && (indirect || !ptrRecv(f)) {
-				s[key] = &Selection{MethodVal, nil, f, concat(index, i), indirect}
+			if _, found := s[id]; !found && (indirect || !ptrRecv(f)) {
+				s[id] = &Selection{MethodVal, nil, f, concat(index, i), indirect}
 				continue
 			}
 		}
-		s[key] = nil // collision
+		s[id] = nil // collision
 	}
 	return s
 }

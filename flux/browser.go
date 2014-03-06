@@ -385,13 +385,10 @@ func (b browser) filteredObjs() (objs objects) {
 					add(types.NewFunc(0, m.Obj.GetPkg(), m.Obj.GetName(), m.Type().(*types.Signature)))
 				}
 			}
-			// TODO: shouldn't go/types also have a NewFieldSet?
-			if nt, ok := obj.Type.(*types.Named); ok {
-				if t, ok := nt.UnderlyingT.(*types.Struct); ok {
-					for _, f := range t.Fields {
-						add(field{f, nt})
-					}
-				}
+			fset := types.NewFieldSet(obj.Type)
+			for i := 0; i < fset.Len(); i++ {
+				f := fset.At(i)
+				add(field{f.Obj.(*types.Var), f.Recv, f.Indirect})
 			}
 		}
 	} else {
@@ -747,7 +744,8 @@ func (s special) GetName() string { return s.name }
 
 type field struct {
 	*types.Var
-	recv types.Type
+	recv        types.Type
+	addressable bool
 }
 
 type objects []types.Object

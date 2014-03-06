@@ -2,12 +2,13 @@ TODO
 
 - automatically dereference a pointer only if it originates from an addressable expression?
 - use types.IsAssignableTo in canConnect
-- support inherited fields
 - don't include sequencing ports in normal keyboard navigation.  access them by special keystrokes (Command-{Semicolon, Quote}?).  (update focusNearestView to ignore sequencing ports, too)
+- don't show struct fields in browser mode 'browse'
 - shortcuts:
   - on an out port, press '.' to select a field or method
   - on an in port, press '{' to create a composite literal of the port's type
   - on a node or connection, press cmd-R(cmd-I?) to bring up a browser with funcs and ops suitable to insert, i.e., having a signature compatible with the existing node's connections
+- remove localVar; give valueNode an addr (y := &x) mode
 - rework typeView appearance
 - use graphics instead of text to identify pointers, slices, funcs, maps, etc in typeView
 - blinking cursor in gui.Text

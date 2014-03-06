@@ -384,14 +384,13 @@ func (r *reader) obj(x ast.Expr) types.Object {
 			return obj.Pkg.Scope().Lookup(n2)
 		case *types.Var:
 			t := obj.Type
-			fm, _, _ := types.LookupFieldOrMethod(t, r.pkg, n2)
+			fm, _, addr := types.LookupFieldOrMethod(t, r.pkg, n2)
 			switch fm := fm.(type) {
 			case *types.Func:
 				sig := fm.Type.(*types.Signature)
 				return types.NewFunc(0, r.pkg, n2, types.NewSignature(nil, newVar("", t), sig.Params, sig.Results, sig.IsVariadic))
 			case *types.Var:
-				t, _ := indirect(t) // valueNode expects a *types.Named, for now
-				return field{fm, t}
+				return field{fm, t, addr}
 			}
 		}
 	}

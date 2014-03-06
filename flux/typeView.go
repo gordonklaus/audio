@@ -14,6 +14,7 @@ import (
 type typeView struct {
 	*ViewBase
 	typ  *types.Type
+	val  types.Object // non-nil if this is a valueView
 	pkg  *types.Package
 	mode browserMode
 	done func()
@@ -55,6 +56,7 @@ func newValueView(val types.Object) *typeView {
 		}
 	}
 	v := newTypeView(t)
+	v.val = val
 	v.pkg = val.GetPkg()
 	v.name = NewText(*name)
 	v.name.SetTextColor(color(val, false, false))
@@ -116,7 +118,7 @@ func (v *typeView) setType(t types.Type) {
 				v.unexported = NewText("contains unexported fields")
 				continue
 			}
-			v.elems.right = append(v.elems.right, newValueView(field{f, nil}))
+			v.elems.right = append(v.elems.right, newValueView(field{Var: f}))
 		}
 	case *types.Signature:
 		s = "func"
@@ -222,13 +224,24 @@ func (v *typeView) reform() {
 }
 
 func (v *typeView) edit(done func()) {
-	if v.name != nil {
-		v.name.Accept = func(string) { v.editType(done) }
-		v.name.Reject = done
-		SetKeyFocus(v.name)
+	if v.name == nil {
+		v.editType(done)
 		return
 	}
-	v.editType(done)
+
+	done2 := func() {
+		done()
+		if f, ok := v.val.(field); ok {
+			f.Anonymous = len(v.name.GetText()) == 0
+			if f.Anonymous && *v.typ != nil {
+				t, _ := indirect(*v.typ)
+				f.Name = t.(*types.Named).Obj.GetName()
+			}
+		}
+	}
+	v.name.Accept = func(string) { v.editType(done2) }
+	v.name.Reject = done2
+	SetKeyFocus(v.name)
 }
 func (v *typeView) editType(done func()) {
 	switch t := (*v.typ).(type) {
@@ -478,7 +491,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 		v.edit(func() {
 			if *v.typ == nil {
 				v.setType(oldTyp)
-				if v.name != nil && len(v.name.GetText()) == 0 {
+				if v.name != nil {
 					v.name.SetText(oldName)
 				}
 			}

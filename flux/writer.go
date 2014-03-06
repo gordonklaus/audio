@@ -338,22 +338,21 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				if n.set || len(results) > 0 {
 					name := ""
 					addr := false
-					switch n.obj.(type) {
+					switch obj := n.obj.(type) {
 					case *types.Var, *types.Const, *localVar:
-						name = w.qualifiedName(n.obj)
+						name = w.qualifiedName(obj)
 						addr = true
 					case *types.Func:
-						if isMethod(n.obj) {
-							name = args[0] + "." + n.obj.GetName()
+						if isMethod(obj) {
+							name = args[0] + "." + obj.GetName()
 							args = args[1:]
 						} else {
-							name = w.qualifiedName(n.obj)
+							name = w.qualifiedName(obj)
 						}
 					case field:
-						name = args[0] + "." + n.obj.GetName()
+						name = args[0] + "." + obj.GetName()
 						args = args[1:]
-						// TODO: use indirect result of types.LookupFieldOrMethod, or types.Selection.Indirect()
-						_, addr = n.x.obj.Type.(*types.Pointer)
+						addr = obj.addressable
 					case nil:
 						name = "*" + args[0]
 						args = args[1:]

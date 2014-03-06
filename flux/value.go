@@ -77,19 +77,8 @@ func (n *valueNode) reform() {
 		}
 	case field:
 		xt = obj.recv
-		// TODO: use indirect result of types.LookupFieldOrMethod, or types.Selection.Indirect()
-		if n.set {
-			xt = &types.Pointer{Elem: xt}
-		} else {
-			if len(n.x.conns) > 0 {
-				xt = n.x.conns[0].src.obj.Type
-			}
-			if p, ok := xt.(*types.Pointer); ok {
-				if !types.IsIdentical(p.Elem, obj.recv) {
-					xt = p.Elem
-				}
-				yt = &types.Pointer{Elem: yt}
-			}
+		if !n.set && obj.addressable {
+			yt = &types.Pointer{Elem: yt}
 		}
 	case nil:
 		if len(n.x.conns) > 0 {
@@ -109,22 +98,23 @@ func (n *valueNode) reform() {
 }
 
 func (n *valueNode) KeyPress(event KeyEvent) {
-	if _, ok := n.obj.(*types.Const); ok || n.obj == nil {
-		n.nodeBase.KeyPress(event)
-	} else {
-		switch event.Text {
-		case "=":
-			if n.x != nil {
-				// TODO: use indirect result of types.LookupFieldOrMethod, or types.Selection.Indirect()
-				if _, ok := n.x.obj.Type.(*types.Pointer); !ok {
-					break
-				}
-			}
-			n.set = !n.set
-			n.reform()
-			SetKeyFocus(n)
-		default:
-			n.nodeBase.KeyPress(event)
+	canSet := false
+	switch obj := n.obj.(type) {
+	case *types.Var, *localVar:
+		canSet = true
+	case field:
+		canSet = obj.addressable
+	case nil:
+		if len(n.x.conns) > 0 {
+			t := n.x.conns[0].src.obj.Type
+			_, canSet = indirect(t)
 		}
+	}
+	if event.Text == "=" && canSet {
+		n.set = !n.set
+		n.reform()
+		SetKeyFocus(n)
+	} else {
+		n.nodeBase.KeyPress(event)
 	}
 }
