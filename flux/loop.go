@@ -25,7 +25,7 @@ func newLoopNode(arranged blockchan) *loopNode {
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
 	n.input = newInput(n, nil)
-	n.input.connsChanged = n.updateInputType
+	n.input.connsChanged = n.connsChanged
 	MoveCenter(n.input, Pt(0, portSize/2))
 	n.Add(n.input)
 
@@ -39,7 +39,7 @@ func newLoopNode(arranged blockchan) *loopNode {
 	n.inputsNode = newInputsNode()
 	n.inputsNode.newOutput(nil)
 	n.loopblk.addNode(n.inputsNode)
-	n.updateInputType()
+	n.connsChanged()
 	return n
 }
 
@@ -54,64 +54,60 @@ func (n loopNode) outConns() []*connection {
 	return append(n.seqOut.conns, n.loopblk.outConns()...)
 }
 
-func (n *loopNode) updateInputType() {
-	var t, u, key, elt types.Type
+func (n *loopNode) connectable(t types.Type, dst *port) bool {
+	ok := false
+	switch t := underlying(t).(type) {
+	case *types.Basic:
+		ok = t.Info&(types.IsInteger|types.IsString) != 0
+	case *types.Array, *types.Slice, *types.Map, *types.Chan:
+		ok = true
+	case *types.Pointer:
+		_, ok = underlying(t.Elem).(*types.Array)
+	}
+	return ok
+}
+
+func (n *loopNode) connsChanged() {
+	t := inputType(n.input)
+	var key, elem types.Type
 	key = types.Typ[types.Int]
-	// TODO: loop over conns until a non-nil src is found, then break after getting the type (and do the same in other nodes)
-	if len(n.input.conns) > 0 {
-		if p := n.input.conns[0].src; p != nil {
-			ptr := false
-			t, ptr = indirect(p.obj.Type)
-			u = t
-			if n, ok := t.(*types.Named); ok {
-				u = n.UnderlyingT
-			}
-			switch u := u.(type) {
-			case *types.Basic:
-				if u.Info&types.IsString != 0 {
-					elt = types.Typ[types.Rune]
-				} else if u.Kind != types.UntypedInt {
-					key = u
-				}
-			case *types.Array:
-				elt = u.Elem
-				if ptr {
-					t = p.obj.Type
-					elt = &types.Pointer{Elem: elt}
-				}
-			case *types.Slice:
-				elt = &types.Pointer{Elem: u.Elem}
-			case *types.Map:
-				key, elt = u.Key, u.Elem
-			case *types.Chan:
-				key = u.Elem
-			}
+	elemPort := true
+	switch t := underlying(t).(type) {
+	case *types.Basic:
+		if t.Info&types.IsString != 0 {
+			elem = types.Typ[types.Rune]
+		} else {
+			key = t
+			elemPort = false
 		}
+	case *types.Array:
+		elem = t.Elem
+	case *types.Pointer:
+		elem = &types.Pointer{Elem: underlying(t.Elem).(*types.Array).Elem}
+	case *types.Slice:
+		elem = &types.Pointer{Elem: t.Elem}
+	case *types.Map:
+		key, elem = t.Key, t.Elem
+	case *types.Chan:
+		key = t.Elem
+		elemPort = false
+	case nil:
+		elemPort = false
 	}
 
 	in := n.inputsNode
-	switch u.(type) {
-	default:
-		if len(in.outs) == 2 {
-			for _, c := range in.outs[1].conns {
-				c.blk.removeConn(c)
-			}
-			in.Remove(in.outs[1])
-			in.outs = in.outs[:1]
-		}
-	case *types.Array, *types.Slice, *types.Map:
-		if len(in.outs) == 1 {
-			in.newOutput(nil)
-		}
+	if elemPort && len(in.outs) == 1 {
+		in.newOutput(nil)
+	}
+	if !elemPort && len(in.outs) == 2 {
+		in.removePortBase(in.outs[1])
 	}
 
 	n.input.setType(t)
 	in.outs[0].setType(key)
-	if len(in.outs) == 2 {
-		in.outs[1].setType(elt)
+	if elemPort {
+		in.outs[1].setType(elem)
 	}
-	in.reform()
-	rearrange(n.loopblk)
 }
 
 func (n *loopNode) Move(p Point) {

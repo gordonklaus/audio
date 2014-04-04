@@ -63,60 +63,18 @@ func (p *port) setType(t types.Type) {
 	} else {
 		p.valView.Move(Pt(-Width(p.valView)/2, 12))
 	}
-}
 
-func canConnect(src, dst *port, c *connection) bool {
-	if src.out == dst.out {
-		return false
-	}
-	for _, c := range src.conns {
-		if c.dst == dst {
-			return false
-		}
-	}
-	// TODO: types.IsAssignableTo(src.obj.Type, dst.obj.Type) (handles seqType, too?)
-	if (src.obj.Type == seqType) != (dst.obj.Type == seqType) {
-		return false
-	}
-	if src.obj.Type == seqType && (src.node.block() != dst.node.block() || precedes(src.node, dst.node)) {
-		return false
-	}
-
-	// TODO: recursive func literals
-	// if f, ok := src.node.(*funcNode); ok && parentOrSelfInBlock(dst.node, f.funcblk) != nil {
-	// 	return true
-	// }
-
-	n1, n2 := src.node, dst.node
-	for b := n1.block(); ; n1, b = b.node, b.outer() {
-		if n := b.find(n2); n != nil {
-			n2 = n
-			break
-		}
-	}
-	if c.feedback {
-		for b := n1.block(); ; b = b.outer() {
-			if b == nil {
-				return false
+	for i := 0; i < len(p.conns); {
+		c := p.conns[i]
+		if c.src != nil && c.dst != nil && !c.connectable(c.src, c.dst) {
+			c.blk.removeConn(c)
+		} else {
+			if p.out && c.dst != nil {
+				c.dst.connsChanged()
 			}
-			if _, ok := b.node.(*loopNode); ok {
-				break
-			}
-		}
-		n1, n2 = n2, n1
-	} else if n1 == n2 {
-		return false
-	}
-	return !precedes(n2, n1)
-}
-
-func precedes(n1, n2 node) bool {
-	for _, dst := range dstsInBlock(n1) {
-		if dst == n2 || precedes(dst, n2) {
-			return true
+			i++
 		}
 	}
-	return false
 }
 
 func (p *port) connect(c *connection) {
@@ -249,12 +207,15 @@ func (p *port) KeyPress(event KeyEvent) {
 			SetKeyFocus(p)
 		}
 	case KeyPeriod:
+		if event.Ctrl {
+			p.ViewBase.KeyPress(event)
+		}
 		if !p.out {
 			break
 		}
 		t := p.obj.Type
-		if pt, ok := indirect(t); ok { // dereference **t if p.node is addressable
-			if _, ok := indirect(pt); ok && addressable(p.node) {
+		if pt, ok := indirect(t); ok { // automatically dereference **t
+			if _, ok := indirect(pt); ok {
 				t = pt
 			}
 		}
@@ -328,21 +289,4 @@ func (p port) Paint() {
 		SetPointSize(portSize)
 		DrawPoint(ZP)
 	}
-}
-
-func addressable(n node) bool {
-	switch n := n.(type) {
-	case *valueNode:
-		return n.addressable
-	case *indexNode:
-		return n.addressable
-	case *portsNode:
-		if l, ok := n.blk.node.(*loopNode); ok {
-			switch underlying(l.input.obj.Type).(type) {
-			case *types.Pointer, *types.Slice:
-				return true
-			}
-		}
-	}
-	return false
 }

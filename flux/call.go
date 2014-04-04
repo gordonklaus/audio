@@ -15,56 +15,59 @@ type callNode struct {
 }
 
 func newCallNode(obj types.Object) node {
-	if obj != nil {
-		if sig, ok := obj.GetType().(*types.Signature); ok {
-			n := &callNode{obj: obj}
-			n.nodeBase = newNodeBase(n)
-			name := obj.GetName()
-			if sig.Recv != nil {
-				name = "." + name
-			}
-			n.text.SetText(name)
-			n.addSeqPorts()
-			n.addPorts(sig)
-			return n
-		}
-
-		switch obj.GetName() {
-		case "append":
-			return newAppendNode()
-		case "delete":
-			return newDeleteNode()
-		case "len":
-			return newLenNode()
-		case "make":
-			return newMakeNode()
-		default:
-			panic("unknown builtin: " + obj.GetName())
-		}
-	} else {
+	if obj == nil {
 		n := &callNode{}
 		n.nodeBase = newNodeBase(n)
 		n.text.SetText("call")
 		n.addSeqPorts()
 		in := n.newInput(nil)
 		in.connsChanged = func() {
-			for _, p := range append(ins(n), outs(n)...) {
-				if p != in {
-					n.removePortBase(p)
-				}
+			t := inputType(in)
+			in.setType(t)
+			// TODO: add/remove/modify only the affected ports.  beware: t == in.obj.Type because portsNode mutates the signature in place.
+			for _, p := range append(ins(n)[1:], outs(n)...) {
+				n.removePortBase(p)
 			}
-			if len(in.conns) > 0 {
-				t, _ := indirect(in.conns[0].src.obj.Type)
-				if sig, ok := t.(*types.Signature); ok { // TODO: remove ok (always true) after canConnect checks types
-					in.setType(sig)
-					n.addPorts(sig)
-				}
-			} else {
-				in.setType(nil)
+			if t != nil {
+				n.addPorts(underlying(t).(*types.Signature))
 			}
 		}
 		return n
 	}
+
+	if sig, ok := obj.GetType().(*types.Signature); ok {
+		n := &callNode{obj: obj}
+		n.nodeBase = newNodeBase(n)
+		name := obj.GetName()
+		if sig.Recv != nil {
+			name = "." + name
+		}
+		n.text.SetText(name)
+		n.addSeqPorts()
+		n.addPorts(sig)
+		return n
+	}
+
+	switch obj.GetName() {
+	case "append":
+		return newAppendNode()
+	case "delete":
+		return newDeleteNode()
+	case "len":
+		return newLenNode()
+	case "make":
+		return newMakeNode()
+	default:
+		panic("unknown builtin: " + obj.GetName())
+	}
+}
+
+func (n *callNode) connectable(t types.Type, dst *port) bool {
+	if n.obj == nil && dst == ins(n)[0] {
+		_, ok := underlying(t).(*types.Signature)
+		return ok
+	}
+	return assignable(t, dst.obj.Type)
 }
 
 func (n *callNode) addPorts(sig *types.Signature) {
@@ -81,6 +84,7 @@ func (n *callNode) addPorts(sig *types.Signature) {
 	for _, v := range sig.Results {
 		n.newOutput(v)
 	}
+	rearrange(n.blk)
 }
 
 func (n *callNode) KeyPress(event KeyEvent) {
@@ -129,15 +133,15 @@ func (n *callNode) variadic() (int, *types.Var) {
 	var sig *types.Signature
 	if n.obj != nil {
 		sig = n.obj.GetType().(*types.Signature)
-	} else if in := ins(n)[0]; len(in.conns) > 0 {
-		t, _ := indirect(in.conns[0].src.obj.Type)
-		sig = t.(*types.Signature)
+	} else if t := inputType(ins(n)[0]); t != nil {
+		sig = underlying(t).(*types.Signature)
 	}
 	if sig == nil || !sig.IsVariadic {
 		return -1, nil
 	}
 	i := len(sig.Params) - 1
 	v := sig.Params[i]
+	i++ // for func sig input
 	if sig.Recv != nil {
 		i++
 	}

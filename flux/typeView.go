@@ -86,8 +86,6 @@ func (v *typeView) setType(t types.Type) {
 
 	s := ""
 	switch t := t.(type) {
-	case generic:
-		s = "<T>"
 	case *types.Basic:
 		s = t.Name
 	case *types.Named:
@@ -608,8 +606,6 @@ func (v *typeView) Paint() {
 	DrawRect(Rect(v))
 }
 
-type generic struct{ types.Type }
-
 func underlying(t types.Type) types.Type {
 	if nt, ok := t.(*types.Named); ok {
 		return nt.UnderlyingT
@@ -618,7 +614,7 @@ func underlying(t types.Type) types.Type {
 }
 
 func indirect(t types.Type) (types.Type, bool) {
-	if p, ok := underlying(t).(*types.Pointer); ok {
+	if p, ok := t.(*types.Pointer); ok {
 		return p.Elem, true
 	}
 	return t, false

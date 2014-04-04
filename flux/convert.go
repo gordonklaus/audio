@@ -19,11 +19,7 @@ func newConvertNode() *convertNode {
 	n.nodeBase = newNodeBase(n)
 	in := n.newInput(nil)
 	in.connsChanged = func() {
-		// TODO: this is just wrong.  use types.Convertible
-		if len(in.conns) > 0 {
-			t, _ := indirect(in.conns[0].src.obj.Type)
-			in.setType(t)
-		}
+		in.setType(untypedToTyped(inputType(in)))
 	}
 	out := n.newOutput(nil)
 	n.typ = newTypeView(&out.obj.Type)
@@ -53,4 +49,8 @@ func (n *convertNode) setType(t types.Type) {
 		n.reform()
 		SetKeyFocus(n)
 	}
+}
+
+func (n *convertNode) connectable(t types.Type, dst *port) bool {
+	return types.ConvertibleTo(t, *n.typ.typ)
 }

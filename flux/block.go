@@ -107,7 +107,9 @@ func (b *block) removeNode(n node) {
 				b.func_().subPkgRef(n.obj)
 			}
 		case *compositeLiteralNode:
-			b.func_().subPkgRef(*n.typ.typ)
+			if t := *n.typ.typ; t != nil {
+				b.func_().subPkgRef(t)
+			}
 		case *valueNode:
 			if v, ok := n.obj.(*localVar); ok {
 				v.subref(n)
@@ -567,7 +569,7 @@ func (n *portsNode) removePort(p *port) {
 					sig.IsVariadic = false
 				}
 				if f.obj == nil {
-					f.output.valView.refresh()
+					f.output.setType(sig)
 				}
 				break
 			}
@@ -629,7 +631,7 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 				n.removePortBase(p)
 			}
 			if f.obj == nil {
-				f.output.valView.refresh()
+				f.output.setType(sig)
 			}
 		})
 	} else if n.editable && !n.out && event.Key == KeyPeriod && event.Ctrl {
@@ -649,7 +651,7 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 				p.setType(p.obj.Type.(*types.Slice).Elem)
 			}
 			if f.obj == nil {
-				f.output.valView.refresh()
+				f.output.setType(sig)
 			}
 		}
 	} else {

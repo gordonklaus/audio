@@ -5,6 +5,7 @@
 package main
 
 import (
+	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	. "github.com/chsc/gogl/gl21"
 	"math"
@@ -34,6 +35,163 @@ func newConnection() *connection {
 	c.ViewBase = NewView(c)
 	c.AggregateMouser = AggregateMouser{NewClickFocuser(c)}
 	return c
+}
+
+// TODO: don't let precedes recurse forever
+func (c *connection) connectable(src, dst *port) bool {
+	// Quietly disconnect c for the duration of this call to more accurately simulate the proposed scenario in which
+	// it has the new src and dst.  In particular, assignableToAll must ignore the current state of this connection when
+	// reconnecting a generic input.
+	p, q := c.src, c.dst
+	c.src, c.dst = nil, nil
+	defer func() { c.src, c.dst = p, q }()
+
+	if src.out == dst.out {
+		return false
+	}
+	for _, c := range src.conns {
+		if c.dst == dst {
+			return false
+		}
+	}
+
+	t := src.obj.Type
+	u := dst.obj.Type
+	if t == nil {
+		return false
+	}
+	if (t == seqType) != (u == seqType) {
+		return false
+	}
+	if t == seqType {
+		return src.node.block() == dst.node.block() && !precedes(src.node, dst.node)
+	}
+
+	f := func(t types.Type) bool { return assignable(t, u) }
+	if n, ok := dst.node.(connectable); ok {
+		f = func(t types.Type) bool { return n.connectable(t, dst) && assignableToAll(t, dst) }
+	}
+	if !maybeIndirect(t, f) {
+		return false
+	}
+
+	// TODO: recursive func literals
+	// if f, ok := src.node.(*funcNode); ok && parentOrSelfInBlock(dst.node, f.funcblk) != nil {
+	// 	return true
+	// }
+
+	n1, n2 := src.node, dst.node
+	for b := n1.block(); ; n1, b = b.node, b.outer() {
+		if n := b.find(n2); n != nil {
+			n2 = n
+			break
+		}
+	}
+	if c.feedback {
+		for b := n1.block(); ; b = b.outer() {
+			if b == nil {
+				return false
+			}
+			if _, ok := b.node.(*loopNode); ok {
+				break
+			}
+		}
+		n1, n2 = n2, n1
+	} else if n1 == n2 {
+		return false
+	}
+	return !precedes(n2, n1)
+}
+
+func precedes(n1, n2 node) bool {
+	for _, dst := range dstsInBlock(n1) {
+		if dst == n2 || precedes(dst, n2) {
+			return true
+		}
+	}
+	return false
+}
+
+func assignable(t, u types.Type) bool {
+	if t == nil || u == nil {
+		return false
+	}
+	if t, ok := t.(*types.Basic); ok && t.Info&types.IsUntyped != 0 {
+		// TODO: consider representability of const values
+		switch u := underlying(u).(type) {
+		case *types.Interface:
+			return u.Empty()
+		case *types.Basic:
+			int := t.Info&types.IsInteger != 0
+			float := t.Info&types.IsFloat != 0
+			complex := t.Info&types.IsComplex != 0
+			switch {
+			case u.Info&types.IsBoolean != 0:
+				return t.Info&types.IsBoolean != 0
+			case u.Info&types.IsInteger != 0:
+				return int
+			case u.Info&types.IsFloat != 0:
+				return int || float
+			case u.Info&types.IsComplex != 0:
+				return int || float || complex
+			case u.Info&types.IsString != 0:
+				return t.Info&types.IsString != 0
+			}
+		}
+		return false
+	}
+	return types.IsAssignableTo(t, u)
+}
+
+type connectable interface {
+	connectable(t types.Type, dst *port) bool
+}
+
+// Returns true if t is assignable to or from all of the source types (or their indirections).
+// Does not indirect t as connectable (via which this is meant to be called) already does so.
+func assignableToAll(t types.Type, ins ...*port) bool {
+	for _, p := range ins {
+		for _, c := range p.conns {
+			if c.src != nil {
+				if !maybeIndirect(c.src.obj.Type, func(t2 types.Type) bool { return assignable(t, t2) || assignable(t2, t) }) {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// Returns one of the source types (or its indirection) to which all of the others (or their indirections) are assignable.
+func inputType(ins ...*port) (T types.Type) {
+	assign := func(t, u types.Type) bool {
+		if T == nil || assignable(t, u) {
+			T = u
+			return true
+		}
+		return false
+	}
+	for _, p := range ins {
+		for _, c := range p.conns {
+			if c.src != nil {
+				maybeIndirect(T, func(t types.Type) bool {
+					return maybeIndirect(c.src.obj.Type, func(u types.Type) bool {
+						return assign(t, u) || assign(u, t)
+					})
+				})
+			}
+		}
+	}
+
+	if T != nil && !ins[0].node.(connectable).connectable(T, ins[0]) {
+		T, _ = indirect(T)
+	}
+	return
+}
+
+func maybeIndirect(t types.Type, f func(t types.Type) bool) bool {
+	p, ok := indirect(t)
+	return f(t) || ok && f(p)
 }
 
 func (c connection) connected() bool { return c.src != nil && c.dst != nil }
@@ -341,7 +499,7 @@ func (c *connection) KeyPress(event KeyEvent) {
 					if c.focusSrc {
 						src, dst = dst, src
 					}
-					if canConnect(src, dst, c) {
+					if (src != c.src || dst != c.dst) && c.connectable(src, dst) {
 						ports = append(ports, p2)
 					}
 				}
@@ -459,7 +617,7 @@ func (c *connection) Mouse(m MouseEvent) {
 		if c.focusSrc {
 			src, dst = dst, src
 		}
-		if src == c.src && dst == c.dst || canConnect(src, dst, c) {
+		if src == c.src && dst == c.dst || c.connectable(src, dst) {
 			p = p2
 		}
 	}

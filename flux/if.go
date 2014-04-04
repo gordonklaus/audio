@@ -40,12 +40,20 @@ func (n *ifNode) newBlock() (b *block, cond *port) {
 	b = newBlock(n, n.arranged)
 	n.blocks = append(n.blocks, b)
 
-	cond = newInput(n, newVar("", types.Typ[types.Bool]))
+	cond = newInput(n, newVar("", nil))
+	cond.connsChanged = func() {
+		cond.setType(untypedToTyped(inputType(cond)))
+	}
 	n.cond = append(n.cond, cond)
 	n.Add(cond)
 
 	rearrange(n.blk)
 	return
+}
+
+func (n *ifNode) connectable(t types.Type, dst *port) bool {
+	b, ok := underlying(t).(*types.Basic)
+	return ok && b.Info&types.IsBoolean != 0
 }
 
 func (n ifNode) block() *block      { return n.blk }

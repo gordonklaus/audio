@@ -1,14 +1,17 @@
 TODO
 
-- automatically dereference a pointer only if it originates from an addressable expression?
-- use types.IsAssignableTo in canConnect
+- consider removing map support from indexNode; add map.{get, set} pseudo-methods (or mapget/mapset builtins)
+- consider removing settability from valueNode and indexNode.
 - don't include sequencing ports in normal keyboard navigation.  access them by special keystrokes (Command-{Semicolon, Quote}?).  (update focusNearestView to ignore sequencing ports, too)
 - shortcuts:
   - on an in port, press '{' to create a composite literal of the port's type
   - on a node or connection, press cmd-R(cmd-I?) to bring up a browser with funcs and ops suitable to insert, i.e., having a signature compatible with the existing node's connections
-- remove localVar; give valueNode an addr (y := &x) mode
+- remove localVar
 - rework typeView appearance
+- add in-place operators (+=, etc) that take a pointer as the first arg.
+- give assignment node and in-place operators an output, for easier sequencing.
 - use graphics instead of text to identify pointers, slices, funcs, maps, etc in typeView
+- use different symbols for some operators ("and" instead of "&&", etc)
 - blinking cursor in gui.Text
 - make gui.Text change its appearance based on content when a validator is present.  give validator 3 states:  Acceptable, Intermediate, Invalid.
 - consider not lumping sequencing ports and connections in with the normal ones.  they can be annoying.  don't forget to consider them in the topological sorting order.
@@ -28,7 +31,6 @@ TODO
   - order of imports (alphabetical).
   - node order? pro: deterministic build, stable files; con: hides bugs
   - variable names (also seqIDs)
-- consider removing map support from indexNode; add map.{get, set} pseudo-methods (or mapget/mapset builtins)
 - color conns by type.  hash type name, interpret as color.  or, use multiple colors to describe the whole type tree (outlined, woven, etc).
 - improve valueView editing; currently, name and type can't be edited separately.  solution:  allow to focus name text.
 - find a better way to embed font (current using something like https://github.com/jteeuwen/go-bindata, https://groups.google.com/forum/#!msg/golang-nuts/UOIUyn7uFsY/Uescy-cI7hQJ) (best to wait for this https://code.google.com/p/go/issues/detail?id=3035).  Or consider installing it in a fixed location (OS X: in app bundle.  Linux: in /usr/share?  Windows: in application directory?)  Also check the go src directory in case someone has go-gotten flux?
@@ -45,6 +47,7 @@ before releasing:
 
 
 Benefits over Go:
+- no need to name local variables
 - same syntax for operators and function calls
 - no problem closing over range loop value (index is still trouble, but that can be fixed by automatically inserting i := i)
 

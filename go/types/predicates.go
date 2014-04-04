@@ -76,8 +76,9 @@ func isInterface(typ Type) bool {
 	return ok
 }
 
-func isComparable(typ Type) bool {
-	switch t := typ.Underlying().(type) {
+// Comparable reports whether values of type T are comparable.
+func Comparable(T Type) bool {
+	switch t := T.Underlying().(type) {
 	case *Basic:
 		// assume invalid types to be comparable
 		// to avoid follow-up errors
@@ -86,13 +87,13 @@ func isComparable(typ Type) bool {
 		return true
 	case *Struct:
 		for _, f := range t.Fields {
-			if !isComparable(f.Type) {
+			if !Comparable(f.Type) {
 				return false
 			}
 		}
 		return true
 	case *Array:
-		return isComparable(t.Elem)
+		return Comparable(t.Elem)
 	}
 	return false
 }

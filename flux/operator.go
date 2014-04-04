@@ -26,61 +26,83 @@ func newOperatorNode(obj types.Object) *operatorNode {
 	switch n.op {
 	case "!":
 		n.removePortBase(n.ins[1])
-		fallthrough
-	case "+", "-", "*", "/", "%", "&", "|", "^", "&^", "&&", "||":
-		f := func() {
-			t := combineInputTypes(ins(n))
-			t = untypedToTyped(t)
-			for _, p := range ins(n) {
-				p.setType(t)
-			}
-			n.outs[0].setType(t)
-		}
-		for _, p := range ins(n) {
-			p.connsChanged = f
-		}
-		f()
-	case "<<", ">>":
-
 	case "==", "!=", "<", "<=", ">", ">=":
-		f := func() {
-			t := combineInputTypes(ins(n))
-			t = untypedToTyped(t)
-			for _, p := range ins(n) {
-				p.setType(t)
-			}
-		}
-		for _, p := range ins(n) {
-			p.connsChanged = f
-		}
-		f()
 		n.outs[0].setType(types.Typ[types.UntypedBool])
 	}
+
+	for _, p := range ins(n) {
+		p.connsChanged = n.connsChanged
+	}
+	n.connsChanged()
 	return n
 }
 
-func combineInputTypes(p []*port) (t types.Type) {
-	for _, p := range p {
-		if len(p.conns) > 0 {
-			t2, _ := indirect(p.conns[0].src.obj.Type)
-			switch {
-			case t == nil:
-				t = t2
-			case isUntyped(t) && isUntyped(t2):
-				// TODO: combine untypeds
-			case isUntyped(t):
-				t = t2
-			case isUntyped(t2):
-			default:
-			}
-		}
+func (n *operatorNode) connectable(t types.Type, dst *port) bool {
+	if !n.connectable1(t, dst) {
+		return false
 	}
-	return
+	if n.op != "<<" && n.op != ">>" {
+		return assignableToAll(t, ins(n)...)
+	}
+	return true
 }
 
-func isUntyped(t types.Type) bool {
-	b, ok := t.(*types.Basic)
-	return ok && b.Info&types.IsUntyped != 0
+func (n *operatorNode) connectable1(t types.Type, dst *port) bool {
+	if n.op == "==" || n.op == "!=" {
+		switch underlying(t).(type) {
+		case *types.Slice, *types.Map, *types.Signature:
+			// these types are comparable only with nil
+			other := ins(n)[0]
+			if other == dst {
+				other = ins(n)[1]
+			}
+			return len(other.conns) == 0
+		}
+		return types.Comparable(t)
+	}
+	b, ok := underlying(t).(*types.Basic)
+	if !ok {
+		return false
+	}
+	i := b.Info
+	switch n.op {
+	case "!", "&&", "||":
+		return i&types.IsBoolean != 0
+	case "+":
+		return i&(types.IsString|types.IsNumeric) != 0
+	case "-", "*", "/":
+		return i&types.IsNumeric != 0
+	case "%", "&", "|", "^", "&^", "<<", ">>":
+		if (n.op == "<<" || n.op == ">>") && dst == ins(n)[1] {
+			return i&types.IsUnsigned != 0
+		}
+		return i&types.IsInteger != 0
+	case "<", "<=", ">", ">=":
+		return i&types.IsOrdered != 0
+	}
+	panic(n.op)
+}
+
+func (n *operatorNode) connsChanged() {
+	switch n.op {
+	case "!", "&&", "||", "+", "-", "*", "/", "%", "&", "|", "^", "&^":
+		t := untypedToTyped(inputType(ins(n)...))
+		for _, p := range ins(n) {
+			p.setType(t)
+		}
+		n.outs[0].setType(t)
+	case "<<", ">>":
+		t := untypedToTyped(inputType(n.ins[0]))
+		u := untypedToTyped(inputType(n.ins[1]))
+		n.ins[0].setType(t)
+		n.ins[1].setType(u)
+		n.outs[0].setType(t)
+	case "==", "!=", "<", "<=", ">", ">=":
+		t := untypedToTyped(inputType(ins(n)...))
+		for _, p := range ins(n) {
+			p.setType(t)
+		}
+	}
 }
 
 func untypedToTyped(t types.Type) types.Type {

@@ -352,9 +352,9 @@ func (r *reader) index(b *block, x *ast.IndexExpr, y ast.Expr, set bool, s *ast.
 	r.dst(x.X, n.x)
 	r.dst(x.Index, n.key)
 	if set {
-		r.dst(y, n.inVal)
+		r.dst(y, n.elem)
 	} else {
-		r.src(y, n.outVal)
+		r.src(y, n.elem)
 	}
 	if len(s.Lhs) == 2 {
 		r.src(s.Lhs[1], n.ok)
@@ -412,6 +412,11 @@ func (r *reader) src(x ast.Expr, src *port) {
 func (r *reader) dst(x ast.Expr, dst *port) {
 	name := name(x)
 	for _, c := range r.conns[name] {
+		if !c.connectable(c.src, dst) {
+			println("not connectable:")
+			printf("%#v\n", c.src.node)
+			printf("%#v\n\n", dst.node)
+		}
 		c.setDst(dst)
 	}
 	r.ports[name] = dst //for feedback conns

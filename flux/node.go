@@ -337,29 +337,27 @@ func (n *compositeLiteralNode) editType() {
 func (n *compositeLiteralNode) setType(t types.Type) {
 	n.typ.setType(t)
 	n.outs[0].setType(t)
-	if t != nil {
-		n.blk.func_().addPkgRef(t)
-		t, _ = indirect(t)
-		local := true
-		if nt, ok := t.(*types.Named); ok {
-			t = nt.UnderlyingT
-			local = nt.Obj.Pkg == n.blk.func_().pkg()
-		}
-		switch t := t.(type) {
-		case *types.Struct:
-			for _, f := range t.Fields {
-				if local || f.IsExported() {
-					n.newInput(f)
-				}
-			}
-		case *types.Slice:
-			// TODO: variable number of inputs? (same can be achieved using append.)  variable number of index/value input pairs?
-		case *types.Map:
-			// TODO: variable number of key/value input pairs?
-		}
-		MoveCenter(n.typ, ZP)
-		n.gap = Height(n.typ) / 2
-		n.reform()
-		SetKeyFocus(n)
+	n.blk.func_().addPkgRef(t)
+	t, _ = indirect(t)
+	local := true
+	if nt, ok := t.(*types.Named); ok {
+		t = nt.UnderlyingT
+		local = nt.Obj.Pkg == n.blk.func_().pkg()
 	}
+	switch t := t.(type) {
+	case *types.Struct:
+		for _, f := range t.Fields {
+			if local || f.IsExported() {
+				n.newInput(f)
+			}
+		}
+	case *types.Slice:
+		// TODO: variable number of inputs? (same can be achieved using append.)  variable number of index/value input pairs?
+	case *types.Map:
+		// TODO: variable number of key/value input pairs?
+	}
+	MoveCenter(n.typ, ZP)
+	n.gap = Height(n.typ) / 2
+	n.reform()
+	SetKeyFocus(n)
 }

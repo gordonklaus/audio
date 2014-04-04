@@ -18,33 +18,35 @@ func newAppendNode() *appendNode {
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText("append")
 	n.addSeqPorts()
-	in := n.newInput(newVar("", generic{}))
-	out := n.newOutput(newVar("", generic{}))
+	in := n.newInput(newVar("", nil))
+	out := n.newOutput(newVar("", nil))
 	in.connsChanged = func() {
-		if len(in.conns) > 0 {
-			t, _ := indirect(in.conns[0].src.obj.Type)
-			if t, ok := t.(*types.Slice); ok { // TODO: remove ok (always true) after canConnect checks types
-				in.setType(t)
-				if n.ellipsis() {
-					in := ins(n)[1]
-					in.valView.ellipsis = true
-					in.setType(t)
-				} else {
-					for _, in := range ins(n)[1:] {
-						in.setType(t.Elem)
-					}
-				}
-				out.setType(t)
+		t := inputType(in)
+		in.setType(t)
+		if t == nil {
+			for _, p := range ins(n)[1:] {
+				n.removePortBase(p)
 			}
+		} else if n.ellipsis() {
+			p := ins(n)[1]
+			p.valView.ellipsis = true
+			p.setType(t)
 		} else {
-			in.setType(generic{})
-			for _, in := range ins(n)[1:] {
-				in.setType(generic{})
+			for _, p := range ins(n)[1:] {
+				p.setType(underlying(t).(*types.Slice).Elem)
 			}
-			out.setType(generic{})
 		}
+		out.setType(t)
 	}
 	return n
+}
+
+func (n *appendNode) connectable(t types.Type, dst *port) bool {
+	if dst == ins(n)[0] {
+		_, ok := underlying(t).(*types.Slice)
+		return ok
+	}
+	return assignable(t, dst.obj.Type)
 }
 
 func (n *appendNode) KeyPress(event KeyEvent) {
@@ -56,19 +58,17 @@ func (n *appendNode) KeyPress(event KeyEvent) {
 			n.removePortBase(ins[1])
 		}
 		SetKeyFocus(n.newInput(newVar("", t.Elem)))
-		rearrange(n.blk)
 	} else if ok && event.Key == KeyPeriod && event.Ctrl {
 		if n.ellipsis() {
 			n.removePortBase(ins[1])
 		} else {
-			for _, in := range ins[1:] {
-				n.removePortBase(in)
+			for _, p := range ins[1:] {
+				n.removePortBase(p)
 			}
-			in := n.newInput(v)
-			in.valView.ellipsis = true
-			in.valView.refresh()
-			SetKeyFocus(in)
-			rearrange(n.blk)
+			p := n.newInput(v)
+			p.valView.ellipsis = true
+			p.valView.refresh()
+			SetKeyFocus(p)
 		}
 	} else {
 		n.ViewBase.KeyPress(event)
@@ -97,22 +97,27 @@ func newDeleteNode() *deleteNode {
 	n := &deleteNode{}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText("delete")
-	m := n.newInput(newVar("map", generic{}))
-	key := n.newInput(newVar("key", generic{}))
+	m := n.newInput(newVar("map", nil))
+	key := n.newInput(newVar("key", nil))
 	m.connsChanged = func() {
-		if len(m.conns) > 0 {
-			t, _ := indirect(m.conns[0].src.obj.Type)
-			if t, ok := t.(*types.Map); ok {
-				m.setType(t)
-				key.setType(t.Key)
-			}
+		t := inputType(m)
+		m.setType(t)
+		if t != nil {
+			key.setType(underlying(t).(*types.Map).Key)
 		} else {
-			m.setType(generic{})
-			key.setType(generic{})
+			key.setType(nil)
 		}
 	}
 	n.addSeqPorts()
 	return n
+}
+
+func (n *deleteNode) connectable(t types.Type, dst *port) bool {
+	if dst == ins(n)[0] {
+		_, ok := underlying(t).(*types.Map)
+		return ok
+	}
+	return assignable(t, dst.obj.Type)
 }
 
 type lenNode struct {
@@ -123,23 +128,24 @@ func newLenNode() *lenNode {
 	n := &lenNode{}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText("len")
-	in := n.newInput(newVar("", generic{}))
+	in := n.newInput(newVar("", nil))
 	n.newOutput(newVar("", types.Typ[types.Int]))
 	in.connsChanged = func() {
-		if len(in.conns) > 0 {
-			t := in.conns[0].src.obj.Type
-			if tt, ok := indirect(t); ok {
-				if _, ok := tt.(*types.Array); !ok {
-					t = tt
-				}
-			}
-			in.setType(t)
-		} else {
-			in.setType(generic{})
-		}
+		in.setType(inputType(in))
 	}
 	n.addSeqPorts()
 	return n
+}
+
+func (n *lenNode) connectable(t types.Type, dst *port) bool {
+	ok := false
+	switch t := underlying(t).(type) {
+	case *types.Array, *types.Slice:
+		ok = true
+	case *types.Pointer:
+		_, ok = underlying(t.Elem).(*types.Array)
+	}
+	return ok
 }
 
 type makeNode struct {

@@ -27,7 +27,7 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 		if _, ok := obj.(*types.Func); !ok || isMethod(obj) {
 			n.x = n.newInput(nil)
 			if obj == nil {
-				n.x.connsChanged = n.reform
+				n.x.connsChanged = n.connsChanged
 			}
 			dot = "."
 		}
@@ -46,19 +46,24 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 		n.addSeqPorts()
 	default:
 	}
-	n.reform()
+	n.connsChanged()
 	return n
 }
 
-func (n *valueNode) reform() {
-	if n.set {
-		if n.y.out {
-			n.removePortBase(n.y)
+func (n *valueNode) connectable(t types.Type, dst *port) bool {
+	if n.obj == nil && dst == n.x {
+		_, ok := underlying(t).(*types.Pointer)
+		return ok
+	}
+	return assignable(t, dst.obj.Type)
+}
+
+func (n *valueNode) connsChanged() {
+	if n.set == n.y.out {
+		n.removePortBase(n.y)
+		if n.set {
 			n.y = n.newInput(nil)
-		}
-	} else {
-		if !n.y.out {
-			n.removePortBase(n.y)
+		} else {
 			n.y = n.newOutput(nil)
 		}
 	}
@@ -80,10 +85,8 @@ func (n *valueNode) reform() {
 		xt = obj.recv
 		n.addressable = obj.addressable
 	case nil:
-		if len(n.x.conns) > 0 {
-			xt = n.x.conns[0].src.obj.Type
-			yt, _ = indirect(xt)
-		}
+		xt = inputType(n.x)
+		yt, _ = indirect(underlying(xt))
 		if n.set {
 			n.text.SetText("=")
 		} else {
@@ -102,7 +105,7 @@ func (n *valueNode) reform() {
 func (n *valueNode) KeyPress(event KeyEvent) {
 	if event.Text == "=" && n.addressable {
 		n.set = !n.set
-		n.reform()
+		n.connsChanged()
 		SetKeyFocus(n)
 	} else {
 		n.nodeBase.KeyPress(event)

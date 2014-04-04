@@ -237,7 +237,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					if _, ok := n.(*makeNode); ok && len(ins) > 1 && in == ins[1] {
 						continue //ignore unconnected slice capacity
 					}
-					switch t := in.obj.Type.(type) {
+					switch t := underlying(in.obj.Type).(type) {
 					case *types.Slice, *types.Map, *types.Signature:
 						name = "nil" //must use untyped nil in case this value is used in equality comparison
 					default:
@@ -508,7 +508,7 @@ func (w *writer) results(n node, vars map[*port]string) (results []string, exist
 			}
 			for _, c := range p.conns {
 				v := name
-				if p, ok := c.src.obj.Type.(*types.Pointer); ok && types.IsIdentical(p.Elem, c.dst.obj.Type) {
+				if !assignable(c.src.obj.Type, c.dst.obj.Type) {
 					v = "*" + v
 				}
 				if c.hidden {

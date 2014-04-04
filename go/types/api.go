@@ -219,10 +219,22 @@ func (conf *Config) Check(path string, fset *token.FileSet, files []*ast.File, i
 	return pkg, err
 }
 
+// AssertableTo reports whether a value of type V can be asserted to have type T.
+func AssertableTo(V *Interface, T Type) bool {
+	f, _ := MissingMethod(T, V, false)
+	return f == nil
+}
+
 // IsAssignableTo reports whether a value of type V is assignable to a variable of type T.
 func IsAssignableTo(V, T Type) bool {
 	x := operand{mode: value, typ: V}
 	return x.isAssignableTo(nil, T) // config not needed for non-constant x
+}
+
+// ConvertibleTo reports whether a value of type V is convertible to a value of type T.
+func ConvertibleTo(V, T Type) bool {
+	x := operand{mode: value, typ: V}
+	return x.isConvertible(nil, T) // config not needed for non-constant x
 }
 
 // Implements reports whether a value of type V implements T, as follows:

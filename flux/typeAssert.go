@@ -19,9 +19,7 @@ func newTypeAssertNode() *typeAssertNode {
 	n.nodeBase = newNodeBase(n)
 	in := n.newInput(nil)
 	in.connsChanged = func() {
-		if len(in.conns) > 0 {
-			in.setType(in.conns[0].src.obj.Type)
-		}
+		in.setType(inputType(in))
 	}
 	out := n.newOutput(nil)
 	n.newOutput(newVar("ok", types.Typ[types.Bool]))
@@ -52,4 +50,9 @@ func (n *typeAssertNode) setType(t types.Type) {
 		n.reform()
 		SetKeyFocus(n)
 	}
+}
+
+func (n *typeAssertNode) connectable(t types.Type, dst *port) bool {
+	i, ok := underlying(t).(*types.Interface)
+	return ok && types.AssertableTo(i, *n.typ.typ)
 }

@@ -322,7 +322,7 @@ func (check *checker) typInternal(e ast.Expr, def *Named, cycleOk bool) Type {
 		// Delay this check because it requires fully setup types;
 		// it is safe to continue in any case (was issue 6667).
 		check.delay(func() {
-			if !isComparable(typ.Key) {
+			if !Comparable(typ.Key) {
 				check.errorf(e.Key.Pos(), "invalid map key type %s", typ.Key)
 			}
 		})
