@@ -37,7 +37,6 @@ func newConnection() *connection {
 	return c
 }
 
-// TODO: don't let precedes recurse forever
 func (c *connection) connectable(src, dst *port) bool {
 	// Quietly disconnect c for the duration of this call to more accurately simulate the proposed scenario in which
 	// it has the new src and dst.  In particular, assignableToAll must ignore the current state of this connection when
@@ -209,6 +208,7 @@ func (c *connection) setSrc(src *port) {
 		c.updateSrcTxt("")
 	}
 	c.src = src
+	c.reblock()
 	if src != nil {
 		src.connect(c)
 		if c.dst != nil {
@@ -217,7 +217,6 @@ func (c *connection) setSrc(src *port) {
 		}
 		c.updateSrcTxt(txt)
 	}
-	c.reblock()
 	c.reform()
 }
 
@@ -228,6 +227,7 @@ func (c *connection) setDst(dst *port) {
 		c.updateDstTxt()
 	}
 	c.dst = dst
+	c.reblock()
 	if dst != nil {
 		dst.connect(c)
 		if c.src != nil {
@@ -236,7 +236,6 @@ func (c *connection) setDst(dst *port) {
 		}
 		c.updateDstTxt()
 	}
-	c.reblock()
 	c.reform()
 }
 
