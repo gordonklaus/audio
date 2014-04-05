@@ -614,7 +614,6 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 		n.Add(p)
 		*ports = append((*ports)[:i], append([]*port{p}, (*ports)[i:]...)...)
 		n.reform()
-		rearrange(n.blk)
 		Show(p.valView)
 		p.valView.edit(func() {
 			if v.Type != nil {

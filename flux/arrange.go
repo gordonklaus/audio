@@ -506,10 +506,10 @@ func newBlockArrange(block *block, n *nodeArrange, ports portmap) *blockArrange 
 		b.Add(n)
 	}
 	for c := range block.conns {
-		if c.src == nil || c.dst == nil {
+		c := newConnArrange(c, ports)
+		if c == nil {
 			continue
 		}
-		c := newConnArrange(c, ports)
 		b.conns = append(b.conns, c)
 		b.Add(c)
 	}
@@ -563,6 +563,11 @@ func newConnArrange(conn *connection, ports portmap) *connArrange {
 	c.ViewBase = NewView(c)
 	c.src = ports[conn.src]
 	c.dst = ports[conn.dst]
+	if c.src == nil || c.dst == nil {
+		 // rearrange may be called while a connection is changing but before it is reblocked, leading to missing ports.
+		 // Ignore it; rearrange will be called again after reblocking.
+		return nil
+	}
 	c.hidden = conn.hidden
 	return c
 }

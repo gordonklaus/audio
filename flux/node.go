@@ -88,7 +88,6 @@ func (n *nodeBase) removePortBase(p *port) { // intentionally named to not imple
 			*ports = append((*ports)[:i], (*ports)[i+1:]...)
 			n.Remove(p)
 			n.reform()
-			rearrange(n.blk)
 
 			if i > 0 && (*ports)[i-1].obj.Type != seqType { // assumes sequencing port, if present, is at index 0
 				i--
@@ -136,6 +135,7 @@ func (n *nodeBase) reform() {
 		MoveCenter(p, Pt(0, -n.gap))
 	}
 	n.SetRect(rect)
+	rearrange(n.blk)
 }
 
 func (n nodeBase) block() *block      { return n.blk }

@@ -84,7 +84,6 @@ func (n *callNode) addPorts(sig *types.Signature) {
 	for _, v := range sig.Results {
 		n.newOutput(v)
 	}
-	rearrange(n.blk)
 }
 
 func (n *callNode) KeyPress(event KeyEvent) {
@@ -95,7 +94,6 @@ func (n *callNode) KeyPress(event KeyEvent) {
 				n.removePortBase(ins[i])
 			}
 			SetKeyFocus(n.newInput(newVar(v.Name, v.Type.(*types.Slice).Elem)))
-			rearrange(n.blk)
 		} else if event.Key == KeyPeriod && event.Ctrl {
 			if n.ellipsis() {
 				n.removePortBase(ins[i])
@@ -107,7 +105,6 @@ func (n *callNode) KeyPress(event KeyEvent) {
 				in.valView.ellipsis = true
 				in.valView.refresh()
 				SetKeyFocus(in)
-				rearrange(n.blk)
 			}
 		} else {
 			n.ViewBase.KeyPress(event)
