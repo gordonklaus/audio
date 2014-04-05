@@ -23,12 +23,12 @@ func newIndexNode(set bool) *indexNode {
 	n.key.connsChanged = n.connsChanged
 	if set {
 		n.elem = n.newInput(nil)
+		n.elem.connsChanged = n.connsChanged
 		n.text.SetText("[]=")
 	} else {
 		n.elem = n.newOutput(nil)
 		n.text.SetText("[]")
 	}
-	n.elem.connsChanged = n.connsChanged
 	n.addSeqPorts()
 	n.connsChanged()
 	return n

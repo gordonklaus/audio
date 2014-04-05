@@ -203,7 +203,6 @@ func (c *connection) setSrc(src *port) {
 	txt := ""
 	if c.src != nil {
 		c.src.disconnect(c)
-		c.src.connsChanged()
 		txt = c.src.conntxt.GetText()
 		c.updateSrcTxt("")
 	}
@@ -211,11 +210,10 @@ func (c *connection) setSrc(src *port) {
 	c.reblock()
 	if src != nil {
 		src.connect(c)
-		if c.dst != nil {
-			c.src.connsChanged()
-			c.dst.connsChanged()
-		}
 		c.updateSrcTxt(txt)
+	}
+	if c.dst != nil {
+		c.dst.connsChanged()
 	}
 	c.reform()
 }
@@ -230,10 +228,7 @@ func (c *connection) setDst(dst *port) {
 	c.reblock()
 	if dst != nil {
 		dst.connect(c)
-		if c.src != nil {
-			c.src.connsChanged()
-			c.dst.connsChanged()
-		}
+		c.dst.connsChanged()
 		c.updateDstTxt()
 	}
 	c.reform()

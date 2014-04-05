@@ -234,10 +234,12 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			for _, in := range ins {
 				name, ok := vars[in]
 				if !ok {
-					if _, ok := n.(*makeNode); ok && len(ins) > 1 && in == ins[1] {
+					if _, ok := n.(*makeNode); ok && len(ins) > 1 && in == ins[1] { // TODO: not this.  addable/removable capacity port instead.
 						continue //ignore unconnected slice capacity
 					}
 					switch t := underlying(in.obj.Type).(type) {
+					case nil:
+						continue
 					case *types.Slice, *types.Map, *types.Signature:
 						name = "nil" //must use untyped nil in case this value is used in equality comparison
 					default:
