@@ -1,7 +1,15 @@
 TODO
 
-- consider removing map support from indexNode; add map.{get, set} pseudo-methods (or mapget/mapset builtins)
+- consider removing map support from indexNode; add map.{get, set} pseudo-methods (or mapget/mapset builtins), rename delete.
 - consider removing settability from valueNode and indexNode.
+- chan send, recv, close
+- type switch
+- select
+- slice
+- builtins:  cap, close, complex, copy, imag, new, panic, real, recover
+- go, defer
+- len and capacity inputs for make, ok output for type assert (also mapget?) are optional, creatable by Comma key, deletable
+- color nodes by kind
 - don't include sequencing ports in normal keyboard navigation.  access them by special keystrokes (Command-{Semicolon, Quote}?).  (update focusNearestView to ignore sequencing ports, too)
 - shortcuts:
   - on an in port, press '{' to create a composite literal of the port's type
@@ -19,6 +27,7 @@ TODO
 - dimly highlight connected ports when a port is focused (or only when a key, e.g. Shift, is pressed) (but always for wireless conns)
 - don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.
 - make connectionBundles to reduce wire clutter?  each port has at most one connectionBundle that branches off connections near each port it connects to.  or don't add a new object, just draw connections coincident that originate at the same port.  especially bundle coincident connections that cross block boundaries.
+- condition blocks for if, &&, ||
 - consider drawing nodes as circles/ellipses.  this is the easiest way to treat them when arranging, and it might even be visually ok.  loopNode will work fine, as its loopblk can be drawn as a circle; but ifNode, switchNode, and selectNode will be harder, having multiple blocks.
 - in browser, by default don't show non-Go dirs (and don't show non-Flux dirs in fluxSourceOnly mode); show them when Shift is pressed
 - prefix names with pkg name in browser and typeView

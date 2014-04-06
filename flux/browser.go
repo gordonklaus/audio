@@ -422,6 +422,10 @@ func (b browser) filteredObjs() (objs objects) {
 			}
 		}
 		for _, obj := range types.Universe.Objects {
+			switch obj.GetName() {
+			case "nil", "print", "println":
+				continue
+			}
 			add(obj)
 		}
 		for _, op := range []string{"!", "&&", "||", "+", "-", "*", "/", "%", "&", "|", "^", "&^", "<<", ">>", "==", "!=", "<", "<=", ">", ">="} {

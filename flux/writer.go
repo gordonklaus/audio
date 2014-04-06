@@ -337,7 +337,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.indent("const %s = %s\n", results[0], val)
 				}
 			case *valueNode:
-				if n.set || len(results) > 0 {
+				if n.set && len(args) > 0 || len(results) > 0 {
 					name := ""
 					switch obj := n.obj.(type) {
 					case *types.Var, *types.Const, *localVar:
