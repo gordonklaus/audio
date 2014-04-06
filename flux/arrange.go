@@ -192,7 +192,8 @@ func arrange(arrange, childArranged, arranged blockchan, stop stopchan) {
 					continue
 				}
 				dir := CenterInParent(n1).Sub(CenterInParent(n2))
-				r1, r2 := RectInParent(n1).Inset(-nodeSep/2), RectInParent(n2).Inset(-nodeSep/2)
+				r1 := RectInParent(n1).Inset(-nodeSep/2)
+				r2 := RectInParent(n2).Inset(-nodeSep/2)
 				sep := math.Min(r1.Intersect(r2).Size().XY())
 				n1.add(dir.Mul(nodeSepCoef * math.Min(1, sep/nodeSep) / dir.Len()))
 			}

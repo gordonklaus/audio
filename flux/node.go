@@ -134,7 +134,12 @@ func (n *nodeBase) reform() {
 	if p := seqOut(n); p != nil {
 		MoveCenter(p, Pt(0, -n.gap))
 	}
-	n.SetRect(rect)
+	if _, ok := n.self.(*portsNode); ok {
+		// portsNode rect must have an edge at y==0 or arrangement will diverge
+		n.SetRect(rect)
+	} else {
+		ResizeToFit(n, 0)
+	}
 	rearrange(n.blk)
 }
 
