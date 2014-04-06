@@ -9,17 +9,18 @@ TODO
 - builtins:  cap, close, complex, copy, imag, new, panic, real, recover
 - go, defer
 - len and capacity inputs for make, ok output for type assert (also mapget?) are optional, creatable by Comma key, deletable
-- color nodes by kind
 - don't include sequencing ports in normal keyboard navigation.  access them by special keystrokes (Command-{Semicolon, Quote}?).  (update focusNearestView to ignore sequencing ports, too)
 - shortcuts:
   - on an in port, press '{' to create a composite literal of the port's type
   - on a node or connection, press cmd-R(cmd-I?) to bring up a browser with funcs and ops suitable to insert, i.e., having a signature compatible with the existing node's connections
+- auto pan when key focus changes
 - remove localVar
 - rework typeView appearance
 - add in-place operators (+=, etc) that take a pointer as the first arg.
 - give assignment node and in-place operators an output, for easier sequencing.
 - use graphics instead of text to identify pointers, slices, funcs, maps, etc in typeView
-- use different symbols for some operators ("and" instead of "&&", etc)
+- use different symbols for some operators (=, ≠, ≤, ≥, and, or, etc.)
+- color builtins and operators as specials (or indexNode as func).  in browser and in graph.
 - blinking cursor in gui.Text
 - make gui.Text change its appearance based on content when a validator is present.  give validator 3 states:  Acceptable, Intermediate, Invalid.
 - consider not lumping sequencing ports and connections in with the normal ones.  they can be annoying.  don't forget to consider them in the topological sorting order.

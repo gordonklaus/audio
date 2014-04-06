@@ -128,6 +128,11 @@ func (n *loopNode) KeyPress(event KeyEvent) {
 }
 
 func (n loopNode) Paint() {
-	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
+	if n.focused {
+		SetPointSize(2 * portSize)
+		SetColor(Color{.25, .25, .25, 1})
+		DrawPoint(ZP)
+	}
+	SetColor(Color{.5, .5, .5, 1})
 	DrawLine(Pt(0, -portSize/2), Pt(0, portSize/2))
 }

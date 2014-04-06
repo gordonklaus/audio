@@ -702,7 +702,7 @@ func color(obj types.Object, bright, funcAsVal bool) Color {
 			return color(&types.Var{}, bright, funcAsVal)
 		}
 		return Color{1, .6, .6, alpha}
-	case *types.Var, *types.Const, *types.Nil, field, *localVar:
+	case *types.Var, *types.Const, field, *localVar:
 		return Color{.6, .6, 1, alpha}
 	}
 	panic(fmt.Sprintf("unknown object type %T", obj))
@@ -807,14 +807,14 @@ func objLess(o1, o2 types.Object) bool {
 			return false
 		case *types.Var, field, *localVar:
 			return n1 < n2
-		case *types.Const, *types.Nil, *pkgObject:
+		case *types.Const, *pkgObject:
 			return true
 		}
-	case *types.Const, *types.Nil:
+	case *types.Const:
 		switch o2.(type) {
 		default:
 			return false
-		case *types.Const, *types.Nil:
+		case *types.Const:
 			return n1 < n2
 		case *pkgObject:
 			return true

@@ -431,9 +431,6 @@ func (b *block) KeyPress(event KeyEvent) {
 				b.addNode(n)
 				MoveCenter(n, Center(b))
 				n.text.SetText(text)
-				n.text.Accept = func(string) {
-					SetKeyFocus(n)
-				}
 				n.text.Reject = func() {
 					b.removeNode(n)
 					SetKeyFocus(b)
@@ -659,10 +656,14 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 }
 
 func (n *portsNode) Paint() {
-	n.nodeBase.Paint()
-	if len(n.ins)+len(n.outs) == 0 {
-		DrawLine(Pt(-3, 0), Pt(3, 0))
+	if n.focused {
+		SetPointSize(2 * portSize)
+		SetColor(Color{.25, .25, .25, 1})
+		DrawPoint(ZP)
 	}
+	SetColor(Color{.5, .5, .5, 1})
+	DrawLine(Pt(-3, 0), Pt(3, 0))
+	n.nodeBase.Paint()
 }
 
 type localVar struct {

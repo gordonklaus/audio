@@ -47,6 +47,7 @@ func newNodeBase(self node) *nodeBase {
 	n.text.TextChanged = func(string) {
 		MoveCenter(n.text, ZP)
 		n.gap = Height(n.text) / 2
+		n.reform()
 	}
 	n.Add(n.text)
 	n.ViewBase.Self = self
@@ -179,16 +180,16 @@ func nodeMoved(n node) {
 
 func (n *nodeBase) TookKeyFocus() {
 	n.focused = true
-	n.text.SetTextColor(Color{.5, .5, .9, 1})
+	n.text.SetBackgroundColor(Color{.25, .25, .25, 1})
 }
 
 func (n *nodeBase) LostKeyFocus() {
 	n.focused = false
-	n.text.SetTextColor(Color{1, 1, 1, 1})
+	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
 }
 
 func (n *nodeBase) Paint() {
-	SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
+	SetColor(Color{.5, .5, .5, 1})
 	for _, p := range append(ins(n), outs(n)...) {
 		pt := CenterInParent(p)
 		dy := n.gap
@@ -296,6 +297,7 @@ func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 			return true
 		})
 	}
+	n.text.Accept = func(string) { SetKeyFocus(n) }
 	return n
 }
 

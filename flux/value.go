@@ -28,6 +28,7 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 			n.x = n.newInput(nil)
 			if obj == nil {
 				n.x.connsChanged = n.connsChanged
+				n.text.SetTextColor(color(special{}, true, false))
 			}
 			dot = "."
 		}
@@ -35,6 +36,7 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 	}
 	if obj != nil {
 		n.text.SetText(dot + obj.GetName())
+		n.text.SetTextColor(color(&types.Var{}, true, false))
 	}
 	if set {
 		n.y = n.newInput(nil)

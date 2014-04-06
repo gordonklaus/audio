@@ -18,6 +18,7 @@ func newOperatorNode(obj types.Object) *operatorNode {
 	n := &operatorNode{op: obj.GetName()}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText(n.op)
+	n.text.SetTextColor(color(&types.Func{}, true, false))
 
 	n.newInput(nil)
 	n.newInput(nil)

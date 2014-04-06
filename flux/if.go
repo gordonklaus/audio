@@ -165,7 +165,6 @@ func (n *ifNode) KeyPress(event KeyEvent) {
 
 func (n ifNode) Paint() {
 	for i, b := range n.blocks {
-		SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[i == n.focused])
 		r := RectInParent(b)
 		left := r.Min.X - portSize/2
 		right := r.Max.X + portSize/2
@@ -176,6 +175,12 @@ func (n ifNode) Paint() {
 		if i == len(n.blocks)-1 {
 			right = center
 		}
+		if i == n.focused {
+			SetPointSize(2 * portSize)
+			SetColor(Color{.25, .25, .25, 1})
+			DrawPoint(Pt(center, portSize))
+		}
+		SetColor(Color{.5, .5, .5, 1})
 		DrawLine(Pt(left, portSize), Pt(right, portSize))
 		DrawLine(Pt(center, 2*portSize), Pt(center, 0))
 	}

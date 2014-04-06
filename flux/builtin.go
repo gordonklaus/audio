@@ -17,6 +17,7 @@ func newAppendNode() *appendNode {
 	n := &appendNode{}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText("append")
+	n.text.SetTextColor(color(&types.Func{}, true, false))
 	n.addSeqPorts()
 	in := n.newInput(newVar("", nil))
 	out := n.newOutput(newVar("", nil))
@@ -97,6 +98,7 @@ func newDeleteNode() *deleteNode {
 	n := &deleteNode{}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText("delete")
+	n.text.SetTextColor(color(&types.Func{}, true, false))
 	m := n.newInput(newVar("map", nil))
 	key := n.newInput(newVar("key", nil))
 	m.connsChanged = func() {
@@ -128,6 +130,7 @@ func newLenNode() *lenNode {
 	n := &lenNode{}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText("len")
+	n.text.SetTextColor(color(&types.Func{}, true, false))
 	in := n.newInput(newVar("", nil))
 	n.newOutput(newVar("", types.Typ[types.Int]))
 	in.connsChanged = func() {

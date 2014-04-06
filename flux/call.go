@@ -19,6 +19,7 @@ func newCallNode(obj types.Object) node {
 		n := &callNode{}
 		n.nodeBase = newNodeBase(n)
 		n.text.SetText("call")
+		n.text.SetTextColor(color(special{}, true, false))
 		n.addSeqPorts()
 		in := n.newInput(nil)
 		in.connsChanged = func() {
@@ -43,6 +44,7 @@ func newCallNode(obj types.Object) node {
 			name = "." + name
 		}
 		n.text.SetText(name)
+		n.text.SetTextColor(color(&types.Func{}, true, false))
 		n.addSeqPorts()
 		n.addPorts(sig)
 		return n
