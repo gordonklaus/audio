@@ -455,12 +455,6 @@ func newNode(b *block, obj types.Object, funcAsVal bool) node {
 	switch obj := obj.(type) {
 	case special:
 		switch obj.name {
-		case "=":
-			n = newValueNode(nil, true)
-		case "[]":
-			n = newIndexNode(false)
-		case "[]=":
-			n = newIndexNode(true)
 		case "break", "continue":
 			n = newBranchNode(obj.name)
 		case "call":
@@ -473,15 +467,17 @@ func newNode(b *block, obj types.Object, funcAsVal bool) node {
 			i := newIfNode(b.childArranged)
 			i.newBlock()
 			n = i
-		case "indirect":
-			n = newValueNode(nil, false)
 		case "loop":
 			n = newLoopNode(b.childArranged)
 		case "typeAssert":
 			n = newTypeAssertNode()
 		}
 	case *types.Func, *types.Builtin:
-		if isOperator(obj) {
+		if obj.GetName() == "[]" {
+			n = newIndexNode(false)
+		} else if obj.GetName() == "[]=" {
+			n = newIndexNode(true)
+		} else if isOperator(obj) {
 			n = newOperatorNode(obj)
 		} else if funcAsVal && obj.GetPkg() != nil { //Pkg==nil == builtin
 			n = newValueNode(obj, false)
@@ -489,7 +485,14 @@ func newNode(b *block, obj types.Object, funcAsVal bool) node {
 			n = newCallNode(obj)
 		}
 	case *types.Var, *types.Const, field, *localVar:
-		n = newValueNode(obj, false)
+		switch obj.GetName() {
+		default:
+			n = newValueNode(obj, false)
+		case "=":
+			n = newValueNode(nil, true)
+		case "*":
+			n = newValueNode(nil, false)
+		}
 	}
 	b.addNode(n)
 	MoveCenter(n, Center(b))

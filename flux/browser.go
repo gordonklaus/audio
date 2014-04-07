@@ -408,8 +408,11 @@ func (b browser) filteredObjs() (objs objects) {
 		}
 	} else {
 		if b.mode == browse {
-			for _, name := range []string{"=", "[]", "[]=", "break", "call", "continue", "convert", "func", "if", "indirect", "loop", "typeAssert"} {
+			for _, name := range []string{"break", "call", "continue", "convert", "func", "if", "loop", "typeAssert"} {
 				objs = append(objs, special{name: name})
+			}
+			for _, name := range []string{"=", "*"} {
+				objs = append(objs, newVar(name, nil))
 			}
 		}
 		pkgs := b.imports
@@ -428,7 +431,7 @@ func (b browser) filteredObjs() (objs objects) {
 			}
 			add(obj)
 		}
-		for _, op := range []string{"!", "&&", "||", "+", "-", "*", "/", "%", "&", "|", "^", "&^", "<<", ">>", "==", "!=", "<", "<=", ">", ">="} {
+		for _, op := range []string{"!", "&&", "||", "+", "-", "*", "/", "%", "&", "|", "^", "&^", "<<", ">>", "==", "!=", "<", "<=", ">", ">=", "[]", "[]="} {
 			add(types.NewFunc(0, nil, op, nil))
 		}
 		for _, t := range []*types.TypeName{protoPointer, protoArray, protoSlice, protoMap, protoChan, protoFunc, protoInterface, protoStruct} {

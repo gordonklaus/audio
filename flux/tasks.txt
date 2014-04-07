@@ -8,7 +8,7 @@ TODO
 - slice
 - builtins:  cap, close, complex, copy, imag, new, panic, real, recover
 - go, defer
-- len and capacity inputs for make, ok output for type assert (also mapget?) are optional, creatable by Comma key, deletable
+- len and capacity inputs for make, ok output for type assert (also mapget?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable
 - don't include sequencing ports in normal keyboard navigation.  access them by special keystrokes (Command-{Semicolon, Quote}?).  (update focusNearestView to ignore sequencing ports, too)
 - shortcuts:
   - on an in port, press '{' to create a composite literal of the port's type
@@ -20,10 +20,11 @@ TODO
 - give assignment node and in-place operators an output, for easier sequencing.
 - use graphics instead of text to identify pointers, slices, funcs, maps, etc in typeView
 - use different symbols for some operators (=, ≠, ≤, ≥, and, or, etc.)
-- color builtins and operators as specials (or indexNode as func).  in browser and in graph.
 - blinking cursor in gui.Text
 - make gui.Text change its appearance based on content when a validator is present.  give validator 3 states:  Acceptable, Intermediate, Invalid.
 - consider not lumping sequencing ports and connections in with the normal ones.  they can be annoying.  don't forget to consider them in the topological sorting order.
+- one-off local functions
+- case-insensitive sorting in browser?  currently, all lowercase names follow all upper case.  also, don't sort operators?
 - use go/parser and go/ast to validate basic literals
 - dimly highlight connected ports when a port is focused (or only when a key, e.g. Shift, is pressed) (but always for wireless conns)
 - don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.

@@ -29,7 +29,7 @@ func newIndexNode(set bool) *indexNode {
 		n.elem = n.newOutput(nil)
 		n.text.SetText("[]")
 	}
-	n.text.SetTextColor(color(special{}, true, false))
+	n.text.SetTextColor(color(&types.Func{}, true, false))
 	n.addSeqPorts()
 	n.connsChanged()
 	return n
