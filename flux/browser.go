@@ -431,7 +431,7 @@ func (b browser) filteredObjs() (objs objects) {
 			}
 			add(obj)
 		}
-		for _, op := range []string{"!", "&&", "||", "+", "-", "*", "/", "%", "&", "|", "^", "&^", "<<", ">>", "==", "!=", "<", "<=", ">", ">=", "[]", "[]="} {
+		for _, op := range []string{"!", "&&", "||", "+", "-", "*", "/", "%", "&", "|", "^", "&^", "<<", ">>", "==", "!=", "<", "<=", ">", ">=", "[]"} {
 			add(types.NewFunc(0, nil, op, nil))
 		}
 		for _, t := range []*types.TypeName{protoPointer, protoArray, protoSlice, protoMap, protoChan, protoFunc, protoInterface, protoStruct} {

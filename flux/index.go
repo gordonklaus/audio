@@ -6,6 +6,7 @@ package main
 
 import (
 	"code.google.com/p/gordon-go/go/types"
+	. "code.google.com/p/gordon-go/gui"
 )
 
 type indexNode struct {
@@ -24,11 +25,10 @@ func newIndexNode(set bool) *indexNode {
 	if set {
 		n.elem = n.newInput(nil)
 		n.elem.connsChanged = n.connsChanged
-		n.text.SetText("[]=")
 	} else {
 		n.elem = n.newOutput(nil)
-		n.text.SetText("[]")
 	}
+	n.text.SetText("[]")
 	n.text.SetTextColor(color(&types.Func{}, true, false))
 	n.addSeqPorts()
 	n.connsChanged()
@@ -50,6 +50,15 @@ func (n *indexNode) connectable(t types.Type, dst *port) bool {
 }
 
 func (n *indexNode) connsChanged() {
+	if n.set == n.elem.out {
+		n.removePortBase(n.elem)
+		if n.set {
+			n.elem = n.newInput(nil)
+			n.elem.connsChanged = n.connsChanged
+		} else {
+			n.elem = n.newOutput(nil)
+		}
+	}
 	t := inputType(n.x)
 	var key, elem types.Type
 	n.addressable = false
@@ -62,14 +71,14 @@ func (n *indexNode) connsChanged() {
 			elem = underlying(t.Elem).(*types.Array).Elem
 			if !n.set {
 				elem = &types.Pointer{Elem: elem}
-				n.addressable = true
 			}
+			n.addressable = true
 		case *types.Slice:
 			elem = t.Elem
 			if !n.set {
 				elem = &types.Pointer{Elem: elem}
-				n.addressable = true
 			}
+			n.addressable = true
 		case *types.Map:
 			key, elem = t.Key, t.Elem
 		}
@@ -78,14 +87,24 @@ func (n *indexNode) connsChanged() {
 	n.key.setType(key)
 	n.elem.setType(elem)
 
-	if !n.set {
-		_, isMap := underlying(t).(*types.Map)
-		if isMap && n.ok == nil {
-			n.ok = n.newOutput(newVar("ok", types.Typ[types.Bool]))
+	_, ok := underlying(t).(*types.Map)
+	if !n.set && ok && n.ok == nil {
+		n.ok = n.newOutput(newVar("ok", types.Typ[types.Bool]))
+	}
+	if (n.set || !ok) && n.ok != nil {
+		n.removePortBase(n.ok)
+		n.ok = nil
+	}
+}
+
+func (n *indexNode) KeyPress(event KeyEvent) {
+	if event.Text == "=" {
+		if _, ok := underlying(inputType(n.x)).(*types.Map); ok || n.addressable {
+			n.set = !n.set
+			n.connsChanged()
+			SetKeyFocus(n)
 		}
-		if !isMap && n.ok != nil {
-			n.removePortBase(n.ok)
-			n.ok = nil
-		}
+	} else {
+		n.nodeBase.KeyPress(event)
 	}
 }
