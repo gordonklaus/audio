@@ -21,10 +21,8 @@ func newIndexNode(set bool) *indexNode {
 	n.x = n.newInput(nil)
 	n.x.connsChanged = n.connsChanged
 	n.key = n.newInput(nil)
-	n.key.connsChanged = n.connsChanged
 	if set {
 		n.elem = n.newInput(nil)
-		n.elem.connsChanged = n.connsChanged
 	} else {
 		n.elem = n.newOutput(nil)
 	}
@@ -58,11 +56,11 @@ func (n *indexNode) connsChanged() {
 		n.removePortBase(n.elem)
 		if n.set {
 			n.elem = n.newInput(nil)
-			n.elem.connsChanged = n.connsChanged
 		} else {
 			n.elem = n.newOutput(nil)
 		}
 	}
+
 	t := inputType(n.x)
 	var key, elem types.Type
 	n.addressable = false
