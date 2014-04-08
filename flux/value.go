@@ -56,6 +56,10 @@ func (n *valueNode) connectable(t types.Type, dst *port) bool {
 		_, ok := underlying(t).(*types.Pointer)
 		return ok
 	}
+	if n.obj == nil && inputType(n.x) == nil {
+		// A connection whose destination is being edited may currently be connected to n.x.  It is temporarily disconnected during the call to connectable, but inputs (such as n.y) with dependent types are not updated, so we have to specifically check for this case here.
+		return false
+	}
 	return assignable(t, dst.obj.Type)
 }
 

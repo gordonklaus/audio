@@ -1,6 +1,5 @@
 TODO
 
-- don't use only assignable on dependent inputs' canConnect; recalculate input type, as it may be different based on the disconnect of current connection.
 - chan send, recv, close
 - type switch
 - select

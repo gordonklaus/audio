@@ -65,9 +65,14 @@ func newCallNode(obj types.Object) node {
 }
 
 func (n *callNode) connectable(t types.Type, dst *port) bool {
-	if n.obj == nil && dst == ins(n)[0] {
+	f := ins(n)[0]
+	if n.obj == nil && dst == f {
 		_, ok := underlying(t).(*types.Signature)
 		return ok
+	}
+	if n.obj == nil && inputType(f) == nil {
+		// A connection whose destination is being edited may currently be connected to f.  It is temporarily disconnected during the call to connectable, but inputs with dependent types are not updated, so we have to specifically check for this case here.
+		return false
 	}
 	return assignable(t, dst.obj.Type)
 }

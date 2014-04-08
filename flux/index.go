@@ -46,6 +46,10 @@ func (n *indexNode) connectable(t types.Type, dst *port) bool {
 		}
 		return ok
 	}
+	if inputType(n.x) == nil {
+		// A connection whose destination is being edited may currently be connected to n.x.  It is temporarily disconnected during the call to connectable, but inputs (such as n.elem) with dependent types are not updated, so we have to specifically check for this case here.
+		return false
+	}
 	return assignable(t, dst.obj.Type)
 }
 
