@@ -35,7 +35,7 @@ func loadFunc(obj types.Object) *funcNode {
 		}
 		decl := file.Decls[len(file.Decls)-1].(*ast.FuncDecl) // get param and result var names from the source, as the obj names might not match
 		if decl.Recv != nil {
-			r.src(decl.Recv.List[0].Names[0], f.inputsNode.newOutput(obj.GetType().(*types.Signature).Recv))
+			r.out(decl.Recv.List[0].Names[0], f.inputsNode.newOutput(obj.GetType().(*types.Signature).Recv))
 		}
 		r.fun(f, decl.Type, decl.Body)
 	} else {
@@ -70,7 +70,7 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 
 	for i, p := range typ.Params.List {
 		v := sig.Params[i]
-		r.src(p.Names[0], n.inputsNode.newOutput(v))
+		r.out(p.Names[0], n.inputsNode.newOutput(v))
 		f.addPkgRef(v.Type)
 	}
 	if sig.IsVariadic {
@@ -86,7 +86,7 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 	}
 	r.block(n.funcblk, body.List)
 	for i, p := range results {
-		r.dst(p.Names[0], n.outputsNode.newInput(sig.Results[i]))
+		r.in(p.Names[0], n.outputsNode.newInput(sig.Results[i]))
 	}
 }
 
@@ -99,20 +99,20 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 				case *ast.BinaryExpr:
 					n := newOperatorNode(types.NewFunc(0, nil, x.Op.String(), nil))
 					b.addNode(n)
-					r.dst(x.X, n.ins[0])
-					r.dst(x.Y, n.ins[1])
-					r.src(s.Lhs[0], n.outs[0])
+					r.in(x.X, n.ins[0])
+					r.in(x.Y, n.ins[1])
+					r.out(s.Lhs[0], n.outs[0])
 				case *ast.CallExpr:
 					if p, ok := x.Fun.(*ast.ParenExpr); ok { // writer puts conversions in parens for easy recognition
 						n := newConvertNode()
 						b.addNode(n)
 						n.setType(r.typ(p.X))
-						r.dst(x.Args[0], n.ins[0])
-						r.src(s.Lhs[0], n.outs[0])
+						r.in(x.Args[0], n.ins[0])
+						r.out(s.Lhs[0], n.outs[0])
 					} else {
 						n := r.call(b, x, s)
 						for i, p := range outs(n) {
-							r.src(s.Lhs[i], p)
+							r.out(s.Lhs[i], p)
 						}
 					}
 				case *ast.CompositeLit:
@@ -121,7 +121,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					n := newFuncNode(nil, b.childArranged)
 					b.addNode(n)
 					n.output.setType(r.typ(x.Type))
-					r.src(s.Lhs[0], n.output)
+					r.out(s.Lhs[0], n.output)
 					r.fun(n, x.Type, x.Body)
 				case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
 					r.value(b, x, s.Lhs[0], false, s)
@@ -131,9 +131,9 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					n := newTypeAssertNode()
 					b.addNode(n)
 					n.setType(r.typ(x.Type))
-					r.dst(x.X, n.ins[0])
-					r.src(s.Lhs[0], n.outs[0])
-					r.src(s.Lhs[1], n.outs[1])
+					r.in(x.X, n.ins[0])
+					r.out(s.Lhs[0], n.outs[0])
+					r.out(s.Lhs[1], n.outs[1])
 				case *ast.UnaryExpr:
 					switch x.Op {
 					case token.AND:
@@ -148,12 +148,12 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					case token.NOT:
 						n := newOperatorNode(types.NewFunc(0, nil, x.Op.String(), nil))
 						b.addNode(n)
-						r.dst(x.X, n.ins[0])
-						r.src(s.Lhs[0], n.outs[0])
+						r.in(x.X, n.ins[0])
+						r.out(s.Lhs[0], n.outs[0])
 					case token.ARROW:
 						n := r.sendrecv(b, x.X, nil, s)
-						r.src(s.Lhs[0], n.elem)
-						r.src(s.Lhs[1], n.ok)
+						r.out(s.Lhs[0], n.elem)
+						r.out(s.Lhs[1], n.ok)
 					}
 				}
 			} else {
@@ -200,7 +200,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					r.scope.Insert(newVar(name, r.typ(v.Type))) // temporary local var has nil Pkg
 					r.conns[name] = []*connection{}
 				} else {
-					r.src(v.Names[0], b.node.(*loopNode).inputsNode.outs[1])
+					r.out(v.Names[0], b.node.(*loopNode).inputsNode.outs[1])
 				}
 			case token.CONST:
 				switch x := v.Values[0].(type) {
@@ -216,7 +216,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 						text, _ := strconv.Unquote(x.Value)
 						n.text.SetText(text)
 					}
-					r.src(v.Names[0], n.outs[0])
+					r.out(v.Names[0], n.outs[0])
 				case *ast.Ident, *ast.SelectorExpr:
 					r.value(b, x, v.Names[0], false, s)
 				}
@@ -232,10 +232,10 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			n := newLoopNode(b.childArranged)
 			b.addNode(n)
 			if s.Cond != nil {
-				r.dst(s.Cond.(*ast.BinaryExpr).Y, n.input)
+				r.in(s.Cond.(*ast.BinaryExpr).Y, n.input)
 			}
 			if s.Init != nil {
-				r.src(s.Init.(*ast.AssignStmt).Lhs[0], n.inputsNode.outs[0])
+				r.out(s.Init.(*ast.AssignStmt).Lhs[0], n.inputsNode.outs[0])
 			}
 			r.block(n.loopblk, s.Body.List)
 			r.seq(n, s)
@@ -246,7 +246,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 				b, cond := n.newBlock()
 				switch s2 := s.(type) {
 				case *ast.IfStmt:
-					r.dst(s2.Cond, cond)
+					r.in(s2.Cond, cond)
 					r.block(b, s2.Body.List)
 					s = s2.Else
 				case *ast.BlockStmt:
@@ -258,10 +258,10 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 		case *ast.RangeStmt:
 			n := newLoopNode(b.childArranged)
 			b.addNode(n)
-			r.dst(s.X, n.input)
-			r.src(s.Key, n.inputsNode.outs[0])
+			r.in(s.X, n.input)
+			r.out(s.Key, n.inputsNode.outs[0])
 			if s.Value != nil {
-				r.src(s.Value, n.inputsNode.outs[1])
+				r.out(s.Value, n.inputsNode.outs[1])
 			}
 			r.block(n.loopblk, s.Body.List)
 			r.seq(n, s)
@@ -279,14 +279,14 @@ func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
 	b.addNode(n)
 	switch x := x.(type) {
 	case *ast.SelectorExpr:
-		r.dst(x.X, n.x)
+		r.in(x.X, n.x)
 	case *ast.StarExpr:
-		r.dst(x.X, n.x)
+		r.in(x.X, n.x)
 	}
 	if set {
-		r.dst(y, n.y)
+		r.in(y, n.y)
 	} else {
-		r.src(y, n.y)
+		r.out(y, n.y)
 	}
 	r.seq(n, an)
 }
@@ -327,7 +327,7 @@ func (r *reader) call(b *block, x *ast.CallExpr, s ast.Stmt) node {
 				in.valView.ellipsis = true
 			}
 		}
-		r.dst(arg, ins(n)[i])
+		r.in(arg, ins(n)[i])
 	}
 	r.seq(n, s)
 	return n
@@ -347,27 +347,27 @@ elts:
 		field := name(elt.Key)
 		for _, in := range n.ins {
 			if in.obj.GetName() == field {
-				r.dst(elt.Value, in)
+				r.in(elt.Value, in)
 				continue elts
 			}
 		}
 		panic("no field matching " + field)
 	}
-	r.src(s.Lhs[0], n.outs[0])
+	r.out(s.Lhs[0], n.outs[0])
 }
 
 func (r *reader) index(b *block, x *ast.IndexExpr, y ast.Expr, set bool, s *ast.AssignStmt) {
 	n := newIndexNode(set)
 	b.addNode(n)
-	r.dst(x.X, n.x)
-	r.dst(x.Index, n.key)
+	r.in(x.X, n.x)
+	r.in(x.Index, n.key)
 	if set {
-		r.dst(y, n.elem)
+		r.in(y, n.elem)
 	} else {
-		r.src(y, n.elem)
+		r.out(y, n.elem)
 	}
 	if len(s.Lhs) == 2 {
-		r.src(s.Lhs[1], n.ok)
+		r.out(s.Lhs[1], n.ok)
 	}
 	r.seq(n, s)
 }
@@ -375,9 +375,9 @@ func (r *reader) index(b *block, x *ast.IndexExpr, y ast.Expr, set bool, s *ast.
 func (r *reader) sendrecv(b *block, ch, elem ast.Expr, s ast.Stmt) *chanNode {
 	n := newChanNode(elem != nil)
 	b.addNode(n)
-	r.dst(ch, n.ch)
+	r.in(ch, n.ch)
 	if n.send {
-		r.dst(elem, n.elem)
+		r.in(elem, n.elem)
 	}
 	r.seq(n, s)
 	return n
@@ -426,21 +426,21 @@ func (r *reader) typ(x ast.Expr) types.Type {
 	return t
 }
 
-func (r *reader) src(x ast.Expr, src *port) {
-	r.ports[name(x)] = src
+func (r *reader) out(x ast.Expr, out *port) {
+	r.ports[name(x)] = out
 }
 
-func (r *reader) dst(x ast.Expr, dst *port) {
+func (r *reader) in(x ast.Expr, in *port) {
 	name := name(x)
 	for _, c := range r.conns[name] {
-		if !c.connectable(c.src, dst) {
+		if !c.connectable(c.src, in) {
 			println("not connectable:")
 			printf("%#v\n", c.src.node)
-			printf("%#v\n\n", dst.node)
+			printf("%#v\n\n", in.node)
 		}
-		c.setDst(dst)
+		c.setDst(in)
 	}
-	r.ports[name] = dst //for feedback conns
+	r.ports[name] = in //for feedback conns
 }
 
 func (r *reader) seq(n node, an ast.Node) {
