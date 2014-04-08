@@ -37,6 +37,8 @@ func (n *indexNode) connectable(t types.Type, dst *port) bool {
 	if dst == n.x {
 		ok := false
 		switch t := underlying(t).(type) {
+		case *types.Basic:
+			ok = t.Info&types.IsString != 0
 		case *types.Array, *types.Slice, *types.Map:
 			ok = true
 		case *types.Pointer:
@@ -61,12 +63,14 @@ func (n *indexNode) connsChanged() {
 		}
 	}
 
-	t := inputType(n.x)
+	t := untypedToTyped(inputType(n.x))
 	var key, elem types.Type
 	n.addressable = false
 	if t != nil {
 		key = types.Typ[types.Int]
 		switch t := underlying(t).(type) {
+		case *types.Basic:
+			elem = types.Typ[types.Byte]
 		case *types.Array:
 			elem = t.Elem
 		case *types.Pointer:
