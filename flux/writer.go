@@ -251,9 +251,25 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			}
 			results, existing := w.results(n, vars)
 			switch n := n.(type) {
-			case *portsNode:
-				// only inputsNodes are in the order (1st)
-				// portsNode is included here so that assignExisting is called for it, to handle assignments of func args and loop vars
+			case *appendNode:
+				if len(ins[0].conns) > 0 && len(outs(n)[0].conns) > 0 {
+					if n.ellipsis() {
+						args[1] += "..."
+					}
+					w.indent("%s := append(%s)", results[0], strings.Join(args, ", "))
+				}
+				w.seq(n)
+			case *basicLiteralNode:
+				if len(results) > 0 {
+					val := n.text.GetText()
+					switch n.kind {
+					case token.STRING:
+						val = strconv.Quote(val)
+					case token.CHAR:
+						val = strconv.QuoteRune([]rune(val)[0])
+					}
+					w.indent("const %s = %s\n", results[0], val)
+				}
 			case *callNode:
 				if !(n.obj == nil && len(args) == 0) {
 					f := ""
@@ -277,17 +293,29 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.write("%s(%s)", f, strings.Join(args, ", "))
 					w.seq(n)
 				}
-			case *appendNode:
-				if len(ins[0].conns) > 0 && len(outs(n)[0].conns) > 0 {
-					if n.ellipsis() {
-						args[1] += "..."
-					}
-					w.indent("%s := append(%s)", results[0], strings.Join(args, ", "))
+			case *convertNode:
+				if len(ins[0].conns) > 0 && len(results) > 0 {
+					w.indent("%s := (%s)(%s)\n", results[0], w.typ(*n.typ.typ), args[0]) // parenthesize type for easy recognition in reader
 				}
-				w.seq(n)
 			case *deleteNode:
 				if len(ins[0].conns) > 0 {
 					w.indent("delete(%s, %s)", args[0], args[1])
+				}
+				w.seq(n)
+			case *funcNode:
+				if len(results) > 0 {
+					w.indent("%s := ", results[0])
+					w.fun(n, vars)
+				}
+			case *indexNode:
+				if n.set {
+					w.indent("%s[%s] = %s", args[0], args[1], args[2])
+				} else if len(results) > 0 {
+					amp := ""
+					if n.addressable {
+						amp = "&"
+					}
+					w.indent("%s := %s%s[%s]", strings.Join(results, ", "), amp, args[0], args[1])
 				}
 				w.seq(n)
 			case *lenNode:
@@ -314,27 +342,12 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				} else {
 					existing = nil
 				}
-			case *indexNode:
-				if n.set {
-					w.indent("%s[%s] = %s", args[0], args[1], args[2])
-				} else if len(results) > 0 {
-					amp := ""
-					if n.addressable {
-						amp = "&"
-					}
-					w.indent("%s := %s%s[%s]", strings.Join(results, ", "), amp, args[0], args[1])
-				}
-				w.seq(n)
-			case *basicLiteralNode:
-				if len(results) > 0 {
-					val := n.text.GetText()
-					switch n.kind {
-					case token.STRING:
-						val = strconv.Quote(val)
-					case token.CHAR:
-						val = strconv.QuoteRune([]rune(val)[0])
-					}
-					w.indent("const %s = %s\n", results[0], val)
+			case *portsNode:
+				// only inputsNodes are in the order (1st)
+				// portsNode is included here so that assignExisting is called for it, to handle assignments of func args and loop vars
+			case *typeAssertNode:
+				if len(ins[0].conns) > 0 && len(results) > 0 {
+					w.indent("%s := %s.(%s)\n", strings.Join(results, ", "), args[0], w.typ(*n.typ.typ))
 				}
 			case *valueNode:
 				if n.set && len(args) > 0 || len(results) > 0 {
@@ -370,21 +383,11 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					}
 					w.seq(n)
 				}
-			case *convertNode:
-				if len(ins[0].conns) > 0 && len(results) > 0 {
-					w.indent("%s := (%s)(%s)\n", results[0], w.typ(*n.typ.typ), args[0]) // parenthesize type for easy recognition in reader
-				}
-			case *typeAssertNode:
-				if len(ins[0].conns) > 0 && len(results) > 0 {
-					w.indent("%s := %s.(%s)\n", strings.Join(results, ", "), args[0], w.typ(*n.typ.typ))
-				}
-			case *funcNode:
-				if len(results) > 0 {
-					w.indent("%s := ", results[0])
-					w.fun(n, vars)
-				}
 			}
 			w.assignExisting(existing)
+		case *branchNode:
+			w.indent(n.text.GetText())
+			w.seq(n)
 		case *compositeLiteralNode:
 			results, existing := w.results(n, vars)
 			if len(results) > 0 {
@@ -486,9 +489,6 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			}
 			w.block(n.loopblk, vars)
 			w.indent("}")
-			w.seq(n)
-		case *branchNode:
-			w.indent(n.text.GetText())
 			w.seq(n)
 		}
 	}

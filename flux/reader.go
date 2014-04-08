@@ -96,10 +96,12 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 		case *ast.AssignStmt:
 			if s.Tok == token.DEFINE {
 				switch x := s.Rhs[0].(type) {
-				case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
-					r.value(b, x, s.Lhs[0], false, s)
-				case *ast.CompositeLit:
-					r.compositeLit(b, x, false, s)
+				case *ast.BinaryExpr:
+					n := newOperatorNode(types.NewFunc(0, nil, x.Op.String(), nil))
+					b.addNode(n)
+					r.dst(x.X, n.ins[0])
+					r.dst(x.Y, n.ins[1])
+					r.src(s.Lhs[0], n.outs[0])
 				case *ast.CallExpr:
 					n := r.callOrConvert(b, x)
 					outs := outs(n)
@@ -107,8 +109,25 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 						r.src(lhs, outs[i])
 					}
 					r.seq(n, s)
+				case *ast.CompositeLit:
+					r.compositeLit(b, x, false, s)
+				case *ast.FuncLit:
+					n := newFuncNode(nil, b.childArranged)
+					b.addNode(n)
+					n.output.setType(r.typ(x.Type))
+					r.src(s.Lhs[0], n.output)
+					r.fun(n, x.Type, x.Body)
+				case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
+					r.value(b, x, s.Lhs[0], false, s)
 				case *ast.IndexExpr:
 					r.index(b, x, s.Lhs[0], false, s)
+				case *ast.TypeAssertExpr:
+					n := newTypeAssertNode()
+					b.addNode(n)
+					n.setType(r.typ(x.Type))
+					r.dst(x.X, n.ins[0])
+					r.src(s.Lhs[0], n.outs[0])
+					r.src(s.Lhs[1], n.outs[1])
 				case *ast.UnaryExpr:
 					switch x.Op {
 					case token.AND:
@@ -126,25 +145,6 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 						r.dst(x.X, n.ins[0])
 						r.src(s.Lhs[0], n.outs[0])
 					}
-				case *ast.BinaryExpr:
-					n := newOperatorNode(types.NewFunc(0, nil, x.Op.String(), nil))
-					b.addNode(n)
-					r.dst(x.X, n.ins[0])
-					r.dst(x.Y, n.ins[1])
-					r.src(s.Lhs[0], n.outs[0])
-				case *ast.TypeAssertExpr:
-					n := newTypeAssertNode()
-					b.addNode(n)
-					n.setType(r.typ(x.Type))
-					r.dst(x.X, n.ins[0])
-					r.src(s.Lhs[0], n.outs[0])
-					r.src(s.Lhs[1], n.outs[1])
-				case *ast.FuncLit:
-					n := newFuncNode(nil, b.childArranged)
-					b.addNode(n)
-					n.output.setType(r.typ(x.Type))
-					r.src(s.Lhs[0], n.output)
-					r.fun(n, x.Type, x.Body)
 				}
 			} else {
 				lh := s.Lhs[0]
@@ -170,6 +170,10 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					}
 				}
 			}
+		case *ast.BranchStmt:
+			n := newBranchNode(s.Tok.String())
+			b.addNode(n)
+			r.seq(n, s)
 		case *ast.DeclStmt:
 			decl := s.Decl.(*ast.GenDecl)
 			v := decl.Specs[0].(*ast.ValueSpec)
@@ -207,6 +211,8 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					r.value(b, x, v.Names[0], false, s)
 				}
 			}
+		case *ast.ExprStmt:
+			r.seq(r.callOrConvert(b, s.X.(*ast.CallExpr)), s)
 		case *ast.ForStmt:
 			n := newLoopNode(b.childArranged)
 			b.addNode(n)
@@ -243,12 +249,6 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 				r.src(s.Value, n.inputsNode.outs[1])
 			}
 			r.block(n.loopblk, s.Body.List)
-			r.seq(n, s)
-		case *ast.ExprStmt:
-			r.seq(r.callOrConvert(b, s.X.(*ast.CallExpr)), s)
-		case *ast.BranchStmt:
-			n := newBranchNode(s.Tok.String())
-			b.addNode(n)
 			r.seq(n, s)
 		}
 	}
