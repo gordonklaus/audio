@@ -475,6 +475,8 @@ func newNode(b *block, obj types.Object, funcAsVal bool) node {
 	case *types.Func, *types.Builtin:
 		if obj.GetName() == "[]" {
 			n = newIndexNode(false)
+		} else if obj.GetName() == "[:]" {
+			n = newSliceNode()
 		} else if obj.GetName() == "<-" {
 			n = newChanNode(true)
 		} else if isOperator(obj) {

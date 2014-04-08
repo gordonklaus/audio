@@ -364,6 +364,14 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			case *portsNode:
 				// only inputsNodes are in the order (1st)
 				// portsNode is included here so that assignExisting is called for it, to handle assignments of func args and loop vars
+			case *sliceNode:
+				if len(results) > 0 {
+					w.indent("%s := %s[%s", results[0], args[0], strings.Join(args[1:], ":"))
+					if n.high == nil {
+						w.write(":")
+					}
+					w.write("]\n")
+				}
 			case *typeAssertNode:
 				if len(args) > 0 && len(results) > 0 {
 					w.indent("%s := %s.(%s)\n", strings.Join(results, ", "), args[0], w.typ(*n.typ.typ))

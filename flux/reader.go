@@ -127,6 +127,22 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					r.value(b, x, s.Lhs[0], false, s)
 				case *ast.IndexExpr:
 					r.index(b, x, s.Lhs[0], false, s)
+				case *ast.SliceExpr:
+					n := newSliceNode()
+					b.addNode(n)
+					r.in(x.X, n.x)
+					r.in(x.Low, n.low)
+					if x.High == nil {
+						n.removePortBase(n.high)
+						n.high = nil
+					} else {
+						r.in(x.High, n.high)
+					}
+					if x.Max != nil {
+						n.max = n.newInput(newVar("max", types.Typ[types.Int]))
+						r.in(x.Max, n.max)
+					}
+					r.out(s.Lhs[0], n.y)
 				case *ast.TypeAssertExpr:
 					n := newTypeAssertNode()
 					b.addNode(n)
