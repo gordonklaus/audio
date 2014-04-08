@@ -98,7 +98,7 @@ func (n *callNode) addPorts(sig *types.Signature) {
 func (n *callNode) KeyPress(event KeyEvent) {
 	if i, v := n.variadic(); v != nil {
 		ins := ins(n)
-		if event.Key == KeyComma {
+		if event.Text == "," {
 			if n.ellipsis() {
 				n.removePortBase(ins[i])
 			}

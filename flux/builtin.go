@@ -54,7 +54,7 @@ func (n *appendNode) KeyPress(event KeyEvent) {
 	ins := ins(n)
 	v := ins[0].obj
 	t, ok := v.Type.(*types.Slice)
-	if ok && event.Key == KeyComma {
+	if ok && event.Text == "," {
 		if n.ellipsis() {
 			n.removePortBase(ins[1])
 		}

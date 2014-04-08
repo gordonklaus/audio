@@ -582,7 +582,7 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 		SetKeyFocus(l)
 	} else if f, ok := n.blk.node.(*funcNode); ok && f.literal && event.Key == KeyDown && n.out {
 		SetKeyFocus(f)
-	} else if n.editable && event.Key == KeyComma {
+	} else if n.editable && event.Text == "," {
 		f := n.blk.node.(*funcNode)
 		sig := f.sig()
 
