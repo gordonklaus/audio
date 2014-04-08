@@ -373,10 +373,12 @@ func (c *connection) toggleHidden() {
 				} else {
 					c.focus(c.focusSrc)
 				}
+				srctxt.TextChanged = nil
 			}
 			srctxt.Reject = func() {
 				c.toggleHidden()
 				c.focus(c.focusSrc)
+				srctxt.TextChanged = nil
 			}
 			SetKeyFocus(srctxt)
 		}

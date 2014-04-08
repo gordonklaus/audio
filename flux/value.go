@@ -43,7 +43,7 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 		n.y = n.newOutput(nil)
 	}
 	switch obj.(type) {
-	case *types.Var, field, *localVar:
+	case *types.Var, field, *localVar, nil:
 		n.addSeqPorts()
 	default:
 	}

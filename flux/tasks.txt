@@ -1,8 +1,6 @@
 TODO
 
 - don't use only assignable on dependent inputs' canConnect; recalculate input type, as it may be different based on the disconnect of current connection.
-- consider removing map support from indexNode; add map.{get, set} pseudo-methods (or mapget/mapset builtins), rename delete.
-- consider removing settability from valueNode and indexNode.
 - chan send, recv, close
 - type switch
 - select
@@ -12,7 +10,8 @@ TODO
 - len and capacity inputs for make, ok output for type assert (also mapget?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable
 - don't include sequencing ports in normal keyboard navigation.  access them by special keystrokes (Command-{Semicolon, Quote}?).  (update focusNearestView to ignore sequencing ports, too)
 - shortcuts:
-  - on an in port, press '{' to create a composite literal of the port's type
+  - on an input, press '{' to create a composite literal of the port's type
+  - on a pointer output, press '=' to create an assignment node
   - on a node or connection, press cmd-R(cmd-I?) to bring up a browser with funcs and ops suitable to insert, i.e., having a signature compatible with the existing node's connections
 - auto pan when key focus changes
 - remove localVar
