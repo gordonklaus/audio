@@ -293,6 +293,24 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.write("%s(%s)", f, strings.Join(args, ", "))
 					w.seq(n)
 				}
+			case *chanNode:
+				if len(args) > 0 {
+					if n.send {
+						w.indent("%s <- %s", args[0], args[1])
+					} else {
+						w.indent("")
+						if len(results) > 0 {
+							w.write(strings.Join(results, ", ") + " := ")
+						}
+						w.write("<-%s", args[0])
+					}
+					w.seq(n)
+				}
+			case *closeNode:
+				if len(ins[0].conns) > 0 {
+					w.indent("close(%s)", args[0])
+					w.seq(n)
+				}
 			case *convertNode:
 				if len(ins[0].conns) > 0 && len(results) > 0 {
 					w.indent("%s := (%s)(%s)\n", results[0], w.typ(*n.typ.typ), args[0]) // parenthesize type for easy recognition in reader

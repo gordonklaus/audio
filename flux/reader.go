@@ -108,7 +108,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					for i, lhs := range s.Lhs {
 						r.src(lhs, outs[i])
 					}
-					r.seq(n, s)
+					r.seq(n, s) // TODO: does a convertNode need sequencing?  if not, move r.seq into r.callOrConvert
 				case *ast.CompositeLit:
 					r.compositeLit(b, x, false, s)
 				case *ast.FuncLit:
@@ -144,6 +144,10 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 						b.addNode(n)
 						r.dst(x.X, n.ins[0])
 						r.src(s.Lhs[0], n.outs[0])
+					case token.ARROW:
+						n := r.sendrecv(b, x.X, nil, s)
+						r.src(s.Lhs[0], n.elem)
+						r.src(s.Lhs[1], n.ok)
 					}
 				}
 			} else {
@@ -212,7 +216,12 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 				}
 			}
 		case *ast.ExprStmt:
-			r.seq(r.callOrConvert(b, s.X.(*ast.CallExpr)), s)
+			switch x := s.X.(type) {
+			case *ast.CallExpr:
+				r.seq(r.callOrConvert(b, x), s)
+			case *ast.UnaryExpr:
+				r.sendrecv(b, x.X, nil, s)
+			}
 		case *ast.ForStmt:
 			n := newLoopNode(b.childArranged)
 			b.addNode(n)
@@ -250,6 +259,8 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			}
 			r.block(n.loopblk, s.Body.List)
 			r.seq(n, s)
+		case *ast.SendStmt:
+			r.sendrecv(b, s.Chan, s.Value, s)
 		}
 	}
 }
@@ -360,6 +371,17 @@ func (r *reader) index(b *block, x *ast.IndexExpr, y ast.Expr, set bool, s *ast.
 		r.src(s.Lhs[1], n.ok)
 	}
 	r.seq(n, s)
+}
+
+func (r *reader) sendrecv(b *block, ch, elem ast.Expr, s ast.Stmt) *chanNode {
+	n := newChanNode(elem != nil)
+	b.addNode(n)
+	r.dst(ch, n.ch)
+	if n.send {
+		r.dst(elem, n.elem)
+	}
+	r.seq(n, s)
+	return n
 }
 
 func (r *reader) obj(x ast.Expr) types.Object {

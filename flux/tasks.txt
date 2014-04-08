@@ -1,12 +1,11 @@
 TODO
 
-- chan send, recv, close
 - type switch
 - select
 - slice
-- builtins:  cap, close, complex, copy, imag, new, panic, real, recover
+- builtins:  cap, complex, copy, imag, new, panic, real, recover
 - go, defer
-- len and capacity inputs for make, ok output for type assert (also mapget?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable
+- len and capacity inputs for make, len and max input for slice, ok output for type assert (also mapget and chanrecv?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable
 - don't include sequencing ports in normal keyboard navigation.  access them by special keystrokes (Command-{Semicolon, Quote}?).  (update focusNearestView to ignore sequencing ports, too)
 - shortcuts:
   - on an input, press '{' to create a composite literal of the port's type

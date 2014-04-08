@@ -53,6 +53,8 @@ func newCallNode(obj types.Object) node {
 	switch obj.GetName() {
 	case "append":
 		return newAppendNode()
+	case "close":
+		return newCloseNode()
 	case "delete":
 		return newDeleteNode()
 	case "len":
