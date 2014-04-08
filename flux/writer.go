@@ -257,8 +257,8 @@ func (w *writer) block(b *block, vars map[*port]string) {
 						args[1] += "..."
 					}
 					w.indent("%s := append(%s)", results[0], strings.Join(args, ", "))
+					w.seq(n)
 				}
-				w.seq(n)
 			case *basicLiteralNode:
 				if len(results) > 0 {
 					val := n.text.GetText()
@@ -300,29 +300,30 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			case *deleteNode:
 				if len(ins[0].conns) > 0 {
 					w.indent("delete(%s, %s)", args[0], args[1])
+					w.seq(n)
 				}
-				w.seq(n)
 			case *funcNode:
 				if len(results) > 0 {
 					w.indent("%s := ", results[0])
 					w.fun(n, vars)
 				}
 			case *indexNode:
-				if n.set {
+				if n.set && len(args) > 0 {
 					w.indent("%s[%s] = %s", args[0], args[1], args[2])
+					w.seq(n)
 				} else if len(results) > 0 {
 					amp := ""
 					if n.addressable {
 						amp = "&"
 					}
 					w.indent("%s := %s%s[%s]", strings.Join(results, ", "), amp, args[0], args[1])
+					w.seq(n)
 				}
-				w.seq(n)
 			case *lenNode:
 				if len(results) > 0 && len(ins[0].conns) > 0 {
 					w.indent("%s := len(%s)", results[0], args[0])
+					w.seq(n)
 				}
-				w.seq(n)
 			case *makeNode:
 				if len(results) > 0 {
 					w.indent("%s := make(%s, %s)\n", results[0], w.typ(*n.typ.typ), strings.Join(args, ", "))
