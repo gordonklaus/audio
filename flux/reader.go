@@ -103,12 +103,18 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					r.dst(x.Y, n.ins[1])
 					r.src(s.Lhs[0], n.outs[0])
 				case *ast.CallExpr:
-					n := r.callOrConvert(b, x)
-					outs := outs(n)
-					for i, lhs := range s.Lhs {
-						r.src(lhs, outs[i])
+					if p, ok := x.Fun.(*ast.ParenExpr); ok { // writer puts conversions in parens for easy recognition
+						n := newConvertNode()
+						b.addNode(n)
+						n.setType(r.typ(p.X))
+						r.dst(x.Args[0], n.ins[0])
+						r.src(s.Lhs[0], n.outs[0])
+					} else {
+						n := r.call(b, x, s)
+						for i, p := range outs(n) {
+							r.src(s.Lhs[i], p)
+						}
 					}
-					r.seq(n, s) // TODO: does a convertNode need sequencing?  if not, move r.seq into r.callOrConvert
 				case *ast.CompositeLit:
 					r.compositeLit(b, x, false, s)
 				case *ast.FuncLit:
@@ -218,7 +224,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 		case *ast.ExprStmt:
 			switch x := s.X.(type) {
 			case *ast.CallExpr:
-				r.seq(r.callOrConvert(b, x), s)
+				r.call(b, x, s)
 			case *ast.UnaryExpr:
 				r.sendrecv(b, x.X, nil, s)
 			}
@@ -285,15 +291,7 @@ func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
 	r.seq(n, an)
 }
 
-func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
-	if p, ok := x.Fun.(*ast.ParenExpr); ok { // writer puts conversions in parens for easy recognition
-		n := newConvertNode()
-		b.addNode(n)
-		n.setType(r.typ(p.X))
-		r.dst(x.Args[0], n.ins[0])
-		return n
-	}
-
+func (r *reader) call(b *block, x *ast.CallExpr, s ast.Stmt) node {
 	obj := r.obj(x.Fun)
 	n := newCallNode(obj)
 	b.addNode(n)
@@ -331,6 +329,7 @@ func (r *reader) callOrConvert(b *block, x *ast.CallExpr) node {
 		}
 		r.dst(arg, ins(n)[i])
 	}
+	r.seq(n, s)
 	return n
 }
 
