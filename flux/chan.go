@@ -24,7 +24,7 @@ func newChanNode(send bool) *chanNode {
 		n.elem = n.newInput(nil)
 	} else {
 		n.elem = n.newOutput(nil)
-		n.ok = n.newOutput(newVar("ok", types.Typ[types.Bool]))
+		n.ok = n.newOutput(newVar("ok", nil))
 	}
 	n.text.SetText("<-")
 	n.text.SetTextColor(color(&types.Func{}, true, false))
@@ -63,17 +63,21 @@ func (n *chanNode) connsChanged() {
 			n.removePortBase(n.ok)
 		} else {
 			n.elem = n.newOutput(nil)
-			n.ok = n.newOutput(newVar("ok", types.Typ[types.Bool]))
+			n.ok = n.newOutput(newVar("ok", nil))
 		}
 	}
 
 	t := inputType(n.ch)
-	var elem types.Type
+	var elem, ok types.Type
 	if t != nil {
 		elem = underlying(t).(*types.Chan).Elem
+		ok = types.Typ[types.Bool]
 	}
 	n.ch.setType(t)
 	n.elem.setType(elem)
+	if !n.send {
+		n.ok.setType(ok)
+	}
 }
 
 func (n *chanNode) KeyPress(event KeyEvent) {

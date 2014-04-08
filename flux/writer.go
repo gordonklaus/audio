@@ -252,7 +252,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			results, existing := w.results(n, vars)
 			switch n := n.(type) {
 			case *appendNode:
-				if len(ins[0].conns) > 0 && len(outs(n)[0].conns) > 0 {
+				if len(args) > 0 && len(results) > 0 {
 					if n.ellipsis() {
 						args[1] += "..."
 					}
@@ -307,16 +307,16 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.seq(n)
 				}
 			case *closeNode:
-				if len(ins[0].conns) > 0 {
+				if len(args) > 0 {
 					w.indent("close(%s)", args[0])
 					w.seq(n)
 				}
 			case *convertNode:
-				if len(ins[0].conns) > 0 && len(results) > 0 {
+				if len(args) > 0 && len(results) > 0 {
 					w.indent("%s := (%s)(%s)\n", results[0], w.typ(*n.typ.typ), args[0]) // parenthesize type for easy recognition in reader
 				}
 			case *deleteNode:
-				if len(ins[0].conns) > 0 {
+				if len(args) > 0 {
 					w.indent("delete(%s, %s)", args[0], args[1])
 					w.seq(n)
 				}
@@ -338,7 +338,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.seq(n)
 				}
 			case *lenNode:
-				if len(results) > 0 && len(ins[0].conns) > 0 {
+				if len(args) > 0 && len(results) > 0 {
 					w.indent("%s := len(%s)", results[0], args[0])
 					w.seq(n)
 				}
@@ -365,7 +365,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				// only inputsNodes are in the order (1st)
 				// portsNode is included here so that assignExisting is called for it, to handle assignments of func args and loop vars
 			case *typeAssertNode:
-				if len(ins[0].conns) > 0 && len(results) > 0 {
+				if len(args) > 0 && len(results) > 0 {
 					w.indent("%s := %s.(%s)\n", strings.Join(results, ", "), args[0], w.typ(*n.typ.typ))
 				}
 			case *valueNode:

@@ -132,9 +132,15 @@ func newLenNode() *lenNode {
 	n.text.SetText("len")
 	n.text.SetTextColor(color(&types.Func{}, true, false))
 	in := n.newInput(newVar("", nil))
-	n.newOutput(newVar("", types.Typ[types.Int]))
+	len := n.newOutput(newVar("", nil))
 	in.connsChanged = func() {
-		in.setType(inputType(in))
+		t := inputType(in)
+		in.setType(t)
+		if t != nil {
+			len.setType(types.Typ[types.Int])
+		} else {
+			len.setType(nil)
+		}
 	}
 	n.addSeqPorts()
 	return n
@@ -143,7 +149,9 @@ func newLenNode() *lenNode {
 func (n *lenNode) connectable(t types.Type, dst *port) bool {
 	ok := false
 	switch t := underlying(t).(type) {
-	case *types.Array, *types.Slice:
+	case *types.Basic:
+		ok = t.Info&types.IsString != 0
+	case *types.Array, *types.Slice, *types.Map, *types.Chan:
 		ok = true
 	case *types.Pointer:
 		_, ok = underlying(t.Elem).(*types.Array)

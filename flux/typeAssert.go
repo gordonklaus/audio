@@ -18,12 +18,20 @@ func newTypeAssertNode() *typeAssertNode {
 	n := &typeAssertNode{}
 	n.nodeBase = newNodeBase(n)
 	in := n.newInput(nil)
-	in.connsChanged = func() {
-		in.setType(inputType(in))
-	}
 	out := n.newOutput(nil)
-	n.newOutput(newVar("ok", types.Typ[types.Bool]))
-	n.typ = newTypeView(&out.obj.Type)
+	ok := n.newOutput(newVar("ok", nil))
+	in.connsChanged = func() {
+		t := inputType(in)
+		var u, b types.Type
+		if t != nil {
+			u = *n.typ.typ
+			b = types.Typ[types.Bool]
+		}
+		in.setType(t)
+		out.setType(u)
+		ok.setType(b)
+	}
+	n.typ = newTypeView(new(types.Type))
 	n.typ.mode = typesOnly
 	n.Add(n.typ)
 	return n
@@ -42,7 +50,6 @@ func (n *typeAssertNode) editType() {
 
 func (n *typeAssertNode) setType(t types.Type) {
 	n.typ.setType(t)
-	n.outs[0].setType(t)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
 		MoveCenter(n.typ, ZP)

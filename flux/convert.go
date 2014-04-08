@@ -18,11 +18,17 @@ func newConvertNode() *convertNode {
 	n := &convertNode{}
 	n.nodeBase = newNodeBase(n)
 	in := n.newInput(nil)
-	in.connsChanged = func() {
-		in.setType(untypedToTyped(inputType(in)))
-	}
 	out := n.newOutput(nil)
-	n.typ = newTypeView(&out.obj.Type)
+	in.connsChanged = func() {
+		t := untypedToTyped(inputType(in))
+		in.setType(t)
+		if t != nil {
+			out.setType(*n.typ.typ)
+		} else {
+			out.setType(nil)
+		}
+	}
+	n.typ = newTypeView(new(types.Type))
 	n.typ.mode = typesOnly
 	n.Add(n.typ)
 	return n
@@ -41,7 +47,6 @@ func (n *convertNode) editType() {
 
 func (n *convertNode) setType(t types.Type) {
 	n.typ.setType(t)
-	n.outs[0].setType(t)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
 		MoveCenter(n.typ, ZP)
