@@ -46,6 +46,9 @@ func (n *sliceNode) connectable(t types.Type, dst *port) bool {
 
 func (n *sliceNode) connsChanged() {
 	t := untypedToTyped(inputType(n.x))
+	if p, ok := underlying(t).(*types.Pointer); ok {
+		t = &types.Slice{underlying(p.Elem).(*types.Array).Elem}
+	}
 	var i types.Type
 	if t != nil {
 		i = types.Typ[types.Int]
