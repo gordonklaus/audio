@@ -55,6 +55,8 @@ func newCallNode(obj types.Object) node {
 		return newAppendNode()
 	case "close":
 		return newCloseNode()
+	case "copy":
+		return newCopyNode()
 	case "delete":
 		return newDeleteNode()
 	case "len":

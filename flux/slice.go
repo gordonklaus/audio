@@ -86,3 +86,54 @@ func (n *sliceNode) KeyPress(event KeyEvent) {
 		n.nodeBase.KeyPress(event)
 	}
 }
+
+type copyNode struct {
+	*nodeBase
+	dst, src, n *port
+}
+
+func newCopyNode() *copyNode {
+	n := &copyNode{}
+	n.nodeBase = newNodeBase(n)
+	n.text.SetText("copy")
+	n.text.SetTextColor(color(&types.Func{}, true, false))
+	n.dst = n.newInput(newVar("dst", nil))
+	n.src = n.newInput(newVar("src", nil))
+	n.n = n.newOutput(newVar("n", nil))
+	n.dst.connsChanged = n.connsChanged
+	n.src.connsChanged = n.connsChanged
+	n.addSeqPorts()
+	return n
+}
+
+func (n *copyNode) connectable(t types.Type, p *port) bool {
+	var elem types.Type
+	if dst, ok := underlying(n.dst.obj.Type).(*types.Slice); ok {
+		elem = dst.Elem
+	}
+	switch src := underlying(n.src.obj.Type).(type) {
+	case *types.Basic:
+		elem = types.Typ[types.Byte]
+	case *types.Slice:
+		elem = src.Elem
+	}
+	switch t := underlying(t).(type) {
+	case *types.Basic:
+		return p == n.src && t.Info&types.IsString != 0 && (elem == nil || types.IsIdentical(elem, types.Typ[types.Byte]))
+	case *types.Slice:
+		return elem == nil || types.IsIdentical(t.Elem, elem)
+	}
+	return false
+}
+
+func (n *copyNode) connsChanged() {
+	dst := inputType(n.dst)
+	src := untypedToTyped(inputType(n.src))
+	n.dst.setType(dst)
+	n.src.setType(src)
+	if dst != nil && src != nil {
+		n.n.setType(types.Typ[types.Int])
+	} else {
+		n.n.setType(nil)
+	}
+}

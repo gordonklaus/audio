@@ -315,6 +315,15 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				if len(args) > 0 && len(results) > 0 {
 					w.indent("%s := (%s)(%s)\n", results[0], w.typ(*n.typ.typ), args[0]) // parenthesize type for easy recognition in reader
 				}
+			case *copyNode:
+				if len(args) == 2 {
+					w.indent("")
+					if len(results) > 0 {
+						w.write("%s := ", results[0])
+					}
+					w.write("copy(%s, %s)", args[0], args[1])
+					w.seq(n)
+				}
 			case *deleteNode:
 				if len(args) > 0 {
 					w.indent("delete(%s, %s)", args[0], args[1])
