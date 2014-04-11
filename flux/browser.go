@@ -427,13 +427,11 @@ func (b browser) filteredObjs() (objs objects) {
 			}
 		}
 	} else {
-		if b.mode == browse || b.mode == godeferrable {
-			for _, name := range []string{"break", "call", "continue", "convert", "defer", "func", "go", "if", "loop", "typeAssert"} {
-				add(special{newVar(name, nil)})
-			}
-			for _, name := range []string{"=", "*"} {
-				add(newVar(name, nil))
-			}
+		for _, name := range []string{"break", "call", "continue", "convert", "defer", "func", "go", "if", "loop", "typeAssert"} {
+			add(special{newVar(name, nil)})
+		}
+		for _, name := range []string{"=", "*"} {
+			add(newVar(name, nil))
 		}
 		pkgs := b.imports
 		if b.currentPkg != nil {
@@ -659,7 +657,7 @@ func (b *browser) KeyPress(event KeyEvent) {
 		}
 		makePkgInRoot := len(b.path) == 0 && event.Text == "1"
 		makeMethod := recv != nil && event.Text == "3"
-		if b.newObj == nil && b.mode != typesOnly && event.Command && (makePkgInRoot || makeInPkg || makeMethod) {
+		if b.newObj == nil && event.Command && (makePkgInRoot || makeInPkg || makeMethod) {
 			switch event.Text {
 			case "1":
 				b.newObj = &pkgObject{}
