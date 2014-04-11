@@ -30,7 +30,7 @@ TODO
 - make connectionBundles to reduce wire clutter?  each port has at most one connectionBundle that branches off connections near each port it connects to.  or don't add a new object, just draw connections coincident that originate at the same port.  especially bundle coincident connections that cross block boundaries.
 - condition blocks for if, &&, ||
 - consider drawing nodes as circles/ellipses.  this is the easiest way to treat them when arranging, and it might even be visually ok.  loopNode will work fine, as its loopblk can be drawn as a circle; but ifNode, switchNode, and selectNode will be harder, having multiple blocks.
-- in browser, by default don't show non-Go dirs (and don't show non-Flux dirs in fluxSourceOnly mode); show them when Shift is pressed
+- in browser, by default don't show non-Go dirs (and don't show non-Flux dirs in isFluxObj mode); show them when Shift is pressed
 - prefix names with pkg name in browser and typeView
 - manage code flux:  names, signatures, types, etc.
   - update objects currently being edited

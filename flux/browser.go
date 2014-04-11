@@ -19,7 +19,6 @@ import (
 
 type browser struct {
 	*ViewBase
-	mode       browserMode
 	options    browserOptions
 	typ        types.Type // non-nil if this is a selection browser
 	fun        *funcNode
@@ -40,24 +39,13 @@ type browser struct {
 	funcAsVal           bool
 }
 
-type browserMode int
-
-const (
-	fluxSourceOnly browserMode = iota
-	browse
-	typesOnly
-	compositeOrPtrType
-	compositeType
-	makeableType
-	godeferrable
-)
-
 type browserOptions struct {
-	acceptTypes, enterTypes bool
+	objFilter                             func(types.Object) bool
+	acceptTypes, enterTypes, canFuncAsVal bool
 }
 
-func newBrowser(mode browserMode, options browserOptions, parent View) *browser {
-	b := &browser{mode: mode, options: options}
+func newBrowser(options browserOptions, parent View) *browser {
+	b := &browser{options: options}
 	b.ViewBase = NewView(b)
 
 	// not a very beautiful way to get context but the most comprehensible I could find
@@ -99,7 +87,7 @@ loop:
 }
 
 func newSelectionBrowser(t types.Type, parent View) *browser {
-	b := newBrowser(browse, browserOptions{}, parent)
+	b := newBrowser(browserOptions{canFuncAsVal: true}, parent)
 	b.typ = t
 	b.clearText()
 	return b
@@ -286,82 +274,12 @@ var pkgObjects = map[string]*pkgObject{}
 
 func (b browser) filteredObjs() (objs objects) {
 	add := func(obj types.Object) {
-		if _, ok := obj.(*pkgObject); !ok {
-			switch b.mode {
-			case fluxSourceOnly:
-				if !fluxObjs[obj] {
-					return
-				}
-			case typesOnly:
-				if _, ok := obj.(*types.TypeName); !ok {
-					return
-				}
-			case compositeOrPtrType, compositeType:
-				switch obj {
-				default:
-					obj, ok := obj.(*types.TypeName)
-					if !ok {
-						return
-					}
-					t, ok := obj.GetType().(*types.Named)
-					if !ok {
-						return
-					}
-					switch t.UnderlyingT.(type) {
-					default:
-						return
-					case *types.Array, *types.Slice, *types.Map, *types.Struct:
-					}
-				case protoPointer:
-					if b.mode == compositeType {
-						return
-					}
-				case protoArray, protoSlice, protoMap, protoStruct:
-				}
-			case makeableType:
-				switch obj {
-				default:
-					obj, ok := obj.(*types.TypeName)
-					if !ok {
-						return
-					}
-					t, ok := obj.GetType().(*types.Named)
-					if !ok {
-						return
-					}
-					switch t.UnderlyingT.(type) {
-					default:
-						return
-					case *types.Slice, *types.Map, *types.Chan:
-					}
-				case protoSlice, protoMap, protoChan:
-				}
-			case godeferrable:
-				switch obj := obj.(type) {
-				default:
-					return
-				case special:
-					if obj.Name != "call" {
-						return
-					}
-				case *types.Builtin:
-					switch obj.Name {
-					default:
-						return
-					case "close", "copy", "delete", "panic", "recover":
-					}
-				case *types.Func:
-					if isOperator(obj) {
-						return
-					}
-				case *types.TypeName:
-				}
-			}
-			if invisible(obj, b.currentPkg) {
-				return
-			}
+		if invisible(obj, b.currentPkg) {
+			return
 		}
-		objs = append(objs, obj)
+		if _, ok := obj.(*pkgObject); ok || b.options.objFilter == nil || b.options.objFilter(obj) {
+			objs = append(objs, obj)
+		}
 	}
 
 	addSubPkgs := func(importPath string) {
@@ -471,14 +389,73 @@ func (b browser) filteredObjs() (objs objects) {
 		}
 	}
 
-	sort.Sort(objects(objs))
+	sort.Sort(objs)
 	return
+}
+
+func isFluxObj(obj types.Object) bool {
+	return fluxObjs[obj]
+}
+
+func isType(obj types.Object) bool {
+	_, ok := obj.(*types.TypeName)
+	return ok
+}
+
+func isCompositeOrPtrType(obj types.Object) bool {
+	return isCompositeType(obj) || obj == protoPointer
+}
+
+func isCompositeType(obj types.Object) bool {
+	switch obj {
+	case protoArray, protoSlice, protoMap, protoStruct:
+		return true
+	}
+	if obj, ok := obj.(*types.TypeName); ok {
+		switch underlying(obj.GetType()).(type) {
+		case *types.Array, *types.Slice, *types.Map, *types.Struct:
+			return true
+		}
+	}
+	return false
+}
+
+func isMakeableType(obj types.Object) bool {
+	switch obj {
+	case protoSlice, protoMap, protoChan:
+		return true
+	}
+	if obj, ok := obj.(*types.TypeName); ok {
+		switch underlying(obj.GetType()).(type) {
+		case *types.Slice, *types.Map, *types.Chan:
+			return true
+		}
+	}
+	return false
+}
+
+func isGoDeferrable(obj types.Object) bool {
+	switch obj := obj.(type) {
+	case special:
+		return obj.Name == "call"
+	case *types.Builtin:
+		switch obj.Name {
+		case "close", "copy", "delete", "panic", "recover":
+			return true
+		}
+	case *types.Func:
+		return !isOperator(obj)
+	case *types.TypeName:
+		_, ok := obj.GetType().(*types.Named)
+		return ok
+	}
+	return false
 }
 
 func (b *browser) LostKeyFocus() { b.cancel() } // TODO: implement this differently.  it interferes with localVar type editing
 
 func (b *browser) KeyPress(event KeyEvent) {
-	if b.mode == browse && event.Shift != b.funcAsVal {
+	if b.options.canFuncAsVal && event.Shift != b.funcAsVal {
 		b.funcAsVal = event.Shift
 		b.refresh()
 	}
@@ -693,7 +670,7 @@ func (b *browser) KeyPress(event KeyEvent) {
 }
 
 func (b *browser) KeyRelease(event KeyEvent) {
-	if b.mode == browse && event.Shift != b.funcAsVal {
+	if b.options.canFuncAsVal && event.Shift != b.funcAsVal {
 		b.funcAsVal = event.Shift
 		b.refresh()
 	}
@@ -747,6 +724,8 @@ func (p pkgObject) GetName() string {
 	}
 	return path.Base(p.importPath)
 }
+
+func (p pkgObject) GetPkg() *types.Package { return nil }
 
 var (
 	protoPointer   = types.NewTypeName(0, nil, "pointer", nil)

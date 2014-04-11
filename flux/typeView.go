@@ -13,10 +13,10 @@ import (
 
 type typeView struct {
 	*ViewBase
+	mode typeViewMode
 	typ  *types.Type
 	val  types.Object // non-nil if this is a valueView
 	pkg  *types.Package
-	mode browserMode
 	done func()
 
 	name       *TextBase // non-nil if this is a valueView
@@ -27,8 +27,17 @@ type typeView struct {
 	focused    bool
 }
 
+type typeViewMode int
+
+const (
+	anyType typeViewMode = iota
+	compositeOrPtrType
+	compositeType
+	makeableType
+)
+
 func newTypeView(t *types.Type) *typeView {
-	v := &typeView{typ: t, mode: typesOnly}
+	v := &typeView{typ: t, mode: anyType}
 	v.ViewBase = NewView(v)
 	v.text = NewText("")
 	v.text.SetTextColor(color(&types.TypeName{}, false, false))
@@ -244,7 +253,14 @@ func (v *typeView) edit(done func()) {
 func (v *typeView) editType(done func()) {
 	switch t := (*v.typ).(type) {
 	case nil:
-		b := newBrowser(v.mode, browserOptions{acceptTypes: true}, v)
+		opts := browserOptions{acceptTypes: true}
+		opts.objFilter = map[typeViewMode]func(types.Object) bool{
+			anyType:            isType,
+			compositeOrPtrType: isCompositeOrPtrType,
+			compositeType:      isCompositeType,
+			makeableType:       isMakeableType,
+		}[v.mode]
+		b := newBrowser(opts, v)
 		v.Add(b)
 		b.Move(Center(v))
 		b.accepted = func(obj types.Object) {

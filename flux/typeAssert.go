@@ -32,7 +32,7 @@ func newTypeAssertNode() *typeAssertNode {
 		ok.setType(b)
 	}
 	n.typ = newTypeView(new(types.Type))
-	n.typ.mode = typesOnly
+	n.typ.mode = anyType
 	n.Add(n.typ)
 	return n
 }
