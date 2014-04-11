@@ -20,6 +20,7 @@ import (
 type browser struct {
 	*ViewBase
 	mode       browserMode
+	options    browserOptions
 	typ        types.Type // non-nil if this is a selection browser
 	fun        *funcNode
 	currentPkg *types.Package
@@ -51,8 +52,12 @@ const (
 	godeferrable
 )
 
-func newBrowser(mode browserMode, parent View) *browser {
-	b := &browser{mode: mode}
+type browserOptions struct {
+	acceptTypes, enterTypes bool
+}
+
+func newBrowser(mode browserMode, options browserOptions, parent View) *browser {
+	b := &browser{mode: mode, options: options}
 	b.ViewBase = NewView(b)
 
 	// not a very beautiful way to get context but the most comprehensible I could find
@@ -94,7 +99,7 @@ loop:
 }
 
 func newSelectionBrowser(t types.Type, parent View) *browser {
-	b := newBrowser(browse, parent)
+	b := newBrowser(browse, browserOptions{}, parent)
 	b.typ = t
 	b.clearText()
 	return b
@@ -349,6 +354,7 @@ func (b browser) filteredObjs() (objs objects) {
 					if isOperator(obj) {
 						return
 					}
+				case *types.TypeName:
 				}
 			}
 			if invisible(obj, b.currentPkg) {
@@ -586,7 +592,7 @@ func (b *browser) KeyPress(event KeyEvent) {
 
 		_, isPkg := obj.(*pkgObject)
 		_, isType := obj.(*types.TypeName)
-		if !(isPkg || b.mode == browse && isType) {
+		if !(isPkg || isType && !b.options.acceptTypes) {
 			b.finished = true
 			b.accepted(obj)
 			return
@@ -597,7 +603,7 @@ func (b *browser) KeyPress(event KeyEvent) {
 			switch obj := b.currentObj().(type) {
 			case *pkgObject, *types.TypeName:
 				if t, ok := obj.(*types.TypeName); ok {
-					if _, ok = t.Type.(*types.Basic); ok || t.Type == nil {
+					if _, ok = t.Type.(*types.Basic); ok || t.Type == nil || !b.options.enterTypes {
 						break
 					}
 				}

@@ -395,7 +395,7 @@ func (b *block) KeyPress(event KeyEvent) {
 		}
 	default:
 		openBrowser := func() {
-			browser := newBrowser(browse, b)
+			browser := newBrowser(browse, browserOptions{enterTypes: true}, b)
 			b.Add(browser)
 			browser.Move(Center(b))
 			browser.accepted = func(obj types.Object) {
@@ -465,7 +465,7 @@ func newNode(b *block, obj types.Object, funcAsVal bool, godefer string) node {
 			n = newFuncNode(nil, b.childArranged)
 		case "go", "defer":
 			godefer = obj.Name + " "
-			browser := newBrowser(godeferrable, b)
+			browser := newBrowser(godeferrable, browserOptions{enterTypes: true}, b)
 			browser.Move(Center(b))
 			browser.accepted = func(obj types.Object) {
 				browser.Close()

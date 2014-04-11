@@ -244,7 +244,7 @@ func (v *typeView) edit(done func()) {
 func (v *typeView) editType(done func()) {
 	switch t := (*v.typ).(type) {
 	case nil:
-		b := newBrowser(v.mode, v)
+		b := newBrowser(v.mode, browserOptions{acceptTypes: true}, v)
 		v.Add(b)
 		b.Move(Center(v))
 		b.accepted = func(obj types.Object) {
