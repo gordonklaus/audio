@@ -14,11 +14,15 @@ type callNode struct {
 	obj types.Object
 }
 
-func newCallNode(obj types.Object) node {
+func newCallNode(obj types.Object, godefer string) node {
 	if obj == nil {
 		n := &callNode{}
-		n.nodeBase = newNodeBase(n)
-		n.text.SetText("call")
+		n.nodeBase = newGoDeferNodeBase(n, godefer)
+		if godefer == "" {
+			n.text.SetText("call")
+		} else {
+			n.text.SetText("") //trigger TextChanged
+		}
 		n.text.SetTextColor(color(special{}, true, false))
 		n.addSeqPorts()
 		in := n.newInput(nil)
@@ -38,7 +42,7 @@ func newCallNode(obj types.Object) node {
 
 	if sig, ok := obj.GetType().(*types.Signature); ok {
 		n := &callNode{obj: obj}
-		n.nodeBase = newNodeBase(n)
+		n.nodeBase = newGoDeferNodeBase(n, godefer)
 		name := obj.GetName()
 		if sig.Recv != nil {
 			name = "." + name
@@ -54,11 +58,11 @@ func newCallNode(obj types.Object) node {
 	case "append":
 		return newAppendNode()
 	case "close":
-		return newCloseNode()
+		return newCloseNode(godefer)
 	case "copy":
-		return newCopyNode()
+		return newCopyNode(godefer)
 	case "delete":
-		return newDeleteNode()
+		return newDeleteNode(godefer)
 	case "len":
 		return newLenNode()
 	case "make":
@@ -149,7 +153,9 @@ func (n *callNode) variadic() (int, *types.Var) {
 	}
 	i := len(sig.Params) - 1
 	v := sig.Params[i]
-	i++ // for func sig input
+	if n.obj == nil {
+		i++ // for func sig input
+	}
 	if sig.Recv != nil {
 		i++
 	}

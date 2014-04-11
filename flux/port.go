@@ -226,7 +226,7 @@ func (p *port) KeyPress(event KeyEvent) {
 		p.Add(b)
 		b.accepted = func(obj types.Object) {
 			b.Close()
-			n := newNode(p.node.block(), obj, b.funcAsVal)
+			n := newNode(p.node.block(), obj, b.funcAsVal, "")
 			c := newConnection()
 			c.setSrc(p)
 			c.setDst(ins(n)[0])

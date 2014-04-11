@@ -34,22 +34,39 @@ type nodeBase struct {
 	ins  []*port
 	outs []*port
 
+	godefer     string
+	godeferText Text
+
 	focused bool
 	gap     float64
 }
 
 func newNodeBase(self node) *nodeBase {
-	n := &nodeBase{self: self}
+	return newGoDeferNodeBase(self, "")
+}
+
+func newGoDeferNodeBase(self node, godefer string) *nodeBase {
+	n := &nodeBase{self: self, godefer: godefer}
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(self), NewMover(self)}
 	n.text = NewText("")
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	n.text.TextChanged = func(string) {
-		MoveCenter(n.text, ZP)
-		n.gap = Height(n.text) / 2
+		if n.text.GetText() == "" {
+			n.godeferText.SetText(godefer[:len(godefer)-1])
+		}
+		width := Width(n.godeferText) + Width(n.text)
+		height := Height(n.godeferText)
+		n.godeferText.Move(Pt(-width/2, -height/2))
+		n.text.Move(Pt(-width/2+Width(n.godeferText), -height/2))
+		n.gap = height / 2
 		n.reform()
 	}
 	n.Add(n.text)
+	n.godeferText = NewText(godefer)
+	n.godeferText.SetBackgroundColor(Color{0, 0, 0, 0})
+	n.godeferText.SetTextColor(color(special{}, true, false))
+	n.Add(n.godeferText)
 	n.ViewBase.Self = self
 	return n
 }
@@ -64,9 +81,11 @@ func (n *nodeBase) newInput(v *types.Var) *port {
 
 func (n *nodeBase) newOutput(v *types.Var) *port {
 	p := newOutput(n.self, v)
-	n.Add(p)
-	n.outs = append(n.outs, p)
-	n.reform()
+	if n.godefer == "" {
+		n.Add(p)
+		n.outs = append(n.outs, p)
+		n.reform()
+	}
 	return p
 }
 
@@ -180,12 +199,16 @@ func nodeMoved(n node) {
 
 func (n *nodeBase) TookKeyFocus() {
 	n.focused = true
-	n.text.SetBackgroundColor(Color{.25, .25, .25, 1})
+	c := Color{.25, .25, .25, 1}
+	n.text.SetBackgroundColor(c)
+	n.godeferText.SetBackgroundColor(c)
 }
 
 func (n *nodeBase) LostKeyFocus() {
 	n.focused = false
-	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
+	c := Color{0, 0, 0, 0}
+	n.text.SetBackgroundColor(c)
+	n.godeferText.SetBackgroundColor(c)
 }
 
 func (n *nodeBase) Paint() {

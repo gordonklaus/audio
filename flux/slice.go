@@ -92,9 +92,9 @@ type copyNode struct {
 	dst, src, n *port
 }
 
-func newCopyNode() *copyNode {
+func newCopyNode(godefer string) *copyNode {
 	n := &copyNode{}
-	n.nodeBase = newNodeBase(n)
+	n.nodeBase = newGoDeferNodeBase(n, godefer)
 	n.text.SetText("copy")
 	n.text.SetTextColor(color(&types.Func{}, true, false))
 	n.dst = n.newInput(newVar("dst", nil))

@@ -97,9 +97,9 @@ type closeNode struct {
 	*nodeBase
 }
 
-func newCloseNode() *closeNode {
+func newCloseNode(godefer string) *closeNode {
 	n := &closeNode{}
-	n.nodeBase = newNodeBase(n)
+	n.nodeBase = newGoDeferNodeBase(n, godefer)
 	n.text.SetText("close")
 	n.text.SetTextColor(color(&types.Func{}, true, false))
 	in := n.newInput(newVar("", nil))

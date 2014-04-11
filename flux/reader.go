@@ -110,7 +110,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 						r.in(x.Args[0], n.ins[0])
 						r.out(s.Lhs[0], n.outs[0])
 					} else {
-						n := r.call(b, x, s)
+						n := r.call(b, x, "", s)
 						for i, p := range outs(n) {
 							r.out(s.Lhs[i], p)
 						}
@@ -237,10 +237,12 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					r.value(b, x, v.Names[0], false, s)
 				}
 			}
+		case *ast.DeferStmt:
+			r.call(b, s.Call, "defer ", s)
 		case *ast.ExprStmt:
 			switch x := s.X.(type) {
 			case *ast.CallExpr:
-				r.call(b, x, s)
+				r.call(b, x, "", s)
 			case *ast.UnaryExpr:
 				r.sendrecv(b, x.X, nil, s)
 			}
@@ -255,6 +257,8 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			}
 			r.block(n.loopblk, s.Body.List)
 			r.seq(n, s)
+		case *ast.GoStmt:
+			r.call(b, s.Call, "go ", s)
 		case *ast.IfStmt:
 			n := newIfNode(b.childArranged)
 			b.addNode(n)
@@ -307,9 +311,9 @@ func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
 	r.seq(n, an)
 }
 
-func (r *reader) call(b *block, x *ast.CallExpr, s ast.Stmt) node {
+func (r *reader) call(b *block, x *ast.CallExpr, godefer string, s ast.Stmt) node {
 	obj := r.obj(x.Fun)
-	n := newCallNode(obj)
+	n := newCallNode(obj, godefer)
 	b.addNode(n)
 	args := x.Args
 	switch {

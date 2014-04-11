@@ -400,7 +400,7 @@ func (b *block) KeyPress(event KeyEvent) {
 			browser.Move(Center(b))
 			browser.accepted = func(obj types.Object) {
 				browser.Close()
-				newNode(b, obj, browser.funcAsVal)
+				newNode(b, obj, browser.funcAsVal, "")
 			}
 			oldFocus := KeyFocus(b)
 			browser.canceled = func() {
@@ -450,19 +450,34 @@ func (b *block) KeyPress(event KeyEvent) {
 	}
 }
 
-func newNode(b *block, obj types.Object, funcAsVal bool) node {
+func newNode(b *block, obj types.Object, funcAsVal bool, godefer string) node {
 	var n node
 	switch obj := obj.(type) {
 	case special:
-		switch obj.name {
+		switch obj.Name {
 		case "break", "continue":
-			n = newBranchNode(obj.name)
+			n = newBranchNode(obj.Name)
 		case "call":
-			n = newCallNode(nil)
+			n = newCallNode(nil, godefer)
 		case "convert":
 			n = newConvertNode()
 		case "func":
 			n = newFuncNode(nil, b.childArranged)
+		case "go", "defer":
+			godefer = obj.Name + " "
+			browser := newBrowser(godeferrable, b)
+			browser.Move(Center(b))
+			browser.accepted = func(obj types.Object) {
+				browser.Close()
+				newNode(b, obj, false, godefer)
+			}
+			browser.canceled = func() {
+				browser.Close()
+				SetKeyFocus(b)
+			}
+			b.Add(browser)
+			SetKeyFocus(browser)
+			return nil
 		case "if":
 			i := newIfNode(b.childArranged)
 			i.newBlock()
@@ -484,7 +499,7 @@ func newNode(b *block, obj types.Object, funcAsVal bool) node {
 		} else if funcAsVal && obj.GetPkg() != nil { //Pkg==nil == builtin
 			n = newValueNode(obj, false)
 		} else {
-			n = newCallNode(obj)
+			n = newCallNode(obj, godefer)
 		}
 	case *types.Var, *types.Const, field, *localVar:
 		switch obj.GetName() {

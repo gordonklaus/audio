@@ -94,9 +94,9 @@ type deleteNode struct {
 	*nodeBase
 }
 
-func newDeleteNode() *deleteNode {
+func newDeleteNode(godefer string) *deleteNode {
 	n := &deleteNode{}
-	n.nodeBase = newNodeBase(n)
+	n.nodeBase = newGoDeferNodeBase(n, godefer)
 	n.text.SetText("delete")
 	n.text.SetTextColor(color(&types.Func{}, true, false))
 	m := n.newInput(newVar("map", nil))

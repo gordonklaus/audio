@@ -48,6 +48,7 @@ const (
 	compositeOrPtrType
 	compositeType
 	makeableType
+	godeferrable
 )
 
 func newBrowser(mode browserMode, parent View) *browser {
@@ -330,6 +331,25 @@ func (b browser) filteredObjs() (objs objects) {
 					}
 				case protoSlice, protoMap, protoChan:
 				}
+			case godeferrable:
+				switch obj := obj.(type) {
+				default:
+					return
+				case special:
+					if obj.Name != "call" {
+						return
+					}
+				case *types.Builtin:
+					switch obj.Name {
+					default:
+						return
+					case "close", "copy", "delete", "panic", "recover":
+					}
+				case *types.Func:
+					if isOperator(obj) {
+						return
+					}
+				}
 			}
 			if invisible(obj, b.currentPkg) {
 				return
@@ -407,12 +427,12 @@ func (b browser) filteredObjs() (objs objects) {
 			}
 		}
 	} else {
-		if b.mode == browse {
-			for _, name := range []string{"break", "call", "continue", "convert", "func", "if", "loop", "typeAssert"} {
-				objs = append(objs, special{name: name})
+		if b.mode == browse || b.mode == godeferrable {
+			for _, name := range []string{"break", "call", "continue", "convert", "defer", "func", "go", "if", "loop", "typeAssert"} {
+				add(special{newVar(name, nil)})
 			}
 			for _, name := range []string{"=", "*"} {
-				objs = append(objs, newVar(name, nil))
+				add(newVar(name, nil))
 			}
 		}
 		pkgs := b.imports
@@ -758,11 +778,8 @@ func newProtoType(t *types.TypeName) types.Type {
 }
 
 type special struct {
-	types.Object
-	name string
+	*types.Var
 }
-
-func (s special) GetName() string { return s.name }
 
 type field struct {
 	*types.Var

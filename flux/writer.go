@@ -290,7 +290,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					if len(results) > 0 {
 						w.write(strings.Join(results, ", ") + " := ")
 					}
-					w.write("%s(%s)", f, strings.Join(args, ", "))
+					w.write("%s%s(%s)", n.godefer, f, strings.Join(args, ", "))
 					w.seq(n)
 				}
 			case *chanNode:
@@ -308,7 +308,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				}
 			case *closeNode:
 				if len(args) > 0 {
-					w.indent("close(%s)", args[0])
+					w.indent("%sclose(%s)", n.godefer, args[0])
 					w.seq(n)
 				}
 			case *convertNode:
@@ -321,12 +321,12 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					if len(results) > 0 {
 						w.write("%s := ", results[0])
 					}
-					w.write("copy(%s, %s)", args[0], args[1])
+					w.write("%scopy(%s, %s)", n.godefer, args[0], args[1])
 					w.seq(n)
 				}
 			case *deleteNode:
 				if len(args) > 0 {
-					w.indent("delete(%s, %s)", args[0], args[1])
+					w.indent("%sdelete(%s, %s)", n.godefer, args[0], args[1])
 					w.seq(n)
 				}
 			case *funcNode:
