@@ -31,6 +31,7 @@ type typeViewMode int
 
 const (
 	anyType typeViewMode = iota
+	comparableType
 	compositeOrPtrType
 	compositeType
 	makeableType
@@ -101,7 +102,11 @@ func (v *typeView) setType(t types.Type) {
 		s = t.Obj.Name
 	case *types.Pointer:
 		s = "*"
-		v.elems.right = []*typeView{newTypeView(&t.Elem)}
+		elem := newTypeView(&t.Elem)
+		if v.mode == compositeOrPtrType {
+			elem.mode = compositeType
+		}
+		v.elems.right = []*typeView{elem}
 	case *types.Array:
 		s = fmt.Sprintf("[%d]", t.Len)
 		v.elems.right = []*typeView{newTypeView(&t.Elem)}
@@ -116,7 +121,9 @@ func (v *typeView) setType(t types.Type) {
 		v.elems.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Map:
 		s = ":"
-		v.elems.left = []*typeView{newTypeView(&t.Key)}
+		key := newTypeView(&t.Key)
+		key.mode = comparableType
+		v.elems.left = []*typeView{key}
 		v.elems.right = []*typeView{newTypeView(&t.Elem)}
 	case *types.Struct:
 		s = "struct"
@@ -156,13 +163,12 @@ func (v *typeView) setType(t types.Type) {
 		v.Add(v.unexported)
 	}
 	for _, c := range append(v.elems.left, v.elems.right...) {
+		if v.mode == comparableType {
+			c.mode = comparableType
+		}
 		c.pkg = v.pkg
 		c.refresh()
 		v.Add(c)
-	}
-
-	if _, ok := t.(*types.Pointer); ok && v.mode == compositeOrPtrType {
-		v.elems.right[0].mode = compositeType
 	}
 
 	v.reform()
@@ -256,6 +262,7 @@ func (v *typeView) editType(done func()) {
 		opts := browserOptions{acceptTypes: true}
 		opts.objFilter = map[typeViewMode]func(types.Object) bool{
 			anyType:            isType,
+			comparableType:     isComparableType,
 			compositeOrPtrType: isCompositeOrPtrType,
 			compositeType:      isCompositeType,
 			makeableType:       isMakeableType,

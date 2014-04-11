@@ -402,6 +402,15 @@ func isType(obj types.Object) bool {
 	return ok
 }
 
+func isComparableType(obj types.Object) bool {
+	switch obj {
+	case protoPointer, protoArray, protoChan, protoInterface, protoStruct:
+		return true
+	}
+	t, ok := obj.(*types.TypeName)
+	return ok && t.GetType() != nil && types.Comparable(t.GetType())
+}
+
 func isCompositeOrPtrType(obj types.Object) bool {
 	return isCompositeType(obj) || obj == protoPointer
 }
