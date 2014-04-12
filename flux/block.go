@@ -400,7 +400,7 @@ func (b *block) KeyPress(event KeyEvent) {
 			browser.Move(Center(b))
 			browser.accepted = func(obj types.Object) {
 				browser.Close()
-				newNode(b, obj, browser.funcAsVal, "")
+				b.newNode(obj, browser.funcAsVal, "")
 			}
 			oldFocus := KeyFocus(b)
 			browser.canceled = func() {
@@ -450,7 +450,7 @@ func (b *block) KeyPress(event KeyEvent) {
 	}
 }
 
-func newNode(b *block, obj types.Object, funcAsVal bool, godefer string) node {
+func (b *block) newNode(obj types.Object, funcAsVal bool, godefer string) node {
 	var n node
 	switch obj := obj.(type) {
 	case special:
@@ -469,7 +469,7 @@ func newNode(b *block, obj types.Object, funcAsVal bool, godefer string) node {
 			browser.Move(Center(b))
 			browser.accepted = func(obj types.Object) {
 				browser.Close()
-				newNode(b, obj, false, godefer)
+				b.newNode(obj, false, godefer)
 			}
 			browser.canceled = func() {
 				browser.Close()

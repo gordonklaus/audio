@@ -2,7 +2,7 @@ TODO
 
 - type switch
 - select
-- builtins:  cap, complex, imag, new, panic, real, recover
+- builtins panic and recover should have valid signatures in go/types
 - len and capacity inputs for make, len and max input for slice, ok output for type assert (also mapget and chanrecv?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable
 - sequencing ports:
   - don't include them in normal keyboard navigation.  access them by special keystrokes (Command-{Semicolon, Quote}?).  (update focusNearestView to ignore sequencing ports, too)

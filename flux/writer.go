@@ -311,6 +311,10 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.indent("%sclose(%s)", n.godefer, args[0])
 					w.seq(n)
 				}
+			case *complexNode:
+				if len(args) > 0 && len(results) > 0 {
+					w.indent("%s := complex(%s, %s)\n", results[0], args[0], args[1])
+				}
 			case *convertNode:
 				if len(args) > 0 && len(results) > 0 {
 					w.indent("%s := (%s)(%s)\n", results[0], w.typ(*n.typ.typ), args[0]) // parenthesize type for easy recognition in reader
@@ -346,14 +350,18 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					w.indent("%s := %s%s[%s]", strings.Join(results, ", "), amp, args[0], args[1])
 					w.seq(n)
 				}
-			case *lenNode:
+			case *lenCapNode:
 				if len(args) > 0 && len(results) > 0 {
-					w.indent("%s := len(%s)", results[0], args[0])
+					w.indent("%s := %s(%s)", results[0], n.name, args[0])
 					w.seq(n)
 				}
 			case *makeNode:
 				if len(results) > 0 {
 					w.indent("%s := make(%s, %s)\n", results[0], w.typ(*n.typ.typ), strings.Join(args, ", "))
+				}
+			case *newNode:
+				if len(results) > 0 {
+					w.indent("%s := new(%s)\n", results[0], w.typ(*n.typ.typ))
 				}
 			case *operatorNode:
 				c := 0
@@ -373,6 +381,10 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			case *portsNode:
 				// only inputsNodes are in the order (1st)
 				// portsNode is included here so that assignExisting is called for it, to handle assignments of func args and loop vars
+			case *realImagNode:
+				if len(args) > 0 && len(results) > 0 {
+					w.indent("%s := %s(%s)\n", results[0], n.name, args[0])
+				}
 			case *sliceNode:
 				if len(results) > 0 {
 					w.indent("%s := %s[%s", results[0], args[0], strings.Join(args[1:], ":"))

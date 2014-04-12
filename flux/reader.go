@@ -323,7 +323,9 @@ func (r *reader) call(b *block, x *ast.CallExpr, godefer string, s ast.Stmt) nod
 	case obj == nil: // func value call
 		args = append([]ast.Expr{x.Fun}, args...)
 	}
-	if n, ok := n.(*makeNode); ok {
+	if n, ok := n.(interface {
+		setType(types.Type)
+	}); ok {
 		n.setType(r.typ(args[0]))
 		args = args[1:]
 	}

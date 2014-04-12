@@ -54,21 +54,27 @@ func newCallNode(obj types.Object, godefer string) node {
 		return n
 	}
 
-	switch obj.GetName() {
+	switch name := obj.GetName(); name {
 	case "append":
 		return newAppendNode()
 	case "close":
 		return newCloseNode(godefer)
+	case "complex":
+		return newComplexNode()
 	case "copy":
 		return newCopyNode(godefer)
 	case "delete":
 		return newDeleteNode(godefer)
-	case "len":
-		return newLenNode()
+	case "len", "cap":
+		return newLenCapNode(name)
 	case "make":
 		return newMakeNode()
+	case "new":
+		return newNewNode()
+	case "real", "imag":
+		return newRealImagNode(name)
 	default:
-		panic("unknown builtin: " + obj.GetName())
+		panic("unknown builtin: " + name)
 	}
 }
 

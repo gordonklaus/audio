@@ -7,6 +7,7 @@ package main
 import (
 	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
+	"math"
 )
 
 type appendNode struct {
@@ -90,6 +91,43 @@ func (n *appendNode) ellipsis() bool {
 	return len(ins) == 2 && ins[1].obj == ins[0].obj
 }
 
+type complexNode struct {
+	*nodeBase
+	re, im, out *port
+}
+
+func newComplexNode() *complexNode {
+	n := &complexNode{}
+	n.nodeBase = newNodeBase(n)
+	n.text.SetText("complex")
+	n.text.SetTextColor(color(&types.Func{}, true, false))
+	n.re = n.newInput(newVar("real", nil))
+	n.re.connsChanged = n.connsChanged
+	n.im = n.newInput(newVar("imag", nil))
+	n.im.connsChanged = n.connsChanged
+	n.out = n.newOutput(newVar("", nil))
+	return n
+}
+
+func (n *complexNode) connectable(t types.Type, dst *port) bool {
+	b, ok := underlying(t).(*types.Basic)
+	return ok && b.Info&types.IsFloat != 0 && assignableToAll(t, n.ins...)
+}
+
+func (n *complexNode) connsChanged() {
+	t := untypedToTyped(inputType(n.ins...))
+	n.ins[0].setType(t)
+	n.ins[1].setType(t)
+	if t != nil {
+		if underlying(t).(*types.Basic).Kind == types.Float32 {
+			t = types.Typ[types.Complex64]
+		} else {
+			t = types.Typ[types.Complex128]
+		}
+	}
+	n.outs[0].setType(t)
+}
+
 type deleteNode struct {
 	*nodeBase
 }
@@ -122,14 +160,15 @@ func (n *deleteNode) connectable(t types.Type, dst *port) bool {
 	return assignable(t, dst.obj.Type)
 }
 
-type lenNode struct {
+type lenCapNode struct {
 	*nodeBase
+	name string
 }
 
-func newLenNode() *lenNode {
-	n := &lenNode{}
+func newLenCapNode(name string) *lenCapNode {
+	n := &lenCapNode{name: name}
 	n.nodeBase = newNodeBase(n)
-	n.text.SetText("len")
+	n.text.SetText(name)
 	n.text.SetTextColor(color(&types.Func{}, true, false))
 	in := n.newInput(newVar("", nil))
 	len := n.newOutput(newVar("", nil))
@@ -146,12 +185,14 @@ func newLenNode() *lenNode {
 	return n
 }
 
-func (n *lenNode) connectable(t types.Type, dst *port) bool {
+func (n *lenCapNode) connectable(t types.Type, dst *port) bool {
 	ok := false
 	switch t := underlying(t).(type) {
 	case *types.Basic:
-		ok = t.Info&types.IsString != 0
-	case *types.Array, *types.Slice, *types.Map, *types.Chan:
+		ok = n.name == "len" && t.Info&types.IsString != 0
+	case *types.Map:
+		ok = n.name == "len"
+	case *types.Array, *types.Slice, *types.Chan:
 		ok = true
 	case *types.Pointer:
 		_, ok = underlying(t.Elem).(*types.Array)
@@ -167,6 +208,8 @@ type makeNode struct {
 func newMakeNode() *makeNode {
 	n := &makeNode{}
 	n.nodeBase = newNodeBase(n)
+	n.text.SetText("make ")
+	n.text.SetTextColor(color(&types.Func{}, true, false))
 	out := n.newOutput(nil)
 	n.typ = newTypeView(&out.obj.Type)
 	n.typ.mode = makeableType
@@ -197,11 +240,91 @@ func (n *makeNode) setType(t types.Type) {
 		if _, ok := t.(*types.Slice); ok {
 			n.newInput(newVar("cap", types.Typ[types.Int]))
 		}
-		MoveCenter(n.typ, ZP)
-		n.gap = Height(n.typ) / 2
+		width := Width(n.text) + Width(n.typ)
+		height1 := Height(n.text)
+		height2 := Height(n.typ)
+		n.text.Move(Pt(-width/2, -height1/2))
+		n.typ.Move(Pt(-width/2+Width(n.text), -height2/2))
+		n.gap = math.Max(height1, height2) / 2
 		n.reform()
 		SetKeyFocus(n)
 	}
+}
+
+type newNode struct {
+	*nodeBase
+	typ *typeView
+}
+
+func newNewNode() *newNode {
+	n := &newNode{}
+	n.nodeBase = newNodeBase(n)
+	n.text.SetText("new ")
+	n.text.SetTextColor(color(&types.Func{}, true, false))
+	t := &types.Pointer{}
+	n.newOutput(newVar("", t))
+	n.typ = newTypeView(&t.Elem)
+	n.Add(n.typ)
+	return n
+}
+
+func (n *newNode) editType() {
+	n.typ.editType(func() {
+		if t := *n.typ.typ; t != nil {
+			n.setType(t)
+		} else {
+			n.blk.removeNode(n)
+			SetKeyFocus(n.blk)
+		}
+	})
+}
+
+func (n *newNode) setType(t types.Type) {
+	n.typ.setType(t)
+	n.outs[0].setType(n.outs[0].obj.Type)
+	if t != nil {
+		n.blk.func_().addPkgRef(t)
+		width := Width(n.text) + Width(n.typ)
+		height1 := Height(n.text)
+		height2 := Height(n.typ)
+		n.text.Move(Pt(-width/2, -height1/2))
+		n.typ.Move(Pt(-width/2+Width(n.text), -height2/2))
+		n.gap = math.Max(height1, height2) / 2
+		n.reform()
+		SetKeyFocus(n)
+	}
+}
+
+type realImagNode struct {
+	*nodeBase
+	name string
+}
+
+func newRealImagNode(name string) *realImagNode {
+	n := &realImagNode{name: name}
+	n.nodeBase = newNodeBase(n)
+	n.text.SetText(name)
+	n.text.SetTextColor(color(&types.Func{}, true, false))
+	in := n.newInput(newVar("", nil))
+	out := n.newOutput(newVar("", nil))
+	in.connsChanged = func() {
+		t := untypedToTyped(inputType(in))
+		in.setType(t)
+		if t != nil {
+			if underlying(t).(*types.Basic).Kind == types.Complex64 {
+				t = types.Typ[types.Float32]
+			} else {
+				t = types.Typ[types.Float64]
+			}
+		}
+		out.setType(t)
+	}
+	return n
+}
+
+func (n *realImagNode) connectable(t types.Type, dst *port) bool {
+	b, ok := underlying(t).(*types.Basic)
+	return ok && b.Info&types.IsComplex != 0
 }
 
 func newVar(name string, typ types.Type) *types.Var {
