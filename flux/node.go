@@ -52,7 +52,7 @@ func newGoDeferNodeBase(self node, godefer string) *nodeBase {
 	n.text = NewText("")
 	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
 	n.text.TextChanged = func(string) {
-		if n.text.GetText() == "" {
+		if n.text.GetText() == "" && godefer != "" {
 			n.godeferText.SetText(godefer[:len(godefer)-1])
 		}
 		width := Width(n.godeferText) + Width(n.text)
