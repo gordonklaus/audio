@@ -13,7 +13,7 @@ import (
 	"math/rand"
 )
 
-const blockRadius = 16
+const blockRadius = 8
 
 type block struct {
 	*ViewBase
@@ -354,7 +354,14 @@ func (b *block) focusNearestView(viewOrPoint interface{}, dirKey int) {
 	}
 }
 
-func (b *block) TookKeyFocus() { b.focused = true; Repaint(b) }
+func (b *block) TookKeyFocus() { 
+	for n := range b.nodes {
+		SetKeyFocus(n)
+		return
+	}
+	b.focused = true
+	Repaint(b)
+}
 func (b *block) LostKeyFocus() { b.focused = false; Repaint(b) }
 
 func (b *block) KeyPress(event KeyEvent) {
@@ -545,11 +552,12 @@ func (b *block) newNode(obj types.Object, funcAsVal bool, godefer string) node {
 
 func (b *block) Paint() {
 	if b.focused {
-		SetColor(Color{.3, .3, .7, 1})
-	} else {
-		SetColor(Color{.5, .5, .5, 1})
+		SetPointSize(2 * portSize)
+		SetColor(Color{.25, .25, .25, 1})
+		DrawPoint(Center(b))
 	}
 	{
+		SetColor(Color{.5, .5, .5, 1})
 		rect := Rect(b)
 		l, r, b, t := rect.Min.X, rect.Max.X, rect.Min.Y, rect.Max.Y
 		lb, bl := Pt(l, b+blockRadius), Pt(l+blockRadius, b)

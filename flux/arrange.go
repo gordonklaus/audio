@@ -167,9 +167,6 @@ func (b *blockArrange) setRectReal() {
 			rect = rect.Union(r)
 		}
 	}
-	if rect == ZR {
-		rect = Rectangle{ZP, Pt(0, 16)}
-	}
 	rect = rect.Inset(-blockRadius)
 	b.SetRect(rect)
 	b.block.SetRect(rect)
@@ -404,9 +401,6 @@ func (b *blockArrange) setRect() {
 		} else {
 			rect = rect.Union(r)
 		}
-	}
-	if rect == ZR {
-		rect = Rectangle{ZP, Pt(0, 16)}
 	}
 	rect = rect.Inset(-blockRadius)
 	b.SetRect(rect)

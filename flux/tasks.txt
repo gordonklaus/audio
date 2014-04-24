@@ -3,8 +3,6 @@ TODO
 - type switch
 - builtins panic and recover should have valid signatures in go/types
 - len and capacity inputs for make, len and max input for slice, ok output for type assert (also mapget and chanrecv?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable
-- draw an empty block as a small circle.  when it is focused, draw a grey dot in the middle.
-- don't focus outermost func block
 - focus connection ends more clearly:  don't draw connection in blue; highlight, e.g. with a series of points of diminishing size in the direction of the connection.
 - sequencing ports:
   - don't include them in normal keyboard navigation.  access them by special keystrokes (Command-{Semicolon, Quote}?).  (update focusNearestView to ignore sequencing ports, too)
