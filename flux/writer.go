@@ -494,6 +494,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					key = w.name("i")
 				}
 				w.write("%s := %s(0); %s < %s; %s++ {\n", key, w.typ(n.input.obj.Type), key, vars[n.input], key)
+				// TODO: string
 			case *types.Array, *types.Pointer, *types.Slice:
 				if val != "_" && key == "_" {
 					key = w.name("i")
@@ -536,6 +537,50 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				vars[kv[1]] = val
 			}
 			w.block(n.loopblk, vars)
+			w.indent("}")
+			w.seq(n)
+		case *selectNode:
+			for _, c := range n.cases {
+				if c.elem != nil && vars[c.elem] == "" {
+					if t := c.elem.obj.Type; t != nil {
+						name := w.name("v")
+						w.indent("var %s %s\n", name, w.typ(t))
+						vars[c.elem] = name
+					}
+				}
+			}
+			w.indent("select {\n")
+			for _, c := range n.cases {
+				if c.ch == nil {
+					w.indent("default:\n")
+				} else {
+					ch := vars[c.ch]
+					if ch == "" {
+						continue
+					}
+					w.indent("case ")
+					if c.send {
+						w.write("%s <- %s", ch, vars[c.elem])
+					} else {
+						elemOk := c.elemOk.outs
+						elem, ok := "_", "_"
+						if len(elemOk[0].conns) > 0 {
+							elem = w.name("v")
+							vars[elemOk[0]] = elem
+						}
+						if len(elemOk[1].conns) > 0 {
+							ok = w.name("ok")
+							vars[elemOk[1]] = ok
+						}
+						if elem != "_" || ok != "_" {
+							w.write("%s, %s := ", elem, ok)
+						}
+						w.write("<-%s", ch)
+					}
+					w.write(":\n")
+				}
+				w.block(c.blk, vars)
+			}
 			w.indent("}")
 			w.seq(n)
 		}

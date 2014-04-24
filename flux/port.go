@@ -190,8 +190,8 @@ func (p *port) KeyPress(event KeyEvent) {
 				p.focusMiddle()
 			}
 		} else {
-			if n, ok := p.node.(*ifNode); ok {
-				n.focusFrom(p)
+			if f, ok := p.node.(focuserFrom); ok {
+				f.focusFrom(p)
 			} else {
 				SetKeyFocus(p.node)
 			}

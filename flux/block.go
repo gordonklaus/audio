@@ -118,6 +118,10 @@ func (b *block) removeNode(n node) {
 			for _, b := range n.blocks {
 				b.close()
 			}
+		case *selectNode:
+			for _, c := range n.cases {
+				c.blk.close()
+			}
 		case *loopNode:
 			n.loopblk.close()
 		case *funcNode:
@@ -160,6 +164,10 @@ func (b *block) walk(bf func(*block), nf func(node), cf func(*connection)) {
 		case *ifNode:
 			for _, b := range n.blocks {
 				b.walk(bf, nf, cf)
+			}
+		case *selectNode:
+			for _, c := range n.cases {
+				c.blk.walk(bf, nf, cf)
 			}
 		case *loopNode:
 			n.loopblk.walk(bf, nf, cf)
@@ -314,6 +322,10 @@ func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) 
 	return
 }
 
+type focuserFrom interface {
+	focusFrom(View)
+}
+
 func (b *block) focusNearestView(viewOrPoint interface{}, dirKey int) {
 	p, _ := viewOrPoint.(Point)
 	if v, ok := viewOrPoint.(View); ok {
@@ -329,6 +341,8 @@ func (b *block) focusNearestView(viewOrPoint interface{}, dirKey int) {
 		views = append(views, n)
 		switch n.(type) {
 		case *ifNode:
+			views = append(views, seqIn(n), seqOut(n))
+		case *selectNode:
 			views = append(views, seqIn(n), seqOut(n))
 		case *loopNode:
 			views = append(views, seqOut(n))
@@ -362,6 +376,10 @@ func (b *block) KeyPress(event KeyEvent) {
 				} else if len := len(outs(n)); len > 0 {
 					outs(n)[len/2].focusMiddle()
 				}
+			}
+		} else if f, ok := b.node.(focuserFrom); ok {
+			if event.Key == KeyUp {
+				f.focusFrom(b)
 			}
 		} else {
 			b.ViewBase.KeyPress(event)
@@ -484,6 +502,8 @@ func (b *block) newNode(obj types.Object, funcAsVal bool, godefer string) node {
 			n = i
 		case "loop":
 			n = newLoopNode(b.childArranged)
+		case "select":
+			n = newSelectNode(b.childArranged)
 		case "typeAssert":
 			n = newTypeAssertNode()
 		}
@@ -597,6 +617,8 @@ func (n *portsNode) removePort(p *port) {
 func (n *portsNode) KeyPress(event KeyEvent) {
 	if l, ok := n.blk.node.(*loopNode); ok && event.Key == KeyUp {
 		SetKeyFocus(l)
+	} else if s, ok := n.blk.node.(*selectNode); ok && event.Key == KeyUp {
+		s.focusFrom(n)
 	} else if f, ok := n.blk.node.(*funcNode); ok && f.literal && event.Key == KeyDown && n.out {
 		SetKeyFocus(f)
 	} else if n.editable && event.Text == "," {

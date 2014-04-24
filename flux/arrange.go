@@ -111,6 +111,40 @@ func (n *nodeArrange) arrange() {
 			MoveCenter(output, Pt(0, -portSize/2))
 		}
 		ResizeToFit(n, 0)
+	case *selectNode:
+		seqIn := n.ports[0]
+		seqOut := n.ports[len(n.ports)-1]
+		if len(n.blocks) > 0 {
+			x := 0.0
+			i := 1
+			for j, b := range n.blocks {
+				if j > 0 {
+					x += portSize + (Width(n.blocks[j-1])+Width(b))/2
+				}
+				if !n.defaultCase[b.block] {
+					ch := n.ports[i]
+					i++
+					if n.sendCase[b.block] {
+						elem := n.ports[i]
+						i++
+						MoveCenter(ch, Pt(x-portSize/2, 2*portSize))
+						MoveCenter(elem, Pt(x+portSize/2, 2*portSize))
+					} else {
+						MoveCenter(ch, Pt(x, 2*portSize))
+					}
+				}
+				b.Move(Pt(x-Width(b)/2, -Height(b)))
+			}
+			MoveCenter(seqIn, ZP)
+			MoveCenter(seqOut, Pt(0, -Height(n.blocks[0])))
+		} else {
+			r := RectInParent(node.name)
+			x := r.Center().X
+			MoveCenter(seqIn, Pt(x, r.Max.Y))
+			MoveCenter(seqOut, Pt(x, r.Min.Y))
+		}
+		ResizeToFit(n, 0)
+		n.SetRect(Rect(n).Union(RectInParent(node.name)))
 	}
 }
 
@@ -472,11 +506,13 @@ type blockArrange struct {
 
 type nodeArrange struct {
 	*ViewBase
-	node     node
-	block    *blockArrange
-	ports    []*portArrange
-	blocks   []*blockArrange
-	hasConns bool
+	node   node
+	block  *blockArrange
+	ports  []*portArrange
+	blocks []*blockArrange
+
+	hasConns              bool
+	defaultCase, sendCase map[*block]bool
 
 	g, g_, step Point
 
@@ -546,6 +582,16 @@ func newNodeArrange(node node, b *blockArrange, ports portmap) *nodeArrange {
 		b := newBlockArrange(node.funcblk, n, ports)
 		n.blocks = []*blockArrange{b}
 		n.Add(b)
+	case *selectNode:
+		n.defaultCase = map[*block]bool{}
+		n.sendCase = map[*block]bool{}
+		for _, c := range node.cases {
+			b := newBlockArrange(c.blk, n, ports)
+			n.blocks = append(n.blocks, b)
+			n.Add(b)
+			n.defaultCase[c.blk] = c.ch == nil
+			n.sendCase[c.blk] = c.send
+		}
 	}
 	n.step = Pt(1, 1)
 	return n
@@ -606,6 +652,8 @@ func (n *nodeArrange) copy(b *blockArrange, ports portmap) *nodeArrange {
 		n2.Add(b)
 	}
 	n2.hasConns = n.hasConns
+	n2.defaultCase = n.defaultCase
+	n2.sendCase = n.sendCase
 	n2.step = Pt(1, 1)
 	return n2
 }

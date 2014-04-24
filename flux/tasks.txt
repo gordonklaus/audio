@@ -1,9 +1,11 @@
 TODO
 
 - type switch
-- select
 - builtins panic and recover should have valid signatures in go/types
 - len and capacity inputs for make, len and max input for slice, ok output for type assert (also mapget and chanrecv?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable
+- draw an empty block as a small circle.  when it is focused, draw a grey dot in the middle.
+- don't focus outermost func block
+- focus connection ends more clearly:  don't draw connection in blue; highlight, e.g. with a series of points of diminishing size in the direction of the connection.
 - sequencing ports:
   - don't include them in normal keyboard navigation.  access them by special keystrokes (Command-{Semicolon, Quote}?).  (update focusNearestView to ignore sequencing ports, too)
   - draw as straight dotted line
@@ -29,6 +31,7 @@ TODO
 - don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.
 - make connectionBundles to reduce wire clutter?  each port has at most one connectionBundle that branches off connections near each port it connects to.  or don't add a new object, just draw connections coincident that originate at the same port.  especially bundle coincident connections that cross block boundaries.
 - condition blocks for if, &&, ||
+- use layered DAG as first approximation in arrangement?
 - consider drawing nodes as circles/ellipses.  this is the easiest way to treat them when arranging, and it might even be visually ok.  loopNode will work fine, as its loopblk can be drawn as a circle; but ifNode, switchNode, and selectNode will be harder, having multiple blocks.
 - in browser, by default don't show non-Go dirs (and don't show non-Flux dirs in isFluxObj mode); show them when Shift is pressed
 - prefix names with pkg name in browser and typeView

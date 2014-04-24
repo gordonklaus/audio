@@ -285,6 +285,30 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			}
 			r.block(n.loopblk, s.Body.List)
 			r.seq(n, s)
+		case *ast.SelectStmt:
+			n := newSelectNode(b.childArranged)
+			b.addNode(n)
+			for _, s := range s.Body.List {
+				s := s.(*ast.CommClause)
+				c := n.newCase()
+				switch s := s.Comm.(type) {
+				case *ast.AssignStmt:
+					c.send = false
+					r.in(s.Rhs[0].(*ast.UnaryExpr).X, c.ch)
+					r.out(s.Lhs[0], c.elemOk.outs[0])
+					r.out(s.Lhs[1], c.elemOk.outs[1])
+				case *ast.ExprStmt:
+					c.send = false
+					r.in(s.X.(*ast.UnaryExpr).X, c.ch)
+				case *ast.SendStmt:
+					r.in(s.Chan, c.ch)
+					r.in(s.Value, c.elem)
+				case nil:
+					c.setDefault()
+				}
+				r.block(c.blk, s.Body)
+			}
+			r.seq(n, s)
 		case *ast.SendStmt:
 			r.sendrecv(b, s.Chan, s.Value, s)
 		}

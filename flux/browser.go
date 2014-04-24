@@ -351,7 +351,7 @@ func (b browser) filteredObjs() (objs objects) {
 			}
 		}
 	} else {
-		for _, name := range []string{"break", "call", "continue", "convert", "defer", "func", "go", "if", "loop", "typeAssert"} {
+		for _, name := range []string{"break", "call", "continue", "convert", "defer", "func", "go", "if", "loop", "select", "typeAssert"} {
 			add(special{newVar(name, nil)})
 		}
 		for _, name := range []string{"=", "*"} {

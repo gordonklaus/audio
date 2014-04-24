@@ -40,7 +40,7 @@ func (n *ifNode) newBlock() (b *block, cond *port) {
 	b = newBlock(n, n.arranged)
 	n.blocks = append(n.blocks, b)
 
-	cond = newInput(n, newVar("", nil))
+	cond = newInput(n, nil)
 	cond.connsChanged = func() {
 		cond.setType(untypedToTyped(inputType(cond)))
 	}
@@ -86,9 +86,9 @@ func (n *ifNode) focus(i int) {
 	Repaint(n)
 }
 
-func (n *ifNode) focusFrom(p *port) {
-	for i, p2 := range n.cond {
-		if p2 == p {
+func (n *ifNode) focusFrom(v View) {
+	for i := range n.cond {
+		if v == n.cond[i] || v == n.blocks[i] {
 			n.focus(i)
 			break
 		}
@@ -109,15 +109,6 @@ func (n *ifNode) TookKeyFocus() {
 func (n *ifNode) LostKeyFocus() { n.focused = -1; Repaint(n) }
 
 func (n *ifNode) KeyPress(event KeyEvent) {
-	if b, ok := KeyFocus(n).(*block); ok {
-		for i, b2 := range n.blocks {
-			if b == b2 && event.Key == KeyUp {
-				n.focus(i)
-			}
-		}
-		return
-	}
-
 	switch event.Key {
 	case KeyUp:
 		SetKeyFocus(n.cond[n.focused])
