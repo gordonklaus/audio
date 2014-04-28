@@ -34,6 +34,7 @@ func newFuncNode(obj types.Object, arranged blockchan) *funcNode {
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
 	if n.literal {
 		n.output = newOutput(n, newVar("", &types.Signature{}))
+		MoveCenter(n.output, Pt(0, -portSize))
 		n.Add(n.output)
 	} else {
 		n.pkgRefs = map[*types.Package]int{}
@@ -145,7 +146,12 @@ func (n *funcNode) KeyPress(event KeyEvent) {
 
 func (n funcNode) Paint() {
 	if n.literal {
-		SetColor(map[bool]Color{false: {.5, .5, .5, 1}, true: {.3, .3, .7, 1}}[n.focused])
-		DrawLine(Pt(0, -portSize/2), Pt(0, portSize/2))
+		SetColor(lineColor)
+		DrawLine(Pt(0, portSize/2), Pt(0, -portSize))
+		if n.focused {
+			SetPointSize(2 * portSize)
+			SetColor(focusColor)
+			DrawPoint(ZP)
+		}
 	}
 }

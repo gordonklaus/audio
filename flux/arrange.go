@@ -85,31 +85,25 @@ func (n *nodeArrange) arrange() {
 	case *ifNode:
 		x := 0.0
 		for i, b := range n.blocks {
+			if i > 0 {
+				x += portSize + (Width(n.blocks[i-1])+Width(b))/2
+			}
 			cond := n.ports[i+1]
-			MoveCenter(cond, Pt(x+Width(b)/2, 2*portSize))
-			b.Move(Pt(x, -Height(b)))
-			x += Width(b) + portSize
+			MoveCenter(cond, Pt(x, portSize))
+			b.Move(Pt(x-Width(b)/2, -Height(b)-portSize))
 		}
-		seqIn := n.ports[0]
 		seqOut := n.ports[len(n.ports)-1]
-		b := n.blocks[0]
-		dx := Size(b).X / 2
-		MoveCenter(seqIn, Pt(dx, 0))
-		MoveCenter(seqOut, Pt(dx, -Height(b)))
+		MoveCenter(seqOut, Pt(0, -Height(n.blocks[0])-portSize))
 		ResizeToFit(n, 0)
 	case *loopNode:
 		b := n.blocks[0]
-		b.Move(Pt(-Width(b)/2, -Height(b)-portSize/2))
+		b.Move(Pt(-Width(b)/2, -Height(b)-portSize))
 		seqOut := n.ports[2]
-		MoveCenter(seqOut, Pt(0, -Height(b)-portSize/2))
+		MoveCenter(seqOut, Pt(0, -Height(b)-portSize))
 		ResizeToFit(n, 0)
 	case *funcNode:
 		b := n.blocks[0]
 		b.Move(Pt(-Width(b)/2, portSize/2))
-		if node.literal {
-			output := n.ports[0]
-			MoveCenter(output, Pt(0, -portSize/2))
-		}
 		ResizeToFit(n, 0)
 	case *selectNode:
 		seqIn := n.ports[0]
@@ -127,16 +121,16 @@ func (n *nodeArrange) arrange() {
 					if n.sendCase[b.block] {
 						elem := n.ports[i]
 						i++
-						MoveCenter(ch, Pt(x-portSize/2, 2*portSize))
-						MoveCenter(elem, Pt(x+portSize/2, 2*portSize))
+						MoveCenter(ch, Pt(x-portSize/2, portSize))
+						MoveCenter(elem, Pt(x+portSize/2, portSize))
 					} else {
-						MoveCenter(ch, Pt(x, 2*portSize))
+						MoveCenter(ch, Pt(x, portSize))
 					}
 				}
-				b.Move(Pt(x-Width(b)/2, -Height(b)))
+				b.Move(Pt(x-Width(b)/2, -Height(b)-portSize))
 			}
-			MoveCenter(seqIn, ZP)
-			MoveCenter(seqOut, Pt(0, -Height(n.blocks[0])))
+			MoveCenter(seqIn, Pt(0, -portSize))
+			MoveCenter(seqOut, Pt(0, -Height(n.blocks[0])-portSize))
 		} else {
 			r := RectInParent(node.name)
 			x := r.Center().X

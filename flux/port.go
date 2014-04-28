@@ -44,7 +44,7 @@ func newPort(out bool, n node, v *types.Var) *port {
 	p.setType(*p.valView.typ)
 
 	p.conntxt = NewText("")
-	p.conntxt.SetBackgroundColor(Color{0, 0, 0, 0})
+	p.conntxt.SetBackgroundColor(noColor)
 	p.conntxt.SetValidator(validateID)
 	p.Add(p.conntxt)
 	return p
@@ -285,7 +285,7 @@ func (p *port) Mouse(m MouseEvent) {
 
 func (p port) Paint() {
 	if p.focused {
-		SetColor(Color{.3, .3, .7, .5})
+		SetColor(focusColor)
 		SetPointSize(portSize)
 		DrawPoint(ZP)
 	}

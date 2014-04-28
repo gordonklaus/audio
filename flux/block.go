@@ -9,7 +9,6 @@ import (
 	. "code.google.com/p/gordon-go/gui"
 	. "code.google.com/p/gordon-go/util"
 	"go/token"
-	"math"
 	"math/rand"
 )
 
@@ -354,7 +353,7 @@ func (b *block) focusNearestView(viewOrPoint interface{}, dirKey int) {
 	}
 }
 
-func (b *block) TookKeyFocus() { 
+func (b *block) TookKeyFocus() {
 	for n := range b.nodes {
 		SetKeyFocus(n)
 		return
@@ -553,26 +552,26 @@ func (b *block) newNode(obj types.Object, funcAsVal bool, godefer string) node {
 func (b *block) Paint() {
 	if b.focused {
 		SetPointSize(2 * portSize)
-		SetColor(Color{.25, .25, .25, 1})
+		SetColor(focusColor)
 		DrawPoint(Center(b))
 	}
 	{
-		SetColor(Color{.5, .5, .5, 1})
+		SetColor(lineColor)
+		SetLineWidth(1.5)
 		rect := Rect(b)
 		l, r, b, t := rect.Min.X, rect.Max.X, rect.Min.Y, rect.Max.Y
 		lb, bl := Pt(l, b+blockRadius), Pt(l+blockRadius, b)
 		rb, br := Pt(r, b+blockRadius), Pt(r-blockRadius, b)
 		rt, tr := Pt(r, t-blockRadius), Pt(r-blockRadius, t)
 		lt, tl := Pt(l, t-blockRadius), Pt(l+blockRadius, t)
-		steps := int(math.Trunc(2 * math.Pi * blockRadius))
 		DrawLine(bl, br)
-		DrawQuadratic([3]Point{br, Pt(r, b), rb}, steps)
+		DrawBezier(br, Pt(r, b), rb)
 		DrawLine(rb, rt)
-		DrawQuadratic([3]Point{rt, Pt(r, t), tr}, steps)
+		DrawBezier(rt, Pt(r, t), tr)
 		DrawLine(tr, tl)
-		DrawQuadratic([3]Point{tl, Pt(l, t), lt}, steps)
+		DrawBezier(tl, Pt(l, t), lt)
 		DrawLine(lt, lb)
-		DrawQuadratic([3]Point{lb, Pt(l, b), bl}, steps)
+		DrawBezier(lb, Pt(l, b), bl)
 	}
 }
 
@@ -706,14 +705,15 @@ func (n *portsNode) KeyPress(event KeyEvent) {
 }
 
 func (n *portsNode) Paint() {
+	SetColor(lineColor)
+	SetLineWidth(3)
+	DrawLine(Pt(-portSize/4, 0), Pt(portSize/4, 0))
+	n.nodeBase.Paint()
 	if n.focused {
 		SetPointSize(2 * portSize)
-		SetColor(Color{.25, .25, .25, 1})
+		SetColor(focusColor)
 		DrawPoint(ZP)
 	}
-	SetColor(Color{.5, .5, .5, 1})
-	DrawLine(Pt(-3, 0), Pt(3, 0))
-	n.nodeBase.Paint()
 }
 
 type localVar struct {

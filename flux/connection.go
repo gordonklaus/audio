@@ -647,37 +647,26 @@ func (c *connection) Paint() {
 		p3 := end.Add(off)
 		pts = []Point{start, p1, p2, p3, end}
 	}
-	steps := 0.0
-	for i := range pts {
-		if i > 0 {
-			steps += pts[i].Sub(pts[i-1]).Len()
-		}
-	}
 
-	c1 := Color{.5, .5, .5, 1}
+	SetColor(lineColor)
+	SetLineWidth(3)
+	DrawBezier(pts...)
+
 	if c.focused {
-		c2 := Color{.3, .3, .7, 1}
+		c2 := focusColor
 		if c.editing {
 			c2 = Color{1, .5, 0, .5}
 		}
+		c1 := c2
+		c1.A = 0
 		if c.focusSrc {
 			c1, c2 = c2, c1
 		}
 		ctrlPts := []Double{Double(c1.R), Double(c1.G), Double(c1.B), Double(c1.A), Double(c2.R), Double(c2.G), Double(c2.B), Double(c2.A)}
 		Map1d(MAP1_COLOR_4, 0, 1, 4, 2, &ctrlPts[0])
 		Enable(MAP1_COLOR_4)
-		defer Disable(MAP1_COLOR_4)
-	} else {
-		SetColor(c1)
+		SetLineWidth(7)
+		DrawBezier(pts...)
+		Disable(MAP1_COLOR_4)
 	}
-
-	ctrlPts := []Double{}
-	for _, p := range pts {
-		ctrlPts = append(ctrlPts, Double(p.X), Double(p.Y), 0)
-	}
-	Map1d(MAP1_VERTEX_3, 0, 1, 3, Int(len(pts)), &ctrlPts[0])
-	Enable(MAP1_VERTEX_3)
-	defer Disable(MAP1_VERTEX_3)
-	MapGrid1d(Int(steps), 0, 1)
-	EvalMesh1(LINE, 0, Int(steps))
 }

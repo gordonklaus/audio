@@ -42,7 +42,7 @@ func newTypeView(t *types.Type) *typeView {
 	v.ViewBase = NewView(v)
 	v.text = NewText("")
 	v.text.SetTextColor(color(&types.TypeName{}, false, false))
-	v.text.SetBackgroundColor(Color{0, 0, 0, 0})
+	v.text.SetBackgroundColor(noColor)
 	v.Add(v.text)
 	v.setType(*t)
 	return v
@@ -70,7 +70,7 @@ func newValueView(val types.Object) *typeView {
 	v.pkg = val.GetPkg()
 	v.name = NewText(*name)
 	v.name.SetTextColor(color(val, false, false))
-	v.name.SetBackgroundColor(Color{0, 0, 0, 0})
+	v.name.SetBackgroundColor(noColor)
 	v.name.TextChanged = func(text string) {
 		*name = text
 		v.reform()
@@ -627,7 +627,7 @@ func (v *typeView) Paint() {
 		FillRect(Rect(v))
 	}
 	if _, ok := Parent(v).(*typeView); ok {
-		SetColor(Color{.5, .5, .5, 1})
+		SetColor(lineColor)
 		SetLineWidth(1)
 		DrawRect(Rect(v))
 	}

@@ -50,13 +50,17 @@ func newGoDeferNodeBase(self node, godefer string) *nodeBase {
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(self), NewMover(self)}
 	n.text = NewText("")
-	n.text.SetBackgroundColor(Color{0, 0, 0, 0})
+	n.text.SetBackgroundColor(noColor)
 	n.text.TextChanged = func(string) {
-		if n.text.GetText() == "" && godefer != "" {
+		if n.text.GetText() != "" {
+			n.text.SetFrameSize(3)
+		}
+		if godefer != "" {
 			n.godeferText.SetText(godefer[:len(godefer)-1])
+			n.godeferText.SetFrameSize(3)
 		}
 		width := Width(n.godeferText) + Width(n.text)
-		height := Height(n.godeferText)
+		height := math.Max(Height(n.godeferText), Height(n.text))
 		n.godeferText.Move(Pt(-width/2, -height/2))
 		n.text.Move(Pt(-width/2+Width(n.godeferText), -height/2))
 		n.gap = height / 2
@@ -64,7 +68,7 @@ func newGoDeferNodeBase(self node, godefer string) *nodeBase {
 	}
 	n.Add(n.text)
 	n.godeferText = NewText(godefer)
-	n.godeferText.SetBackgroundColor(Color{0, 0, 0, 0})
+	n.godeferText.SetBackgroundColor(noColor)
 	n.godeferText.SetTextColor(color(special{}, true, false))
 	n.Add(n.godeferText)
 	n.ViewBase.Self = self
@@ -199,20 +203,21 @@ func nodeMoved(n node) {
 
 func (n *nodeBase) TookKeyFocus() {
 	n.focused = true
-	c := Color{.25, .25, .25, 1}
-	n.text.SetBackgroundColor(c)
-	n.godeferText.SetBackgroundColor(c)
+	c := focusColor
+	n.text.SetFrameColor(c)
+	n.godeferText.SetFrameColor(c)
 }
 
 func (n *nodeBase) LostKeyFocus() {
 	n.focused = false
-	c := Color{0, 0, 0, 0}
-	n.text.SetBackgroundColor(c)
-	n.godeferText.SetBackgroundColor(c)
+	c := noColor
+	n.text.SetFrameColor(c)
+	n.godeferText.SetFrameColor(c)
 }
 
 func (n *nodeBase) Paint() {
-	SetColor(Color{.5, .5, .5, 1})
+	SetColor(lineColor)
+	SetLineWidth(3)
 	for _, p := range append(ins(n), outs(n)...) {
 		pt := CenterInParent(p)
 		dy := n.gap
@@ -220,7 +225,7 @@ func (n *nodeBase) Paint() {
 			dy = -dy
 		}
 		y := (pt.Y-dy)/2 + dy
-		DrawCubic([4]Point{Pt(0, dy), Pt(0, y), Pt(pt.X, y), pt}, int(pt.Len()/2))
+		DrawBezier(Pt(0, dy), Pt(0, y), Pt(pt.X, y), pt)
 	}
 }
 

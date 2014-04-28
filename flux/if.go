@@ -166,13 +166,14 @@ func (n ifNode) Paint() {
 		if i == len(n.blocks)-1 {
 			right = center
 		}
+		SetColor(lineColor)
+		SetLineWidth(3)
+		DrawLine(Pt(left, 0), Pt(right, 0))
+		DrawLine(Pt(center, portSize), Pt(center, -portSize))
 		if i == n.focused {
 			SetPointSize(2 * portSize)
-			SetColor(Color{.25, .25, .25, 1})
-			DrawPoint(Pt(center, portSize))
+			SetColor(focusColor)
+			DrawPoint(Pt(center, 0))
 		}
-		SetColor(Color{.5, .5, .5, 1})
-		DrawLine(Pt(left, portSize), Pt(right, portSize))
-		DrawLine(Pt(center, 2*portSize), Pt(center, 0))
 	}
 }

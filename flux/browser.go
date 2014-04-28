@@ -68,7 +68,7 @@ loop:
 	}
 
 	b.text = NewText("")
-	b.text.SetBackgroundColor(Color{0, 0, 0, 0})
+	b.text.SetBackgroundColor(noColor)
 	b.text.SetValidator(b.validateText)
 	b.text.TextChanged = b.textChanged
 	b.Add(b.text)
@@ -696,29 +696,6 @@ func (b *browser) Paint() {
 	}
 	SetColor(Color{1, 1, 1, .7})
 	FillRect(rect)
-}
-
-func color(obj types.Object, bright, funcAsVal bool) Color {
-	alpha := .7
-	if bright {
-		alpha = 1
-	}
-	switch obj.(type) {
-	case special:
-		return Color{1, 1, .6, alpha}
-	case *pkgObject:
-		return Color{1, 1, 1, alpha}
-	case *types.TypeName:
-		return Color{.6, 1, .6, alpha}
-	case *types.Func, *types.Builtin:
-		if funcAsVal && obj.GetPkg() != nil { //Pkg==nil == builtin
-			return color(&types.Var{}, bright, funcAsVal)
-		}
-		return Color{1, .6, .6, alpha}
-	case *types.Var, *types.Const, field, *localVar:
-		return Color{.6, .6, 1, alpha}
-	}
-	panic(fmt.Sprintf("unknown object type %T", obj))
 }
 
 type pkgObject struct {

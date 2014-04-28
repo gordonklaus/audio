@@ -26,11 +26,11 @@ func newLoopNode(arranged blockchan) *loopNode {
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
 	n.input = newInput(n, nil)
 	n.input.connsChanged = n.connsChanged
-	MoveCenter(n.input, Pt(0, portSize/2))
+	MoveCenter(n.input, Pt(0, portSize))
 	n.Add(n.input)
 
 	n.seqIn = newInput(n, newVar("seq", seqType))
-	MoveCenter(n.seqIn, Pt(0, -portSize/2))
+	MoveCenter(n.seqIn, Pt(0, -portSize))
 	n.Add(n.seqIn)
 	n.seqOut = newOutput(n, newVar("seq", seqType))
 	n.Add(n.seqOut)
@@ -128,11 +128,12 @@ func (n *loopNode) KeyPress(event KeyEvent) {
 }
 
 func (n loopNode) Paint() {
+	SetColor(lineColor)
+	SetLineWidth(3)
+	DrawLine(Pt(0, -portSize), Pt(0, portSize))
 	if n.focused {
 		SetPointSize(2 * portSize)
-		SetColor(Color{.25, .25, .25, 1})
+		SetColor(focusColor)
 		DrawPoint(ZP)
 	}
-	SetColor(Color{.5, .5, .5, 1})
-	DrawLine(Pt(0, -portSize/2), Pt(0, portSize/2))
 }

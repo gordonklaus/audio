@@ -28,9 +28,10 @@ func newSelectNode(arranged blockchan) *selectNode {
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(n), NewMover(n)}
 	n.name = NewText("select")
-	n.name.SetBackgroundColor(Color{0, 0, 0, 0})
+	n.name.SetBackgroundColor(noColor)
 	n.name.SetTextColor(color(special{}, true, false))
-	n.name.Move(Pt(-Width(n.name)-portSize/2, portSize/4))
+	n.name.SetFrameSize(3)
+	n.name.Move(Pt(-Width(n.name)-portSize/2, -portSize))
 	n.Add(n.name)
 
 	n.seqIn = newInput(n, newVar("seq", seqType))
@@ -122,9 +123,9 @@ func (n selectNode) outConns() []*connection {
 func (n *selectNode) focus(i int) {
 	n.focused = i
 	if i == -1 {
-		n.name.SetBackgroundColor(Color{.25, .25, .25, 1})
+		n.name.SetFrameColor(focusColor)
 	} else {
-		n.name.SetBackgroundColor(Color{0, 0, 0, 0})
+		n.name.SetFrameColor(noColor)
 	}
 	SetKeyFocus(n)
 	Repaint(n)
@@ -167,15 +168,15 @@ func (n *selectNode) TookKeyFocus() {
 		n.focused = -1
 	}
 	if n.focused == -1 {
-		n.name.SetBackgroundColor(Color{.25, .25, .25, 1})
+		n.name.SetFrameColor(focusColor)
 	} else {
-		n.name.SetBackgroundColor(Color{0, 0, 0, 0})
+		n.name.SetFrameColor(noColor)
 	}
 	Repaint(n)
 }
 func (n *selectNode) LostKeyFocus() {
 	n.focused = -2
-	n.name.SetBackgroundColor(Color{0, 0, 0, 0})
+	n.name.SetFrameColor(noColor)
 	Repaint(n)
 }
 
@@ -269,25 +270,23 @@ func (n selectNode) Paint() {
 		if i == len(n.cases)-1 {
 			right = center
 		}
-		origin := Pt(center, portSize)
-		if i == n.focused {
-			SetPointSize(2 * portSize)
-			SetColor(Color{.25, .25, .25, 1})
-			DrawPoint(origin)
-		}
-		SetColor(Color{.5, .5, .5, 1})
-		DrawLine(Pt(left, portSize), Pt(right, portSize))
-		DrawLine(origin, Pt(center, 0))
-
+		origin := Pt(center, 0)
+		SetColor(lineColor)
+		SetLineWidth(3)
+		DrawLine(Pt(left, 0), Pt(right, 0))
+		DrawLine(origin, Pt(center, -portSize))
 		if c.ch != nil {
 			p := CenterInParent(c.ch)
-			y := (p.Y-portSize)/2 + portSize
-			DrawCubic([4]Point{origin, Pt(center, y), Pt(p.X, y), p}, int(p.Sub(origin).Len()/2))
+			DrawBezier(origin, Pt(center, p.Y/2), Pt(p.X, p.Y/2), p)
 			if c.elem != nil {
 				p := CenterInParent(c.elem)
-				y := (p.Y-portSize)/2 + portSize
-				DrawCubic([4]Point{origin, Pt(center, y), Pt(p.X, y), p}, int(p.Sub(origin).Len()/2))
+				DrawBezier(origin, Pt(center, p.Y/2), Pt(p.X, p.Y/2), p)
 			}
+		}
+		if i == n.focused {
+			SetPointSize(2 * portSize)
+			SetColor(focusColor)
+			DrawPoint(origin)
 		}
 	}
 }
