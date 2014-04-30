@@ -360,8 +360,13 @@ func (b *block) TookKeyFocus() {
 	}
 	b.focused = true
 	Repaint(b)
+	panTo(b, Center(b))
 }
-func (b *block) LostKeyFocus() { b.focused = false; Repaint(b) }
+
+func (b *block) LostKeyFocus() {
+	b.focused = false
+	Repaint(b)
+}
 
 func (b *block) KeyPress(event KeyEvent) {
 	switch k := event.Key; k {

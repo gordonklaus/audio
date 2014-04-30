@@ -1,6 +1,5 @@
 TODO
 
-- auto pan when key focus changes
 - focus hidden connections more clearly
 - type switch
 - builtins panic and recover should have valid signatures in go/types

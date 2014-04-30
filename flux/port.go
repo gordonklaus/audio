@@ -163,8 +163,18 @@ func (p *port) Move(pt Point) {
 	}
 }
 
-func (p *port) TookKeyFocus() { p.focused = true; Repaint(p); Show(p.valView) }
-func (p *port) LostKeyFocus() { p.focused = false; Repaint(p); Hide(p.valView) }
+func (p *port) TookKeyFocus() {
+	p.focused = true
+	Repaint(p)
+	Show(p.valView)
+	panTo(p, ZP)
+}
+
+func (p *port) LostKeyFocus() {
+	p.focused = false
+	Repaint(p)
+	Hide(p.valView)
+}
 
 func (p *port) KeyPress(event KeyEvent) {
 	if event.Alt {

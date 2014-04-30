@@ -304,6 +304,11 @@ func (c *connection) focus(focusSrc bool) {
 	c.updateTextColors()
 	SetKeyFocus(c)
 	Repaint(c)
+	if focusSrc {
+		panTo(c, c.srcPt)
+	} else {
+		panTo(c, c.dstPt)
+	}
 }
 
 func (c *connection) startEditing() {
@@ -509,8 +514,10 @@ func (c *connection) KeyPress(event KeyEvent) {
 			if p, ok := v.(*port); ok {
 				if c.focusSrc {
 					c.setSrc(p)
+					panTo(c, c.srcPt)
 				} else {
 					c.setDst(p)
+					panTo(c, c.dstPt)
 				}
 			}
 		case KeyEnter:

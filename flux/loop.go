@@ -115,8 +115,16 @@ func (n *loopNode) Move(p Point) {
 	nodeMoved(n)
 }
 
-func (n *loopNode) TookKeyFocus() { n.focused = true; Repaint(n) }
-func (n *loopNode) LostKeyFocus() { n.focused = false; Repaint(n) }
+func (n *loopNode) TookKeyFocus() {
+	n.focused = true
+	Repaint(n)
+	panTo(n, ZP)
+}
+
+func (n *loopNode) LostKeyFocus() {
+	n.focused = false
+	Repaint(n)
+}
 
 func (n *loopNode) KeyPress(event KeyEvent) {
 	switch event.Key {

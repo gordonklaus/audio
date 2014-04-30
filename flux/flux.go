@@ -7,7 +7,9 @@ package main
 import (
 	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
+	"math"
 	"runtime"
+	"time"
 )
 
 func main() {
@@ -20,6 +22,9 @@ type fluxWindow struct {
 	*Window
 	*Panner
 	browser *browser
+
+	target chan Point
+	pause  chan bool
 }
 
 func newFluxWindow() *fluxWindow {
@@ -76,7 +81,57 @@ func newFluxWindow() *fluxWindow {
 	}
 	w.browser.canceled = func() {}
 	SetKeyFocus(w.browser)
+
+	w.target = make(chan Point)
+	w.pause = make(chan bool)
+	go w.animate()
+
 	return w
+}
+
+func panTo(v View, p Point) {
+	w := window(v)
+	if w == nil {
+		return
+	}
+	p = MapTo(v, p, w)
+	go func() { w.target <- p }()
+}
+
+func window(v View) *fluxWindow {
+	switch v := v.(type) {
+	case nil:
+		return nil
+	case *fluxWindow:
+		return v
+	}
+	return window(Parent(v))
+}
+
+func (w *fluxWindow) animate() {
+	target := <-w.target
+	vel := ZP
+	center := make(chan Point)
+	for {
+		next := time.After(time.Second / fps)
+		Do(w) <- func() {
+			Pan(w, Rect(w).Min.Add(vel.Div(fps)))
+			center <- Center(w)
+		}
+		d := target.Sub(<-center)
+		d.X = math.Copysign(math.Max(0, math.Abs(d.X)-Width(w)/4), d.X)
+		d.Y = math.Copysign(math.Max(0, math.Abs(d.Y)-Height(w)/4), d.Y)
+		vel = vel.Add(d).Mul(.8)
+		if vel.Len() < .1 {
+			next = nil
+		}
+		select {
+		case <-next:
+		case target = <-w.target:
+		case <-w.pause:
+			target = <-w.target
+		}
+	}
 }
 
 func (w *fluxWindow) SetRect(r Rectangle) {
@@ -85,5 +140,9 @@ func (w *fluxWindow) SetRect(r Rectangle) {
 }
 
 func (w *fluxWindow) Scroll(s ScrollEvent) {
-	w.SetRect(Rect(w).Sub(s.Delta.Mul(4)))
+	select {
+	case w.pause <- true:
+	default:
+	}
+	Pan(w, Rect(w).Min.Sub(s.Delta.Mul(4)))
 }

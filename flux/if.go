@@ -84,6 +84,7 @@ func (n *ifNode) focus(i int) {
 	n.focused = i
 	SetKeyFocus(n)
 	Repaint(n)
+	panTo(n, Pt(CenterInParent(n.blocks[i]).X, 0))
 }
 
 func (n *ifNode) focusFrom(v View) {
@@ -105,8 +106,13 @@ func (n *ifNode) TookKeyFocus() {
 		n.focused = 0
 	}
 	Repaint(n)
+	panTo(n, Pt(CenterInParent(n.blocks[n.focused]).X, 0))
 }
-func (n *ifNode) LostKeyFocus() { n.focused = -1; Repaint(n) }
+
+func (n *ifNode) LostKeyFocus() {
+	n.focused = -1
+	Repaint(n)
+}
 
 func (n *ifNode) KeyPress(event KeyEvent) {
 	switch event.Key {

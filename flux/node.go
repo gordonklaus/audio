@@ -199,6 +199,10 @@ func nodeMoved(n node) {
 	for _, c := range append(n.inConns(), n.outConns()...) {
 		c.reform()
 	}
+	if KeyFocus(n) == n {
+		// TODO: not ZP for if and select
+		panTo(n, ZP)
+	}
 }
 
 func (n *nodeBase) TookKeyFocus() {
@@ -206,6 +210,7 @@ func (n *nodeBase) TookKeyFocus() {
 	c := focusColor
 	n.text.SetFrameColor(c)
 	n.godeferText.SetFrameColor(c)
+	panTo(n, ZP)
 }
 
 func (n *nodeBase) LostKeyFocus() {

@@ -124,8 +124,10 @@ func (n *selectNode) focus(i int) {
 	n.focused = i
 	if i == -1 {
 		n.name.SetFrameColor(focusColor)
+		panTo(n.name, Center(n.name))
 	} else {
 		n.name.SetFrameColor(noColor)
+		panTo(n, Pt(CenterInParent(n.cases[i].blk).X, 0))
 	}
 	SetKeyFocus(n)
 	Repaint(n)
@@ -167,17 +169,19 @@ func (n *selectNode) TookKeyFocus() {
 	if n.focused < -1 {
 		n.focused = -1
 	}
+	Repaint(n)
 	if n.focused == -1 {
 		n.name.SetFrameColor(focusColor)
+		panTo(n.name, Center(n.name))
 	} else {
 		n.name.SetFrameColor(noColor)
+		panTo(n, Pt(CenterInParent(n.cases[n.focused].blk).X, 0))
 	}
-	Repaint(n)
 }
 func (n *selectNode) LostKeyFocus() {
 	n.focused = -2
-	n.name.SetFrameColor(noColor)
 	Repaint(n)
+	n.name.SetFrameColor(noColor)
 }
 
 func (n *selectNode) KeyPress(event KeyEvent) {
