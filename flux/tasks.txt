@@ -21,6 +21,7 @@ TODO
 - make gui.Text change its appearance based on content when a validator is present.  give validator 3 states:  Acceptable, Intermediate, Invalid.
 - consider not lumping sequencing ports and connections in with the normal ones.  they can be annoying.  don't forget to consider them in the topological sorting order.
 - one-off local functions
+- reposition port.valView after creating new param/result
 - case-insensitive sorting in browser?  currently, all lowercase names follow all upper case.  also, don't sort operators?
 - use go/parser and go/ast to validate basic literals
 - dimly highlight connected ports when a port is focused (or only when a key, e.g. Shift, is pressed) (but always for wireless conns)

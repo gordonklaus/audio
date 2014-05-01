@@ -30,12 +30,12 @@ type nodeBase struct {
 	AggregateMouser
 
 	blk  *block
-	text *TextBase
+	text *Text
 	ins  []*port
 	outs []*port
 
 	godefer     string
-	godeferText Text
+	godeferText *Text
 
 	focused bool
 	gap     float64
@@ -52,7 +52,7 @@ func newGoDeferNodeBase(self node, godefer string) *nodeBase {
 	n.text = NewText("")
 	n.text.SetBackgroundColor(noColor)
 	n.text.TextChanged = func(string) {
-		if n.text.GetText() != "" {
+		if n.text.Text() != "" {
 			n.text.SetFrameSize(3)
 		}
 		if godefer != "" {
@@ -288,7 +288,7 @@ func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 		} else {
 			out.setType(types.Typ[types.UntypedFloat])
 		}
-		n.text.SetValidator(func(s *string) bool {
+		n.text.Validate = func(s *string) bool {
 			*s = strings.TrimLeft(*s, "0")
 			if *s == "" || *s == "-" {
 				*s = "0"
@@ -315,20 +315,20 @@ func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 				}
 			}
 			return true
-		})
+		}
 	case token.IMAG:
 		// TODO
 	case token.STRING:
 		out.setType(types.Typ[types.UntypedString])
 	case token.CHAR:
 		out.setType(types.Typ[types.UntypedRune])
-		n.text.SetValidator(func(s *string) bool {
+		n.text.Validate = func(s *string) bool {
 			if *s == "" {
 				return false
 			}
 			*s = (*s)[len(*s)-1:]
 			return true
-		})
+		}
 	}
 	n.text.Accept = func(string) { SetKeyFocus(n) }
 	return n
@@ -337,7 +337,7 @@ func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 func (n *basicLiteralNode) KeyPress(k KeyEvent) {
 	switch k.Key {
 	case KeyEnter:
-		s := n.text.GetText()
+		s := n.text.Text()
 		t := n.outs[0].obj.Type
 		n.text.Reject = func() {
 			n.text.SetText(s)

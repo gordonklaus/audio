@@ -12,7 +12,7 @@ import (
 type selectNode struct {
 	*ViewBase
 	AggregateMouser
-	name Text
+	name *Text
 
 	blk           *block
 	seqIn, seqOut *port

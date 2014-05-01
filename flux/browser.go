@@ -32,10 +32,10 @@ type browser struct {
 	i          int
 	newObj     types.Object
 
-	pathTexts, objTexts []Text
-	text                *TextBase
+	pathTexts, objTexts []*Text
+	text                *Text
 	typeView            *typeView
-	pkgName             *TextBase
+	pkgName             *Text
 	funcAsVal           bool
 }
 
@@ -69,7 +69,7 @@ loop:
 
 	b.text = NewText("")
 	b.text.SetBackgroundColor(noColor)
-	b.text.SetValidator(b.validateText)
+	b.text.Validate = b.validateText
 	b.text.TextChanged = b.textChanged
 	b.Add(b.text)
 
@@ -130,7 +130,7 @@ func (b *browser) makeCurrent(obj types.Object) {
 	}
 }
 
-func (b browser) lastPathText() (Text, bool) {
+func (b browser) lastPathText() (*Text, bool) {
 	if np := len(b.pathTexts); np > 0 {
 		return b.pathTexts[np-1], true
 	}
@@ -198,7 +198,7 @@ func (b *browser) refresh() {
 	if cur != nil {
 		f := b.text.TextChanged
 		b.text.TextChanged = nil
-		b.text.SetText(cur.GetName()[:len(b.text.GetText())])
+		b.text.SetText(cur.GetName()[:len(b.text.Text())])
 		b.text.TextChanged = f
 	}
 
@@ -209,7 +209,7 @@ func (b *browser) refresh() {
 			if _, ok := cur.(*pkgObject); ok {
 				sep = "/"
 			}
-			text := t.GetText()
+			text := t.Text()
 			t.SetText(text[:len(text)-1] + sep)
 		}
 		xOffset = Pos(t).X + Width(t)
@@ -486,7 +486,7 @@ func (b *browser) KeyPress(event KeyEvent) {
 			b.refresh()
 		}
 	case KeyBackspace:
-		if len(b.text.GetText()) > 0 {
+		if len(b.text.Text()) > 0 {
 			b.text.KeyPress(event)
 			break
 		}

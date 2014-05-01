@@ -22,7 +22,7 @@ type port struct {
 	focused      bool
 	connsChanged func()
 
-	conntxt *TextBase
+	conntxt *Text
 }
 
 const portSize = 11.0
@@ -46,7 +46,7 @@ func newPort(out bool, n node, v *types.Var) *port {
 	p.conntxt = NewText("")
 	p.conntxt.SetTextColor(lineColor)
 	p.conntxt.SetBackgroundColor(noColor)
-	p.conntxt.SetValidator(validateID)
+	p.conntxt.Validate = validateID
 	p.Add(p.conntxt)
 	return p
 }

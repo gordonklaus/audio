@@ -203,7 +203,7 @@ func (c *connection) setSrc(src *port) {
 	txt := ""
 	if c.src != nil {
 		c.src.disconnect(c)
-		txt = c.src.conntxt.GetText()
+		txt = c.src.conntxt.Text()
 		c.updateSrcTxt("")
 	}
 	c.src = src
@@ -354,7 +354,7 @@ func (c *connection) toggleHidden() {
 	c.hidden = !c.hidden
 	rearrange(c.blk)
 	if c.hidden {
-		if srctxt := c.src.conntxt; srctxt.GetText() == "" {
+		if srctxt := c.src.conntxt; srctxt.Text() == "" {
 			srctxt.TextChanged = func(string) {
 				for _, c := range c.src.conns {
 					if c.hidden {
@@ -366,7 +366,7 @@ func (c *connection) toggleHidden() {
 				names := map[string]bool{"": true}
 				c.blk.outermost().walk(nil, nil, func(conn *connection) {
 					if conn.src != c.src {
-						names[conn.src.conntxt.GetText()] = true
+						names[conn.src.conntxt.Text()] = true
 					}
 				})
 				if names[name] {
@@ -411,7 +411,7 @@ func (c *connection) updateDstTxt() {
 	nameset := map[string]bool{}
 	for _, c := range c.dst.conns {
 		if c.hidden {
-			nameset[c.src.conntxt.GetText()] = true
+			nameset[c.src.conntxt.Text()] = true
 		}
 	}
 	names := []string{}

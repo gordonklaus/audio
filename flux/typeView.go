@@ -19,10 +19,10 @@ type typeView struct {
 	pkg  *types.Package
 	done func()
 
-	name       *TextBase // non-nil if this is a valueView
-	text       Text
+	name       *Text // non-nil if this is a valueView
+	text       *Text
 	elems      struct{ left, right []*typeView }
-	unexported Text
+	unexported *Text
 	ellipsis   bool
 	focused    bool
 }
@@ -245,7 +245,7 @@ func (v *typeView) edit(done func()) {
 	done2 := func() {
 		done()
 		if f, ok := v.val.(field); ok {
-			f.Anonymous = len(v.name.GetText()) == 0
+			f.Anonymous = len(v.name.Text()) == 0
 			if f.Anonymous && *v.typ != nil {
 				t, _ := indirect(*v.typ)
 				f.Name = t.(*types.Named).Obj.GetName()
@@ -374,7 +374,7 @@ func (v *typeView) insertMethod(m *[]*types.Func, elems *[]*typeView, before boo
 	v.refresh()
 	t := (*elems)[i]
 	t.edit(func() {
-		if *t.typ == nil || len(t.name.GetText()) == 0 {
+		if *t.typ == nil || len(t.name.Text()) == 0 {
 			*m = append((*m)[:i], (*m)[i+1:]...)
 			v.refresh()
 			if fail != nil {
@@ -505,7 +505,7 @@ func (v *typeView) KeyPress(event KeyEvent) {
 		}
 		oldTyp, oldName := *v.typ, ""
 		if v.name != nil {
-			oldName = v.name.GetText()
+			oldName = v.name.Text()
 			v.name.SetText("")
 		}
 		v.setType(nil)

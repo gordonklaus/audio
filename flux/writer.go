@@ -261,7 +261,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				}
 			case *basicLiteralNode:
 				if len(results) > 0 {
-					val := n.text.GetText()
+					val := n.text.Text()
 					switch n.kind {
 					case token.STRING:
 						val = strconv.Quote(val)
@@ -434,7 +434,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 			}
 			w.assignExisting(existing)
 		case *branchNode:
-			w.indent(n.text.GetText())
+			w.indent(n.text.Text())
 			w.seq(n)
 		case *compositeLiteralNode:
 			results, existing := w.results(n, vars)
@@ -607,7 +607,7 @@ func (w *writer) results(n node, vars map[*port]string) (results []string, exist
 					v = "*" + v
 				}
 				if c.hidden {
-					v += "//" + c.src.conntxt.GetText()
+					v += "//" + c.src.conntxt.Text()
 				}
 				existing[vars[c.dst]] = v
 			}
