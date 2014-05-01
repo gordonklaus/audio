@@ -43,9 +43,7 @@ TODO
   - variable names (also seqIDs)
 - color conns by type.  hash type name, interpret as color.  or, use multiple colors to describe the whole type tree (outlined, woven, etc).
 - improve valueView editing; currently, name and type can't be edited separately.  solution:  allow to focus name text.
-- find a better way to embed font (current using something like https://github.com/jteeuwen/go-bindata, https://groups.google.com/forum/#!msg/golang-nuts/UOIUyn7uFsY/Uescy-cI7hQJ) (best to wait for this https://code.google.com/p/go/issues/detail?id=3035).  Or consider installing it in a fixed location (OS X: in app bundle.  Linux: in /usr/share?  Windows: in application directory?)  Also check the go src directory in case someone has go-gotten flux?
 - handle constant expressions:
-  - write result to constant (not variable), or type may not propagate correctly
   - a node in a const expr should be collapsable to its value; in particular, this will be nice in typeView for array length
 - multiple panes for editing multiple funcs, types, etc.  panes arranged as Voronoi diagram, each pane with a center point and a relative size
 

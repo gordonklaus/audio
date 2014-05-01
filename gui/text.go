@@ -3,13 +3,26 @@ package gui
 import (
 	"code.google.com/p/gordon-go/ftgl"
 	gl "github.com/chsc/gogl/gl21"
+	"go/build"
+	"os"
+	"path/filepath"
 )
 
 var font ftgl.Font
 
 func initFont() {
-	font = ftgl.NewTextureFont("/Library/Fonts/Times New Roman.ttf")
+	font = ftgl.NewTextureFont(filepath.Join(pkgDir(), "Times New Roman.ttf"))
 	font.SetFaceSize(18, 1)
+}
+
+func pkgDir() string {
+	for _, dir := range build.Default.SrcDirs() {
+		dir := filepath.Join(dir, "code.google.com/p/gordon-go/gui")
+		if _, err := os.Stat(dir); err == nil {
+			return dir
+		}
+	}
+	panic("unreachable")
 }
 
 type Text struct {
