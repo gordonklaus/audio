@@ -301,7 +301,6 @@ func (c *connection) reform() {
 
 func (c *connection) focus(focusSrc bool) {
 	c.focusSrc = focusSrc
-	c.updateTextColors()
 	SetKeyFocus(c)
 	Repaint(c)
 	if focusSrc {
@@ -321,7 +320,6 @@ func (c *connection) startEditing() {
 		c.savedPort = c.dst
 	}
 	c.editing = true
-	c.updateTextColors()
 	c.reform()
 }
 
@@ -349,7 +347,6 @@ func (c *connection) stopEditing() {
 			c.blk.removeConn(c)
 			SetKeyFocus(p)
 		}
-		c.updateTextColors()
 	}
 }
 
@@ -357,7 +354,6 @@ func (c *connection) toggleHidden() {
 	c.hidden = !c.hidden
 	rearrange(c.blk)
 	if c.hidden {
-		Hide(c)
 		if srctxt := c.src.conntxt; srctxt.GetText() == "" {
 			srctxt.TextChanged = func(string) {
 				for _, c := range c.src.conns {
@@ -387,8 +383,6 @@ func (c *connection) toggleHidden() {
 			}
 			SetKeyFocus(srctxt)
 		}
-	} else {
-		Show(c)
 	}
 	c.updateSrcTxt("")
 	c.updateDstTxt()
@@ -408,7 +402,6 @@ func (c *connection) updateSrcTxt(txt string) {
 		srctxt.SetText(txt)
 	}
 	srctxt.Move(Pt(-Width(srctxt)/2, -Height(srctxt)))
-	c.src.updateTextColor()
 }
 
 func (c *connection) updateDstTxt() {
@@ -429,49 +422,16 @@ func (c *connection) updateDstTxt() {
 	dsttxt := c.dst.conntxt
 	dsttxt.SetText(strings.Join(names, ","))
 	dsttxt.Move(Pt(-Width(dsttxt)/2, 0))
-	c.dst.updateTextColor()
-}
-
-func (p *port) updateTextColor() {
-	if p == nil {
-		return
-	}
-	var focused, focusSrc, editing bool
-	for _, c := range p.conns {
-		if c.focused && c.hidden {
-			focused = true
-			focusSrc = c.focusSrc
-			editing = c.editing
-		}
-	}
-	c := Color{.6, .6, .6, 1}
-	if focused {
-		c = Color{.5, .5, .8, 1}
-		if p.out == focusSrc {
-			c = Color{.3, .3, .7, 1}
-			if editing {
-				c = Color{1, .5, 0, .5}
-			}
-		}
-	}
-	p.conntxt.SetTextColor(c)
-}
-
-func (c *connection) updateTextColors() {
-	c.src.updateTextColor()
-	c.dst.updateTextColor()
 }
 
 func (c *connection) TookKeyFocus() {
 	c.focused = true
-	c.updateTextColors()
 	Repaint(c)
 }
 
 func (c *connection) LostKeyFocus() {
 	c.cancelEditing()
 	c.focused = false
-	c.updateTextColors()
 	Repaint(c)
 }
 
@@ -655,9 +615,11 @@ func (c *connection) Paint() {
 		pts = []Point{start, p1, p2, p3, end}
 	}
 
-	SetColor(lineColor)
-	SetLineWidth(3)
-	DrawBezier(pts...)
+	if !c.hidden {
+		SetColor(lineColor)
+		SetLineWidth(3)
+		DrawBezier(pts...)
+	}
 
 	if c.focused {
 		c2 := focusColor

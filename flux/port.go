@@ -44,6 +44,7 @@ func newPort(out bool, n node, v *types.Var) *port {
 	p.setType(*p.valView.typ)
 
 	p.conntxt = NewText("")
+	p.conntxt.SetTextColor(lineColor)
 	p.conntxt.SetBackgroundColor(noColor)
 	p.conntxt.SetValidator(validateID)
 	p.Add(p.conntxt)
