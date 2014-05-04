@@ -17,7 +17,6 @@ TODO
 - give assignment node and in-place operators an output, for easier sequencing.
 - use graphics instead of text to identify pointers, slices, funcs, maps, etc in typeView
 - use different symbols for some operators (=, ≠, ≤, ≥, and, or, etc.)
-- blinking cursor in gui.Text
 - make gui.Text change its appearance based on content when a validator is present.  give validator 3 states:  Acceptable, Intermediate, Invalid.
 - consider not lumping sequencing ports and connections in with the normal ones.  they can be annoying.  don't forget to consider them in the topological sorting order.
 - one-off local functions

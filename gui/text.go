@@ -6,6 +6,7 @@ import (
 	"go/build"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 var font ftgl.Font
@@ -35,6 +36,9 @@ type Text struct {
 	Validate            func(*string) bool
 	Accept, TextChanged func(string)
 	Reject              func()
+
+	cursor     bool
+	stopCursor chan struct{}
 }
 
 func NewText(text string) *Text {
@@ -75,6 +79,35 @@ func (t *Text) SetFrameSize(size float64) {
 	Resize(t, Pt(2*t.frameSize+font.Advance(t.text), 2*t.frameSize-font.Descender()+font.Ascender()))
 }
 
+func (t *Text) TookKeyFocus() {
+	t.cursor = true
+	Repaint(t)
+	t.stopCursor = make(chan struct{})
+	go func() {
+		tick := time.NewTicker(time.Second / 2)
+		defer tick.Stop()
+		for {
+			select {
+			case <-tick.C:
+				Do(t) <- func() {
+					t.cursor = !t.cursor
+					Repaint(t)
+				}
+			case <-t.stopCursor:
+				t.stopCursor <- struct{}{}
+				return
+			}
+		}
+	}()
+}
+
+func (t *Text) LostKeyFocus() {
+	t.stopCursor <- struct{}{}
+	<-t.stopCursor
+	t.cursor = false
+	Repaint(t)
+}
+
 func (t *Text) KeyPress(event KeyEvent) {
 	if len(event.Text) > 0 {
 		text := t.text + event.Text
@@ -108,6 +141,13 @@ func (t *Text) Paint() {
 		SetColor(t.frameColor)
 		SetLineWidth(t.frameSize)
 		DrawRect(Rect(t))
+	}
+	
+	if t.cursor {
+		SetColor(t.textColor)
+		SetLineWidth(2)
+		x := t.frameSize + font.Advance(t.text)
+		DrawLine(Pt(x, t.frameSize), Pt(x, Height(t)-2*t.frameSize))
 	}
 
 	SetColor(t.textColor)
