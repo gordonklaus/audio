@@ -63,7 +63,7 @@ func (c *connection) connectable(src, dst *port) bool {
 		return false
 	}
 	if t == seqType {
-		return src.node.block() == dst.node.block() && !precedes(src.node, dst.node)
+		return src.node.block() == dst.node.block() && src.node != dst.node && !precedes(src.node, dst.node) && !precedes(dst.node, src.node)
 	}
 
 	f := func(t types.Type) bool { return assignable(t, u) }
@@ -280,13 +280,7 @@ func (c *connection) reform() {
 		c.srcPt = c.dstPt.Sub(unconnectedOffset)
 	}
 
-	var rect Rectangle
-	if c.src != nil && c.src.obj.Type == seqType || c.dst != nil && c.dst.obj.Type == seqType {
-		rect = Rectangle{Pt(math.Min(c.srcPt.X, c.dstPt.X)-25, c.srcPt.Y), Pt(math.Max(c.srcPt.X, c.dstPt.X), c.dstPt.Y)}
-	} else {
-		rect = Rectangle{c.srcPt, c.dstPt}.Canon()
-	}
-
+	rect := Rectangle{c.srcPt, c.dstPt}.Canon()
 	pos := rect.Min
 
 	// center the origin so that keyboard navigation works
@@ -504,10 +498,11 @@ func (c *connection) KeyPress(event KeyEvent) {
 	case KeyUp:
 		if c.focusSrc {
 			ins := ins(c.src.node)
-			if len(ins) > 0 {
-				ins[len(ins)/2].focusMiddle()
-			} else {
-				SetKeyFocus(c.src.node)
+			n := len(ins)
+			if p := seqIn(c.src.node); p != nil && len(p.conns) > 0 && n == 0 {
+				p.focusMiddle()
+			} else if n > 0 {
+				ins[(len(ins)-1)/2].focusMiddle()
 			}
 		} else {
 			c.focus(true)
@@ -516,12 +511,14 @@ func (c *connection) KeyPress(event KeyEvent) {
 		if c.focusSrc {
 			c.focus(false)
 		} else {
+			outs := outs(c.dst.node)
+			n := len(outs)
 			if f, ok := c.dst.node.(focuserFrom); ok {
 				f.focusFrom(c.dst)
-			} else if outs := outs(c.dst.node); len(outs) > 0 {
-				outs[len(outs)/2].focusMiddle()
-			} else {
-				SetKeyFocus(c.dst.node)
+			} else if p := seqOut(c.dst.node); p != nil && len(p.conns) > 0 && n == 0 {
+				p.focusMiddle()
+			} else if n > 0 {
+				outs[(len(outs)-1)/2].focusMiddle()
 			}
 		}
 	case KeyRight, KeyLeft:
@@ -599,25 +596,30 @@ func (c *connection) Mouse(m MouseEvent) {
 
 func (c *connection) Paint() {
 	start, end := c.srcPt, c.dstPt
-	var pts []Point
-	if c.src != nil && c.src.obj.Type == seqType || c.dst != nil && c.dst.obj.Type == seqType {
-		pts = []Point{start, Pt(start.X-40, start.Y), Pt(end.X-40, end.Y), end}
-	} else {
-		d := end.Sub(start)
-		mid := start.Add(d.Div(2))
-		if c.feedback {
-			mid.X = math.Max(start.X, end.X) + 128
-		}
-		off := Pt(0, math.Abs(d.Y/3))
-		p1 := start.Sub(off)
-		p2 := mid
-		p3 := end.Add(off)
-		pts = []Point{start, p1, p2, p3, end}
+	d := end.Sub(start)
+	mid := start.Add(d.Div(2))
+	if c.feedback {
+		mid.X = math.Max(start.X, end.X) + 128
 	}
+	off := Pt(0, math.Abs(d.Y/3))
+	p1 := start.Sub(off)
+	p2 := mid
+	p3 := end.Add(off)
+	pts := []Point{start, p1, p2, p3, end}
 
-	if !c.hidden {
-		SetColor(lineColor)
-		SetLineWidth(3)
+	SetColor(lineColor)
+	SetLineWidth(3)
+	if c.src != nil && c.src.obj.Type == seqType || c.dst != nil && c.dst.obj.Type == seqType {
+		n := d.Len() / 3
+		d = d.Div(n)
+		p := start
+		for i := 0; i < int(n+.5); i += 2 {
+			q := p.Add(d)
+			DrawLine(p, q)
+			p = q.Add(d)
+		}
+		pts = []Point{start, end}
+	} else if !c.hidden {
 		DrawBezier(pts...)
 	}
 

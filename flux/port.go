@@ -107,6 +107,7 @@ func (p *port) focusMiddle() {
 	}
 }
 
+// TODO: work with all of a node's in/out conns (including seq conns), not just a single port's conns.
 func (p *port) focusNextConn(curƟ float64, dir int) {
 	less := func(x, y float64) bool { return x < y }
 	if p.out != (dir == KeyRight) {
@@ -135,6 +136,11 @@ func (p *port) focusNextConn(curƟ float64, dir int) {
 }
 
 func (p *port) next(dir int) *port {
+	if p.obj.Type == seqType {
+		// TODO: return nearest
+		return nil
+	}
+
 	ports := ins(p.node)
 	if p.out {
 		ports = outs(p.node)
@@ -178,7 +184,7 @@ func (p *port) LostKeyFocus() {
 }
 
 func (p *port) KeyPress(event KeyEvent) {
-	if event.Alt {
+	if event.Alt && !event.Shift {
 		switch event.Key {
 		case KeyLeft, KeyRight, KeyDown, KeyUp:
 			p.node.block().focusNearestView(p, event.Key)
@@ -189,17 +195,7 @@ func (p *port) KeyPress(event KeyEvent) {
 	switch k := event.Key; k {
 	case KeyUp, KeyDown:
 		if p.out == (k == KeyDown) {
-			if p.obj.Type == seqType { // TODO: fix me (should be under KeyLeft)
-				ports := ins(p.node)
-				if p.out {
-					ports = outs(p.node)
-				}
-				if len(ports) > 0 {
-					ports[len(ports)/2].focusMiddle()
-				}
-			} else {
-				p.focusMiddle()
-			}
+			p.focusMiddle()
 		} else {
 			if f, ok := p.node.(focuserFrom); ok {
 				f.focusFrom(p)
@@ -207,13 +203,7 @@ func (p *port) KeyPress(event KeyEvent) {
 				SetKeyFocus(p.node)
 			}
 		}
-	case KeyRight:
-		if p.obj.Type == seqType && len(p.conns) > 0 {
-			p.conns[len(p.conns)-1].focus(p.out)
-			return
-		}
-		fallthrough
-	case KeyLeft:
+	case KeyLeft, KeyRight:
 		if p := p.next(k); p != nil {
 			SetKeyFocus(p)
 		}

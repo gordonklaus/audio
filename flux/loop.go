@@ -128,8 +128,18 @@ func (n *loopNode) LostKeyFocus() {
 
 func (n *loopNode) KeyPress(event KeyEvent) {
 	switch event.Key {
+	case KeyUp:
+		if event.Alt && event.Shift {
+			n.seqIn.focusMiddle()
+		} else {
+			n.input.focusMiddle()
+		}
 	case KeyDown:
-		SetKeyFocus(n.inputsNode)
+		if event.Alt && event.Shift {
+			n.seqOut.focusMiddle()
+		} else {
+			SetKeyFocus(n.inputsNode)
+		}
 	default:
 		n.ViewBase.KeyPress(event)
 	}

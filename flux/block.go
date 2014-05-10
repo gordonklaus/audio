@@ -338,14 +338,6 @@ func (b *block) focusNearestView(viewOrPoint interface{}, dirKey int) {
 	views := []View{}
 	for _, n := range b.allNodes() {
 		views = append(views, n)
-		switch n.(type) {
-		case *ifNode:
-			views = append(views, seqIn(n), seqOut(n))
-		case *selectNode:
-			views = append(views, seqIn(n), seqOut(n))
-		case *loopNode:
-			views = append(views, seqOut(n))
-		}
 	}
 	nearest := nearestView(b, views, p, dirKey)
 	if nearest != nil {
@@ -371,21 +363,24 @@ func (b *block) LostKeyFocus() {
 func (b *block) KeyPress(event KeyEvent) {
 	switch k := event.Key; k {
 	case KeyLeft, KeyRight, KeyUp, KeyDown:
-		if event.Alt {
+		if event.Alt && !event.Shift {
 			b.focusNearestView(KeyFocus(b), k)
 		} else if n, ok := KeyFocus(b).(node); ok {
+			focseq := event.Alt && event.Shift
 			if k == KeyUp {
-				if seqIn(n) != nil {
-					SetKeyFocus(seqIn(n))
-				} else if len := len(ins(n)); len > 0 {
-					ins(n)[len/2].focusMiddle()
+				seq := seqIn(n)
+				if num := len(ins(n)); seq != nil && (focseq || num == 0 && len(seq.conns) > 0) {
+					seq.focusMiddle()
+				} else if num > 0 {
+					ins(n)[(num-1)/2].focusMiddle()
 				}
 			}
 			if k == KeyDown {
-				if seqOut(n) != nil {
-					SetKeyFocus(seqOut(n))
-				} else if len := len(outs(n)); len > 0 {
-					outs(n)[len/2].focusMiddle()
+				seq := seqOut(n)
+				if num := len(outs(n)); seq != nil && (focseq || num == 0 && len(seq.conns) > 0) {
+					seq.focusMiddle()
+				} else if num > 0 {
+					outs(n)[(num-1)/2].focusMiddle()
 				}
 			}
 		} else if f, ok := b.node.(focuserFrom); ok {

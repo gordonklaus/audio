@@ -117,10 +117,15 @@ func (n *ifNode) LostKeyFocus() {
 func (n *ifNode) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyUp:
-		SetKeyFocus(n.cond[n.focused])
+		if event.Alt && event.Shift {
+			n.seqIn.focusMiddle()
+		} else {
+			SetKeyFocus(n.cond[n.focused])
+		}
 	case KeyDown:
-		b := n.blocks[n.focused]
-		if len(b.nodes) == 0 {
+		if event.Alt && event.Shift {
+			n.seqOut.focusMiddle()
+		} else if b := n.blocks[n.focused]; len(b.nodes) == 0 {
 			SetKeyFocus(b)
 		} else {
 			n.blk.focusNearestView(MapToParent(n, Pt(CenterInParent(b).X, 0)), event.Key)

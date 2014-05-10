@@ -25,7 +25,7 @@ Every node belongs to a block.  Outermost is the function block, all of whose no
 
 The execution order of nodes is determined as follows:  Node A runs before node B if there is a connection with A as its source and B as its destination.  A connection that exits or enters a block has that block's containing node as a source or destination, respectively.
 
-The arrow keys are used to navigate the graph.  On their own, they move the focus along and between connections following the topology of the graph.  While holding Option, they move the focus between nodes with no regard for connectivity.  Pressing Escape moves the focus from a connection end to its port or from a node to its containing node.
+The arrow keys are used to navigate the graph.  On their own, they move the focus along and between connections following the topology of the graph.  While holding Alt, they move the focus between nodes with no regard for connectivity.  Pressing Escape moves the focus from a connection end to its port, from a port to its node, or from a node to its containing node.
 
 To create a named node (function or method, struct field, operator, special node), simply start typing its name; the browser will open, allowing you to select the desired item.  Hold Shift in the browser to treat functions and methods as values; otherwise they are treated as calls.
 
