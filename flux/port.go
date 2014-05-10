@@ -198,7 +198,7 @@ func (p *port) KeyPress(event KeyEvent) {
 			p.focusMiddle()
 		} else {
 			if f, ok := p.node.(focuserFrom); ok {
-				f.focusFrom(p)
+				f.focusFrom(p, true)
 			} else {
 				SetKeyFocus(p.node)
 			}
@@ -256,7 +256,11 @@ func (p *port) KeyPress(event KeyEvent) {
 			SetKeyFocus(p.node)
 		}
 	case KeyEscape:
-		SetKeyFocus(p.node)
+		if f, ok := p.node.(focuserFrom); ok {
+			f.focusFrom(p, false)
+		} else {
+			SetKeyFocus(p.node)
+		}
 	default:
 		if pn, ok := p.node.(*portsNode); ok && p.out && pn.outs[0] == p && event.Text == "*" {
 			if t, ok := p.obj.Type.(*types.Pointer); ok {

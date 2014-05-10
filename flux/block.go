@@ -322,7 +322,7 @@ func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) 
 }
 
 type focuserFrom interface {
-	focusFrom(View)
+	focusFrom(v View, pass bool)
 }
 
 func (b *block) focusNearestView(viewOrPoint interface{}, dirKey int) {
@@ -342,6 +342,14 @@ func (b *block) focusNearestView(viewOrPoint interface{}, dirKey int) {
 	nearest := nearestView(b, views, p, dirKey)
 	if nearest != nil {
 		SetKeyFocus(nearest)
+	}
+}
+
+func (b *block) focus() {
+	if len(b.nodes) == 0 {
+		SetKeyFocus(b)
+	} else {
+		b.focusNearestView(Center(b).Add(Pt(0, Height(b)/2)), KeyDown)
 	}
 }
 
@@ -385,7 +393,7 @@ func (b *block) KeyPress(event KeyEvent) {
 			}
 		} else if f, ok := b.node.(focuserFrom); ok {
 			if event.Key == KeyUp {
-				f.focusFrom(b)
+				f.focusFrom(b, true)
 			}
 		} else {
 			b.ViewBase.KeyPress(event)
@@ -411,11 +419,17 @@ func (b *block) KeyPress(event KeyEvent) {
 		if n, ok := KeyFocus(b).(node); ok {
 			if f, ok := n.block().node.(*funcNode); ok && !f.literal {
 				f.Close()
+			} else if f, ok := n.block().node.(focuserFrom); ok {
+				f.focusFrom(b, false)
 			} else {
 				SetKeyFocus(n.block().node)
 			}
 		} else {
-			SetKeyFocus(b.node)
+			if f, ok := b.node.(focuserFrom); ok {
+				f.focusFrom(b, false)
+			} else {
+				SetKeyFocus(b.node)
+			}
 		}
 	default:
 		openBrowser := func() {
@@ -621,13 +635,19 @@ func (n *portsNode) removePort(p *port) {
 	}
 }
 
+func (n *portsNode) focusFrom(v View, pass bool) {
+	if f, ok := n.blk.node.(focuserFrom); ok {
+		f.focusFrom(n, pass)
+	}
+}
+
 func (n *portsNode) KeyPress(event KeyEvent) {
 	if l, ok := n.blk.node.(*loopNode); ok && event.Key == KeyUp {
-		SetKeyFocus(l)
+		l.focusFrom(n, true)
 	} else if s, ok := n.blk.node.(*selectNode); ok && event.Key == KeyUp {
-		s.focusFrom(n)
+		s.focusFrom(n, true)
 	} else if f, ok := n.blk.node.(*funcNode); ok && f.literal && event.Key == KeyDown && n.out {
-		SetKeyFocus(f)
+		f.focusFrom(n, true)
 	} else if n.editable && event.Text == "," {
 		f := n.blk.node.(*funcNode)
 		sig := f.sig()

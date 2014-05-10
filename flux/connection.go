@@ -499,7 +499,9 @@ func (c *connection) KeyPress(event KeyEvent) {
 		if c.focusSrc {
 			ins := ins(c.src.node)
 			n := len(ins)
-			if p := seqIn(c.src.node); p != nil && len(p.conns) > 0 && n == 0 {
+			if f, ok := c.src.node.(focuserFrom); ok {
+				f.focusFrom(c.src, true)
+			} else if p := seqIn(c.src.node); p != nil && len(p.conns) > 0 && n == 0 {
 				p.focusMiddle()
 			} else if n > 0 {
 				ins[(len(ins)-1)/2].focusMiddle()
@@ -514,7 +516,7 @@ func (c *connection) KeyPress(event KeyEvent) {
 			outs := outs(c.dst.node)
 			n := len(outs)
 			if f, ok := c.dst.node.(focuserFrom); ok {
-				f.focusFrom(c.dst)
+				f.focusFrom(c.dst, true)
 			} else if p := seqOut(c.dst.node); p != nil && len(p.conns) > 0 && n == 0 {
 				p.focusMiddle()
 			} else if n > 0 {
