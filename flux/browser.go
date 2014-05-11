@@ -304,8 +304,10 @@ func (b browser) filteredObjs() (objs objects) {
 				importPath := path.Join(importPath, name)
 				pkgObj, ok := pkgObjects[importPath]
 				if !ok {
-					pkg, _ := build.Import(importPath, "", build.AllowBinary)
-					pkgObj = &pkgObject{nil, importPath, pkg.Name, srcDir}
+					if pkg, err := build.Import(importPath, "", build.AllowBinary); err == nil {
+						name = pkg.Name
+					}
+					pkgObj = &pkgObject{nil, importPath, name, srcDir}
 					pkgObjects[importPath] = pkgObj
 				}
 				add(pkgObj)
@@ -336,7 +338,7 @@ func (b browser) filteredObjs() (objs objects) {
 				if _, ok := err.(*build.NoGoError); !ok {
 					fmt.Println(err)
 				}
-				pkgs[obj.importPath] = types.NewPackage(obj.importPath, obj.name, &types.Scope{})
+				pkgs[obj.importPath] = types.NewPackage(obj.importPath, obj.name, types.NewScope(types.Universe))
 			}
 			addSubPkgs(obj.importPath)
 		case *types.TypeName:
