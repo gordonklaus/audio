@@ -132,6 +132,10 @@ func (n *funcNode) Move(p Point) {
 }
 
 func (n *funcNode) focusFrom(v View, pass bool) {
+	if !n.literal {
+		return
+	}
+
 	if !pass {
 		SetKeyFocus(n)
 		return
