@@ -2,6 +2,7 @@ TODO
 
 - don't save+exit func on Escape.  exit with Command-W, prompt for save if there are changes.
 - fix spacing, highlighting of makeNode, newNode, convertNode, typeAssertNode (highlight typeView differently?)
+- identify current func/type in window title
 - type switch
 - builtins panic and recover should have valid signatures in go/types
 - len and capacity inputs for make, len and max input for slice, ok output for type assert (also mapget and chanrecv?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable

@@ -81,7 +81,9 @@ func (n *operatorNode) connsChanged() {
 	case "!", "&&", "||", "+", "-", "*", "/", "%", "&", "|", "^", "&^":
 		t := untypedToTyped(inputType(n.ins...))
 		n.ins[0].setType(t)
-		n.ins[1].setType(t)
+		if len(n.ins) > 1 {
+			n.ins[1].setType(t)
+		}
 		n.outs[0].setType(t)
 	case "<<", ">>":
 		t := untypedToTyped(inputType(n.ins[0]))
