@@ -1,6 +1,5 @@
 TODO
 
-- bugfix: allow to set the name of an empty package
 - don't save+exit func on Escape.  exit with Command-W, prompt for save if there are changes.
 - fix spacing, highlighting of makeNode, newNode, convertNode, typeAssertNode (highlight typeView differently?)
 - identify current func/type in window title

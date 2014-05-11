@@ -19,10 +19,11 @@ import (
 	"strings"
 )
 
-func savePackageName(pkg *pkgObject) {
-	p, _ := build.Import(pkg.importPath, "", build.AllowBinary)
-	for _, name := range append(append(append(p.GoFiles, p.IgnoredGoFiles...), p.CgoFiles...), p.TestGoFiles...) {
-		path := filepath.Join(p.Dir, name)
+func savePackageName(importPath, name string) {
+	p, _ := build.Import(importPath, "", 0)
+	files := append(append(append(p.GoFiles, p.IgnoredGoFiles...), p.CgoFiles...), p.TestGoFiles...)
+	for _, file := range files {
+		path := filepath.Join(p.Dir, file)
 		b, err := ioutil.ReadFile(path)
 		if err != nil {
 			panic(err)
@@ -35,14 +36,19 @@ func savePackageName(pkg *pkgObject) {
 		}
 		oldName := astFile.Name
 		i := fset.Position(oldName.Pos()).Offset
-		src = src[:i] + p.Name + src[i+len(oldName.Name):]
+		src = src[:i] + name + src[i+len(oldName.Name):]
 		if err := ioutil.WriteFile(path, []byte(src), 0666); err != nil {
+			panic(err)
+		}
+	}
+	if len(files) == 0 {
+		if err := ioutil.WriteFile(filepath.Join(p.Dir, "package.flux.go"), []byte("package "+name), 0666); err != nil {
 			panic(err)
 		}
 	}
 
 	if pkg, ok := pkgs[p.ImportPath]; ok {
-		pkg.Name = p.Name
+		pkg.Name = name
 	}
 
 	// TODO: update all uses?  could get messy with name conflicts.  not that everything has work perfectly.

@@ -515,7 +515,7 @@ func (b *browser) KeyPress(event KeyEvent) {
 			b.pkgName.Accept = func(name string) {
 				if pkg.name != name {
 					pkg.name = name
-					savePackageName(pkg)
+					savePackageName(pkg.importPath, name)
 				}
 				b.refresh()
 				SetKeyFocus(b)
