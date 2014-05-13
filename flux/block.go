@@ -417,9 +417,7 @@ func (b *block) KeyPress(event KeyEvent) {
 		}
 	case KeyEscape:
 		if n, ok := KeyFocus(b).(node); ok {
-			if f, ok := n.block().node.(*funcNode); ok && !f.literal {
-				f.Close()
-			} else if f, ok := n.block().node.(focuserFrom); ok {
+			if f, ok := n.block().node.(focuserFrom); ok {
 				f.focusFrom(b, false)
 			} else {
 				SetKeyFocus(n.block().node)

@@ -133,6 +133,9 @@ func (n *funcNode) Move(p Point) {
 
 func (n *funcNode) focusFrom(v View, pass bool) {
 	if !n.literal {
+		if !pass {
+			n.Close()
+		}
 		return
 	}
 
