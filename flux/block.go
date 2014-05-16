@@ -85,8 +85,15 @@ func (b *block) addNode(n node) {
 		case *compositeLiteralNode:
 			// handled in compositeLiteralNode.setType
 		case *valueNode:
-			if v, ok := n.obj.(*localVar); ok {
-				v.addref(n)
+			switch obj := n.obj.(type) {
+			case *types.Const, *types.Var:
+				b.func_().addPkgRef(obj)
+			case *types.Func:
+				if !isMethod(obj) {
+					b.func_().addPkgRef(obj)
+				}
+			case *localVar:
+				obj.addref(n)
 			}
 		}
 		rearrange(b)
@@ -110,8 +117,15 @@ func (b *block) removeNode(n node) {
 				b.func_().subPkgRef(t)
 			}
 		case *valueNode:
-			if v, ok := n.obj.(*localVar); ok {
-				v.subref(n)
+			switch obj := n.obj.(type) {
+			case *types.Const, *types.Var:
+				b.func_().subPkgRef(obj)
+			case *types.Func:
+				if !isMethod(obj) {
+					b.func_().subPkgRef(obj)
+				}
+			case *localVar:
+				obj.subref(n)
 			}
 		case *ifNode:
 			for _, b := range n.blocks {
