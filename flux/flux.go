@@ -40,7 +40,7 @@ func newFluxWindow() *fluxWindow {
 			// TODO: move type editing into browser (just like with localVar and when creating types for make, convert, etc)
 			typ := obj.Type.(*types.Named)
 			Hide(w.browser)
-			v := newTypeView(&typ.UnderlyingT)
+			v := newTypeView(&typ.UnderlyingT, obj.Pkg)
 			w.Add(v)
 			MoveCenter(v, Center(w))
 			reset := func() {

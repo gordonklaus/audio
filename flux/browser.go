@@ -73,8 +73,7 @@ loop:
 	b.text.TextChanged = b.textChanged
 	b.Add(b.text)
 
-	b.typeView = newTypeView(new(types.Type))
-	b.typeView.pkg = b.currentPkg
+	b.typeView = newTypeView(new(types.Type), b.currentPkg)
 	b.Add(b.typeView)
 
 	b.pkgName = NewText("")

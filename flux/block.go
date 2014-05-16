@@ -473,7 +473,7 @@ func (b *block) KeyPress(event KeyEvent) {
 				}
 				SetKeyFocus(n.text)
 			case "{":
-				n := newCompositeLiteralNode()
+				n := newCompositeLiteralNode(b.func_().pkg())
 				b.addNode(n)
 				MoveCenter(n, Center(b))
 				n.editType()
@@ -488,15 +488,16 @@ func (b *block) KeyPress(event KeyEvent) {
 
 func (b *block) newNode(obj types.Object, funcAsVal bool, godefer string) node {
 	var n node
+	currentPkg := b.func_().pkg()
 	switch obj := obj.(type) {
 	case special:
 		switch obj.Name {
 		case "break", "continue":
 			n = newBranchNode(obj.Name)
 		case "call":
-			n = newCallNode(nil, godefer)
+			n = newCallNode(nil, currentPkg, godefer)
 		case "convert":
-			n = newConvertNode()
+			n = newConvertNode(currentPkg)
 		case "func":
 			n = newFuncNode(nil, b.childArranged)
 		case "go", "defer":
@@ -523,7 +524,7 @@ func (b *block) newNode(obj types.Object, funcAsVal bool, godefer string) node {
 		case "select":
 			n = newSelectNode(b.childArranged)
 		case "typeAssert":
-			n = newTypeAssertNode()
+			n = newTypeAssertNode(currentPkg)
 		}
 	case *types.Func, *types.Builtin:
 		if obj.GetName() == "[]" {
@@ -537,7 +538,7 @@ func (b *block) newNode(obj types.Object, funcAsVal bool, godefer string) node {
 		} else if funcAsVal && obj.GetPkg() != nil { //Pkg==nil == builtin
 			n = newValueNode(obj, false)
 		} else {
-			n = newCallNode(obj, godefer)
+			n = newCallNode(obj, currentPkg, godefer)
 		}
 	case *types.Var, *types.Const, field, *localVar:
 		switch obj.GetName() {

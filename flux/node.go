@@ -355,11 +355,11 @@ type compositeLiteralNode struct {
 	typ *typeView
 }
 
-func newCompositeLiteralNode() *compositeLiteralNode {
+func newCompositeLiteralNode(currentPkg *types.Package) *compositeLiteralNode {
 	n := &compositeLiteralNode{}
 	n.nodeBase = newNodeBase(n)
 	out := n.newOutput(nil)
-	n.typ = newTypeView(&out.obj.Type)
+	n.typ = newTypeView(&out.obj.Type, currentPkg)
 	n.typ.mode = compositeOrPtrType
 	n.Add(n.typ)
 	return n

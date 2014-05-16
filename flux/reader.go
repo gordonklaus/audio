@@ -104,7 +104,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					r.out(s.Lhs[0], n.outs[0])
 				case *ast.CallExpr:
 					if p, ok := x.Fun.(*ast.ParenExpr); ok { // writer puts conversions in parens for easy recognition
-						n := newConvertNode()
+						n := newConvertNode(r.pkg)
 						b.addNode(n)
 						n.setType(r.typ(p.X))
 						r.in(x.Args[0], n.ins[0])
@@ -144,7 +144,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 					}
 					r.out(s.Lhs[0], n.y)
 				case *ast.TypeAssertExpr:
-					n := newTypeAssertNode()
+					n := newTypeAssertNode(r.pkg)
 					b.addNode(n)
 					n.setType(r.typ(x.Type))
 					r.in(x.X, n.ins[0])
@@ -337,7 +337,7 @@ func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
 
 func (r *reader) call(b *block, x *ast.CallExpr, godefer string, s ast.Stmt) node {
 	obj := r.obj(x.Fun)
-	n := newCallNode(obj, godefer)
+	n := newCallNode(obj, r.pkg, godefer)
 	b.addNode(n)
 	args := x.Args
 	switch {
@@ -384,7 +384,7 @@ func (r *reader) compositeLit(b *block, x *ast.CompositeLit, ptr bool, s *ast.As
 	if ptr {
 		t = &types.Pointer{Elem: t}
 	}
-	n := newCompositeLiteralNode()
+	n := newCompositeLiteralNode(r.pkg)
 	b.addNode(n)
 	n.setType(t)
 elts:

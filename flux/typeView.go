@@ -13,11 +13,11 @@ import (
 
 type typeView struct {
 	*ViewBase
-	mode typeViewMode
-	typ  *types.Type
-	val  types.Object // non-nil if this is a valueView
-	pkg  *types.Package
-	done func()
+	mode       typeViewMode
+	typ        *types.Type
+	val        types.Object // non-nil if this is a valueView
+	currentPkg *types.Package
+	done       func()
 
 	name       *Text // non-nil if this is a valueView
 	text       *Text
@@ -37,8 +37,8 @@ const (
 	makeableType
 )
 
-func newTypeView(t *types.Type) *typeView {
-	v := &typeView{typ: t, mode: anyType}
+func newTypeView(t *types.Type, currentPkg *types.Package) *typeView {
+	v := &typeView{typ: t, currentPkg: currentPkg, mode: anyType}
 	v.ViewBase = NewView(v)
 	v.text = NewText("")
 	v.text.SetTextColor(color(&types.TypeName{}, false, false))
@@ -48,7 +48,7 @@ func newTypeView(t *types.Type) *typeView {
 	return v
 }
 
-func newValueView(val types.Object) *typeView {
+func newValueView(val types.Object, currentPkg *types.Package) *typeView {
 	var t *types.Type
 	name := new(string)
 	switch val := val.(type) {
@@ -65,9 +65,8 @@ func newValueView(val types.Object) *typeView {
 			name = &val.Name
 		}
 	}
-	v := newTypeView(t)
+	v := newTypeView(t, currentPkg)
 	v.val = val
-	v.pkg = val.GetPkg()
 	v.name = NewText(*name)
 	v.name.SetTextColor(color(val, false, false))
 	v.name.SetBackgroundColor(noColor)
@@ -102,57 +101,57 @@ func (v *typeView) setType(t types.Type) {
 		s = t.Obj.Name
 	case *types.Pointer:
 		s = "*"
-		elem := newTypeView(&t.Elem)
+		elem := newTypeView(&t.Elem, v.currentPkg)
 		if v.mode == compositeOrPtrType {
 			elem.mode = compositeType
 		}
 		v.elems.right = []*typeView{elem}
 	case *types.Array:
 		s = fmt.Sprintf("[%d]", t.Len)
-		v.elems.right = []*typeView{newTypeView(&t.Elem)}
+		v.elems.right = []*typeView{newTypeView(&t.Elem, v.currentPkg)}
 	case *types.Slice:
 		s = "[]"
 		if v.ellipsis {
 			s = "…"
 		}
-		v.elems.right = []*typeView{newTypeView(&t.Elem)}
+		v.elems.right = []*typeView{newTypeView(&t.Elem, v.currentPkg)}
 	case *types.Chan:
 		s = "chan"
-		v.elems.right = []*typeView{newTypeView(&t.Elem)}
+		v.elems.right = []*typeView{newTypeView(&t.Elem, v.currentPkg)}
 	case *types.Map:
 		s = ":"
-		key := newTypeView(&t.Key)
+		key := newTypeView(&t.Key, v.currentPkg)
 		key.mode = comparableType
 		v.elems.left = []*typeView{key}
-		v.elems.right = []*typeView{newTypeView(&t.Elem)}
+		v.elems.right = []*typeView{newTypeView(&t.Elem, v.currentPkg)}
 	case *types.Struct:
 		s = "struct"
 		for _, f := range t.Fields {
-			if invisible(f, v.pkg) {
+			if invisible(f, v.currentPkg) {
 				v.unexported = NewText("contains unexported fields")
 				continue
 			}
-			v.elems.right = append(v.elems.right, newValueView(field{Var: f}))
+			v.elems.right = append(v.elems.right, newValueView(field{Var: f}, v.currentPkg))
 		}
 	case *types.Signature:
 		s = "func"
 		for _, val := range t.Params {
-			v.elems.left = append(v.elems.left, newValueView(val))
+			v.elems.left = append(v.elems.left, newValueView(val, v.currentPkg))
 		}
 		if t.IsVariadic {
 			v.elems.left[len(v.elems.left)-1].ellipsis = true
 		}
 		for _, val := range t.Results {
-			v.elems.right = append(v.elems.right, newValueView(val))
+			v.elems.right = append(v.elems.right, newValueView(val, v.currentPkg))
 		}
 	case *types.Interface:
 		s = "interface"
 		for _, m := range t.Methods {
-			if invisible(m, v.pkg) {
+			if invisible(m, v.currentPkg) {
 				v.unexported = NewText("contains unexported methods")
 				continue
 			}
-			v.elems.right = append(v.elems.right, newValueView(m))
+			v.elems.right = append(v.elems.right, newValueView(m, v.currentPkg))
 		}
 	}
 	v.text.SetText(s)
@@ -166,8 +165,6 @@ func (v *typeView) setType(t types.Type) {
 		if v.mode == comparableType {
 			c.mode = comparableType
 		}
-		c.pkg = v.pkg
-		c.refresh()
 		v.Add(c)
 	}
 
@@ -334,7 +331,7 @@ func (v *typeView) insertVar(vs *[]*types.Var, elems *[]*typeView, before bool, 
 	if !before {
 		i++
 	}
-	*vs = append((*vs)[:i], append([]*types.Var{types.NewVar(0, v.pkg, "", nil)}, (*vs)[i:]...)...)
+	*vs = append((*vs)[:i], append([]*types.Var{types.NewVar(0, v.currentPkg, "", nil)}, (*vs)[i:]...)...)
 	v.refresh()
 	t := (*elems)[i]
 	t.edit(func() {
@@ -369,8 +366,8 @@ func (v *typeView) insertMethod(m *[]*types.Func, elems *[]*typeView, before boo
 	if !before {
 		i++
 	}
-	sig := &types.Signature{Recv: types.NewVar(0, v.pkg, "", *v.typ)}
-	*m = append((*m)[:i], append([]*types.Func{types.NewFunc(0, v.pkg, "", sig)}, (*m)[i:]...)...)
+	sig := &types.Signature{Recv: types.NewVar(0, v.currentPkg, "", *v.typ)}
+	*m = append((*m)[:i], append([]*types.Func{types.NewFunc(0, v.currentPkg, "", sig)}, (*m)[i:]...)...)
 	v.refresh()
 	t := (*elems)[i]
 	t.edit(func() {

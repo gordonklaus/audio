@@ -14,7 +14,7 @@ type callNode struct {
 	obj types.Object
 }
 
-func newCallNode(obj types.Object, godefer string) node {
+func newCallNode(obj types.Object, currentPkg *types.Package, godefer string) node {
 	if obj == nil {
 		n := &callNode{}
 		n.nodeBase = newGoDeferNodeBase(n, godefer)
@@ -68,9 +68,9 @@ func newCallNode(obj types.Object, godefer string) node {
 	case "len", "cap":
 		return newLenCapNode(name)
 	case "make":
-		return newMakeNode()
+		return newMakeNode(currentPkg)
 	case "new":
-		return newNewNode()
+		return newNewNode(currentPkg)
 	case "real", "imag":
 		return newRealImagNode(name)
 	default:

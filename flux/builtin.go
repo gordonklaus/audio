@@ -205,13 +205,13 @@ type makeNode struct {
 	typ *typeView
 }
 
-func newMakeNode() *makeNode {
+func newMakeNode(currentPkg *types.Package) *makeNode {
 	n := &makeNode{}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText("make ")
 	n.text.SetTextColor(color(&types.Func{}, true, false))
 	out := n.newOutput(nil)
-	n.typ = newTypeView(&out.obj.Type)
+	n.typ = newTypeView(&out.obj.Type, currentPkg)
 	n.typ.mode = makeableType
 	n.Add(n.typ)
 	return n
@@ -256,14 +256,14 @@ type newNode struct {
 	typ *typeView
 }
 
-func newNewNode() *newNode {
+func newNewNode(currentPkg *types.Package) *newNode {
 	n := &newNode{}
 	n.nodeBase = newNodeBase(n)
 	n.text.SetText("new ")
 	n.text.SetTextColor(color(&types.Func{}, true, false))
 	t := &types.Pointer{}
 	n.newOutput(newVar("", t))
-	n.typ = newTypeView(&t.Elem)
+	n.typ = newTypeView(&t.Elem, currentPkg)
 	n.Add(n.typ)
 	return n
 }

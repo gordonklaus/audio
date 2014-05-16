@@ -14,7 +14,7 @@ type typeAssertNode struct {
 	typ *typeView
 }
 
-func newTypeAssertNode() *typeAssertNode {
+func newTypeAssertNode(currentPkg *types.Package) *typeAssertNode {
 	n := &typeAssertNode{}
 	n.nodeBase = newNodeBase(n)
 	in := n.newInput(nil)
@@ -31,7 +31,7 @@ func newTypeAssertNode() *typeAssertNode {
 		out.setType(u)
 		ok.setType(b)
 	}
-	n.typ = newTypeView(new(types.Type))
+	n.typ = newTypeView(new(types.Type), currentPkg)
 	n.typ.mode = anyType
 	n.Add(n.typ)
 	return n

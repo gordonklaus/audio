@@ -36,7 +36,7 @@ func newPort(out bool, n node, v *types.Var) *port {
 
 	p := &port{out: out, node: n, obj: v}
 	p.ViewBase = NewView(p)
-	p.valView = newValueView(v)
+	p.valView = newValueView(v, nil) // should pass currentPkg here but inconvenient to get during initialization and rarely important (unnamed struct param/result with invisible field)
 	Hide(p.valView)
 	p.connsChanged = func() {}
 	p.Add(p.valView)

@@ -1,5 +1,18 @@
 TODO
 
+- handle unknown IDs in reader:
+  - const, var, field, func val, method val getter or setter
+  - func or method call
+  - type or field name in composite literal
+  - type in make, new, conversion, type assertion
+  - type in signature
+  - temporary local var type (including loop var).  can safely ignore?
+  - package name.  avoidable by always using named imports
+- handle invalid connections in reader:
+  - const, var, field, func val, method val type changed
+  - func param or result not present or type changed
+  - inferred type changed (array/slice/map elem)
+  - underlying type changed
 - each connection to an input must originate from a different block.  only one connection to an input may originate from the input's block or an outer block.  (too restrictive?:  if node A precedes node B then an input may not have connections originating from both A and B)
 - fix spacing, highlighting of makeNode, newNode, convertNode, typeAssertNode (highlight typeView differently?)
 - identify current func/type in window title

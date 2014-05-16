@@ -14,7 +14,7 @@ type convertNode struct {
 	typ *typeView
 }
 
-func newConvertNode() *convertNode {
+func newConvertNode(currentPkg *types.Package) *convertNode {
 	n := &convertNode{}
 	n.nodeBase = newNodeBase(n)
 	in := n.newInput(nil)
@@ -28,7 +28,7 @@ func newConvertNode() *convertNode {
 			out.setType(nil)
 		}
 	}
-	n.typ = newTypeView(new(types.Type))
+	n.typ = newTypeView(new(types.Type), currentPkg)
 	n.typ.mode = anyType
 	n.Add(n.typ)
 	return n
