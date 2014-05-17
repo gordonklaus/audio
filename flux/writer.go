@@ -66,6 +66,22 @@ func saveType(t *types.Named) {
 }
 
 func saveFunc(f *funcNode) {
+	unknowns := false
+	f.funcblk.walk(nil, func(n node) {
+		switch n := n.(type) {
+		case *valueNode:
+			_, ok := n.obj.(unknownObject)
+			unknowns = unknowns || ok
+		case *callNode:
+			_, ok := n.obj.(unknownObject)
+			unknowns = unknowns || ok
+		}
+	}, func(c *connection) {})
+	if unknowns {
+		println("func contains unknown objects; not saving")
+		return
+	}
+
 	w := newWriter(f.obj)
 	defer w.close()
 
@@ -243,12 +259,19 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					if _, ok := n.(*makeNode); ok && len(ins) > 1 && in == ins[1] { // TODO: not this.  addable/removable capacity port instead.
 						continue //ignore unconnected slice capacity
 					}
-					switch t := underlying(in.obj.Type).(type) {
-					case nil:
+					t := in.obj.Type
+					if t == nil {
 						continue
+					}
+					w.collectPkgs(t)
+					hasNil := false
+					switch underlying(t).(type) {
 					case *types.Slice, *types.Map, *types.Signature:
-						name = "nil" //must use untyped nil in case this value is used in equality comparison
-					default:
+						hasNil = true
+					}
+					if n, ok := n.(*operatorNode); ok && n.op == "==" && hasNil {
+						name = "nil"
+					} else {
 						name = w.name("v")
 						w.indent("var %s %s\n", name, w.typ(t))
 					}

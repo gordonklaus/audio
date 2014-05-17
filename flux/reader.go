@@ -81,8 +81,11 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 		results = r.List
 	}
 	for i, p := range results {
-		r.conns[p.Names[0].Name] = []*connection{}
-		f.addPkgRef(sig.Results[i].Type)
+		name := p.Names[0].Name
+		t := sig.Results[i].Type
+		r.scope.Insert(newVar(name, t)) //make the type available for r.in's handling of unknownObject
+		r.conns[name] = []*connection{}
+		f.addPkgRef(t)
 	}
 	r.block(n.funcblk, body.List)
 	for i, p := range results {
@@ -319,7 +322,11 @@ func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
 	if x2, ok := x.(*ast.UnaryExpr); ok {
 		x = x2.X
 	}
-	n := newValueNode(r.obj(x), set) // r.obj returns nil for a *ast.StarExpr, which is what valueNode expects for an assignment (*x = y)
+	var obj types.Object
+	if _, ok := x.(*ast.StarExpr); !ok { // StarExpr indicates an assignment (*x = y), for which obj must be nil
+		obj = r.obj(x)
+	}
+	n := newValueNode(obj, set)
 	b.addNode(n)
 	switch x := x.(type) {
 	case *ast.SelectorExpr:
@@ -337,9 +344,26 @@ func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
 
 func (r *reader) call(b *block, x *ast.CallExpr, godefer string, s ast.Stmt) node {
 	obj := r.obj(x.Fun)
+	args := x.Args
+	if u, ok := obj.(unknownObject); ok {
+		sig := &types.Signature{}
+		for _, arg := range args {
+			sig.Params = append(sig.Params, newVar("", r.scope.Lookup(name(arg)).(*types.Var).Type))
+		}
+		if u.recv != nil {
+			sig.Recv = newVar("", u.recv)
+			args = append([]ast.Expr{x.Fun.(*ast.SelectorExpr).X}, args...)
+		}
+		if s, ok := s.(*ast.AssignStmt); ok {
+			for _ = range s.Lhs {
+				sig.Results = append(sig.Results, newVar("", nil))
+			}
+		}
+		u.typ = sig
+		obj = u
+	}
 	n := newCallNode(obj, r.pkg, godefer)
 	b.addNode(n)
-	args := x.Args
 	switch {
 	case isMethod(obj):
 		recv := x.Fun.(*ast.SelectorExpr).X
@@ -430,7 +454,6 @@ func (r *reader) sendrecv(b *block, ch, elem ast.Expr, s ast.Stmt) *chanNode {
 }
 
 func (r *reader) obj(x ast.Expr) types.Object {
-	// TODO: go/types should be able to do this for me.  see http://golang.org/issue/7151
 	switch x := x.(type) {
 	case *ast.Ident:
 		if v, ok := r.localVars[x.Name]; ok {
@@ -442,13 +465,17 @@ func (r *reader) obj(x ast.Expr) types.Object {
 			}
 			return obj
 		}
+		return unknownObject{pkg: r.pkg, name: x.Name}
 	case *ast.SelectorExpr:
 		// TODO: Type.Method and pkg.Type.Method
 		n1 := name(x.X)
 		n2 := x.Sel.Name
 		switch obj := r.scope.LookupParent(n1).(type) {
 		case *types.PkgName:
-			return obj.Pkg.Scope().Lookup(n2)
+			if obj := obj.Pkg.Scope().Lookup(n2); obj != nil {
+				return obj
+			}
+			return unknownObject{pkg: obj.Pkg, name: n2}
 		case *types.Var:
 			t := obj.Type
 			fm, _, addr := types.LookupFieldOrMethod(t, r.pkg, n2)
@@ -459,9 +486,10 @@ func (r *reader) obj(x ast.Expr) types.Object {
 			case *types.Var:
 				return field{fm, t, addr}
 			}
+			return unknownObject{pkg: obj.Pkg, recv: t, name: n2}
 		}
 	}
-	return nil
+	panic("unreachable")
 }
 
 func (r *reader) typ(x ast.Expr) types.Type {
@@ -479,6 +507,9 @@ func (r *reader) out(x ast.Expr, out *port) {
 func (r *reader) in(x ast.Expr, in *port) {
 	name := name(x)
 	for _, c := range r.conns[name] {
+		if c.src.obj.Type == nil { //unknownObjects have nil-typed outputs; give them types so connections succeed
+			c.src.setType(r.scope.Lookup(name).(*types.Var).Type)
+		}
 		if !c.connectable(c.src, in) {
 			println("not connectable:")
 			printf("%#v\n", c.src.node)
@@ -515,3 +546,15 @@ func name(x ast.Expr) string {
 	}
 	return ""
 }
+
+type unknownObject struct {
+	types.Object
+	pkg  *types.Package
+	recv types.Type
+	name string
+	typ  types.Type
+}
+
+func (o unknownObject) GetPkg() *types.Package { return o.pkg }
+func (o unknownObject) GetName() string        { return o.name }
+func (o unknownObject) GetType() types.Type    { return o.typ }

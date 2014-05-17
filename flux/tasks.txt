@@ -1,8 +1,6 @@
 TODO
 
 - handle unknown IDs in reader:
-  - const, var, field, func val, method val getter or setter
-  - func or method call
   - type or field name in composite literal
   - type in make, new, conversion, type assertion
   - type in signature
@@ -13,6 +11,8 @@ TODO
   - func param or result not present or type changed
   - inferred type changed (array/slice/map elem)
   - underlying type changed
+- prompt to Save, Don't Save, or Cancel when closing a func.  prompt to Discard Changes or Cancel when closing a func with unknowns.
+- qualify names with package (and fields/methods with type?)
 - each connection to an input must originate from a different block.  only one connection to an input may originate from the input's block or an outer block.  (too restrictive?:  if node A precedes node B then an input may not have connections originating from both A and B)
 - fix spacing, highlighting of makeNode, newNode, convertNode, typeAssertNode (highlight typeView differently?)
 - identify current func/type in window title
@@ -34,6 +34,7 @@ TODO
 - one-off local functions
 - reposition port.valView after creating new param/result
 - case-insensitive sorting in browser?  currently, all lowercase names follow all upper case.  also, don't sort operators?
+- node replacement: focus node, type shortcut (just Enter?), select compatible item from browser; node is replaced and connections remain
 - use go/parser and go/ast to validate basic literals
 - dimly highlight connected ports when a port is focused (or only when a key, e.g. Shift, is pressed) (but always for wireless conns)
 - don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.
