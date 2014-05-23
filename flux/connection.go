@@ -28,6 +28,8 @@ type connection struct {
 
 	savedPort *port
 	editing   bool
+	
+	bad, wasBad bool
 }
 
 func newConnection() *connection {
@@ -206,6 +208,9 @@ func (c *connection) setSrc(src *port) {
 		txt = c.src.conntxt.Text()
 		c.updateSrcTxt("")
 	}
+	if c.bad && src != nil && c.connectable(src, c.dst) {
+		c.bad = false
+	}
 	c.src = src
 	c.reblock()
 	if src != nil {
@@ -223,6 +228,9 @@ func (c *connection) setDst(dst *port) {
 		c.dst.disconnect(c)
 		c.dst.connsChanged()
 		c.updateDstTxt()
+	}
+	if c.bad && dst != nil && c.connectable(c.src, dst) {
+		c.bad = false
 	}
 	c.dst = dst
 	c.reblock()
@@ -313,6 +321,7 @@ func (c *connection) startEditing() {
 	} else {
 		c.savedPort = c.dst
 	}
+	c.wasBad = c.bad
 	c.editing = true
 	c.reform()
 }
@@ -324,6 +333,7 @@ func (c *connection) cancelEditing() {
 		} else {
 			c.setDst(c.savedPort)
 		}
+		c.bad = c.wasBad
 		c.stopEditing()
 	}
 }
@@ -641,5 +651,14 @@ func (c *connection) Paint() {
 		SetLineWidth(7)
 		DrawBezier(pts...)
 		Disable(MAP1_COLOR_4)
+	}
+	if c.bad {
+		SetColor(Color{1, 0, 0, 1})
+		SetLineWidth(3)
+		p := Center(c)
+		d := Pt(6, 6)
+		DrawLine(p.Add(d), p.Sub(d))
+		d = Pt(6, -6)
+		DrawLine(p.Add(d), p.Sub(d))
 	}
 }

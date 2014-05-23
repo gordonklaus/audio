@@ -135,6 +135,10 @@ func (n *callNode) KeyPress(event KeyEvent) {
 }
 
 func (n *callNode) removePort(p *port) {
+	if p.bad {
+		n.removePortBase(p)
+		return
+	}
 	if i, v := n.variadic(); v != nil {
 		for _, p2 := range ins(n)[i:] {
 			if p2 == p {

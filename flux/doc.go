@@ -59,5 +59,10 @@ The type editor displays a type as a tree.  Composite types have their children 
 Press Enter to move the focus from a composite type to one of its children.  Use the arrow keys to move the focus between the children of a composite type.  Press Escape to move the focus from a child to its parent.
 
 To replace the focused item, press Backspace.  For a named item (struct field, function parameter or result, or interface method), first type the name and Enter.  Otherwise just select the type from the browser.  After a composite type is created, each of its children is edited in turn.  Press Escape to stop entering new named items.  Press Comma to insert a new named item (hold Shift to insert before the focused item); to delete one, press Delete.
+
+
+Invalid code
+
+It is impossible to write invalid (uncompilable) code in Flux.  However, it is possible for code to become invalid when its dependencies change.  For example, when a variable is renamed or removed or when a function signature changes, any code that referred to those objects will no longer work.  In the case of a name change, the referred-to object is simply unknown; while in the case of a type change, some connections or ports may become invalid.  Such invalidities are indicated by a red X drawn over the offending name, port, or connection.  Replace invalid nodes, adjust invalid connections, and remove invalid ports to make the code valid again.
 */
 package main

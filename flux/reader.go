@@ -116,8 +116,12 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 						r.out(s.Lhs[0], n.outs[0])
 					} else {
 						n := r.call(b, x, "", s)
-						for i, p := range outs(n) {
-							r.out(s.Lhs[i], p)
+						for i, res := range s.Lhs {
+							if i >= len(outs(n)) {
+								out := n.(*callNode).newOutput(nil)
+								out.bad = true
+							}
+							r.out(res, outs(n)[i])
 						}
 					}
 				case *ast.CompositeLit:
@@ -415,12 +419,17 @@ func (r *reader) call(b *block, x *ast.CallExpr, godefer string, s ast.Stmt) nod
 				newInput = n.newInput
 				v = ins(n)[0].obj
 			}
-			if x.Ellipsis == 0 {
-				v = newVar(v.Name, v.Type.(*types.Slice).Elem)
-			}
-			in := newInput(v)
-			if x.Ellipsis != 0 {
-				in.valView.setEllipsis()
+			if v != nil {
+				if x.Ellipsis == 0 {
+					v = newVar(v.Name, v.Type.(*types.Slice).Elem)
+				}
+				in := newInput(v)
+				if x.Ellipsis != 0 {
+					in.valView.setEllipsis()
+				}
+			} else {
+				in := newInput(newVar("", r.scope.Lookup(name(arg)).(*types.Var).Type))
+				in.bad = true
 			}
 		}
 		r.in(arg, ins(n)[i])
@@ -631,9 +640,7 @@ func (r *reader) in(x ast.Expr, in *port) {
 			c.src.setType(r.scope.Lookup(name).(*types.Var).Type)
 		}
 		if !c.connectable(c.src, in) {
-			println("not connectable:")
-			printf("%#v\n", c.src.node)
-			printf("%#v\n\n", in.node)
+			c.bad = true
 		}
 		c.setDst(in)
 	}
