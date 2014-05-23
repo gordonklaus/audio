@@ -139,7 +139,7 @@ func (v *typeView) setType(t types.Type) {
 			v.elems.left = append(v.elems.left, newValueView(val, v.currentPkg))
 		}
 		if t.IsVariadic {
-			v.elems.left[len(v.elems.left)-1].ellipsis = true
+			v.elems.left[len(v.elems.left)-1].setEllipsis()
 		}
 		for _, val := range t.Results {
 			v.elems.right = append(v.elems.right, newValueView(val, v.currentPkg))
@@ -398,9 +398,9 @@ func (v *typeView) addMethods(m *[]*types.Func, elems *[]*typeView, done func())
 	}, done)
 }
 
-func (v *typeView) refresh() {
-	v.setType(*v.typ)
-}
+func (v *typeView) refresh() { v.setType(*v.typ) }
+
+func (v *typeView) setEllipsis() { v.ellipsis = true; v.refresh() }
 
 func (v *typeView) TookKeyFocus() { v.focused = true; Repaint(v) }
 func (v *typeView) LostKeyFocus() { v.focused = false; Repaint(v) }

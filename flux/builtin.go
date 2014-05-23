@@ -31,7 +31,7 @@ func newAppendNode() *appendNode {
 			}
 		} else if n.ellipsis() {
 			p := ins(n)[1]
-			p.valView.ellipsis = true
+			p.valView.setEllipsis()
 			p.setType(t)
 		} else {
 			for _, p := range ins(n)[1:] {
@@ -68,8 +68,7 @@ func (n *appendNode) KeyPress(event KeyEvent) {
 				n.removePortBase(p)
 			}
 			p := n.newInput(v)
-			p.valView.ellipsis = true
-			p.valView.refresh()
+			p.valView.setEllipsis()
 			SetKeyFocus(p)
 		}
 	} else {

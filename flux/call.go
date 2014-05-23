@@ -123,8 +123,7 @@ func (n *callNode) KeyPress(event KeyEvent) {
 					n.removePortBase(in)
 				}
 				in := n.newInput(v)
-				in.valView.ellipsis = true
-				in.valView.refresh()
+				in.valView.setEllipsis()
 				SetKeyFocus(in)
 			}
 		} else {
