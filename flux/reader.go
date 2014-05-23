@@ -437,17 +437,20 @@ func (r *reader) compositeLit(b *block, x *ast.CompositeLit, ptr bool, s *ast.As
 	n := newCompositeLiteralNode(r.pkg)
 	b.addNode(n)
 	n.setType(t)
-elts:
 	for _, elt := range x.Elts {
 		elt := elt.(*ast.KeyValueExpr)
-		field := name(elt.Key)
-		for _, in := range n.ins {
-			if in.obj.GetName() == field {
-				r.in(elt.Value, in)
-				continue elts
+		var in *port
+		for _, p := range n.ins {
+			if p.obj.GetName() == name(elt.Key) {
+				in = p
+				break
 			}
 		}
-		panic("no field matching " + field)
+		if in == nil {
+			in = n.newInput(newVar(name(elt.Key), r.scope.Lookup(name(elt.Value)).(*types.Var).Type))
+			in.bad = true
+		}
+		r.in(elt.Value, in)
 	}
 	r.out(s.Lhs[0], n.outs[0])
 }

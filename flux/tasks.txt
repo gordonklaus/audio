@@ -1,13 +1,11 @@
 TODO
 
 - handle unknown IDs in reader:
-  - field name in composite literal
   - type in signature
   - temporary local var type (including loop var).  can safely ignore?
   - package name.  avoidable by always using named imports
 - handle invalid connections in reader:
   - const, var, field, func val, method val type changed
-  - field missing in composite literal
   - func param or result not present or type changed
   - inferred type changed (array/slice/map elem)
   - underlying type changed

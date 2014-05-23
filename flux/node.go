@@ -401,3 +401,9 @@ func (n *compositeLiteralNode) setType(t types.Type) {
 	n.reform()
 	SetKeyFocus(n)
 }
+
+func (n *compositeLiteralNode) removePort(p *port) {
+	if p.bad {
+		n.removePortBase(p)
+	}
+}

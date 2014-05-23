@@ -19,7 +19,7 @@ type port struct {
 	obj          *types.Var
 	valView      *typeView
 	conns        []*connection
-	focused      bool
+	focused, bad bool
 	connsChanged func()
 
 	conntxt *Text
@@ -288,10 +288,17 @@ func (p *port) Mouse(m MouseEvent) {
 	c.startEditing()
 }
 
-func (p port) Paint() {
+func (p *port) Paint() {
 	if p.focused {
 		SetColor(focusColor)
 		SetPointSize(portSize)
 		DrawPoint(ZP)
+	}
+	if p.bad {
+		SetColor(Color{1, 0, 0, 1})
+		SetLineWidth(3)
+		r := Rect(p)
+		DrawLine(r.Min, r.Max)
+		DrawLine(Pt(r.Min.X, r.Max.Y), Pt(r.Max.X, r.Min.Y))
 	}
 }
