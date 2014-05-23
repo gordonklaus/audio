@@ -23,9 +23,8 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 	n.nodeBase = newNodeBase(n)
 	dot := ""
 	switch obj.(type) {
-	case field, *types.Func, nil, unknownObject:
-		uo, isUnknown := obj.(unknownObject)
-		if _, ok := obj.(*types.Func); !ok && (!isUnknown || uo.recv != nil) || isMethod(obj) {
+	case field, *types.Func, nil:
+		if _, ok := obj.(*types.Func); !ok || isMethod(obj) {
 			n.x = n.newInput(nil)
 			if obj == nil {
 				n.x.connsChanged = n.connsChanged
@@ -44,7 +43,7 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 		n.y = n.newOutput(nil)
 	}
 	switch obj.(type) {
-	case *types.Var, field, *localVar, nil, unknownObject:
+	case *types.Var, field, *localVar, nil:
 		n.addSeqPorts()
 	default:
 	}
@@ -98,8 +97,6 @@ func (n *valueNode) connsChanged() {
 		} else {
 			n.text.SetText("*")
 		}
-	case unknownObject:
-		xt = obj.recv
 	}
 	if !n.set && n.addressable {
 		yt = &types.Pointer{Elem: yt}
@@ -122,10 +119,9 @@ func (n *valueNode) KeyPress(event KeyEvent) {
 
 func (n *valueNode) Paint() {
 	n.nodeBase.Paint()
-	if _, ok := n.obj.(unknownObject); ok {
+	if unknown(n.obj) {
 		SetColor(Color{1, 0, 0, 1})
 		SetLineWidth(3)
-		// TODO: question mark instead of X
 		r := RectInParent(n.text)
 		DrawLine(r.Min, r.Max)
 		DrawLine(Pt(r.Min.X, r.Max.Y), Pt(r.Max.X, r.Min.Y))

@@ -66,22 +66,6 @@ func saveType(t *types.Named) {
 }
 
 func saveFunc(f *funcNode) {
-	unknowns := false
-	f.funcblk.walk(nil, func(n node) {
-		switch n := n.(type) {
-		case *valueNode:
-			_, ok := n.obj.(unknownObject)
-			unknowns = unknowns || ok
-		case *callNode:
-			_, ok := n.obj.(unknownObject)
-			unknowns = unknowns || ok
-		}
-	}, func(c *connection) {})
-	if unknowns {
-		println("func contains unknown objects; not saving")
-		return
-	}
-
 	w := newWriter(f.obj)
 	defer w.close()
 

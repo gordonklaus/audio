@@ -14,6 +14,8 @@ import (
 )
 
 // Flux code is stored in a subset of the Go language because this makes it fully interoperable with pure Go projects.  If instead it were stored in a custom Flux file format then, in order to share Flux code with non-Flux projects, generated Go files would also have to be saved in addition to Flux files, whereas in the normal build process these Go files would be temporary artifacts.
+// Actually, it wouldn't be necessary to store custom Flux data in a separate file; it could be stored in a comment at the top of the Go file.
+// A benefit of storing as Go is that many tools (e.g. for refactoring) that work on Go code could also be used on Flux code.
 
 func loadFunc(obj types.Object) *funcNode {
 	f := newFuncNode(obj, nil)
@@ -83,7 +85,7 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 	for i, p := range results {
 		name := p.Names[0].Name
 		t := sig.Results[i].Type
-		r.scope.Insert(newVar(name, t)) //make the type available for r.in's handling of unknownObject
+		r.scope.Insert(newVar(name, t)) //make the type available for r.in's handling of unknown objects
 		r.conns[name] = []*connection{}
 		f.addPkgRef(t)
 	}
@@ -318,13 +320,39 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 	}
 }
 
-func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
+func (r *reader) value(b *block, x, y ast.Expr, set bool, s ast.Stmt) {
 	if x2, ok := x.(*ast.UnaryExpr); ok {
 		x = x2.X
 	}
 	var obj types.Object
 	if _, ok := x.(*ast.StarExpr); !ok { // StarExpr indicates an assignment (*x = y), for which obj must be nil
 		obj = r.obj(x)
+		if u, ok := obj.(unknownObject); ok {
+			if _, ok := s.(*ast.DeclStmt); ok {
+				obj = types.NewConst(0, u.pkg, u.name, nil, nil)
+			} else {
+				var t types.Type
+				if set {
+					t = r.scope.Lookup(name(y)).(*types.Var).Type
+				}
+				addr := false
+				if s, ok := s.(*ast.AssignStmt); ok {
+					if s.Tok == token.DEFINE {
+						_, addr = s.Rhs[0].(*ast.UnaryExpr)
+					}
+				}
+				if u.recv != nil {
+					obj = field{types.NewVar(0, u.pkg, u.name, t), u.recv, addr} // it may be a method val, but a non-addressable field is close enough
+				} else {
+					if addr {
+						obj = types.NewVar(0, u.pkg, u.name, t)
+					} else {
+						obj = types.NewFunc(0, u.pkg, u.name, types.NewSignature(nil, newVar("", u.recv), nil, nil, false))
+					}
+				}
+			}
+			//unknown(obj) == true
+		}
 	}
 	n := newValueNode(obj, set)
 	b.addNode(n)
@@ -339,31 +367,29 @@ func (r *reader) value(b *block, x, y ast.Expr, set bool, an ast.Node) {
 	} else {
 		r.out(y, n.y)
 	}
-	r.seq(n, an)
+	r.seq(n, s)
 }
 
 func (r *reader) call(b *block, x *ast.CallExpr, godefer string, s ast.Stmt) node {
 	obj := r.obj(x.Fun)
-	args := x.Args
 	if u, ok := obj.(unknownObject); ok {
 		sig := &types.Signature{}
-		for _, arg := range args {
-			sig.Params = append(sig.Params, newVar("", r.scope.Lookup(name(arg)).(*types.Var).Type))
-		}
 		if u.recv != nil {
 			sig.Recv = newVar("", u.recv)
-			args = append([]ast.Expr{x.Fun.(*ast.SelectorExpr).X}, args...)
+		}
+		for _, arg := range x.Args {
+			sig.Params = append(sig.Params, newVar("", r.scope.Lookup(name(arg)).(*types.Var).Type))
 		}
 		if s, ok := s.(*ast.AssignStmt); ok {
 			for _ = range s.Lhs {
 				sig.Results = append(sig.Results, newVar("", nil))
 			}
 		}
-		u.typ = sig
-		obj = u
+		obj = types.NewFunc(0, u.pkg, u.name, sig) //unknown(obj) == true
 	}
 	n := newCallNode(obj, r.pkg, godefer)
 	b.addNode(n)
+	args := x.Args
 	switch {
 	case isMethod(obj):
 		recv := x.Fun.(*ast.SelectorExpr).X
@@ -453,6 +479,13 @@ func (r *reader) sendrecv(b *block, ch, elem ast.Expr, s ast.Stmt) *chanNode {
 	return n
 }
 
+type unknownObject struct {
+	types.Object
+	pkg  *types.Package
+	recv types.Type
+	name string
+}
+
 func (r *reader) obj(x ast.Expr) types.Object {
 	switch x := x.(type) {
 	case *ast.Ident:
@@ -493,11 +526,95 @@ func (r *reader) obj(x ast.Expr) types.Object {
 }
 
 func (r *reader) typ(x ast.Expr) types.Type {
-	t, _, err := types.EvalNode(r.fset, x, r.pkg, r.scope)
-	if err != nil {
-		panic(err)
+	switch x := x.(type) {
+	case *ast.Ident:
+		if t, ok := r.scope.LookupParent(x.Name).(*types.TypeName); ok {
+			return t.Type
+		}
+		return types.NewNamed(types.NewTypeName(0, r.pkg, x.Name, nil), types.Typ[types.Invalid], nil) //unknown(t.Obj) == true
+	case *ast.SelectorExpr:
+		pkg := r.scope.LookupParent(name(x.X)).(*types.PkgName).Pkg
+		if t, ok := pkg.Scope().Lookup(x.Sel.Name).(*types.TypeName); ok {
+			return t.Type
+		}
+		return types.NewNamed(types.NewTypeName(0, r.pkg, x.Sel.Name, nil), types.Typ[types.Invalid], nil) //unknown(t.Obj) == true
+	case *ast.StarExpr:
+		return types.NewPointer(r.typ(x.X))
+	case *ast.ArrayType:
+		elem := r.typ(x.Elt)
+		if x.Len != nil {
+			// TODO: x.Len
+			return types.NewArray(elem, 0)
+		}
+		return types.NewSlice(elem)
+	case *ast.Ellipsis:
+		return types.NewSlice(r.typ(x.Elt))
+	case *ast.MapType:
+		return types.NewMap(r.typ(x.Key), r.typ(x.Value))
+	case *ast.ChanType:
+		dir := types.SendRecv
+		if x.Dir&ast.SEND == 0 {
+			dir = types.RecvOnly
+		}
+		if x.Dir&ast.RECV == 0 {
+			dir = types.SendOnly
+		}
+		return types.NewChan(dir, r.typ(x.Value))
+	case *ast.FuncType:
+		var params, results []*types.Var
+		for _, f := range x.Params.List {
+			t := r.typ(f.Type)
+			if f.Names == nil {
+				params = append(params, types.NewParam(0, r.pkg, "", t))
+			}
+			for _, n := range f.Names {
+				params = append(params, types.NewParam(0, r.pkg, n.Name, t))
+			}
+		}
+		variadic := false
+		if x.Results != nil {
+			for _, f := range x.Results.List {
+				t := r.typ(f.Type)
+				if f.Names == nil {
+					results = append(results, types.NewParam(0, r.pkg, "", t))
+				}
+				for _, n := range f.Names {
+					results = append(results, types.NewParam(0, r.pkg, n.Name, t))
+				}
+				_, variadic = f.Type.(*ast.Ellipsis)
+			}
+		}
+		return types.NewSignature(nil, nil, params, results, variadic)
+	case *ast.StructType:
+		var fields []*types.Var
+		if x.Fields != nil {
+			for _, f := range x.Fields.List {
+				t := r.typ(f.Type)
+				if f.Names == nil {
+					fields = append(fields, types.NewField(0, r.pkg, "", t, true))
+				}
+				for _, n := range f.Names {
+					fields = append(fields, types.NewField(0, r.pkg, n.Name, t, false))
+				}
+			}
+		}
+		return types.NewStruct(fields, nil)
+	case *ast.InterfaceType:
+		var methods []*types.Func
+		var embeddeds []*types.Named
+		if x.Methods != nil {
+			for _, f := range x.Methods.List {
+				switch t := r.typ(f.Type).(type) {
+				case *types.Signature:
+					methods = append(methods, types.NewFunc(0, r.pkg, f.Names[0].Name, t))
+				case *types.Named:
+					embeddeds = append(embeddeds, t)
+				}
+			}
+		}
+		return types.NewInterface(methods, embeddeds)
 	}
-	return t
+	panic("unreachable")
 }
 
 func (r *reader) out(x ast.Expr, out *port) {
@@ -507,7 +624,7 @@ func (r *reader) out(x ast.Expr, out *port) {
 func (r *reader) in(x ast.Expr, in *port) {
 	name := name(x)
 	for _, c := range r.conns[name] {
-		if c.src.obj.Type == nil { //unknownObjects have nil-typed outputs; give them types so connections succeed
+		if c.src.obj.Type == nil { //unknown objects have nil-typed outputs; give them types so connections succeed
 			c.src.setType(r.scope.Lookup(name).(*types.Var).Type)
 		}
 		if !c.connectable(c.src, in) {
@@ -547,14 +664,19 @@ func name(x ast.Expr) string {
 	return ""
 }
 
-type unknownObject struct {
-	types.Object
-	pkg  *types.Package
-	recv types.Type
-	name string
-	typ  types.Type
+func unknown(obj types.Object) bool {
+	switch obj := obj.(type) {
+	case field:
+		fm, _, _ := types.LookupFieldOrMethod(obj.recv, obj.Pkg, obj.Name)
+		_, ok := fm.(*types.Var)
+		return !ok
+	case *types.Func:
+		if sig, ok := obj.Type.(*types.Signature); ok && sig.Recv != nil {
+			fm, _, _ := types.LookupFieldOrMethod(sig.Recv.Type, obj.Pkg, obj.Name)
+			_, ok := fm.(*types.Func)
+			return !ok
+		}
+	}
+	pkg := obj.GetPkg()
+	return pkg != nil && pkg.Scope().Lookup(obj.GetName()) == nil
 }
-
-func (o unknownObject) GetPkg() *types.Package { return o.pkg }
-func (o unknownObject) GetName() string        { return o.name }
-func (o unknownObject) GetType() types.Type    { return o.typ }

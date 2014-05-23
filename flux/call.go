@@ -176,10 +176,9 @@ func (n *callNode) ellipsis() bool {
 
 func (n *callNode) Paint() {
 	n.nodeBase.Paint()
-	if _, ok := n.obj.(unknownObject); ok {
+	if n.obj != nil && unknown(n.obj) {
 		SetColor(Color{1, 0, 0, 1})
 		SetLineWidth(3)
-		// TODO: question mark instead of X
 		r := RectInParent(n.text)
 		DrawLine(r.Min, r.Max)
 		DrawLine(Pt(r.Min.X, r.Max.Y), Pt(r.Max.X, r.Min.Y))

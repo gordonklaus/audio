@@ -628,6 +628,13 @@ func (v *typeView) Paint() {
 		SetLineWidth(1)
 		DrawRect(Rect(v))
 	}
+	if t, ok := (*v.typ).(*types.Named); ok && unknown(t.Obj) {
+		SetColor(Color{1, 0, 0, 1})
+		SetLineWidth(3)
+		r := Rect(v)
+		DrawLine(r.Min, r.Max)
+		DrawLine(Pt(r.Min.X, r.Max.Y), Pt(r.Max.X, r.Min.Y))
+	}
 }
 
 func underlying(t types.Type) types.Type {
