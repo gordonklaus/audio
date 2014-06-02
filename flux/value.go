@@ -119,7 +119,7 @@ func (n *valueNode) KeyPress(event KeyEvent) {
 
 func (n *valueNode) Paint() {
 	n.nodeBase.Paint()
-	if unknown(n.obj) {
+	if n.obj != nil && unknown(n.obj) {
 		SetColor(Color{1, 0, 0, 1})
 		SetLineWidth(3)
 		r := RectInParent(n.text)
