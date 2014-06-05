@@ -39,6 +39,10 @@ func (w *Window) Size() (width, height int) {
 	return int(wid), int(hei)
 }
 
+func (w *Window) Move(x, y int) {
+	C.glfwSetWindowPos(w.w, C.int(x), C.int(y))
+}
+
 func (w *Window) FramebufferSize() (width, height int) {
 	var wid, hei C.int
 	C.glfwGetFramebufferSize(w.w, &wid, &hei)
@@ -49,7 +53,7 @@ func (w *Window) ShouldClose() bool {
 	return C.glfwWindowShouldClose(w.w) == C.GL_TRUE
 }
 
-func (w *Window) MousePosition() (_, _ float64) {
+func (w *Window) MousePosition() (float64, float64) {
 	var x, y C.double
 	C.glfwGetCursorPos(w.w, &x, &y)
 	return float64(x), float64(y)

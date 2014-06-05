@@ -22,7 +22,7 @@ type Window struct {
 }
 
 func NewWindow(self View) *Window {
-	w := &Window{w: glfw.NewWindow(800, 600, "Flux")}
+	w := &Window{w: glfw.NewWindow(960, 520, "Flux")}
 
 	// Somehow, this seems to work:
 	// Have the context current in both threads, as this one needs to be able to call

@@ -1,0 +1,3 @@
+Flux requires the GLFW3 and FTGL libraries and header files.  If your system has a package manager, you can use it to install libglfw3-dev and libftgl-dev, if they are available.  Otherwise, you must build and install them from source:  FTGL requires FreeType (libfreetype6-dev); install both libraries using the standard commands "./configure && make && sudo make install".  To build GLFW3 you need CMake.  Configure GLFW3 with the BUILD_SHARED_LIBS option: run "cmake -D BUILD_SHARED_LIBS=true . && make && sudo make install".
+
+Once you have GLFW3 and FTGL, you can build, install, and run Flux as you would any other Go program, e.g., "go install code.google.com/p/gordon-go/flux".

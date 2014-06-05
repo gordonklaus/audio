@@ -13,9 +13,15 @@ TODO
 - builtins panic and recover should have valid signatures in go/types
 - len and capacity inputs for make, len and max input for slice, ok output for type assert (also mapget and chanrecv?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable
 - shortcuts:
+  - on a port, press Space to open a browser with funcs suitable for connection
   - on an input, press '{' to create a composite or func literal of the port's type
   - on a pointer output, press '=' to create an assignment node
   - on a node or connection, press cmd-R(cmd-I?) to bring up a browser with funcs and ops suitable to insert, i.e., having a signature compatible with the existing node's connections
+- advanced editing
+  - selection of multiple nodes
+  - cut, copy, paste
+  - drag and drop nodes between blocks
+  - undo, redo
 - remove localVar
 - rework typeView appearance
 - add in-place operators (+=, etc) that take a pointer as the first arg.
