@@ -358,7 +358,7 @@ func (r *reader) value(b *block, x, y ast.Expr, set bool, s ast.Stmt) {
 			//unknown(obj) == true
 		}
 	}
-	n := newValueNode(obj, set)
+	n := newValueNode(obj, r.pkg, set)
 	b.addNode(n)
 	switch x := x.(type) {
 	case *ast.SelectorExpr:

@@ -46,6 +46,8 @@ func newCallNode(obj types.Object, currentPkg *types.Package, godefer string) no
 		name := obj.GetName()
 		if sig.Recv != nil {
 			name = "." + name
+		} else if p := obj.GetPkg(); p != currentPkg && p != nil {
+			n.pkg.setPkg(obj.GetPkg())
 		}
 		n.text.SetText(name)
 		n.text.SetTextColor(color(&types.Func{}, true, false))

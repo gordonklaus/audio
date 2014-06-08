@@ -199,6 +199,17 @@ func SetMouser(m MouserView, button int) {
 	}
 }
 
+func MouseParent(v View, m MouseEvent) {
+	for v != nil {
+		m.Pos = MapToParent(v, m.Pos)
+		v = Parent(v)
+		if v, ok := v.(Mouser); ok {
+			v.Mouse(m)
+			return
+		}
+	}
+}
+
 func Repaint(v View) {
 	if w := v.win(); w != nil {
 		w.repaint()

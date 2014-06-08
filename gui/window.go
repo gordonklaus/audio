@@ -12,6 +12,7 @@ type Window struct {
 	*ViewBase
 	centralView View
 	keyFocus    View
+	mouseIn     MouserView
 	mouser      map[int]MouserView
 	control     chan interface{}
 	key         chan KeyEvent
@@ -194,10 +195,35 @@ func (w *Window) run() {
 					}
 				case m.Move:
 					m.Pos = mapToWindow(m.Pos)
+					m.Move = false
+					v, _ := viewAtFunc(w.Self, m.Pos, func(v View) View {
+						v, _ = v.(MouserView)
+						return v
+					}).(MouserView)
+					if w.mouseIn != v {
+						p := commonParent(w.mouseIn, v)
+						for v := View(w.mouseIn); v != p && v != nil; v = Parent(v) {
+							if v, ok := v.(MouserView); ok {
+								m := m
+								m.Pos = MapFrom(v, m.Pos, w.Self)
+								m.Leave = true
+								v.Mouse(m)
+							}
+						}
+						for v := View(v); v != p && v != nil; v = Parent(v) {
+							if v, ok := v.(MouserView); ok {
+								m := m
+								m.Pos = MapFrom(v, m.Pos, w.Self)
+								m.Enter = true
+								v.Mouse(m)
+							}
+						}
+						w.mouseIn = v
+					}
 					for button, v := range w.mouser {
 						m := m
 						m.Pos = MapFrom(v, m.Pos, w.Self)
-						m.Move, m.Drag = false, true
+						m.Drag = true
 						m.Button = button
 						v.Mouse(m)
 					}
@@ -232,6 +258,17 @@ func (w *Window) run() {
 		}
 	}()
 	wg.Wait()
+}
+
+func commonParent(v1, v2 View) (p View) {
+	for ; v1 != nil; v1 = Parent(v1) {
+		for v2 := v2; v2 != nil; v2 = Parent(v2) {
+			if v1 == v2 {
+				return v1
+			}
+		}
+	}
+	return nil
 }
 
 func (w *Window) setKeyFocus(view View) {

@@ -5,7 +5,6 @@ TODO
   - temporary local var type (including loop var).  can safely ignore?
   - package name.  avoidable by always using named imports
 - prompt to Save, Don't Save, or Cancel when closing a func
-- qualify names with package (and fields/methods with type?)
 - each connection to an input must originate from a different block.  only one connection to an input may originate from the input's block or an outer block.  (too restrictive?:  if node A precedes node B then an input may not have connections originating from both A and B)
 - fix spacing, highlighting of makeNode, newNode, convertNode, typeAssertNode (highlight typeView differently?)
 - identify current func/type in window title
@@ -16,7 +15,7 @@ TODO
   - on a port, press Space to open a browser with funcs suitable for connection
   - on an input, press '{' to create a composite or func literal of the port's type
   - on a pointer output, press '=' to create an assignment node
-  - on a node or connection, press cmd-R(cmd-I?) to bring up a browser with funcs and ops suitable to insert, i.e., having a signature compatible with the existing node's connections
+  - on a node or connection, press cmd-R(cmd-I?) (just Enter?) to bring up a browser with funcs and ops suitable to insert, i.e., having a signature compatible with the existing node's connections
 - advanced editing
   - selection of multiple nodes
   - cut, copy, paste
@@ -24,6 +23,7 @@ TODO
   - undo, redo
 - remove localVar
 - rework typeView appearance
+- display package name for top-level (imported) objects in browser
 - add in-place operators (+=, etc) that take a pointer as the first arg.
 - give assignment node and in-place operators an output, for easier sequencing.
 - use graphics instead of text to identify pointers, slices, funcs, maps, etc in typeView
@@ -33,7 +33,7 @@ TODO
 - one-off local functions
 - reposition port.valView after creating new param/result
 - case-insensitive sorting in browser?  currently, all lowercase names follow all upper case.  also, don't sort operators?
-- node replacement: focus node, type shortcut (just Enter?), select compatible item from browser; node is replaced and connections remain
+- color convertNode and typeAssertNode the same as makeNode and newNode (generic funcs)
 - use go/parser and go/ast to validate basic literals
 - dimly highlight connected ports when a port is focused (or only when a key, e.g. Shift, is pressed) (but always for wireless conns)
 - don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.

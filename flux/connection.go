@@ -28,7 +28,7 @@ type connection struct {
 
 	savedPort *port
 	editing   bool
-	
+
 	bad, wasBad bool
 }
 

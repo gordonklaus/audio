@@ -36,7 +36,7 @@ func newPort(out bool, n node, v *types.Var) *port {
 
 	p := &port{out: out, node: n, obj: v}
 	p.ViewBase = NewView(p)
-	p.valView = newValueView(v, nil) // should pass currentPkg here but inconvenient to get during initialization and rarely important (unnamed struct param/result with invisible field)
+	p.valView = newValueView(v, nil) // TODO: pass currentPkg here so that named types are not package qualified in the current package and so that unexported fields in unnamed literals (rare) are hidden as appropriate
 	Hide(p.valView)
 	p.connsChanged = func() {}
 	p.Add(p.valView)
@@ -275,17 +275,19 @@ func (p *port) KeyPress(event KeyEvent) {
 }
 
 func (p *port) Mouse(m MouseEvent) {
-	SetKeyFocus(p)
-	c := newConnection()
-	if p.out {
-		c.setSrc(p)
-		c.focus(false)
-	} else {
-		c.setDst(p)
-		c.focus(true)
+	if m.Press {
+		SetKeyFocus(p)
+		c := newConnection()
+		if p.out {
+			c.setSrc(p)
+			c.focus(false)
+		} else {
+			c.setDst(p)
+			c.focus(true)
+		}
+		SetMouser(c, m.Button)
+		c.startEditing()
 	}
-	SetMouser(c, m.Button)
-	c.startEditing()
 }
 
 func (p *port) Paint() {

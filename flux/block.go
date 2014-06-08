@@ -550,18 +550,18 @@ func (b *block) newNode(obj types.Object, funcAsVal bool, godefer string) node {
 		} else if isOperator(obj) {
 			n = newOperatorNode(obj)
 		} else if funcAsVal && obj.GetPkg() != nil { //Pkg==nil == builtin
-			n = newValueNode(obj, false)
+			n = newValueNode(obj, currentPkg, false)
 		} else {
 			n = newCallNode(obj, currentPkg, godefer)
 		}
 	case *types.Var, *types.Const, field, *localVar:
 		switch obj.GetName() {
 		default:
-			n = newValueNode(obj, false)
+			n = newValueNode(obj, currentPkg, false)
 		case "=":
-			n = newValueNode(nil, true)
+			n = newValueNode(nil, nil, true)
 		case "*":
-			n = newValueNode(nil, false)
+			n = newValueNode(nil, nil, false)
 		}
 	}
 	b.addNode(n)

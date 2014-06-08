@@ -11,6 +11,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type node interface {
@@ -30,6 +31,7 @@ type nodeBase struct {
 	AggregateMouser
 
 	blk  *block
+	pkg  *pkgText
 	text *Text
 	ins  []*port
 	outs []*port
@@ -49,21 +51,21 @@ func newGoDeferNodeBase(self node, godefer string) *nodeBase {
 	n := &nodeBase{self: self, godefer: godefer}
 	n.ViewBase = NewView(n)
 	n.AggregateMouser = AggregateMouser{NewClickFocuser(self), NewMover(self)}
+	n.pkg = newPkgText()
+	n.Add(n.pkg)
 	n.text = NewText("")
 	n.text.SetBackgroundColor(noColor)
 	n.text.TextChanged = func(string) {
-		if n.text.Text() != "" {
-			n.text.SetFrameSize(3)
-		}
 		if godefer != "" {
-			n.godeferText.SetText(godefer[:len(godefer)-1])
-			n.godeferText.SetFrameSize(3)
+			n.godeferText.SetText(godefer)
 		}
-		width := Width(n.godeferText) + Width(n.text)
-		height := math.Max(Height(n.godeferText), Height(n.text))
-		n.godeferText.Move(Pt(-width/2, -height/2))
-		n.text.Move(Pt(-width/2+Width(n.godeferText), -height/2))
-		n.gap = height / 2
+		x := -(Width(n.godeferText) + Width(n.pkg) + Width(n.text)) / 2
+		n.godeferText.Move(Pt(x, -Height(n.godeferText)/2))
+		x += Width(n.godeferText)
+		n.pkg.Move(Pt(x, -Height(n.pkg)/2))
+		x += Width(n.pkg)
+		n.text.Move(Pt(x, -Height(n.text)/2))
+		n.gap = math.Max(math.Max(Height(n.godeferText), Height(n.pkg)), Height(n.text)) / 2
 		n.reform()
 	}
 	n.Add(n.text)
@@ -207,17 +209,11 @@ func nodeMoved(n node) {
 
 func (n *nodeBase) TookKeyFocus() {
 	n.focused = true
-	c := focusColor
-	n.text.SetFrameColor(c)
-	n.godeferText.SetFrameColor(c)
 	panTo(n, ZP)
 }
 
 func (n *nodeBase) LostKeyFocus() {
 	n.focused = false
-	c := noColor
-	n.text.SetFrameColor(c)
-	n.godeferText.SetFrameColor(c)
 }
 
 func (n *nodeBase) Paint() {
@@ -231,6 +227,57 @@ func (n *nodeBase) Paint() {
 		}
 		y := (pt.Y-dy)/2 + dy
 		DrawBezier(Pt(0, dy), Pt(0, y), Pt(pt.X, y), pt)
+	}
+	if n.focused && n.text.Text() != "" {
+		DrawRect(RectInParent(n.godeferText).Union(RectInParent(n.pkg)).Union(RectInParent(n.text)))
+	}
+}
+
+type pkgText struct {
+	*ViewBase
+	text  *Text
+	pkg   *types.Package
+	leave chan bool
+}
+
+func newPkgText() *pkgText {
+	t := &pkgText{}
+	t.ViewBase = NewView(t)
+	t.text = NewText("")
+	t.text.SetTextColor(color(&pkgObject{}, true, false))
+	t.text.SetBackgroundColor(noColor)
+	t.Add(t.text)
+	t.leave = make(chan bool, 1)
+	return t
+}
+
+func (t *pkgText) setPkg(p *types.Package) {
+	t.pkg = p
+	t.setText(p.Name)
+}
+
+func (t *pkgText) setText(s string) {
+	t.text.SetText(s + ".")
+	dx := Width(t) - Width(t.text)
+	t.Move(Pos(t).Add(Pt(dx, 0)))
+	Resize(t, Size(t.text))
+}
+
+func (t *pkgText) Mouse(m MouseEvent) {
+	if m.Enter {
+		go func() {
+			select {
+			case <-time.After(time.Second):
+				Do(t) <- func() { t.setText(t.pkg.Path) }
+				<-t.leave
+				Do(t) <- func() { t.setText(t.pkg.Name) }
+			case <-t.leave:
+			}
+		}()
+	} else if m.Leave {
+		t.leave <- true
+	} else {
+		MouseParent(t, m)
 	}
 }
 

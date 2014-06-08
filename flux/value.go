@@ -18,7 +18,7 @@ type valueNode struct {
 	addressable bool
 }
 
-func newValueNode(obj types.Object, set bool) *valueNode {
+func newValueNode(obj types.Object, currentPkg *types.Package, set bool) *valueNode {
 	n := &valueNode{obj: obj, set: set}
 	n.nodeBase = newNodeBase(n)
 	dot := ""
@@ -31,9 +31,11 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 			}
 			dot = "."
 		}
-	default:
 	}
 	if obj != nil {
+		if p := obj.GetPkg(); p != currentPkg && p != nil && dot == "" {
+			n.pkg.setPkg(p)
+		}
 		n.text.SetText(dot + obj.GetName())
 	}
 	n.text.SetTextColor(color(&types.Var{}, true, false))
@@ -45,7 +47,6 @@ func newValueNode(obj types.Object, set bool) *valueNode {
 	switch obj.(type) {
 	case *types.Var, field, *localVar, nil:
 		n.addSeqPorts()
-	default:
 	}
 	n.connsChanged()
 	return n

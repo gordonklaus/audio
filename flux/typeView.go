@@ -20,6 +20,7 @@ type typeView struct {
 	done       func()
 
 	name       *Text // non-nil if this is a valueView
+	pkg        *pkgText
 	text       *Text
 	elems      struct{ left, right []*typeView }
 	unexported *Text
@@ -41,7 +42,7 @@ func newTypeView(t *types.Type, currentPkg *types.Package) *typeView {
 	v := &typeView{typ: t, currentPkg: currentPkg, mode: anyType}
 	v.ViewBase = NewView(v)
 	v.text = NewText("")
-	v.text.SetTextColor(color(&types.TypeName{}, false, false))
+	v.text.SetTextColor(color(&types.TypeName{}, true, false))
 	v.text.SetBackgroundColor(noColor)
 	v.Add(v.text)
 	v.setType(*t)
@@ -68,7 +69,7 @@ func newValueView(val types.Object, currentPkg *types.Package) *typeView {
 	v := newTypeView(t, currentPkg)
 	v.val = val
 	v.name = NewText(*name)
-	v.name.SetTextColor(color(val, false, false))
+	v.name.SetTextColor(color(val, true, false))
 	v.name.SetBackgroundColor(noColor)
 	v.name.TextChanged = func(text string) {
 		*name = text
@@ -99,6 +100,11 @@ func (v *typeView) setType(t types.Type) {
 		s = t.Name
 	case *types.Named:
 		s = t.Obj.Name
+		if p := t.Obj.Pkg; p != v.currentPkg && p != nil {
+			v.pkg = newPkgText()
+			v.pkg.setPkg(p)
+			v.Add(v.pkg)
+		}
 	case *types.Pointer:
 		s = "*"
 		elem := newTypeView(&t.Elem, v.currentPkg)
@@ -214,6 +220,10 @@ func (v *typeView) reform() {
 		y += Height(c) + spacing
 	}
 	x += maxWidth + spacing
+	if v.pkg != nil {
+		v.pkg.Move(Pt(x, (math.Max(h1, h2)-Height(v.pkg))/2))
+		x += Width(v.pkg)
+	}
 	v.text.Move(Pt(x, (math.Max(h1, h2)-Height(v.text))/2))
 	x += Width(v.text) + spacing
 	y = math.Max(0, h1-h2) / 2

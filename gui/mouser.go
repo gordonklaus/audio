@@ -6,6 +6,7 @@ type Mouser interface {
 
 type MouseEvent struct {
 	Pos                        Point
+	Enter, Leave               bool
 	Move, Press, Release, Drag bool
 	Button                     int
 }
@@ -23,8 +24,10 @@ type Clicker func(MouseEvent)
 func (c Clicker) Mouse(m MouseEvent) { c(m) }
 
 func NewClickFocuser(view View) Clicker {
-	return func(MouseEvent) {
-		SetKeyFocus(view)
+	return func(m MouseEvent) {
+		if m.Press {
+			SetKeyFocus(view)
+		}
 	}
 }
 

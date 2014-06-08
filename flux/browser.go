@@ -248,6 +248,11 @@ func (b *browser) refresh() {
 	Hide(b.typeView)
 	if cur != nil {
 		b.text.SetTextColor(color(cur, true, b.funcAsVal))
+		if b.currentPkg == nil && len(b.path) > 0 {
+			if p, ok := b.path[0].(*pkgObject); ok {
+				b.typeView.currentPkg = pkgs[p.importPath]
+			}
+		}
 		switch cur := cur.(type) {
 		case *types.TypeName:
 			if t, ok := cur.Type.(*types.Named); ok && t.UnderlyingT != nil {
