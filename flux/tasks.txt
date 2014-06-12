@@ -42,7 +42,6 @@ TODO
 - use layered DAG as first approximation in arrangement?
 - consider drawing nodes as circles/ellipses.  this is the easiest way to treat them when arranging, and it might even be visually ok.  loopNode will work fine, as its loopblk can be drawn as a circle; but ifNode, switchNode, and selectNode will be harder, having multiple blocks.
 - in browser, by default don't show non-Go dirs (and don't show non-Flux dirs in isFluxObj mode); show them when Shift is pressed
-- prefix names with pkg name in browser and typeView
 - manage code flux:  names, signatures, types, etc.
   - update objects currently being edited
   - update known clients upon change (e.g., update callers when func sig changes)
@@ -67,7 +66,7 @@ before releasing:
 - tutorial
 
 
-Benefits over Go:
+Some advantages over text:
 - no need to name local variables
 - same syntax for operators and function calls
 - no problem closing over range loop value (index is still trouble, but that can be fixed by automatically inserting i := i)
