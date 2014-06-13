@@ -37,6 +37,7 @@ func newFluxWindow() *fluxWindow {
 	w.browser.accepted = func(obj types.Object) {
 		switch obj := obj.(type) {
 		case *types.TypeName:
+			w.SetTitle(obj.Pkg.Path + "." + obj.Name)
 			// TODO: move type editing into browser (just like with localVar and when creating types for make, convert, etc)
 			typ := obj.Type.(*types.Named)
 			Hide(w.browser)
@@ -48,6 +49,7 @@ func newFluxWindow() *fluxWindow {
 				Show(w.browser)
 				w.browser.clearText()
 				SetKeyFocus(w.browser)
+				w.SetTitle("Flux")
 			}
 			if typ.UnderlyingT == nil {
 				v.edit(func() {
@@ -66,6 +68,12 @@ func newFluxWindow() *fluxWindow {
 				SetKeyFocus(v)
 			}
 		case *types.Func:
+			prefix := obj.Pkg.Path + "."
+			if recv := obj.Type.(*types.Signature).Recv; recv != nil {
+				t, _ := indirect(recv.Type)
+				prefix += t.(*types.Named).Obj.Name + "."
+			}
+			w.SetTitle(prefix + obj.Name)
 			Hide(w.browser)
 			f := loadFunc(obj)
 			w.Add(f)
@@ -75,6 +83,7 @@ func newFluxWindow() *fluxWindow {
 				Show(w.browser)
 				w.browser.clearText()
 				SetKeyFocus(w.browser)
+				w.SetTitle("Flux")
 			}
 			SetKeyFocus(f.inputsNode)
 		}

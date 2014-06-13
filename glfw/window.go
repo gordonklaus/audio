@@ -33,6 +33,10 @@ func (w *Window) Destroy() {
 	C.glfwDestroyWindow(w.w)
 }
 
+func (w *Window) SetTitle(s string) {
+	C.glfwSetWindowTitle(w.w, C.CString(s))
+}
+
 func (w *Window) Size() (width, height int) {
 	var wid, hei C.int
 	C.glfwGetWindowSize(w.w, &wid, &hei)

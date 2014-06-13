@@ -59,6 +59,8 @@ func NewWindow(self View) *Window {
 	return w
 }
 
+func (w *Window) SetTitle(s string) { w.w.SetTitle(s) }
+
 func (w *Window) win() *Window { return w }
 
 func (w *Window) SetCentralView(v View) {
