@@ -10,7 +10,7 @@ Packages and directories are displayed in white, types in green, functions and m
 
 To create a new item, hold Command and press 1 (package or directory), 2 (type), 3 (func or method), 4 (var or struct field), or 5 (const); then, type the new item's name followed by Enter.  The new item will be opened for editing.
 
-To delete an item, press Command-Delete (not yet implemented).
+To delete an item (and its children, if it has any), press Command-Delete.  Only items created in Flux can be deleted.
 
 To change the name of a package, press Shift-Enter, then edit the name and press Enter.
 

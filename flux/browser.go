@@ -40,8 +40,9 @@ type browser struct {
 }
 
 type browserOptions struct {
-	objFilter                             func(types.Object) bool
-	acceptTypes, enterTypes, canFuncAsVal bool
+	objFilter               func(types.Object) bool
+	acceptTypes, enterTypes bool
+	canFuncAsVal, canDelete bool
 }
 
 func newBrowser(options browserOptions, parent View) *browser {
@@ -203,14 +204,12 @@ func (b *browser) refresh() {
 
 	xOffset := 0.0
 	if t, ok := b.lastPathText(); ok {
-		if cur != nil {
-			sep := "."
-			if _, ok := cur.(*pkgObject); ok {
-				sep = "/"
-			}
-			text := t.Text()
-			t.SetText(text[:len(text)-1] + sep)
+		sep := "."
+		if _, ok := cur.(*pkgObject); ok {
+			sep = "/"
 		}
+		text := t.Text()
+		t.SetText(text[:len(text)-1] + sep)
 		xOffset = Pos(t).X + Width(t)
 	}
 
@@ -491,12 +490,6 @@ func (b *browser) KeyPress(event KeyEvent) {
 			}
 			b.refresh()
 		}
-	case KeyBackspace:
-		if len(b.text.Text()) > 0 {
-			b.text.KeyPress(event)
-			break
-		}
-		fallthrough
 	case KeyLeft:
 		if len(b.path) > 0 && b.newObj == nil {
 			parent := b.path[0]
@@ -629,6 +622,22 @@ func (b *browser) KeyPress(event KeyEvent) {
 		} else {
 			b.cancel()
 		}
+	case KeyBackspace:
+		if !event.Command && len(b.text.Text()) > 0 {
+			b.text.KeyPress(event)
+			break
+		}
+		fallthrough
+	case KeyDelete:
+		if event.Command && b.options.canDelete && b.newObj == nil {
+			b.clearText()
+			if deleteObj(b.currentObj()) {
+				if b.i > 0 {
+					b.i--
+				}
+				b.clearText()
+			}
+		}
 	default:
 		if b.fun != nil {
 			if event.Command && event.Text == "0" {
@@ -689,6 +698,61 @@ func (b *browser) KeyRelease(event KeyEvent) {
 		b.funcAsVal = event.Shift
 		b.refresh()
 	}
+}
+
+// TODO: instead of os.Remove, move files to trash
+func deleteObj(obj types.Object) bool {
+	if p, ok := obj.(*pkgObject); ok {
+		if p, err := getPackage(p.importPath); err == nil {
+			for _, obj := range p.Scope().Objects {
+				deleteObj(obj)
+			}
+		}
+		f, err := os.Open(filepath.Join(p.srcDir, p.importPath))
+		if err != nil {
+			fmt.Println(err)
+			return false
+		}
+		if names, err := f.Readdirnames(0); err == nil && (len(names) == 0 || len(names) == 1 && names[0] == ".DS_Store") {
+			os.Remove(filepath.Join(f.Name(), ".DS_Store"))
+			if err := os.Remove(f.Name()); err != nil {
+				fmt.Println(err)
+				return false
+			}
+			delete(pkgObjects, p.importPath)
+			delete(pkgs, p.importPath)
+			return true
+		}
+		return false
+	}
+	if fluxObjs[obj] {
+		if t, ok := obj.(*types.TypeName); ok {
+			t := t.Type.(*types.Named)
+			for _, m := range t.Methods {
+				deleteObj(m)
+			}
+			if len(t.Methods) > 0 {
+				return false
+			}
+		}
+		if err := os.Remove(fluxPath(obj)); err != nil {
+			fmt.Println(err)
+			return false
+		}
+		if objs := obj.GetPkg().Scope().Objects; objs[obj.GetName()] == obj {
+			delete(objs, obj.GetName())
+			return true
+		}
+		t, _ := indirect(obj.(*types.Func).Type.(*types.Signature).Recv.Type)
+		n := t.(*types.Named)
+		for i, f2 := range n.Methods {
+			if f2 == obj {
+				n.Methods = append(n.Methods[:i], n.Methods[i+1:]...)
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (b *browser) Paint() {

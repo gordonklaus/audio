@@ -31,7 +31,7 @@ func newFluxWindow() *fluxWindow {
 	w := &fluxWindow{}
 	w.Window = NewWindow(w)
 	w.Panner = NewPanner(w)
-	w.browser = newBrowser(browserOptions{objFilter: isFluxObj, acceptTypes: true, enterTypes: true}, nil)
+	w.browser = newBrowser(browserOptions{objFilter: isFluxObj, acceptTypes: true, enterTypes: true, canDelete: true}, nil)
 	w.Add(w.browser)
 	w.SetRect(Rect(w))
 	w.browser.accepted = func(obj types.Object) {

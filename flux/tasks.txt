@@ -1,5 +1,6 @@
 TODO
 
+- allow to rename objects in browser
 - handle unknown IDs in reader:
   - type in signature
   - temporary local var type (including loop var).  can safely ignore?
@@ -59,6 +60,7 @@ TODO
 
 before releasing:
 - address important TODOs
+- don't panic (much)
 - handle all errors
   - including reader.go parsing errors?
 - edit-at-own-risk disclaimer at top of .flux.go files
