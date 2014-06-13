@@ -139,8 +139,15 @@ func (b browser) lastPathText() (*Text, bool) {
 
 func (b *browser) validateText(text *string) bool {
 	if b.newObj != nil {
-		// TODO: unique id
-		return true
+		if _, ok := b.newObj.(*pkgObject); ok {
+			for _, r := range *text {
+				if !unicode.In(r, unicode.PrintRanges...) || strings.ContainsRune("!\"#$%&'()*,:;<=>?[\\]^`{|}" + string(unicode.ReplacementChar), r) {
+					return false
+				}
+			}
+			return true
+		}
+		return validateID(text)
 	}
 	for _, obj := range b.filteredObjs() {
 		name := obj.GetName()
@@ -526,6 +533,9 @@ func (b *browser) KeyPress(event KeyEvent) {
 		}
 
 		if b.newObj != nil {
+			if !b.unique(b.newObj.GetName()) {
+				return
+			}
 			switch obj := b.newObj.(type) {
 			case *pkgObject:
 				// all fields are blank except name which represents the final path element, not the package name.
@@ -691,6 +701,37 @@ func (b *browser) KeyPress(event KeyEvent) {
 			b.text.KeyPress(event)
 		}
 	}
+}
+
+func (b *browser) unique(name string) bool {
+	if name == "" {
+		return false
+	}
+	if _, ok := b.newObj.(*pkgObject); ok {
+		for _, obj := range b.filteredObjs() {
+			if p, ok := obj.(*pkgObject); ok && p.name == name {
+				return false
+			}
+		}
+	} else {
+		p := b.currentPkg
+		if len(b.path) > 0 {
+			switch obj := b.path[0].(type) {
+			case *pkgObject:
+				p = pkgs[obj.importPath]
+			case *types.TypeName:
+				for _, m := range obj.Type.(*types.Named).Methods {
+					if m.Name == name {
+						return false
+					}
+				}
+			}
+		}
+		if p.Scope().Objects[name] != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (b *browser) KeyRelease(event KeyEvent) {

@@ -25,6 +25,7 @@ type Window struct {
 func NewWindow(self View) *Window {
 	w := &Window{w: glfw.NewWindow(960, 520, "Flux")}
 
+	// TODO: investigate if this is what's causing sporadic crashes
 	// Somehow, this seems to work:
 	// Have the context current in both threads, as this one needs to be able to call
 	// Font.Advance and Font.LineHeight (from Text.SetText), and the other thread renders.
