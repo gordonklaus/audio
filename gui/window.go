@@ -53,9 +53,9 @@ func NewWindow(self View) *Window {
 	gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
 
 	windows[w] = true
+	w.Self = self
 	w.run()
 
-	w.Self = self
 	return w
 }
 

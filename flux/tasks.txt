@@ -63,8 +63,6 @@ before releasing:
 - handle all errors
   - including reader.go parsing errors?
 - documentation
-- go vet
-- detect races
 
 
 Some advantages over text:
