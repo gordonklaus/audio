@@ -716,8 +716,20 @@ func (b *browser) unique(name string) bool {
 		return true
 	}
 	if t, ok := b.path[0].(*types.TypeName); ok {
-		fm, _, _ := types.LookupFieldOrMethod(t.Type, t.Pkg, name)
-		return fm == nil
+		t := t.Type.(*types.Named)
+		if t, ok := t.UnderlyingT.(*types.Struct); ok {
+			for _, f := range t.Fields {
+				if f.Name == name {
+					return false
+				}
+			}
+		}
+		for _, m := range t.Methods {
+			if m.Name == name {
+				return false
+			}
+		}
+		return true
 	}
 	return pkgs[b.path[0].(*pkgObject).importPath].Scope().LookupParent(name) == nil
 }

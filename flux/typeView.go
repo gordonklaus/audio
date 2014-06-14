@@ -71,6 +71,7 @@ func newValueView(val types.Object, currentPkg *types.Package) *typeView {
 	v.name = NewText(*name)
 	v.name.SetTextColor(color(val, true, false))
 	v.name.SetBackgroundColor(noColor)
+	v.name.Validate = validateID
 	v.name.TextChanged = func(text string) {
 		*name = text
 		v.reform()
@@ -259,10 +260,64 @@ func (v *typeView) edit(done func()) {
 			}
 		}
 	}
-	v.name.Accept = func(string) { v.editType(done2) }
+	v.name.Accept = func(name string) {
+		if v.unique(name) {
+			v.editType(done2)
+		} else {
+			SetKeyFocus(v.name)
+		}
+	}
 	v.name.Reject = done2
 	SetKeyFocus(v.name)
 }
+
+func (v *typeView) unique(name string) bool {
+	if p, ok := Parent(v).(*port); ok {
+		ports := append(ins(p.node), outs(p.node)...)
+		if n, ok := p.node.(*portsNode); ok {
+			f := n.blk.node.(*funcNode)
+			ports = append(f.inputsNode.outs, f.outputsNode.ins...)
+		}
+		for _, p2 := range ports {
+			if p2 != p && p2.obj.Name == name {
+				return false
+			}
+		}
+		return true
+	}
+	switch t := (*Parent(v).(*typeView).typ).(type) {
+	case *types.Struct:
+		if name == "" {
+			return true
+		}
+		for _, f := range t.Fields {
+			if f.Name == name && f != v.val.(field).Var {
+				return false
+			}
+		}
+		// TODO: if this struct is a Named.UnderlyingT, check for collisions with method names
+	case *types.Signature:
+		if name == "" {
+			return true
+		}
+		for _, pr := range append(t.Params, t.Results...) {
+			if pr != v.val && pr.Name == name {
+				return false
+			}
+		}
+	case *types.Interface:
+		if name == "" {
+			return false
+		}
+		for _, m := range t.Methods {
+			if m.Name == name && m != v.val {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (v *typeView) editType(done func()) {
 	switch t := (*v.typ).(type) {
 	case nil:
