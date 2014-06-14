@@ -55,7 +55,6 @@ func NewWindow(self View) *Window {
 
 	windows[w] = true
 	w.Self = self
-	w.run()
 
 	return w
 }
@@ -78,7 +77,7 @@ func (w *Window) SetCentralView(v View) {
 	}
 }
 
-func (w *Window) run() {
+func (w *Window) Run() {
 	type (
 		close  *Window
 		resize Point

@@ -31,6 +31,7 @@ func newFluxWindow() *fluxWindow {
 	w := &fluxWindow{}
 	w.Window = NewWindow(w)
 	w.Panner = NewPanner(w)
+	w.Run()
 	w.browser = newBrowser(browserOptions{objFilter: isFluxObj, acceptTypes: true, enterTypes: true, canDelete: true}, nil)
 	w.Add(w.browser)
 	w.SetRect(Rect(w))
@@ -120,16 +121,17 @@ func window(v View) *fluxWindow {
 func (w *fluxWindow) animate() {
 	target := <-w.target
 	vel := ZP
-	center := make(chan Point)
+	rect := make(chan Rectangle)
 	for {
 		next := time.After(time.Second / fps)
 		Do(w) <- func() {
 			Pan(w, Rect(w).Min.Add(vel.Div(fps)))
-			center <- Center(w)
+			rect <- Rect(w)
 		}
-		d := target.Sub(<-center)
-		d.X = math.Copysign(math.Max(0, math.Abs(d.X)-Width(w)/4), d.X)
-		d.Y = math.Copysign(math.Max(0, math.Abs(d.Y)-Height(w)/4), d.Y)
+		r := <-rect
+		d := target.Sub(r.Center())
+		d.X = math.Copysign(math.Max(0, math.Abs(d.X)-r.Dx()/4), d.X)
+		d.Y = math.Copysign(math.Max(0, math.Abs(d.Y)-r.Dy()/4), d.Y)
 		vel = vel.Add(d).Mul(.8)
 		if vel.Len() < .1 {
 			next = nil
