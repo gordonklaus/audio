@@ -713,25 +713,13 @@ func (b *browser) unique(name string) bool {
 				return false
 			}
 		}
-	} else {
-		p := b.currentPkg
-		if len(b.path) > 0 {
-			switch obj := b.path[0].(type) {
-			case *pkgObject:
-				p = pkgs[obj.importPath]
-			case *types.TypeName:
-				for _, m := range obj.Type.(*types.Named).Methods {
-					if m.Name == name {
-						return false
-					}
-				}
-			}
-		}
-		if p.Scope().Objects[name] != nil {
-			return false
-		}
+		return true
 	}
-	return true
+	if t, ok := b.path[0].(*types.TypeName); ok {
+		fm, _, _ := types.LookupFieldOrMethod(t.Type, t.Pkg, name)
+		return fm == nil
+	}
+	return pkgs[b.path[0].(*pkgObject).importPath].Scope().LookupParent(name) == nil
 }
 
 func (b *browser) KeyRelease(event KeyEvent) {
