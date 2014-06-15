@@ -45,7 +45,7 @@ func newValueNode(obj types.Object, currentPkg *types.Package, set bool) *valueN
 		n.y = n.newOutput(nil)
 	}
 	switch obj.(type) {
-	case *types.Var, field, *localVar, nil:
+	case *types.Var, field, nil:
 		n.addSeqPorts()
 	}
 	n.connsChanged()
@@ -80,7 +80,7 @@ func (n *valueNode) connsChanged() {
 	n.addressable = false
 	switch obj := n.obj.(type) {
 	case *types.Const:
-	case *types.Var, *localVar:
+	case *types.Var:
 		n.addressable = true
 	case *types.Func:
 		if isMethod(obj) {

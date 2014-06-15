@@ -21,7 +21,6 @@ type browser struct {
 	*ViewBase
 	options    browserOptions
 	typ        types.Type // non-nil if this is a selection browser
-	fun        *funcNode
 	currentPkg *types.Package
 	imports    []*types.Package
 	finished   bool
@@ -42,7 +41,8 @@ type browser struct {
 type browserOptions struct {
 	objFilter               func(types.Object) bool
 	acceptTypes, enterTypes bool
-	canFuncAsVal, canDelete bool
+	canFuncAsVal            bool
+	canCreate, canDelete    bool
 }
 
 func newBrowser(options browserOptions, parent View) *browser {
@@ -54,7 +54,9 @@ loop:
 	for v := parent; v != nil; v = Parent(v) {
 		switch v := v.(type) {
 		case *block: // must use blk.func_() instead of going directly to *funcNode so we don't grab a func literal node
-			b.fun = v.func_()
+			f := v.func_()
+			b.currentPkg = f.pkg()
+			b.imports = f.imports()
 			break loop
 		case *fluxWindow:
 			t := v.browser.currentObj().(*types.TypeName)
@@ -62,10 +64,6 @@ loop:
 			b.imports = imports(t)
 			break loop
 		}
-	}
-	if b.fun != nil {
-		b.currentPkg = b.fun.pkg()
-		b.imports = b.fun.imports()
 	}
 
 	b.text = NewText("")
@@ -184,8 +182,6 @@ func (b *browser) textChanged(text string) {
 			obj.Name = text
 		case *types.Const:
 			obj.Name = text
-		case *localVar:
-			obj.Name = text
 		}
 		i = 0
 		for i < len(objs) && objLess(objs[i], b.newObj) {
@@ -265,7 +261,7 @@ func (b *browser) refresh() {
 				b.typeView.setType(t.UnderlyingT)
 				Show(b.typeView)
 			}
-		case *types.Func, *types.Var, *types.Const, field, *localVar:
+		case *types.Func, *types.Var, *types.Const, field:
 			if !isOperator(cur) {
 				b.typeView.setType(cur.GetType())
 				Show(b.typeView)
@@ -392,13 +388,6 @@ func (b browser) filteredObjs() (objs objects) {
 			add(t)
 		}
 		addSubPkgs("")
-		if b.fun != nil {
-			b.fun.funcblk.walk(func(blk *block) {
-				for v := range blk.localVars {
-					add(v)
-				}
-			}, nil, nil)
-		}
 	}
 
 	sort.Sort(objs)
@@ -473,7 +462,7 @@ func isGoDeferrable(obj types.Object) bool {
 	return false
 }
 
-func (b *browser) LostKeyFocus() { b.cancel() } // TODO: implement this differently.  it interferes with localVar type editing
+func (b *browser) LostKeyFocus() { b.cancel() }
 
 func (b *browser) KeyPress(event KeyEvent) {
 	if b.options.canFuncAsVal && event.Shift != b.funcAsVal {
@@ -568,21 +557,6 @@ func (b *browser) KeyPress(event KeyEvent) {
 					}
 					pkg.Scope().Insert(obj)
 				}
-			case *localVar:
-				b.finished = true // hack to avoid cancelling browser when it loses keyboard focus to typeView
-				b.typeView.edit(func() {
-					b.finished = false
-					if *b.typeView.typ != nil {
-						obj.Type = *b.typeView.typ
-						b.finished = true
-						b.accepted(obj)
-					} else {
-						b.clearText()
-						SetKeyFocus(b)
-					}
-				})
-				b.newObj = nil
-				return
 			}
 
 			b.makeCurrent(b.newObj)
@@ -653,13 +627,8 @@ func (b *browser) KeyPress(event KeyEvent) {
 			}
 		}
 	default:
-		if b.fun != nil {
-			if event.Command && event.Text == "0" {
-				b.newObj = &localVar{refs: map[*valueNode]bool{}}
-				b.clearText()
-			} else {
-				b.text.KeyPress(event)
-			}
+		if !b.options.canCreate {
+			b.text.KeyPress(event)
 			return
 		}
 
@@ -905,11 +874,11 @@ func objLess(o1, o2 types.Object) bool {
 		default:
 			return true
 		}
-	case *types.Var, field, *localVar:
+	case *types.Var, field:
 		switch o2.(type) {
 		default:
 			return false
-		case *types.Var, field, *localVar:
+		case *types.Var, field:
 			return n1 < n2
 		case *types.Const, *pkgObject:
 			return true

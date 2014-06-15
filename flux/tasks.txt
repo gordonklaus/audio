@@ -3,7 +3,7 @@ TODO
 - allow to rename objects in browser
 - handle unknown IDs in reader:
   - type in signature
-  - temporary local var type (including loop var).  can safely ignore?
+  - local var type (including loop var).  can safely ignore?
   - package name.  avoidable by always using named imports
 - prompt to Save, Don't Save, or Cancel when closing a func
 - each connection to an input must originate from a different block.  only one connection to an input may originate from the input's block or an outer block.  (too restrictive?:  if node A precedes node B then an input may not have connections originating from both A and B)
@@ -22,7 +22,6 @@ TODO
   - drag and drop nodes between blocks
   - undo, redo
 - rework package gui, especially considering data races
-- remove localVar
 - rework typeView appearance
 - display package name for top-level (imported) objects in browser
 - add in-place operators (+=, etc) that take a pointer as the first arg.

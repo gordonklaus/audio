@@ -29,7 +29,7 @@ func color(obj types.Object, bright, funcAsVal bool) Color {
 			return color(&types.Var{}, bright, funcAsVal)
 		}
 		return Color{1, .6, .6, alpha}
-	case *types.Var, *types.Const, field, *localVar:
+	case *types.Var, *types.Const, field:
 		return Color{.6, .6, 1, alpha}
 	}
 	panic(fmt.Sprintf("unknown object type %T", obj))

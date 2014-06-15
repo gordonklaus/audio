@@ -32,14 +32,13 @@ func newFluxWindow() *fluxWindow {
 	w.Window = NewWindow(w)
 	w.Panner = NewPanner(w)
 	w.Run()
-	w.browser = newBrowser(browserOptions{objFilter: isFluxObj, acceptTypes: true, enterTypes: true, canDelete: true}, nil)
+	w.browser = newBrowser(browserOptions{objFilter: isFluxObj, acceptTypes: true, enterTypes: true, canCreate: true, canDelete: true}, nil)
 	w.Add(w.browser)
 	w.SetRect(Rect(w))
 	w.browser.accepted = func(obj types.Object) {
 		switch obj := obj.(type) {
 		case *types.TypeName:
 			w.SetTitle(obj.Pkg.Path + "." + obj.Name)
-			// TODO: move type editing into browser (just like with localVar and when creating types for make, convert, etc)
 			typ := obj.Type.(*types.Named)
 			Hide(w.browser)
 			v := newTypeView(&typ.UnderlyingT, obj.Pkg)

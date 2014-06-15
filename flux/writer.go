@@ -231,9 +231,6 @@ func (w *writer) block(b *block, vars map[*port]string) {
 
 	w.nindent++
 
-	for v := range b.localVars {
-		w.indent("var %s %s//\n", v.Name, w.typ(v.Type))
-	}
 	for c := range b.conns {
 		if _, ok := vars[c.dst]; ok {
 			continue
@@ -427,7 +424,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				if n.set && len(args) > 0 || len(results) > 0 {
 					name := ""
 					switch obj := n.obj.(type) {
-					case *types.Var, *types.Const, *localVar:
+					case *types.Var, *types.Const:
 						name = w.qualifiedName(obj)
 					case *types.Func:
 						if isMethod(obj) {

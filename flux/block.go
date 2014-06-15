@@ -20,7 +20,6 @@ type block struct {
 	node      node
 	nodes     map[node]bool
 	conns     map[*connection]bool
-	localVars map[*localVar]bool
 	focused   bool
 
 	arrange, childArranged blockchan
@@ -33,7 +32,6 @@ func newBlock(n node, arranged blockchan) *block {
 	b.node = n
 	b.nodes = map[node]bool{}
 	b.conns = map[*connection]bool{}
-	b.localVars = map[*localVar]bool{}
 
 	b.arrange = make(blockchan)
 	b.childArranged = make(blockchan)
@@ -93,8 +91,6 @@ func (b *block) addNode(n node) {
 				if !isMethod(obj) {
 					b.func_().addPkgRef(obj)
 				}
-			case *localVar:
-				obj.addref(n)
 			}
 		}
 		rearrange(b)
@@ -125,8 +121,6 @@ func (b *block) removeNode(n node) {
 				if !isMethod(obj) {
 					b.func_().subPkgRef(obj)
 				}
-			case *localVar:
-				obj.subref(n)
 			}
 		case *ifNode:
 			for _, b := range n.blocks {
@@ -556,7 +550,7 @@ func (b *block) newNode(obj types.Object, funcAsVal bool, godefer string) node {
 		} else {
 			n = newCallNode(obj, currentPkg, godefer)
 		}
-	case *types.Var, *types.Const, field, *localVar:
+	case *types.Var, *types.Const, field:
 		switch obj.GetName() {
 		default:
 			n = newValueNode(obj, currentPkg, false)
@@ -748,43 +742,5 @@ func (n *portsNode) Paint() {
 		SetPointSize(2 * portSize)
 		SetColor(focusColor)
 		DrawPoint(ZP)
-	}
-}
-
-type localVar struct {
-	types.Var
-	refs map[*valueNode]bool
-	blk  *block
-}
-
-func (v *localVar) addref(n *valueNode) {
-	v.refs[n] = true
-	v.reblock()
-}
-
-func (v *localVar) subref(n *valueNode) {
-	delete(v.refs, n)
-	v.reblock()
-}
-
-func (v *localVar) reblock() {
-	if v.blk != nil {
-		delete(v.blk.localVars, v)
-	}
-	v.blk = nil
-	for n := range v.refs {
-		if v.blk == nil {
-			v.blk = n.blk
-			continue
-		}
-		for b := v.blk; ; b = b.outer() {
-			if b.find(n) != nil {
-				v.blk = b
-				break
-			}
-		}
-	}
-	if v.blk != nil {
-		v.blk.localVars[v] = true
 	}
 }

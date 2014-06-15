@@ -23,7 +23,7 @@ func loadFunc(obj types.Object) *funcNode {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, fluxPath(obj), nil, parser.ParseComments)
 	if err == nil {
-		r := &reader{fset, obj.GetPkg(), types.NewScope(obj.GetPkg().Scope()), map[string]*port{}, map[string][]*connection{}, map[string]*localVar{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
+		r := &reader{fset, obj.GetPkg(), types.NewScope(obj.GetPkg().Scope()), map[string]*port{}, map[string][]*connection{}, ast.NewCommentMap(fset, file, file.Comments), map[int]node{}}
 		for _, i := range file.Imports {
 			path, _ := strconv.Unquote(i.Path.Value)
 			pkg, err := getPackage(path)
@@ -58,7 +58,6 @@ type reader struct {
 	scope     *types.Scope
 	ports     map[string]*port
 	conns     map[string][]*connection
-	localVars map[string]*localVar
 	cmap      ast.CommentMap
 	seqNodes  map[int]node
 }
@@ -217,14 +216,8 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 			switch decl.Tok {
 			case token.VAR:
 				name := v.Names[0].Name
-				if r.cmap[s] != nil {
-					lv := &localVar{}
-					lv.Name = name
-					lv.Type = r.typ(v.Type)
-					lv.refs = map[*valueNode]bool{}
-					r.localVars[name] = lv
-				} else if v.Type != nil {
-					r.scope.Insert(newVar(name, r.typ(v.Type))) // temporary local var has nil Pkg
+				if v.Type != nil {
+					r.scope.Insert(newVar(name, r.typ(v.Type))) // local var has nil Pkg
 					r.conns[name] = []*connection{}
 				} else {
 					r.out(v.Names[0], b.node.(*loopNode).inputsNode.outs[1])
@@ -503,11 +496,8 @@ type unknownObject struct {
 func (r *reader) obj(x ast.Expr) types.Object {
 	switch x := x.(type) {
 	case *ast.Ident:
-		if v, ok := r.localVars[x.Name]; ok {
-			return v
-		}
 		if obj := r.scope.LookupParent(x.Name); obj != nil {
-			if v, ok := obj.(*types.Var); ok && v.Pkg == nil { // ignore temporary local vars
+			if v, ok := obj.(*types.Var); ok && v.Pkg == nil { // ignore local vars
 				return nil
 			}
 			return obj
