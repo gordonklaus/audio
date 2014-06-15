@@ -26,24 +26,29 @@ func savePackageName(importPath, name string) {
 		path := filepath.Join(p.Dir, file)
 		b, err := ioutil.ReadFile(path)
 		if err != nil {
-			panic(err)
+			fmt.Printf("error reading %s: %s\n", path, err)
+			return
 		}
 		src := string(b)
 		fset := token.NewFileSet()
 		astFile, err := parser.ParseFile(fset, "", src, parser.PackageClauseOnly)
 		if err != nil {
-			panic(err)
+			fmt.Printf("error parsing %s: %s\n", path, err)
+			return
 		}
 		oldName := astFile.Name
 		i := fset.Position(oldName.Pos()).Offset
 		src = src[:i] + name + src[i+len(oldName.Name):]
 		if err := ioutil.WriteFile(path, []byte(src), 0666); err != nil {
-			panic(err)
+			fmt.Printf("error writing %s: %s\n", path, err)
+			return
 		}
 	}
 	if len(files) == 0 {
-		if err := ioutil.WriteFile(filepath.Join(p.Dir, "package.flux.go"), []byte("package "+name), 0666); err != nil {
-			panic(err)
+		path := filepath.Join(p.Dir, "package.flux.go")
+		if err := ioutil.WriteFile(path, []byte("package "+name), 0666); err != nil {
+			fmt.Printf("error writing %s: %s\n", path, err)
+			return
 		}
 	}
 
@@ -56,6 +61,9 @@ func savePackageName(importPath, name string) {
 
 func saveType(t *types.Named) {
 	w := newWriter(t.Obj)
+	if w == nil {
+		return
+	}
 	defer w.close()
 
 	u := t.UnderlyingT
@@ -67,6 +75,9 @@ func saveType(t *types.Named) {
 
 func saveFunc(f *funcNode) {
 	w := newWriter(f.obj)
+	if w == nil {
+		return
+	}
 	defer w.close()
 
 	for p := range f.pkgRefs {
@@ -100,7 +111,8 @@ type writer struct {
 func newWriter(obj types.Object) *writer {
 	src, err := os.Create(fluxPath(obj))
 	if err != nil {
-		panic(err)
+		fmt.Printf("error creating %s: %s\n", fluxPath(obj), err)
+		return nil
 	}
 	w := &writer{src, obj.GetPkg(), map[*types.Package]string{}, map[string]int{}, 0, map[node]int{}, 0}
 	fluxObjs[obj] = true
@@ -734,7 +746,7 @@ func (w writer) typ(t types.Type) string {
 		}
 		return s + "}"
 	}
-	panic(fmt.Sprintf("unexpected type %#v\n", t))
+	panic("unreachable")
 }
 
 func (w writer) signature(f *types.Signature) string {
@@ -771,7 +783,6 @@ func (w writer) vars(vars []*types.Var, variadic bool) string {
 
 func walkType(t types.Type, op func(*types.Named)) {
 	switch t := t.(type) {
-	case *types.Basic:
 	case *types.Named:
 		op(t)
 	case *types.Pointer:
@@ -797,16 +808,14 @@ func walkType(t types.Type, op func(*types.Named)) {
 		for _, v := range t.Fields {
 			walkType(v.Type, op)
 		}
-	case nil:
-	default:
-		panic(fmt.Sprintf("unexpected type %#v\n", t))
 	}
 }
 
 func fluxPath(obj types.Object) string {
 	pkg, err := build.Import(obj.GetPkg().Path, "", build.FindOnly)
 	if err != nil {
-		panic(err)
+		fmt.Println("error importing \"%s\": %s\n", obj.GetPkg().Path, err)
+		return ""
 	}
 
 	name := obj.GetName()

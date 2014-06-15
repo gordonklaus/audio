@@ -549,10 +549,14 @@ func (b *browser) KeyPress(event KeyEvent) {
 					obj.srcDir = dirs[len(dirs)-1]
 					obj.importPath = obj.name
 				}
-				pkgObjects[obj.importPath] = obj
-				if err := os.Mkdir(filepath.Join(obj.srcDir, obj.importPath), 0777); err != nil {
-					panic(err)
+				path := filepath.Join(obj.srcDir, obj.importPath)
+				if err := os.Mkdir(path, 0777); err != nil {
+					fmt.Printf("error creating %s: %s\n", path, err)
+					b.newObj = nil
+					b.clearText()
+					return
 				}
+				pkgObjects[obj.importPath] = obj
 			case *types.TypeName, *types.Func, *types.Var, *types.Const:
 				if isMethod(obj) {
 					recv := b.path[0].(*types.TypeName).Type.(*types.Named)

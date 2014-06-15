@@ -235,7 +235,7 @@ func Do(v View) chan<- func() {
 	if w := v.win(); w != nil {
 		return w.do
 	} else {
-		panic("Do called on windowless View")
+		panic("gui.Do called on windowless View")
 	}
 }
 

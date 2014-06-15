@@ -8,6 +8,7 @@ import (
 	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	. "code.google.com/p/gordon-go/util"
+	"fmt"
 	"go/token"
 	"math/rand"
 )
@@ -232,7 +233,8 @@ func (b *block) nodeOrder() []node {
 	var insertInOrder func(n node, visitedThisCall Set)
 	insertInOrder = func(n node, visitedThisCall Set) {
 		if visitedThisCall[n] {
-			panic("cyclic")
+			fmt.Println("cyclic")
+			return
 		}
 		visitedThisCall[n] = true
 
@@ -258,7 +260,7 @@ func (b *block) nodeOrder() []node {
 		}
 	}
 	if len(endNodes) == 0 && len(b.nodes) > 0 {
-		panic("cyclic")
+		fmt.Println("cyclic")
 	}
 
 	for _, n := range endNodes {

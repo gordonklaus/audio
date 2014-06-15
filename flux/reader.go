@@ -6,6 +6,7 @@ package main
 
 import (
 	"code.google.com/p/gordon-go/go/types"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -27,7 +28,8 @@ func loadFunc(obj types.Object) *funcNode {
 			path, _ := strconv.Unquote(i.Path.Value)
 			pkg, err := getPackage(path)
 			if err != nil {
-				panic(err)
+				fmt.Printf("error importing %s: %s\n", i.Path.Value, err)
+				continue
 			}
 			name := pkg.Name
 			if i.Name != nil {

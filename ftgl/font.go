@@ -16,7 +16,7 @@ func NewTextureFont(filePath string) Font {
 	defer C.free(unsafe.Pointer(s))
 	f := C.NewTextureFont(s)
 	if f == nil {
-		panic("couldn't create f")
+		panic("unable to create font from file " + filePath)
 	}
 	return Font{f}
 }
@@ -25,7 +25,7 @@ func NewTextureFont(filePath string) Font {
 func NewTextureFontFromBuffer(buffer []byte) Font {
 	f := C.NewTextureFontFromBuffer((*C.uchar)(&buffer[0]), C.size_t(len(buffer)))
 	if f == nil {
-		panic("unable create font")
+		panic("unable to create font from buffer")
 	}
 	return Font{f}
 }

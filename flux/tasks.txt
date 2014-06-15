@@ -21,6 +21,7 @@ TODO
   - cut, copy, paste
   - drag and drop nodes between blocks
   - undo, redo
+- rework package gui, especially considering data races
 - remove localVar
 - rework typeView appearance
 - display package name for top-level (imported) objects in browser
@@ -58,8 +59,6 @@ TODO
 - multiple panes for editing multiple funcs, types, etc.  panes arranged as Voronoi diagram, each pane with a center point and a relative size
 
 before releasing:
-- address important TODOs
-- don't panic (much)
 - handle all errors
   - including reader.go parsing errors?
 - documentation
