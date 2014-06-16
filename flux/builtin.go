@@ -7,7 +7,6 @@ package main
 import (
 	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
-	"math"
 )
 
 type appendNode struct {
@@ -201,13 +200,12 @@ func (n *lenCapNode) connectable(t types.Type, dst *port) bool {
 
 type makeNode struct {
 	*nodeBase
-	typ *typeView
 }
 
 func newMakeNode(currentPkg *types.Package) *makeNode {
 	n := &makeNode{}
 	n.nodeBase = newNodeBase(n)
-	n.text.SetText("make ")
+	n.text.SetText("make")
 	n.text.SetTextColor(color(&types.Func{}, true, false))
 	out := n.newOutput(nil)
 	n.typ = newTypeView(&out.obj.Type, currentPkg)
@@ -239,12 +237,6 @@ func (n *makeNode) setType(t types.Type) {
 		if _, ok := t.(*types.Slice); ok {
 			n.newInput(newVar("cap", types.Typ[types.Int]))
 		}
-		width := Width(n.text) + Width(n.typ)
-		height1 := Height(n.text)
-		height2 := Height(n.typ)
-		n.text.Move(Pt(-width/2, -height1/2))
-		n.typ.Move(Pt(-width/2+Width(n.text), -height2/2))
-		n.gap = math.Max(height1, height2) / 2
 		n.reform()
 		SetKeyFocus(n)
 	}
@@ -252,13 +244,12 @@ func (n *makeNode) setType(t types.Type) {
 
 type newNode struct {
 	*nodeBase
-	typ *typeView
 }
 
 func newNewNode(currentPkg *types.Package) *newNode {
 	n := &newNode{}
 	n.nodeBase = newNodeBase(n)
-	n.text.SetText("new ")
+	n.text.SetText("new")
 	n.text.SetTextColor(color(&types.Func{}, true, false))
 	t := &types.Pointer{}
 	n.newOutput(newVar("", t))
@@ -283,12 +274,6 @@ func (n *newNode) setType(t types.Type) {
 	n.outs[0].setType(n.outs[0].obj.Type)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
-		width := Width(n.text) + Width(n.typ)
-		height1 := Height(n.text)
-		height2 := Height(n.typ)
-		n.text.Move(Pt(-width/2, -height1/2))
-		n.typ.Move(Pt(-width/2+Width(n.text), -height2/2))
-		n.gap = math.Max(height1, height2) / 2
 		n.reform()
 		SetKeyFocus(n)
 	}

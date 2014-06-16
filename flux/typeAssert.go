@@ -11,7 +11,6 @@ import (
 
 type typeAssertNode struct {
 	*nodeBase
-	typ *typeView
 }
 
 func newTypeAssertNode(currentPkg *types.Package) *typeAssertNode {
@@ -52,8 +51,6 @@ func (n *typeAssertNode) setType(t types.Type) {
 	n.typ.setType(t)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
-		MoveCenter(n.typ, ZP)
-		n.gap = Height(n.typ) / 2
 		n.reform()
 		SetKeyFocus(n)
 	}

@@ -7,7 +7,6 @@ TODO
   - package name.  avoidable by always using named imports
 - prompt to Save, Don't Save, or Cancel when closing a func
 - each connection to an input must originate from a different block.  only one connection to an input may originate from the input's block or an outer block.  (too restrictive?:  if node A precedes node B then an input may not have connections originating from both A and B)
-- fix spacing, highlighting of makeNode, newNode, convertNode, typeAssertNode (highlight typeView differently?)
 - type switch
 - builtins panic and recover should have valid signatures in go/types
 - len and capacity inputs for make, len and max input for slice, ok output for type assert (also mapget and chanrecv?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable
@@ -33,7 +32,7 @@ TODO
 - one-off local functions
 - reposition port.valView after creating new param/result
 - case-insensitive sorting in browser?  currently, all lowercase names follow all upper case.  also, don't sort operators?
-- color convertNode and typeAssertNode the same as makeNode and newNode (generic funcs)
+- represent generic builtin operations consistently:  color convertNode and typeAssertNode the same as makeNode, newNode, et al.  Are they funcs (red) or specials (yellow)?  I think they are specials; they are generic and have well-defined effect and cost, unlike normal functions.  In which case operators should be colored as specials, too.
 - use go/parser and go/ast to validate basic literals
 - dimly highlight connected ports when a port is focused (or only when a key, e.g. Shift, is pressed) (but always for wireless conns)
 - don't automatically discard dead code (unconnected literals, unassigned index expressions, unconnected append(), ...); write them instead as assigment to the blank identifier.  add a command to remove dead code at the user's discretion.

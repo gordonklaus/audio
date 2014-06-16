@@ -38,6 +38,7 @@ type nodeBase struct {
 
 	godefer     string
 	godeferText *Text
+	typ         *typeView
 
 	focused bool
 	gap     float64
@@ -55,19 +56,7 @@ func newGoDeferNodeBase(self node, godefer string) *nodeBase {
 	n.Add(n.pkg)
 	n.text = NewText("")
 	n.text.SetBackgroundColor(noColor)
-	n.text.TextChanged = func(string) {
-		if godefer != "" {
-			n.godeferText.SetText(godefer)
-		}
-		x := -(Width(n.godeferText) + Width(n.pkg) + Width(n.text)) / 2
-		n.godeferText.Move(Pt(x, -Height(n.godeferText)/2))
-		x += Width(n.godeferText)
-		n.pkg.Move(Pt(x, -Height(n.pkg)/2))
-		x += Width(n.pkg)
-		n.text.Move(Pt(x, -Height(n.text)/2))
-		n.gap = math.Max(math.Max(Height(n.godeferText), Height(n.pkg)), Height(n.text)) / 2
-		n.reform()
-	}
+	n.text.TextChanged = func(string) { n.reform() }
 	n.Add(n.text)
 	n.godeferText = NewText(godefer)
 	n.godeferText.SetBackgroundColor(noColor)
@@ -129,12 +118,33 @@ func (n *nodeBase) removePortBase(p *port) { // intentionally named to not imple
 }
 
 func (n *nodeBase) reform() {
-	ins, outs := ins(n), outs(n)
+	if n.godefer != "" {
+		n.godeferText.SetText(n.godefer)
+	}
+	x := -(Width(n.godeferText) + Width(n.pkg) + Width(n.text)) / 2
+	if n.typ != nil {
+		x -= Width(n.typ) / 2
+	}
+	n.godeferText.Move(Pt(x, -Height(n.godeferText)/2))
+	x += Width(n.godeferText)
+	n.pkg.Move(Pt(x, -Height(n.pkg)/2))
+	x += Width(n.pkg)
+	n.text.Move(Pt(x, -Height(n.text)/2))
+	if n.typ != nil {
+		x += Width(n.text)
+		n.typ.Move(Pt(x, -Height(n.typ)/2))
+	}
+	if n.text.Text() != "" {
+		n.gap = math.Max(math.Max(Height(n.godeferText), Height(n.pkg)), Height(n.text)) / 2
+	}
+	if n.typ != nil {
+		n.gap = math.Max(n.gap, Height(n.typ)/2)
+	}
 
+	ins, outs := ins(n), outs(n)
 	numIn := float64(len(ins))
 	numOut := float64(len(outs))
 	rx, ry := (math.Max(numIn, numOut)+1)*portSize/2, 1.0*portSize
-
 	rect := ZR
 	for i, p := range ins {
 		x := portSize * (float64(i) - (numIn-1)/2)
@@ -228,8 +238,12 @@ func (n *nodeBase) Paint() {
 		y := (pt.Y-dy)/2 + dy
 		DrawBezier(Pt(0, dy), Pt(0, y), Pt(pt.X, y), pt)
 	}
-	if n.focused && n.text.Text() != "" {
-		DrawRect(RectInParent(n.godeferText).Union(RectInParent(n.pkg)).Union(RectInParent(n.text)))
+	if n.focused && (n.text.Text() != "" || n.typ != nil) {
+		r := RectInParent(n.godeferText).Union(RectInParent(n.pkg)).Union(RectInParent(n.text))
+		if n.typ != nil {
+			r = r.Union(RectInParent(n.typ))
+		}
+		DrawRect(r)
 	}
 }
 

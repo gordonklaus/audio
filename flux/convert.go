@@ -11,7 +11,6 @@ import (
 
 type convertNode struct {
 	*nodeBase
-	typ *typeView
 }
 
 func newConvertNode(currentPkg *types.Package) *convertNode {
@@ -49,8 +48,6 @@ func (n *convertNode) setType(t types.Type) {
 	n.typ.setType(t)
 	if t != nil {
 		n.blk.func_().addPkgRef(t)
-		MoveCenter(n.typ, ZP)
-		n.gap = Height(n.typ) / 2
 		n.reform()
 		SetKeyFocus(n)
 	}
