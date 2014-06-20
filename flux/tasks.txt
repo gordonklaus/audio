@@ -1,5 +1,6 @@
 TODO
 
+- Command-Q to quit
 - handle unknown IDs in reader:
   - type in signature
   - local var type (including loop var).  can safely ignore?

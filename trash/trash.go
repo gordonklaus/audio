@@ -21,6 +21,12 @@ func Trash(path string) error {
 		return os.Remove(path)
 	}
 
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.Mkdir(dir, 0777); err != nil {
+			return err
+		}
+	}
+
 	name := filepath.Base(path)
 	for i := 0; ; i++ {
 		dst := filepath.Join(dir, name)

@@ -783,7 +783,7 @@ func deleteObj(obj types.Object) bool {
 			}
 		}
 		dir := p.fullPath()
-		trash.Trash(filepath.Join(dir, "package.flux.go"))
+		os.Remove(filepath.Join(dir, "package.flux.go"))
 		os.Remove(filepath.Join(dir, ".DS_Store"))
 		if files, err := ioutil.ReadDir(dir); err != nil || len(files) > 0 || trash.Trash(dir) != nil {
 			return false

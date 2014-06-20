@@ -14,7 +14,7 @@ func getDir() string {
 		if home == "" {
 			return ""
 		}
-		x = filepath.Join(home, ".local.share")
+		x = filepath.Join(home, ".local/share")
 	}
-	return filepath.Join(x, ".Trash/files")
+	return filepath.Join(x, "Trash/files")
 }
