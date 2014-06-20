@@ -8,6 +8,7 @@ import (
 	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	"code.google.com/p/gordon-go/refactor"
+	"code.google.com/p/gordon-go/trash"
 	"fmt"
 	"go/build"
 	"io/ioutil"
@@ -775,7 +776,6 @@ func (b *browser) KeyRelease(event KeyEvent) {
 }
 
 func deleteObj(obj types.Object) bool {
-	// TODO: instead of os.Remove, move files to trash
 	if p, ok := obj.(*pkgObject); ok {
 		if p, err := getPackage(p.importPath); err == nil {
 			for _, obj := range p.Scope().Objects {
@@ -783,9 +783,9 @@ func deleteObj(obj types.Object) bool {
 			}
 		}
 		dir := p.fullPath()
-		os.Remove(filepath.Join(dir, "package.flux.go"))
+		trash.Trash(filepath.Join(dir, "package.flux.go"))
 		os.Remove(filepath.Join(dir, ".DS_Store"))
-		if files, err := ioutil.ReadDir(dir); err != nil || len(files) > 0 || os.Remove(dir) != nil {
+		if files, err := ioutil.ReadDir(dir); err != nil || len(files) > 0 || trash.Trash(dir) != nil {
 			return false
 		}
 		delete(pkgObjects, p.importPath)
@@ -804,7 +804,7 @@ func deleteObj(obj types.Object) bool {
 			return false
 		}
 	}
-	if os.Remove(fluxPath(obj)) != nil {
+	if trash.Trash(fluxPath(obj)) != nil {
 		return false
 	}
 	if objs := obj.GetPkg().Scope().Objects; objs[obj.GetName()] == obj {
