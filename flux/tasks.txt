@@ -1,6 +1,5 @@
 TODO
 
-- allow to rename objects in browser
 - handle unknown IDs in reader:
   - type in signature
   - local var type (including loop var).  can safely ignore?
@@ -9,7 +8,7 @@ TODO
 - each connection to an input must originate from a different block.  only one connection to an input may originate from the input's block or an outer block.  (too restrictive?:  if node A precedes node B then an input may not have connections originating from both A and B)
 - type switch
 - builtins panic and recover should have valid signatures in go/types
-- len and capacity inputs for make, len and max input for slice, ok output for type assert (also mapget and chanrecv?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable
+- len and capacity inputs for make, max input for slice, ok output for type assert (also mapget and chanrecv?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable
 - shortcuts:
   - on a port, press Space to open a browser with funcs suitable for connection
   - on an input, press '{' to create a composite or func literal of the port's type
@@ -23,6 +22,7 @@ TODO
 - rework package gui, especially considering data races
 - rework typeView appearance
 - display package name for top-level (imported) objects in browser
+- browser text is not focused, so blinking cursor is not drawn.  focus text or show cursor in some other way.
 - add in-place operators (+=, etc) that take a pointer as the first arg.
 - give assignment node and in-place operators an output, for easier sequencing.
 - use graphics instead of text to identify pointers, slices, funcs, maps, etc in typeView

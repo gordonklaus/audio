@@ -53,13 +53,13 @@ func loadFunc(obj types.Object) *funcNode {
 }
 
 type reader struct {
-	fset      *token.FileSet
-	pkg       *types.Package
-	scope     *types.Scope
-	ports     map[string]*port
-	conns     map[string][]*connection
-	cmap      ast.CommentMap
-	seqNodes  map[int]node
+	fset     *token.FileSet
+	pkg      *types.Package
+	scope    *types.Scope
+	ports    map[string]*port
+	conns    map[string][]*connection
+	cmap     ast.CommentMap
+	seqNodes map[int]node
 }
 
 func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {

@@ -56,7 +56,7 @@ func savePackageName(importPath, name string) {
 		pkg.Name = name
 	}
 
-	// TODO: update all uses?  could get messy with name conflicts.  not that everything has work perfectly.
+	// TODO: update all uses
 }
 
 func saveType(t *types.Named) {

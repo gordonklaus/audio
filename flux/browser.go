@@ -7,8 +7,10 @@ package main
 import (
 	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
+	"code.google.com/p/gordon-go/refactor"
 	"fmt"
 	"go/build"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -30,6 +32,7 @@ type browser struct {
 	path, objs objects
 	i          int
 	newObj     types.Object
+	oldName    string
 
 	pathTexts, objTexts []*Text
 	text                *Text
@@ -42,7 +45,7 @@ type browserOptions struct {
 	objFilter               func(types.Object) bool
 	acceptTypes, enterTypes bool
 	canFuncAsVal            bool
-	canCreate, canDelete    bool
+	mutable                 bool
 }
 
 func newBrowser(options browserOptions, parent View) *browser {
@@ -139,7 +142,7 @@ func (b *browser) validateText(text *string) bool {
 	if b.newObj != nil {
 		if _, ok := b.newObj.(*pkgObject); ok {
 			for _, r := range *text {
-				if !unicode.In(r, unicode.PrintRanges...) || strings.ContainsRune("!\"#$%&'()*,:;<=>?[\\]^`{|}" + string(unicode.ReplacementChar), r) {
+				if !unicode.In(r, unicode.PrintRanges...) || strings.ContainsRune("!\"#$%&'()*,:;<=>?[\\]^`{|}"+string(unicode.ReplacementChar), r) {
 					return false
 				}
 			}
@@ -171,18 +174,7 @@ func (b *browser) textChanged(text string) {
 	}
 
 	if b.newObj != nil {
-		switch obj := b.newObj.(type) {
-		case *pkgObject:
-			obj.name = text
-		case *types.TypeName:
-			obj.Name = text
-		case *types.Func:
-			obj.Name = text
-		case *types.Var:
-			obj.Name = text
-		case *types.Const:
-			obj.Name = text
-		}
+		setObjectName(b.newObj, text)
 		i = 0
 		for i < len(objs) && objLess(objs[i], b.newObj) {
 			i++
@@ -241,9 +233,9 @@ func (b *browser) refresh() {
 	Hide(b.pkgName)
 	if pkg, ok := cur.(*pkgObject); ok {
 		t := b.pkgName
-		t.SetText(pkg.name)
+		t.SetText(pkg.pkgName)
 		t.Move(Pt(xOffset+width+16, yOffset-(Height(t)-Height(b.text))/2))
-		if pkg.name != pkg.GetName() {
+		if pkg.pkgName != pkg.name {
 			Show(t)
 		}
 	}
@@ -291,18 +283,17 @@ func (b browser) filteredObjs() (objs objects) {
 	addSubPkgs := func(importPath string) {
 		seen := map[string]bool{}
 		for _, srcDir := range build.Default.SrcDirs() {
-			file, err := os.Open(filepath.Join(srcDir, importPath))
+			files, err := ioutil.ReadDir(filepath.Join(srcDir, importPath))
 			if err != nil {
 				continue
 			}
-			defer file.Close()
-			fileInfos, err := file.Readdir(-1)
-			if err != nil {
-				continue
-			}
-			for _, fileInfo := range fileInfos {
-				name := fileInfo.Name()
-				if !fileInfo.IsDir() || !unicode.IsLetter([]rune(name)[0]) || name == "testdata" || seen[name] {
+			for _, f := range files {
+				name := filepath.Base(f.Name())
+				if !f.IsDir() || !unicode.IsLetter([]rune(name)[0]) || name == "testdata" || seen[name] {
+					continue
+				}
+				if _, ok := b.newObj.(*pkgObject); ok && name == b.oldName {
+					// when editing a package path, it will be added in filteredObjs as newObj, so don't add it here
 					continue
 				}
 				seen[name] = true
@@ -313,7 +304,7 @@ func (b browser) filteredObjs() (objs objects) {
 					if pkg, err := build.Import(importPath, "", build.AllowBinary); err == nil {
 						name = pkg.Name
 					}
-					pkgObj = &pkgObject{nil, importPath, name, srcDir}
+					pkgObj = &pkgObject{nil, path.Base(importPath), srcDir, importPath, name}
 					pkgObjects[importPath] = pkgObj
 				}
 				add(pkgObj)
@@ -344,7 +335,7 @@ func (b browser) filteredObjs() (objs objects) {
 				if _, ok := err.(*build.NoGoError); !ok {
 					fmt.Println(err)
 				}
-				pkgs[obj.importPath] = types.NewPackage(obj.importPath, obj.name, types.NewScope(types.Universe))
+				pkgs[obj.importPath] = types.NewPackage(obj.importPath, obj.pkgName, types.NewScope(types.Universe))
 			}
 			addSubPkgs(obj.importPath)
 		case *types.TypeName:
@@ -503,11 +494,11 @@ func (b *browser) KeyPress(event KeyEvent) {
 		if obj == nil {
 			return
 		}
-		if pkg, ok := obj.(*pkgObject); ok && event.Shift && b.newObj == nil {
+		if pkg, ok := obj.(*pkgObject); ok && event.Shift && b.options.mutable && b.newObj == nil {
 			Show(b.pkgName)
 			b.pkgName.Accept = func(name string) {
-				if pkg.name != name {
-					pkg.name = name
+				if pkg.pkgName != name {
+					pkg.pkgName = name
 					savePackageName(pkg.importPath, name)
 				}
 				b.refresh()
@@ -520,47 +511,107 @@ func (b *browser) KeyPress(event KeyEvent) {
 			SetKeyFocus(b.pkgName)
 			return
 		}
+		if event.Command && b.options.mutable && b.newObj == nil {
+			b.newObj = obj
+			b.oldName = obj.GetName()
+			if p, ok := obj.(*pkgObject); ok {
+				delete(pkgs, p.importPath)
+				delete(pkgObjects, p.importPath)
+			} else {
+				if objs := obj.GetPkg().Scope().Objects; objs[obj.GetName()] == obj {
+					delete(objs, obj.GetName())
+				} else {
+					t, _ := indirect(obj.(*types.Func).Type.(*types.Signature).Recv.Type)
+					n := t.(*types.Named)
+					for i, f2 := range n.Methods {
+						if f2 == obj {
+							n.Methods = append(n.Methods[:i], n.Methods[i+1:]...)
+							break
+						}
+					}
+				}
+			}
+			b.text.SetText(obj.GetName())
+			return
+		}
 
-		if b.newObj != nil {
-			if !b.unique(b.newObj.GetName()) {
+		if obj := b.newObj; obj != nil {
+			if !b.unique(obj.GetName()) {
 				return
 			}
-			switch obj := b.newObj.(type) {
-			case *pkgObject:
-				// all fields are blank except name which represents the final path element, not the package name.
-				// fill in srcDir and importPath based on name and, if present, parent.
+			b.newObj = nil
+			if p, ok := obj.(*pkgObject); ok {
+				oldImportPath := p.importPath
 				if len(b.path) > 0 {
 					parent := b.path[0].(*pkgObject)
-					obj.srcDir = parent.srcDir
-					obj.importPath = path.Join(parent.importPath, obj.name)
+					p.srcDir = parent.srcDir
+					p.importPath = path.Join(parent.importPath, p.name)
 				} else {
 					dirs := build.Default.SrcDirs()
-					obj.srcDir = dirs[len(dirs)-1]
-					obj.importPath = obj.name
+					p.srcDir = dirs[len(dirs)-1]
+					p.importPath = p.name
 				}
-				path := filepath.Join(obj.srcDir, obj.importPath)
-				if err := os.Mkdir(path, 0777); err != nil {
-					fmt.Printf("error creating %s: %s\n", path, err)
-					b.newObj = nil
+				pkgObjects[p.importPath] = p
+				if b.oldName != "" {
+					b.oldName = ""
+					if err := refactor.MovePackage(oldImportPath, p.importPath); err != nil {
+						fmt.Printf("error moving package %s: %s\n", oldImportPath, err)
+					}
 					b.clearText()
 					return
 				}
-				pkgObjects[obj.importPath] = obj
-			case *types.TypeName, *types.Func, *types.Var, *types.Const:
+				p.pkgName = p.name
+				path := p.fullPath()
+				if err := os.Mkdir(path, 0777); err != nil {
+					fmt.Printf("error creating %s: %s\n", path, err)
+					b.clearText()
+					return
+				}
+			} else {
 				if isMethod(obj) {
 					recv := b.path[0].(*types.TypeName).Type.(*types.Named)
 					recv.Methods = append(recv.Methods, obj.(*types.Func))
 				} else {
-					pkg := b.currentPkg
-					if len(b.path) > 0 {
-						pkg = pkgs[b.path[0].(*pkgObject).importPath]
+					pkgs[b.path[0].(*pkgObject).importPath].Scope().Insert(obj)
+				}
+				if b.oldName != "" {
+					newName := obj.GetName()
+					setObjectName(obj, b.oldName)
+					oldPaths := []string{fluxPath(obj)}
+					if t, ok := obj.(*types.TypeName); ok {
+						for _, m := range t.Type.(*types.Named).Methods {
+							oldPaths = append(oldPaths, fluxPath(m))
+						}
 					}
-					pkg.Scope().Insert(obj)
+					recv := ""
+					if isMethod(obj) {
+						t, _ := indirect(obj.(*types.Func).Type.(*types.Signature).Recv.Type)
+						recv = t.(*types.Named).Obj.Name
+					}
+					if err := refactor.Rename(obj.GetPkg().Path, recv, b.oldName, newName); err != nil {
+						fmt.Printf("error renaming %v to %v: %v\n", b.oldName, newName, err)
+						b.oldName = ""
+						b.clearText()
+						return
+					}
+					setObjectName(obj, newName)
+					newPaths := []string{fluxPath(obj)}
+					if t, ok := obj.(*types.TypeName); ok {
+						for _, m := range t.Type.(*types.Named).Methods {
+							newPaths = append(newPaths, fluxPath(m))
+						}
+					}
+					for i := range oldPaths {
+						if err := os.Rename(oldPaths[i], newPaths[i]); err != nil {
+							fmt.Println("error renaming files: ", err)
+						}
+					}
+					b.oldName = ""
+					b.clearText()
+					return
 				}
 			}
-
-			b.makeCurrent(b.newObj)
-			b.newObj = nil
+			b.makeCurrent(obj)
 		}
 
 		_, isPkg := obj.(*pkgObject)
@@ -602,10 +653,19 @@ func (b *browser) KeyPress(event KeyEvent) {
 		}
 	case KeyEscape:
 		if b.newObj != nil {
-			b.newObj = nil
-			if b.i < len(b.objs)-1 {
+			if b.oldName != "" {
+				setObjectName(b.newObj, b.oldName)
+				b.oldName = ""
+				if isMethod(b.newObj) {
+					recv := b.path[0].(*types.TypeName).Type.(*types.Named)
+					recv.Methods = append(recv.Methods, b.newObj.(*types.Func))
+				} else {
+					pkgs[b.path[0].(*pkgObject).importPath].Scope().Insert(b.newObj)
+				}
+			} else if b.i < len(b.objs)-1 {
 				b.i++
 			}
+			b.newObj = nil
 			b.clearText()
 		} else {
 			b.cancel()
@@ -617,7 +677,7 @@ func (b *browser) KeyPress(event KeyEvent) {
 		}
 		fallthrough
 	case KeyDelete:
-		if event.Command && b.options.canDelete && b.newObj == nil {
+		if event.Command && b.options.mutable && b.newObj == nil {
 			b.clearText()
 			if deleteObj(b.currentObj()) {
 				if b.i > 0 {
@@ -627,7 +687,7 @@ func (b *browser) KeyPress(event KeyEvent) {
 			}
 		}
 	default:
-		if !b.options.canCreate {
+		if !b.options.mutable {
 			b.text.KeyPress(event)
 			return
 		}
@@ -714,59 +774,53 @@ func (b *browser) KeyRelease(event KeyEvent) {
 	}
 }
 
-// TODO: instead of os.Remove, move files to trash
 func deleteObj(obj types.Object) bool {
+	// TODO: instead of os.Remove, move files to trash
 	if p, ok := obj.(*pkgObject); ok {
 		if p, err := getPackage(p.importPath); err == nil {
 			for _, obj := range p.Scope().Objects {
 				deleteObj(obj)
 			}
 		}
-		f, err := os.Open(filepath.Join(p.srcDir, p.importPath))
-		if err != nil {
-			fmt.Println(err)
+		dir := p.fullPath()
+		os.Remove(filepath.Join(dir, "package.flux.go"))
+		os.Remove(filepath.Join(dir, ".DS_Store"))
+		if files, err := ioutil.ReadDir(dir); err != nil || len(files) > 0 || os.Remove(dir) != nil {
 			return false
 		}
-		if names, err := f.Readdirnames(0); err == nil && (len(names) == 0 || len(names) == 1 && names[0] == ".DS_Store") {
-			os.Remove(filepath.Join(f.Name(), ".DS_Store"))
-			if err := os.Remove(f.Name()); err != nil {
-				fmt.Println(err)
-				return false
-			}
-			delete(pkgObjects, p.importPath)
-			delete(pkgs, p.importPath)
-			return true
-		}
+		delete(pkgObjects, p.importPath)
+		delete(pkgs, p.importPath)
+		return true
+	}
+	if !fluxObjs[obj] {
 		return false
 	}
-	if fluxObjs[obj] {
-		if t, ok := obj.(*types.TypeName); ok {
-			t := t.Type.(*types.Named)
-			for _, m := range t.Methods {
-				deleteObj(m)
-			}
-			if len(t.Methods) > 0 {
-				return false
-			}
+	if t, ok := obj.(*types.TypeName); ok {
+		t := t.Type.(*types.Named)
+		for _, m := range t.Methods {
+			deleteObj(m)
 		}
-		if err := os.Remove(fluxPath(obj)); err != nil {
-			fmt.Println(err)
+		if len(t.Methods) > 0 {
 			return false
 		}
-		if objs := obj.GetPkg().Scope().Objects; objs[obj.GetName()] == obj {
-			delete(objs, obj.GetName())
-			return true
-		}
+	}
+	if os.Remove(fluxPath(obj)) != nil {
+		return false
+	}
+	if objs := obj.GetPkg().Scope().Objects; objs[obj.GetName()] == obj {
+		delete(objs, obj.GetName())
+	} else {
 		t, _ := indirect(obj.(*types.Func).Type.(*types.Signature).Recv.Type)
 		n := t.(*types.Named)
 		for i, f2 := range n.Methods {
 			if f2 == obj {
 				n.Methods = append(n.Methods[:i], n.Methods[i+1:]...)
-				return true
+				break
 			}
 		}
 	}
-	return false
+	delete(fluxObjs, obj)
+	return true
 }
 
 func (b *browser) Paint() {
@@ -784,17 +838,15 @@ func (b *browser) Paint() {
 
 type pkgObject struct {
 	types.Object
-	importPath, name, srcDir string
+	name                        string // the final path element; display name
+	srcDir, importPath, pkgName string
 }
 
-func (p pkgObject) GetName() string {
-	if p.importPath == "" {
-		// during object creation, all fields are blank except p.name which is being edited
-		return p.name
-	}
-	return path.Base(p.importPath)
+func (p pkgObject) fullPath() string {
+	return filepath.Join(p.srcDir, p.importPath)
 }
 
+func (p pkgObject) GetName() string        { return p.name }
 func (p pkgObject) GetPkg() *types.Package { return nil }
 
 var (
@@ -838,6 +890,21 @@ type field struct {
 	*types.Var
 	recv        types.Type
 	addressable bool
+}
+
+func setObjectName(obj types.Object, name string) {
+	switch obj := obj.(type) {
+	case *pkgObject:
+		obj.name = name
+	case *types.TypeName:
+		obj.Name = name
+	case *types.Func:
+		obj.Name = name
+	case *types.Var:
+		obj.Name = name
+	case *types.Const:
+		obj.Name = name
+	}
 }
 
 type objects []types.Object

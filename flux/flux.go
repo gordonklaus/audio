@@ -7,6 +7,7 @@ package main
 import (
 	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
+	"code.google.com/p/gordon-go/refactor"
 	"math"
 	"runtime"
 	"time"
@@ -14,6 +15,7 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	refactor.ReportShadowedPackages()
 	newFluxWindow()
 	Run()
 }
@@ -32,7 +34,7 @@ func newFluxWindow() *fluxWindow {
 	w.Window = NewWindow(w)
 	w.Panner = NewPanner(w)
 	w.Run()
-	w.browser = newBrowser(browserOptions{objFilter: isFluxObj, acceptTypes: true, enterTypes: true, canCreate: true, canDelete: true}, nil)
+	w.browser = newBrowser(browserOptions{objFilter: isFluxObj, acceptTypes: true, enterTypes: true, mutable: true}, nil)
 	w.Add(w.browser)
 	w.SetRect(Rect(w))
 	w.browser.accepted = func(obj types.Object) {

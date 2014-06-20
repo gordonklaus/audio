@@ -12,7 +12,9 @@ To create a new item, hold Command and press 1 (package or directory), 2 (type),
 
 To delete an item (and its children, if it has any), press Command-Delete.  Only items created in Flux can be deleted.
 
-To change the name of a package, press Shift-Enter, then edit the name and press Enter.
+To change the name of an item (or the import path of a package), press Command-Enter, then edit the name and press Enter.
+
+To change the name of a package, press Shift-Enter, then edit the name and press Enter.  The package name is displayed only if it different from the final path element, or while editing it.
 
 The browser behaves differently depending on the context in which it is opened.  In the context of program start, it displays only objects created in Flux and it allows you to create, delete, or open them for editing.  When opened in the context of editing a type or function, a relevant subset of objects is displayed from which one can be selected.
 

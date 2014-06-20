@@ -17,10 +17,10 @@ const blockRadius = 8
 
 type block struct {
 	*ViewBase
-	node      node
-	nodes     map[node]bool
-	conns     map[*connection]bool
-	focused   bool
+	node    node
+	nodes   map[node]bool
+	conns   map[*connection]bool
+	focused bool
 
 	arrange, childArranged blockchan
 	stop                   stopchan
