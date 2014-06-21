@@ -2,6 +2,15 @@
 Flux is a dataflow-style graphical editor for writing Go programs.
 
 
+General
+
+On systems other than OS X, substitute the Control key for the Command key mentioned here.
+
+Most operations can be canceled by pressing Escape.
+
+Press Command-W to close a window.  When all windows are closed, the program quits.
+
+
 Browser
 
 The browser is the first thing you see when starting Flux.  It provides a means of navigating the directories and packages under GOPATH and in the standard library and the objects within those packages, and of creating, deleting, and selecting such items.

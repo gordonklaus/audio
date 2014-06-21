@@ -42,3 +42,7 @@ func MakeContextCurrent(w *Window) {
 func WaitEvents() {
 	C.glfwWaitEvents()
 }
+
+func PostEmptyEvent() {
+	C.glfwPostEmptyEvent()
+}

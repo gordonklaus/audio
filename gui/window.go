@@ -14,7 +14,8 @@ type Window struct {
 	keyFocus    View
 	mouseIn     MouserView
 	mouser      map[int]MouserView
-	control     chan interface{}
+	close       chan struct{}
+	resize      chan Point
 	key         chan KeyEvent
 	mouse       chan MouseEvent
 	scroll      chan ScrollEvent
@@ -37,7 +38,8 @@ func NewWindow(self View) *Window {
 	}
 	w.ViewBase = NewView(w)
 	w.mouser = make(map[int]MouserView)
-	w.control = make(chan interface{})
+	w.close = make(chan struct{})
+	w.resize = make(chan Point)
 	w.key = make(chan KeyEvent)
 	w.mouse = make(chan MouseEvent)
 	w.scroll = make(chan ScrollEvent)
@@ -53,10 +55,15 @@ func NewWindow(self View) *Window {
 	width, height = w.w.FramebufferSize()
 	gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
 
-	windows[w] = true
+	windows[w] = struct{}{}
 	w.Self = self
 
 	return w
+}
+
+func (w *Window) Close() {
+	w.w.SetShouldClose(true)
+	glfw.PostEmptyEvent()
 }
 
 func (w *Window) SetTitle(s string) { w.w.SetTitle(s) }
@@ -78,24 +85,9 @@ func (w *Window) SetCentralView(v View) {
 }
 
 func (w *Window) Run() {
-	type (
-		close  *Window
-		resize Point
-	)
-
-	w.w.OnClose(func() {
-		// callbacks may still be called after OnClose so they must be unregistered to avoid deadlock
-		w.w.OnResize(nil)
-		w.w.OnFramebufferResize(nil)
-		w.w.OnKey(nil)
-		w.w.OnChar(nil)
-		w.w.OnMouseMove(nil)
-		w.w.OnMouseButton(nil)
-		w.w.OnScroll(nil)
-		w.control <- close(w)
-	})
+	w.w.OnClose(w.Close)
 	w.w.OnResize(func(width, height int) {
-		w.control <- resize{float64(width), float64(height)}
+		w.resize <- Pt(float64(width), float64(height))
 	})
 	w.w.OnFramebufferResize(func(width, height int) {
 		gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
@@ -160,19 +152,15 @@ func (w *Window) Run() {
 
 		for {
 			select {
-			case c := <-w.control:
-				switch c := c.(type) {
-				case close:
-					closeWindow <- c
-					return
-				case resize:
-					gl.MatrixMode(gl.PROJECTION)
-					gl.LoadIdentity()
-					gl.Ortho(0, gl.Double(c.X), 0, gl.Double(c.Y), -1, 1)
-					Resize(w.Self, Point(c))
-					if w.centralView != nil {
-						Resize(w.centralView, Point(c))
-					}
+			case <-w.close:
+				return
+			case s := <-w.resize:
+				gl.MatrixMode(gl.PROJECTION)
+				gl.LoadIdentity()
+				gl.Ortho(0, gl.Double(s.X), 0, gl.Double(s.Y), -1, 1)
+				Resize(w.Self, s)
+				if w.centralView != nil {
+					Resize(w.centralView, s)
 				}
 			case k := <-w.key:
 				if w.keyFocus != nil {
@@ -288,6 +276,12 @@ func (w *Window) setKeyFocus(view View) {
 }
 
 func (w *Window) setMouser(m MouserView, button int) { w.mouser[button] = m }
+
+func (w *Window) KeyPress(k KeyEvent) {
+	if k.Command && k.Key == KeyW {
+		w.Close()
+	}
+}
 
 func (w *Window) repaint() {
 	select {

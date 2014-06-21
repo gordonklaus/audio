@@ -18,26 +18,17 @@ func init() {
 	}
 }
 
-var (
-	windows = map[*Window]bool{}
-
-	// Currently, messages on this channel are not processed until
-	// WaitEvents returns, which is an indefinite amount of time (if
-	// usually small).
-	closeWindow = make(chan *Window)
-)
+var windows = map[*Window]struct{}{}
 
 func Run() {
 	defer glfw.Terminate()
 	for len(windows) > 0 {
 		glfw.WaitEvents()
-	F:
-		for {
-			select {
-			case w := <-closeWindow:
+		for w := range windows {
+			if w.w.ShouldClose() {
 				delete(windows, w)
-			default:
-				break F
+				w.close <- struct{}{}
+				w.w.Destroy()
 			}
 		}
 	}

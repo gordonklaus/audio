@@ -1,5 +1,6 @@
 TODO
 
+- fix focusing in typeView
 - Command-Q to quit
 - handle unknown IDs in reader:
   - type in signature
