@@ -27,7 +27,7 @@ func Run() {
 		for w := range windows {
 			if w.w.ShouldClose() {
 				delete(windows, w)
-				w.close <- struct{}{}
+				w.close <- struct{}{} // wait for window to stop before Destroying it to be sure it is done with the OpenGL context
 				w.w.Destroy()
 			}
 		}

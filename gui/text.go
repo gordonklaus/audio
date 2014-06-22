@@ -9,26 +9,10 @@ import (
 	"time"
 )
 
-var font ftgl.Font
-
-func initFont() {
-	font = ftgl.NewTextureFont(filepath.Join(pkgDir(), "Times New Roman.ttf"))
-	font.SetFaceSize(18, 1)
-}
-
-func pkgDir() string {
-	for _, dir := range build.Default.SrcDirs() {
-		dir := filepath.Join(dir, "code.google.com/p/gordon-go/gui")
-		if _, err := os.Stat(dir); err == nil {
-			return dir
-		}
-	}
-	panic("unreachable")
-}
-
 type Text struct {
 	*ViewBase
 	text                string
+	font                ftgl.Font
 	textColor           Color
 	frameSize           float64
 	frameColor          Color
@@ -44,16 +28,38 @@ type Text struct {
 func NewText(text string) *Text {
 	t := &Text{}
 	t.ViewBase = NewView(t)
+	t.font = getFont()
 	t.textColor = Color{1, 1, 1, 1}
 	t.backgroundColor = Color{0, 0, 0, 1}
 	t.SetText(text)
 	return t
 }
 
+var font ftgl.Font
+
+// Must be called from a thread holding an OpenGL context, i.e., the window callback thread.  This probably won't work across multiple windows.  Certainly not concurrently.
+func getFont() ftgl.Font {
+	if font.Nil() {
+		font = ftgl.NewTextureFont(filepath.Join(pkgDir(), "Times New Roman.ttf"))
+		font.SetFaceSize(18, 1)
+	}
+	return font
+}
+
+func pkgDir() string {
+	for _, dir := range build.Default.SrcDirs() {
+		dir := filepath.Join(dir, "code.google.com/p/gordon-go/gui")
+		if _, err := os.Stat(dir); err == nil {
+			return dir
+		}
+	}
+	panic("unreachable")
+}
+
 func (t Text) Text() string { return t.text }
 func (t *Text) SetText(text string) {
 	t.text = text
-	Resize(t, Pt(2*t.frameSize+font.Advance(t.text), 2*t.frameSize-font.Descender()+font.Ascender()))
+	Resize(t, Pt(2*t.frameSize+t.font.Advance(t.text), 2*t.frameSize-t.font.Descender()+t.font.Ascender()))
 	if t.TextChanged != nil {
 		t.TextChanged(text)
 	}
@@ -76,7 +82,7 @@ func (t *Text) SetFrameColor(c Color) {
 
 func (t *Text) SetFrameSize(size float64) {
 	t.frameSize = size
-	Resize(t, Pt(2*t.frameSize+font.Advance(t.text), 2*t.frameSize-font.Descender()+font.Ascender()))
+	Resize(t, Pt(2*t.frameSize+t.font.Advance(t.text), 2*t.frameSize-t.font.Descender()+t.font.Ascender()))
 }
 
 func (t *Text) TookKeyFocus() {
@@ -146,11 +152,11 @@ func (t *Text) Paint() {
 	if t.cursor {
 		SetColor(t.textColor)
 		SetLineWidth(2)
-		x := t.frameSize + font.Advance(t.text)
+		x := t.frameSize + t.font.Advance(t.text)
 		DrawLine(Pt(x, t.frameSize), Pt(x, Height(t)-2*t.frameSize))
 	}
 
 	SetColor(t.textColor)
-	gl.Translated(gl.Double(t.frameSize), gl.Double(t.frameSize-font.Descender()), 0)
-	font.Render(t.text)
+	gl.Translated(gl.Double(t.frameSize), gl.Double(t.frameSize-t.font.Descender()), 0)
+	t.font.Render(t.text)
 }

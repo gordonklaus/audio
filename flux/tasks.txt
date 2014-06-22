@@ -1,6 +1,7 @@
 TODO
 
 - fix focusing in typeView
+- fix placement of browser in func editor
 - Command-Q to quit
 - handle unknown IDs in reader:
   - type in signature

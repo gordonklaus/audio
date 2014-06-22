@@ -29,75 +29,74 @@ type fluxWindow struct {
 	pause  chan bool
 }
 
-func newFluxWindow() *fluxWindow {
+func newFluxWindow() {
 	w := &fluxWindow{}
-	w.Window = NewWindow(w)
-	w.Panner = NewPanner(w)
-	w.Run()
-	w.browser = newBrowser(browserOptions{objFilter: isFluxObj, acceptTypes: true, enterTypes: true, mutable: true}, nil)
-	w.Add(w.browser)
-	w.SetRect(Rect(w))
-	w.browser.accepted = func(obj types.Object) {
-		switch obj := obj.(type) {
-		case *types.TypeName:
-			w.SetTitle(obj.Pkg.Path + "." + obj.Name)
-			typ := obj.Type.(*types.Named)
-			Hide(w.browser)
-			v := newTypeView(&typ.UnderlyingT, obj.Pkg)
-			w.Add(v)
-			MoveCenter(v, Center(w))
-			reset := func() {
-				w.Remove(v)
-				Show(w.browser)
-				w.browser.clearText()
-				SetKeyFocus(w.browser)
-				w.SetTitle("Flux")
-			}
-			if typ.UnderlyingT == nil {
-				v.edit(func() {
-					if typ.UnderlyingT == nil {
-						delete(obj.Pkg.Scope().Objects, obj.Name)
-					} else {
-						saveType(typ)
-					}
-					reset()
-				})
-			} else {
-				v.done = func() {
-					saveType(typ)
-					reset()
+	NewWindow(w, func(win *Window) {
+		w.Window = win
+		w.Panner = NewPanner(w)
+		w.browser = newBrowser(browserOptions{objFilter: isFluxObj, acceptTypes: true, enterTypes: true, mutable: true}, nil)
+		w.Add(w.browser)
+		w.SetRect(Rect(w))
+		w.browser.accepted = func(obj types.Object) {
+			switch obj := obj.(type) {
+			case *types.TypeName:
+				w.SetTitle(obj.Pkg.Path + "." + obj.Name)
+				typ := obj.Type.(*types.Named)
+				Hide(w.browser)
+				v := newTypeView(&typ.UnderlyingT, obj.Pkg)
+				w.Add(v)
+				MoveCenter(v, Center(w))
+				reset := func() {
+					w.Remove(v)
+					Show(w.browser)
+					w.browser.clearText()
+					SetKeyFocus(w.browser)
+					w.SetTitle("Flux")
 				}
-				SetKeyFocus(v)
+				if typ.UnderlyingT == nil {
+					v.edit(func() {
+						if typ.UnderlyingT == nil {
+							delete(obj.Pkg.Scope().Objects, obj.Name)
+						} else {
+							saveType(typ)
+						}
+						reset()
+					})
+				} else {
+					v.done = func() {
+						saveType(typ)
+						reset()
+					}
+					SetKeyFocus(v)
+				}
+			case *types.Func:
+				prefix := obj.Pkg.Path + "."
+				if recv := obj.Type.(*types.Signature).Recv; recv != nil {
+					t, _ := indirect(recv.Type)
+					prefix += t.(*types.Named).Obj.Name + "."
+				}
+				w.SetTitle(prefix + obj.Name)
+				Hide(w.browser)
+				f := loadFunc(obj)
+				w.Add(f)
+				go animate(f.animate, f.stop)
+				f.Move(Center(w))
+				f.done = func() {
+					Show(w.browser)
+					w.browser.clearText()
+					SetKeyFocus(w.browser)
+					w.SetTitle("Flux")
+				}
+				SetKeyFocus(f.inputsNode)
 			}
-		case *types.Func:
-			prefix := obj.Pkg.Path + "."
-			if recv := obj.Type.(*types.Signature).Recv; recv != nil {
-				t, _ := indirect(recv.Type)
-				prefix += t.(*types.Named).Obj.Name + "."
-			}
-			w.SetTitle(prefix + obj.Name)
-			Hide(w.browser)
-			f := loadFunc(obj)
-			w.Add(f)
-			go animate(f.animate, f.stop)
-			f.Move(Center(w))
-			f.done = func() {
-				Show(w.browser)
-				w.browser.clearText()
-				SetKeyFocus(w.browser)
-				w.SetTitle("Flux")
-			}
-			SetKeyFocus(f.inputsNode)
 		}
-	}
-	w.browser.canceled = func() {}
-	SetKeyFocus(w.browser)
+		w.browser.canceled = func() {}
+		SetKeyFocus(w.browser)
 
-	w.target = make(chan Point)
-	w.pause = make(chan bool)
-	go w.animate()
-
-	return w
+		w.target = make(chan Point)
+		w.pause = make(chan bool)
+		go w.animate()
+	})
 }
 
 func panTo(v View, p Point) {

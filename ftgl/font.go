@@ -30,6 +30,8 @@ func NewTextureFontFromBuffer(buffer []byte) Font {
 	return Font{f}
 }
 
+func (f Font) Nil() bool { return f.f == nil }
+
 func (f Font) SetFaceSize(size, res uint) {
 	if C.Font_SetFaceSize(f.f, C.uint(size), C.uint(res)) != 1 {
 		panic("unable to set face size")

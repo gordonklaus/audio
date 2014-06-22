@@ -4,7 +4,6 @@ import (
 	"code.google.com/p/gordon-go/glfw"
 	gl "github.com/chsc/gogl/gl21"
 	"runtime"
-	"sync"
 )
 
 type Window struct {
@@ -23,15 +22,8 @@ type Window struct {
 	do          chan func()
 }
 
-func NewWindow(self View) *Window {
+func NewWindow(self View, init func(w *Window)) {
 	w := &Window{w: glfw.NewWindow(960, 520, "Flux")}
-
-	// TODO: investigate if this is what's causing sporadic crashes
-	// Somehow, this seems to work:
-	// Have the context current in both threads, as this one needs to be able to call
-	// Font.Advance and Font.LineHeight (from Text.SetText), and the other thread renders.
-	// But is this portable?  Or even a good idea?
-	glfw.MakeContextCurrent(w.w)
 
 	if self == nil {
 		self = w
@@ -46,19 +38,10 @@ func NewWindow(self View) *Window {
 	w.paint = make(chan struct{}, 1)
 	w.do = make(chan func())
 
-	// glfw should fire initial resize events to avoid this duplication (https://github.com/glfw/glfw/issues/62)
-	width, height := w.w.Size()
-	gl.MatrixMode(gl.PROJECTION)
-	gl.LoadIdentity()
-	gl.Ortho(0, gl.Double(width), 0, gl.Double(height), -1, 1)
-	Resize(w, Pt(float64(width), float64(height)))
-	width, height = w.w.FramebufferSize()
-	gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
-
 	windows[w] = struct{}{}
 	w.Self = self
-
-	return w
+	
+	w.run(init)
 }
 
 func (w *Window) Close() {
@@ -84,7 +67,7 @@ func (w *Window) SetCentralView(v View) {
 	}
 }
 
-func (w *Window) Run() {
+func (w *Window) run(init func(w *Window)) {
 	w.w.OnClose(w.Close)
 	w.w.OnResize(func(width, height int) {
 		w.resize <- Pt(float64(width), float64(height))
@@ -135,15 +118,21 @@ func (w *Window) Run() {
 		return p.Add(Rect(w).Min)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
 	go func() {
 		runtime.LockOSThread()
 		glfw.MakeContextCurrent(w.w)
 		defer glfw.MakeContextCurrent(nil)
 
-		initFont()
-		wg.Done()
+		// glfw should fire initial resize events to avoid this duplication (https://github.com/glfw/glfw/issues/62)
+		width, height := w.w.Size()
+		gl.MatrixMode(gl.PROJECTION)
+		gl.LoadIdentity()
+		gl.Ortho(0, gl.Double(width), 0, gl.Double(height), -1, 1)
+		Resize(w, Pt(float64(width), float64(height)))
+		width, height = w.w.FramebufferSize()
+		gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
+
+		init(w)
 
 		gl.Enable(gl.BLEND)
 		gl.Enable(gl.POINT_SMOOTH)
@@ -247,7 +236,6 @@ func (w *Window) Run() {
 			}
 		}
 	}()
-	wg.Wait()
 }
 
 func commonParent(v1, v2 View) (p View) {
