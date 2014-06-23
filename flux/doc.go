@@ -4,11 +4,11 @@ Flux is a dataflow-style graphical editor for writing Go programs.
 
 General
 
-On systems other than OS X, substitute the Control key for the Command key mentioned here.
+On systems other than OS X, substitute the Control key for the Command key herein.
 
 Most operations can be canceled by pressing Escape.
 
-Press Command-W to close a window.  When all windows are closed, the program quits.
+Press Command-W to close a window.  Press Command-Q or close all windows to quit.
 
 
 Browser

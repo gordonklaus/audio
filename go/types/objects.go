@@ -22,9 +22,9 @@ import (
 type Object interface {
 	Parent() *Scope   // scope in which this object is declared
 	Pos() token.Pos   // position of object identifier in declaration
-	GetPkg() *Package    // nil for objects in the Universe scope and labels
-	GetName() string     // package local object name
-	GetType() Type       // object type
+	GetPkg() *Package // nil for objects in the Universe scope and labels
+	GetName() string  // package local object name
+	GetType() Type    // object type
 	IsExported() bool // reports whether the name starts with a capital letter
 	Id() string       // object id (see Id below)
 
@@ -78,9 +78,9 @@ type object struct {
 
 func (obj *object) Parent() *Scope   { return obj.parent }
 func (obj *object) Pos() token.Pos   { return obj.pos }
-func (obj *object) GetPkg() *Package    { return obj.Pkg }
-func (obj *object) GetName() string     { return obj.Name }
-func (obj *object) GetType() Type       { return obj.Type }
+func (obj *object) GetPkg() *Package { return obj.Pkg }
+func (obj *object) GetName() string  { return obj.Name }
+func (obj *object) GetType() Type    { return obj.Type }
 func (obj *object) IsExported() bool { return ast.IsExported(obj.Name) }
 func (obj *object) Id() string       { return Id(obj.Pkg, obj.Name) }
 func (obj *object) String() string   { panic("abstract") }

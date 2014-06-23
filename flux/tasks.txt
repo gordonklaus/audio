@@ -2,7 +2,7 @@ TODO
 
 - fix focusing in typeView
 - fix placement of browser in func editor
-- Command-Q to quit
+- document instability of package APIs
 - handle unknown IDs in reader:
   - type in signature
   - local var type (including loop var).  can safely ignore?

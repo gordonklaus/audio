@@ -1,8 +1,8 @@
 package refactor
 
 import (
-	"code.google.com/p/go.tools/go/loader"
 	_ "code.google.com/p/go.tools/go/gcimporter"
+	"code.google.com/p/go.tools/go/loader"
 	"code.google.com/p/go.tools/go/types"
 	"fmt"
 	"go/ast"
@@ -94,7 +94,7 @@ func Rename(importPath, recv, name, newName string) error {
 }
 
 func importers(importPath string) (map[string]bool, error) {
-	paths := map[string]bool{importPath:true}
+	paths := map[string]bool{importPath: true}
 	for _, srcDir := range build.Default.SrcDirs() {
 		if err := filepath.Walk(srcDir, func(path string, f os.FileInfo, err error) error {
 			p, err := build.ImportDir(path, 0)
@@ -142,8 +142,8 @@ func MovePackage(old, new string) error {
 					return nil
 				}
 				for _, imp := range astFile.Imports {
-					importPath := imp.Path.Value[1:len(imp.Path.Value)-1]
-					if importPath == old || strings.HasPrefix(importPath, old + "/") {
+					importPath := imp.Path.Value[1 : len(imp.Path.Value)-1]
+					if importPath == old || strings.HasPrefix(importPath, old+"/") {
 						b, err := ioutil.ReadFile(path)
 						if err != nil {
 							return nil

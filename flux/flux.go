@@ -8,6 +8,7 @@ import (
 	"code.google.com/p/gordon-go/go/types"
 	. "code.google.com/p/gordon-go/gui"
 	"code.google.com/p/gordon-go/refactor"
+	"fmt"
 	"math"
 	"runtime"
 	"time"
@@ -15,9 +16,10 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	refactor.ReportShadowedPackages()
-	newFluxWindow()
-	Run()
+	go refactor.ReportShadowedPackages()
+	if err := Run(newFluxWindow); err != nil {
+		fmt.Println(err)
+	}
 }
 
 type fluxWindow struct {
@@ -31,7 +33,7 @@ type fluxWindow struct {
 
 func newFluxWindow() {
 	w := &fluxWindow{}
-	NewWindow(w, func(win *Window) {
+	NewWindow(w, "Flux", func(win *Window) {
 		w.Window = win
 		w.Panner = NewPanner(w)
 		w.browser = newBrowser(browserOptions{objFilter: isFluxObj, acceptTypes: true, enterTypes: true, mutable: true}, nil)

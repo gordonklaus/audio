@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"code.google.com/p/gordon-go/go/exact"
 	_ "code.google.com/p/go.tools/go/gcimporter"
+	"code.google.com/p/gordon-go/go/exact"
 	. "code.google.com/p/gordon-go/go/types"
 )
 

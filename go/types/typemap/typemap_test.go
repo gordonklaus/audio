@@ -8,8 +8,8 @@ package typemap_test
 import (
 	"testing"
 
-	"code.google.com/p/gordon-go/go/types"
 	"code.google.com/p/go.tools/go/types/typemap"
+	"code.google.com/p/gordon-go/go/types"
 )
 
 var (

@@ -13,7 +13,7 @@ type Window struct {
 	keyFocus    View
 	mouseIn     MouserView
 	mouser      map[int]MouserView
-	close       chan struct{}
+	close       chan bool
 	resize      chan Point
 	key         chan KeyEvent
 	mouse       chan MouseEvent
@@ -22,15 +22,14 @@ type Window struct {
 	do          chan func()
 }
 
-func NewWindow(self View, init func(w *Window)) {
-	w := &Window{w: glfw.NewWindow(960, 520, "Flux")}
-
+func NewWindow(self View, title string, init func(w *Window)) {
+	w := &Window{w: glfw.NewWindow(960, 520, title)}
 	if self == nil {
 		self = w
 	}
-	w.ViewBase = NewView(w)
+	w.ViewBase = NewView(self)
 	w.mouser = make(map[int]MouserView)
-	w.close = make(chan struct{})
+	w.close = make(chan bool)
 	w.resize = make(chan Point)
 	w.key = make(chan KeyEvent)
 	w.mouse = make(chan MouseEvent)
@@ -38,37 +37,9 @@ func NewWindow(self View, init func(w *Window)) {
 	w.paint = make(chan struct{}, 1)
 	w.do = make(chan func())
 
-	windows[w] = struct{}{}
-	w.Self = self
-	
-	w.run(init)
-}
-
-func (w *Window) Close() {
-	w.w.SetShouldClose(true)
-	glfw.PostEmptyEvent()
-}
-
-func (w *Window) SetTitle(s string) { w.w.SetTitle(s) }
-
-func (w *Window) win() *Window { return w }
-
-func (w *Window) SetCentralView(v View) {
-	if w.centralView != nil {
-		w.Remove(w.centralView)
-	}
-	w.centralView = v
-	if v != nil {
-		if Parent(v) != w {
-			w.Add(v)
-		}
-		Resize(v, Size(w))
-		SetKeyFocus(v)
-	}
-}
-
-func (w *Window) run(init func(w *Window)) {
-	w.w.OnClose(w.Close)
+	w.w.OnClose(func() {
+		go w.Close()
+	})
 	w.w.OnResize(func(width, height int) {
 		w.resize <- Pt(float64(width), float64(height))
 	})
@@ -133,6 +104,8 @@ func (w *Window) run(init func(w *Window)) {
 		gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
 
 		init(w)
+		newWindow <- w
+		glfw.PostEmptyEvent()
 
 		gl.Enable(gl.BLEND)
 		gl.Enable(gl.POINT_SMOOTH)
@@ -238,6 +211,29 @@ func (w *Window) run(init func(w *Window)) {
 	}()
 }
 
+func (w *Window) Close() {
+	closeWindow <- w
+	glfw.PostEmptyEvent()
+}
+
+func (w *Window) SetTitle(s string) { w.w.SetTitle(s) }
+
+func (w *Window) win() *Window { return w }
+
+func (w *Window) SetCentralView(v View) {
+	if w.centralView != nil {
+		w.Remove(w.centralView)
+	}
+	w.centralView = v
+	if v != nil {
+		if Parent(v) != w {
+			w.Add(v)
+		}
+		Resize(v, Size(w))
+		SetKeyFocus(v)
+	}
+}
+
 func commonParent(v1, v2 View) (p View) {
 	for ; v1 != nil; v1 = Parent(v1) {
 		for v2 := v2; v2 != nil; v2 = Parent(v2) {
@@ -266,8 +262,13 @@ func (w *Window) setKeyFocus(view View) {
 func (w *Window) setMouser(m MouserView, button int) { w.mouser[button] = m }
 
 func (w *Window) KeyPress(k KeyEvent) {
-	if k.Command && k.Key == KeyW {
-		w.Close()
+	if k.Command {
+		switch k.Key {
+		case KeyW:
+			w.Close()
+		case KeyQ:
+			Quit()
+		}
 	}
 }
 

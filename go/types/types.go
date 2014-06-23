@@ -184,7 +184,7 @@ func NewSignature(scope *Scope, recv *Var, params, results []*Var, isVariadic bo
 		if n == 0 {
 			panic("types.NewSignature: variadic function must have at least one parameter")
 		}
-		if _, ok := params[n - 1].Type.(*Slice); !ok {
+		if _, ok := params[n-1].Type.(*Slice); !ok {
 			panic("types.NewSignature: variadic parameter must be of unnamed slice type")
 		}
 	}

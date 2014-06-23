@@ -688,11 +688,11 @@ func (b *browser) KeyPress(event KeyEvent) {
 			}
 		}
 	default:
-		if event.Command && event.Key == KeyW {
+		if event.Command && (event.Key == KeyW || event.Key == KeyQ) {
 			b.ViewBase.KeyPress(event)
 			return
 		}
-		
+
 		if !b.options.mutable {
 			b.text.KeyPress(event)
 			return

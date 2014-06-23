@@ -148,7 +148,7 @@ func (t *Text) Paint() {
 		SetLineWidth(t.frameSize)
 		DrawRect(Rect(t))
 	}
-	
+
 	if t.cursor {
 		SetColor(t.textColor)
 		SetLineWidth(2)
