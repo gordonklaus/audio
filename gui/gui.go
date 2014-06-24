@@ -61,7 +61,7 @@ func closeWindow(w *Window) {
 }
 
 func Quit() {
-	doMain(func() {
+	go doMain(func() {
 		for len(windows) > 0 {
 			closeWindow(windows[0])
 		}
