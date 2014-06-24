@@ -680,6 +680,8 @@ func (v *typeView) KeyPress(event KeyEvent) {
 				}
 			}
 		}
+	default:
+		v.ViewBase.KeyPress(event)
 	}
 }
 
