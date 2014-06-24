@@ -9,6 +9,7 @@ import (
 )
 
 type ErrorFunc func(err error)
+type FocusFunc func(bool)
 type CloseFunc func()
 type ResizeFunc func(width, height int)
 type KeyFunc func(key, scancode, action, mods int)
@@ -32,6 +33,15 @@ func OnError(f ErrorFunc) {
 		C.setErrorCallback()
 	} else {
 		C.clearErrorCallback()
+	}
+}
+
+func (w *Window) OnFocus(f FocusFunc) {
+	w.focusCB = f
+	if f != nil {
+		C.setFocusCallback(w.w)
+	} else {
+		C.clearFocusCallback(w.w)
 	}
 }
 
@@ -110,6 +120,11 @@ func (w *Window) OnScroll(f ScrollFunc) {
 //export errorCB
 func errorCB(err C.int, desc *C.char) {
 	errorCallback(errors.New(C.GoString(desc)))
+}
+
+//export focusCB
+func focusCB(w unsafe.Pointer, focused C.int) {
+	win(w).focusCB(focused == C.GL_TRUE)
 }
 
 //export closeCB

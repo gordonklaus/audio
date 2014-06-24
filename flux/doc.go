@@ -8,7 +8,7 @@ On systems other than OS X, substitute the Control key for the Command key herei
 
 Most operations can be canceled by pressing Escape.
 
-Press Command-W to close a window.  Press Command-Q or close all windows to quit.
+Press Command-N to open a new window.  Press Command-W to close a window.  Press Command-Q or close all windows to quit.
 
 
 Browser

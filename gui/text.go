@@ -2,10 +2,12 @@ package gui
 
 import (
 	"code.google.com/p/gordon-go/ftgl"
+	"code.google.com/p/gordon-go/glfw"
 	gl "github.com/chsc/gogl/gl21"
 	"go/build"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -35,13 +37,24 @@ func NewText(text string) *Text {
 	return t
 }
 
-var font ftgl.Font
+var fontCache = struct {
+	sync.Mutex
+	m map[*glfw.Window]ftgl.Font
+}{m: map[*glfw.Window]ftgl.Font{}}
 
-// Must be called from a thread holding an OpenGL context, i.e., the window callback thread.  This probably won't work across multiple windows.  Certainly not concurrently.
+// Must be called from a thread holding an OpenGL context, i.e., a window callback thread.
 func getFont() ftgl.Font {
+	w := glfw.GetCurrentContext()
+	if w == nil {
+		panic("no current context")
+	}
+	fontCache.Lock()
+	defer fontCache.Unlock()
+	font := fontCache.m[w]
 	if font.Nil() {
 		font = ftgl.NewTextureFont(filepath.Join(pkgDir(), "Times New Roman.ttf"))
 		font.SetFaceSize(18, 1)
+		fontCache.m[w] = font
 	}
 	return font
 }

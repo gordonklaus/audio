@@ -6,6 +6,9 @@
 void setErrorCallback();
 void clearErrorCallback();
 
+void setFocusCallback(GLFWwindow* w);
+void clearFocusCallback(GLFWwindow* w);
+
 void setCloseCallback(GLFWwindow* w);
 void clearCloseCallback(GLFWwindow* w);
 

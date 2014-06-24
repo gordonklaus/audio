@@ -23,7 +23,7 @@ type Window struct {
 }
 
 func NewWindow(self View, title string, init func(w *Window)) {
-	w := &Window{w: glfw.NewWindow(960, 520, title)}
+	w := &Window{}
 	if self == nil {
 		self = w
 	}
@@ -37,51 +37,69 @@ func NewWindow(self View, title string, init func(w *Window)) {
 	w.paint = make(chan struct{}, 1)
 	w.do = make(chan func())
 
-	w.w.OnClose(func() {
-		go w.Close()
-	})
-	w.w.OnResize(func(width, height int) {
-		w.resize <- Pt(float64(width), float64(height))
-	})
-	w.w.OnFramebufferResize(func(width, height int) {
-		gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
-	})
+	doMain(func() {
+		w.w = glfw.NewWindow(960, 520, title)
 
-	keyEvent := KeyEvent{}
-	w.w.OnKey(func(key, scancode, action, mods int) {
-		keyEvent.Key = key
-		keyEvent.action = action
-		keyEvent.Repeat = action == glfw.Repeat
-		keyEvent.Shift = mods&glfw.ModShift != 0
-		keyEvent.Ctrl = mods&glfw.ModControl != 0
-		keyEvent.Alt = mods&glfw.ModAlt != 0
-		keyEvent.Super = mods&glfw.ModSuper != 0
-		keyEvent.Command = commandKey(keyEvent)
-		if key >= KeyEscape || action == glfw.Release {
-			keyEvent.Text = ""
-			w.key <- keyEvent
-		}
-	})
-	w.w.OnChar(func(char rune) {
-		if char < KeyEscape {
-			keyEvent.Text = string(char)
-			w.key <- keyEvent
-		}
-	})
+		w.w.OnFocus(func(focused bool) {
+			if focused {
+				go doMain(func() {
+					for i, w2 := range windows {
+						if w2 == w {
+							windows = append(append([]*Window{w}, windows[:i]...), windows[i+1:]...)
+							break
+						}
+					}
+				})
+			}
+		})
+		w.w.OnClose(func() {
+			go w.Close()
+		})
+		w.w.OnResize(func(width, height int) {
+			w.resize <- Pt(float64(width), float64(height))
+		})
+		w.w.OnFramebufferResize(func(width, height int) {
+			gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
+		})
 
-	m := MouseEvent{}
-	w.w.OnMouseMove(func(x, y float64) {
-		m.Pos = Pt(x, y)
-		m.Move, m.Press, m.Release, m.Drag = true, false, false, false
-		w.mouse <- m
-	})
-	w.w.OnMouseButton(func(button, action, mods int) {
-		m.Button = button
-		m.Move, m.Press, m.Release, m.Drag = false, action == glfw.Press, action == glfw.Release, false
-		w.mouse <- m
-	})
-	w.w.OnScroll(func(dx, dy float64) {
-		w.scroll <- ScrollEvent{m.Pos, Pt(dx, -dy)}
+		keyEvent := KeyEvent{}
+		w.w.OnKey(func(key, scancode, action, mods int) {
+			keyEvent.Key = key
+			keyEvent.action = action
+			keyEvent.Repeat = action == glfw.Repeat
+			keyEvent.Shift = mods&glfw.ModShift != 0
+			keyEvent.Ctrl = mods&glfw.ModControl != 0
+			keyEvent.Alt = mods&glfw.ModAlt != 0
+			keyEvent.Super = mods&glfw.ModSuper != 0
+			keyEvent.Command = commandKey(keyEvent)
+			if key >= KeyEscape || action == glfw.Release {
+				keyEvent.Text = ""
+				w.key <- keyEvent
+			}
+		})
+		w.w.OnChar(func(char rune) {
+			if char < KeyEscape {
+				keyEvent.Text = string(char)
+				w.key <- keyEvent
+			}
+		})
+
+		m := MouseEvent{}
+		w.w.OnMouseMove(func(x, y float64) {
+			m.Pos = Pt(x, y)
+			m.Move, m.Press, m.Release, m.Drag = true, false, false, false
+			w.mouse <- m
+		})
+		w.w.OnMouseButton(func(button, action, mods int) {
+			m.Button = button
+			m.Move, m.Press, m.Release, m.Drag = false, action == glfw.Press, action == glfw.Release, false
+			w.mouse <- m
+		})
+		w.w.OnScroll(func(dx, dy float64) {
+			w.scroll <- ScrollEvent{m.Pos, Pt(dx, -dy)}
+		})
+
+		windows = append([]*Window{w}, windows...)
 	})
 
 	mapToWindow := func(p Point) Point {
@@ -104,8 +122,6 @@ func NewWindow(self View, title string, init func(w *Window)) {
 		gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
 
 		init(w)
-		newWindow <- w
-		glfw.PostEmptyEvent()
 
 		gl.Enable(gl.BLEND)
 		gl.Enable(gl.POINT_SMOOTH)
@@ -212,8 +228,9 @@ func NewWindow(self View, title string, init func(w *Window)) {
 }
 
 func (w *Window) Close() {
-	closeWindow <- w
-	glfw.PostEmptyEvent()
+	go doMain(func() {
+		closeWindow(w)
+	})
 }
 
 func (w *Window) SetTitle(s string) { w.w.SetTitle(s) }

@@ -11,6 +11,16 @@ void clearErrorCallback() {
 	glfwSetErrorCallback(0);
 }
 
+void focusCallback(GLFWwindow* w, int focused) {
+	focusCB(w, focused);
+}
+void setFocusCallback(GLFWwindow* w) {
+	glfwSetWindowFocusCallback(w, &focusCallback);
+}
+void clearFocusCallback(GLFWwindow* w) {
+	glfwSetWindowFocusCallback(w, 0);
+}
+
 void closeCallback(GLFWwindow* w) {
 	closeCB(w);
 }

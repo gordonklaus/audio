@@ -688,7 +688,7 @@ func (b *browser) KeyPress(event KeyEvent) {
 			}
 		}
 	default:
-		if event.Command && (event.Key == KeyW || event.Key == KeyQ) {
+		if event.Command && (event.Key == KeyN || event.Key == KeyW || event.Key == KeyQ) {
 			b.ViewBase.KeyPress(event)
 			return
 		}

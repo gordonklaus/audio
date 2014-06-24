@@ -152,6 +152,14 @@ func (w *fluxWindow) SetRect(r Rectangle) {
 	w.browser.Move(Center(w))
 }
 
+func (w *fluxWindow) KeyPress(k KeyEvent) {
+	if k.Command && k.Key == KeyN {
+		go newFluxWindow() // don't know why, but I must "go" here or glfw.NewWindow blocks forever
+	} else {
+		w.Window.KeyPress(k)
+	}
+}
+
 func (w *fluxWindow) Scroll(s ScrollEvent) {
 	select {
 	case w.pause <- true:

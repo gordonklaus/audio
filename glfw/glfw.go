@@ -31,6 +31,12 @@ func Terminate() {
 	C.glfwTerminate()
 }
 
+func GetCurrentContext() *Window {
+	windows.Lock()
+	defer windows.Unlock()
+	return windows.m[C.glfwGetCurrentContext()]
+}
+
 func MakeContextCurrent(w *Window) {
 	if w == nil {
 		C.glfwMakeContextCurrent(nil)
