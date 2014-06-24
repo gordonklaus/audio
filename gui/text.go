@@ -108,10 +108,10 @@ func (t *Text) TookKeyFocus() {
 		for {
 			select {
 			case <-tick.C:
-				Do(t) <- func() {
+				Do(t, func() {
 					t.cursor = !t.cursor
 					Repaint(t)
-				}
+				})
 			case <-t.stopCursor:
 				t.stopCursor <- struct{}{}
 				return

@@ -123,14 +123,13 @@ func window(v View) *fluxWindow {
 func (w *fluxWindow) animate() {
 	target := <-w.target
 	vel := ZP
-	rect := make(chan Rectangle)
 	for {
 		next := time.After(time.Second / fps)
-		Do(w) <- func() {
+		r := ZR
+		Do(w, func() {
 			Pan(w, Rect(w).Min.Add(vel.Div(fps)))
-			rect <- Rect(w)
-		}
-		r := <-rect
+			r = Rect(w)
+		})
 		d := target.Sub(r.Center())
 		d.X = math.Copysign(math.Max(0, math.Abs(d.X)-r.Dx()/4), d.X)
 		d.Y = math.Copysign(math.Max(0, math.Abs(d.Y)-r.Dy()/4), d.Y)

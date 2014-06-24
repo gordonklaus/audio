@@ -282,9 +282,9 @@ func (t *pkgText) Mouse(m MouseEvent) {
 		go func() {
 			select {
 			case <-time.After(time.Second):
-				Do(t) <- func() { t.setText(t.pkg.Path) }
+				Do(t, func() { t.setText(t.pkg.Path) })
 				<-t.leave
-				Do(t) <- func() { t.setText(t.pkg.Name) }
+				Do(t, func() { t.setText(t.pkg.Name) })
 			case <-t.leave:
 			}
 		}()

@@ -231,12 +231,20 @@ func (v *ViewBase) paint() {
 }
 func (v ViewBase) Paint() {}
 
-func Do(v View) chan<- func() {
-	if w := v.win(); w != nil {
-		return w.do
-	} else {
+func Do(v View, f func()) {
+	w := v.win()
+	if w == nil {
 		panic("gui.Do called on windowless View")
 	}
+	w.Do(f)
+}
+
+func DoChan(v View) chan<- func() {
+	w := v.win()
+	if w == nil {
+		panic("gui.DoChan called on windowless View")
+	}
+	return w.do
 }
 
 func ViewAt(v View, p Point) View { return viewAtFunc(v, p, func(v View) View { return v }) }

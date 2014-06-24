@@ -53,7 +53,7 @@ func closeWindow(w *Window) {
 			break
 		}
 	}
-	w.close <- true // wait for window before Destroying it to be sure it is done with the OpenGL context
+	w.Do(func() { w.close = true } )
 	w.w.Destroy()
 	if len(windows) > 0 {
 		windows[0].w.Show()

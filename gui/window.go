@@ -13,12 +13,8 @@ type Window struct {
 	keyFocus    View
 	mouseIn     MouserView
 	mouser      map[int]MouserView
-	close       chan bool
-	resize      chan Point
-	key         chan KeyEvent
-	mouse       chan MouseEvent
-	scroll      chan ScrollEvent
-	paint       chan struct{}
+	close       bool
+	paint       chan bool
 	do          chan func()
 }
 
@@ -29,12 +25,7 @@ func NewWindow(self View, title string, init func(w *Window)) {
 	}
 	w.ViewBase = NewView(self)
 	w.mouser = make(map[int]MouserView)
-	w.close = make(chan bool)
-	w.resize = make(chan Point)
-	w.key = make(chan KeyEvent)
-	w.mouse = make(chan MouseEvent)
-	w.scroll = make(chan ScrollEvent)
-	w.paint = make(chan struct{}, 1)
+	w.paint = make(chan bool, 1)
 	w.do = make(chan func())
 
 	doMain(func() {
@@ -52,60 +43,91 @@ func NewWindow(self View, title string, init func(w *Window)) {
 				})
 			}
 		})
-		w.w.OnClose(func() {
-			go w.Close()
-		})
+		w.w.OnClose(w.Close)
 		w.w.OnResize(func(width, height int) {
-			w.resize <- Pt(float64(width), float64(height))
+			w.Do(func() {
+				s := Pt(float64(width), float64(height))
+				gl.MatrixMode(gl.PROJECTION)
+				gl.LoadIdentity()
+				gl.Ortho(0, gl.Double(s.X), 0, gl.Double(s.Y), -1, 1)
+				Resize(w.Self, s)
+				if w.centralView != nil {
+					Resize(w.centralView, s)
+				}
+			})
 		})
 		w.w.OnFramebufferResize(func(width, height int) {
-			gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
+			w.Do(func() {
+				gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
+			})
 		})
 
-		keyEvent := KeyEvent{}
+		k := KeyEvent{}
 		w.w.OnKey(func(key, scancode, action, mods int) {
-			keyEvent.Key = key
-			keyEvent.action = action
-			keyEvent.Repeat = action == glfw.Repeat
-			keyEvent.Shift = mods&glfw.ModShift != 0
-			keyEvent.Ctrl = mods&glfw.ModControl != 0
-			keyEvent.Alt = mods&glfw.ModAlt != 0
-			keyEvent.Super = mods&glfw.ModSuper != 0
-			keyEvent.Command = commandKey(keyEvent)
-			if key >= KeyEscape || action == glfw.Release {
-				keyEvent.Text = ""
-				w.key <- keyEvent
-			}
+			w.Do(func() {
+				k.Key = key
+				k.action = action
+				k.Repeat = action == glfw.Repeat
+				k.Shift = mods&glfw.ModShift != 0
+				k.Ctrl = mods&glfw.ModControl != 0
+				k.Alt = mods&glfw.ModAlt != 0
+				k.Super = mods&glfw.ModSuper != 0
+				k.Command = commandKey(k)
+				if key >= KeyEscape || action == glfw.Release {
+					k.Text = ""
+					if w.keyFocus != nil {
+						if k.action != glfw.Release {
+							w.keyFocus.KeyPress(k)
+						} else {
+							w.keyFocus.KeyRelease(k)
+						}
+					}
+				}
+			})
 		})
 		w.w.OnChar(func(char rune) {
-			if char < KeyEscape {
-				keyEvent.Text = string(char)
-				w.key <- keyEvent
-			}
+			w.Do(func() {
+				if char < KeyEscape {
+					k.Text = string(char)
+					if w.keyFocus != nil {
+						if k.action != glfw.Release {
+							w.keyFocus.KeyPress(k)
+						} else {
+							w.keyFocus.KeyRelease(k)
+						}
+					}
+				}
+			})
 		})
 
 		m := MouseEvent{}
 		w.w.OnMouseMove(func(x, y float64) {
 			m.Pos = Pt(x, y)
 			m.Move, m.Press, m.Release, m.Drag = true, false, false, false
-			w.mouse <- m
+			w.mouse(m)
 		})
 		w.w.OnMouseButton(func(button, action, mods int) {
 			m.Button = button
 			m.Move, m.Press, m.Release, m.Drag = false, action == glfw.Press, action == glfw.Release, false
-			w.mouse <- m
+			w.mouse(m)
 		})
 		w.w.OnScroll(func(dx, dy float64) {
-			w.scroll <- ScrollEvent{m.Pos, Pt(dx, -dy)}
+			w.Do(func() {
+				s := ScrollEvent{m.Pos, Pt(dx, -dy)}
+				s.Pos = w.mapToWindow(s.Pos)
+				v, _ := viewAtFunc(w.Self, s.Pos, func(v View) View {
+					v, _ = v.(ScrollerView)
+					return v
+				}).(ScrollerView)
+				if v != nil {
+					s.Pos = MapFrom(v, s.Pos, w.Self)
+					v.Scroll(s)
+				}
+			})
 		})
 
 		windows = append([]*Window{w}, windows...)
 	})
-
-	mapToWindow := func(p Point) Point {
-		p.Y = Height(w) - p.Y
-		return p.Add(Rect(w).Min)
-	}
 
 	go func() {
 		runtime.LockOSThread()
@@ -128,91 +150,10 @@ func NewWindow(self View, title string, init func(w *Window)) {
 		gl.Enable(gl.LINE_SMOOTH)
 		gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
-		for {
+		for !w.close {
 			select {
-			case <-w.close:
-				return
-			case s := <-w.resize:
-				gl.MatrixMode(gl.PROJECTION)
-				gl.LoadIdentity()
-				gl.Ortho(0, gl.Double(s.X), 0, gl.Double(s.Y), -1, 1)
-				Resize(w.Self, s)
-				if w.centralView != nil {
-					Resize(w.centralView, s)
-				}
-			case k := <-w.key:
-				if w.keyFocus != nil {
-					if k.action != glfw.Release {
-						w.keyFocus.KeyPress(k)
-					} else {
-						w.keyFocus.KeyRelease(k)
-					}
-				}
-			case m := <-w.mouse:
-				switch {
-				case m.Press:
-					m.Pos = mapToWindow(m.Pos)
-					v, _ := viewAtFunc(w.Self, m.Pos, func(v View) View {
-						v, _ = v.(MouserView)
-						return v
-					}).(MouserView)
-					if v != nil {
-						w.mouser[m.Button] = v
-						m.Pos = MapFrom(v, m.Pos, w.Self)
-						v.Mouse(m)
-					}
-				case m.Move:
-					m.Pos = mapToWindow(m.Pos)
-					m.Move = false
-					v, _ := viewAtFunc(w.Self, m.Pos, func(v View) View {
-						v, _ = v.(MouserView)
-						return v
-					}).(MouserView)
-					if w.mouseIn != v {
-						p := commonParent(w.mouseIn, v)
-						for v := View(w.mouseIn); v != p && v != nil; v = Parent(v) {
-							if v, ok := v.(MouserView); ok {
-								m := m
-								m.Pos = MapFrom(v, m.Pos, w.Self)
-								m.Leave = true
-								v.Mouse(m)
-							}
-						}
-						for v := View(v); v != p && v != nil; v = Parent(v) {
-							if v, ok := v.(MouserView); ok {
-								m := m
-								m.Pos = MapFrom(v, m.Pos, w.Self)
-								m.Enter = true
-								v.Mouse(m)
-							}
-						}
-						w.mouseIn = v
-					}
-					for button, v := range w.mouser {
-						m := m
-						m.Pos = MapFrom(v, m.Pos, w.Self)
-						m.Drag = true
-						m.Button = button
-						v.Mouse(m)
-					}
-				case m.Release:
-					m.Pos = mapToWindow(m.Pos)
-					if v, ok := w.mouser[m.Button]; ok {
-						m.Pos = MapFrom(v, m.Pos, w.Self)
-						v.Mouse(m)
-						delete(w.mouser, m.Button)
-					}
-				}
-			case s := <-w.scroll:
-				s.Pos = mapToWindow(s.Pos)
-				v, _ := viewAtFunc(w.Self, s.Pos, func(v View) View {
-					v, _ = v.(ScrollerView)
-					return v
-				}).(ScrollerView)
-				if v != nil {
-					s.Pos = MapFrom(v, s.Pos, w.Self)
-					v.Scroll(s)
-				}
+			case f := <-w.do:
+				f()
 			case <-w.paint:
 				gl.MatrixMode(gl.MODELVIEW)
 				gl.LoadIdentity()
@@ -220,16 +161,87 @@ func NewWindow(self View, title string, init func(w *Window)) {
 				gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 				w.base().paint()
 				w.w.SwapBuffers()
-			case f := <-w.do:
-				f()
 			}
 		}
 	}()
 }
 
+func (w *Window) mapToWindow(p Point) Point {
+	p.Y = Height(w) - p.Y
+	return p.Add(Rect(w).Min)
+}
+
+func (w *Window) Do(f func()) {
+	done := make(chan bool)
+	w.do <- func() {
+		f()
+		done <- true
+	}
+	<-done
+}
+
 func (w *Window) Close() {
 	go doMain(func() {
 		closeWindow(w)
+	})
+}
+
+func (w *Window) mouse(m MouseEvent) {
+	w.Do(func() {
+		switch {
+		case m.Press:
+			m.Pos = w.mapToWindow(m.Pos)
+			v, _ := viewAtFunc(w.Self, m.Pos, func(v View) View {
+				v, _ = v.(MouserView)
+				return v
+			}).(MouserView)
+			if v != nil {
+				w.mouser[m.Button] = v
+				m.Pos = MapFrom(v, m.Pos, w.Self)
+				v.Mouse(m)
+			}
+		case m.Move:
+			m.Pos = w.mapToWindow(m.Pos)
+			m.Move = false
+			v, _ := viewAtFunc(w.Self, m.Pos, func(v View) View {
+				v, _ = v.(MouserView)
+				return v
+			}).(MouserView)
+			if w.mouseIn != v {
+				p := commonParent(w.mouseIn, v)
+				for v := View(w.mouseIn); v != p && v != nil; v = Parent(v) {
+					if v, ok := v.(MouserView); ok {
+						m := m
+						m.Pos = MapFrom(v, m.Pos, w.Self)
+						m.Leave = true
+						v.Mouse(m)
+					}
+				}
+				for v := View(v); v != p && v != nil; v = Parent(v) {
+					if v, ok := v.(MouserView); ok {
+						m := m
+						m.Pos = MapFrom(v, m.Pos, w.Self)
+						m.Enter = true
+						v.Mouse(m)
+					}
+				}
+				w.mouseIn = v
+			}
+			for button, v := range w.mouser {
+				m := m
+				m.Pos = MapFrom(v, m.Pos, w.Self)
+				m.Drag = true
+				m.Button = button
+				v.Mouse(m)
+			}
+		case m.Release:
+			m.Pos = w.mapToWindow(m.Pos)
+			if v, ok := w.mouser[m.Button]; ok {
+				m.Pos = MapFrom(v, m.Pos, w.Self)
+				v.Mouse(m)
+				delete(w.mouser, m.Button)
+			}
+		}
 	})
 }
 
@@ -291,7 +303,7 @@ func (w *Window) KeyPress(k KeyEvent) {
 
 func (w *Window) repaint() {
 	select {
-	case w.paint <- struct{}{}:
+	case w.paint <- true:
 	default:
 	}
 }

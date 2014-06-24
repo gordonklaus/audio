@@ -20,7 +20,7 @@ func animate(animate blockchan, stop stopchan) {
 	for {
 		next := time.After(time.Second / fps)
 		select {
-		case Do(n) <- func() {
+		case DoChan(n) <- func() {
 			c := CenterInParent(n)
 			converged <- b.animate()
 			ResizeToFit(n, 0)
@@ -172,7 +172,10 @@ func rearrange(b *block) {
 	}
 	ba := newBlockArrange(b, nil, portmap{})
 	go func() {
-		b.arrange <- ba
+		select {
+		case b.arrange <- ba:
+		case <-b.stop:
+		}
 	}()
 }
 
@@ -318,7 +321,11 @@ func arrange(arrange, childArranged, arranged blockchan, stop stopchan) {
 			if cross < minCross {
 				minCross = cross
 				stagnant = 0
-				arranged <- b.copy(nil, portmap{})
+				select {
+				case arranged <- b.copy(nil, portmap{}):
+				case <-stop:
+					return
+				}
 			} else {
 				stagnant++
 			}
