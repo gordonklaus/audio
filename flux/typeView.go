@@ -686,6 +686,10 @@ func (v *typeView) KeyPress(event KeyEvent) {
 }
 
 func (v *typeView) Paint() {
+	if v.focused {
+		SetColor(Color{.25, .25, .25, 1})
+		FillRect(Rect(v))
+	}
 	if _, ok := Parent(v).(*typeView); ok {
 		SetColor(lineColor)
 		SetLineWidth(1)
