@@ -76,7 +76,7 @@ func (n *nodeBase) newInput(v *types.Var) *port {
 
 func (n *nodeBase) newOutput(v *types.Var) *port {
 	p := newOutput(n.self, v)
-	if n.godefer == "" {
+	if n.godefer == "" || v.Type == seqType {
 		n.Add(p)
 		n.outs = append(n.outs, p)
 		n.reform()
