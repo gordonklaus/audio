@@ -209,7 +209,7 @@ func arrange(arrange, childArranged, arranged blockchan, stop stopchan) {
 				} else {
 					p.Y = Rect(b).Max.Y - 2
 				}
-				dir := p.Sub(MapToParent(n1, ZP))
+				dir := p.Sub(MapToParent(ZP, n1))
 				if n1.hasConns {
 					dir.X = 0
 				}
@@ -367,7 +367,7 @@ func (n *nodeArrange) in(b *blockArrange) *nodeArrange {
 }
 
 func (p *portArrange) centerIn(b *blockArrange) Point {
-	return MapTo(p, Center(p), b)
+	return Map(Center(p), p, b)
 }
 
 func rprop(g_, g, step *float64) float64 {

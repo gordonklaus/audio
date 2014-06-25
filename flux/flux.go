@@ -106,7 +106,7 @@ func panTo(v View, p Point) {
 	if w == nil {
 		return
 	}
-	p = MapTo(v, p, w)
+	p = Map(p, v, w)
 	go func() { w.target <- p }()
 }
 

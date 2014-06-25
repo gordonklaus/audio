@@ -136,10 +136,10 @@ func MoveOrigin(v View, p Point) { v.Move(p.Add(Rect(v).Min)) }
 func Rect(v View) Rectangle { return v.base().rect }
 func RectInParent(v View) Rectangle {
 	r := Rect(v)
-	return Rectangle{MapToParent(v, r.Min), MapToParent(v, r.Max)}
+	return Rectangle{MapToParent(r.Min, v), MapToParent(r.Max, v)}
 }
 func Center(v View) Point               { return Rect(v).Min.Add(Size(v).Div(2)) }
-func CenterInParent(v View) Point       { return MapToParent(v, Center(v)) }
+func CenterInParent(v View) Point       { return MapToParent(Center(v), v) }
 func Size(v View) Point                 { return Rect(v).Size() }
 func Width(v View) float64              { return Rect(v).Dx() }
 func Height(v View) float64             { return Rect(v).Dy() }
@@ -201,7 +201,7 @@ func SetMouser(m MouserView, button int) {
 
 func MouseParent(v View, m MouseEvent) {
 	for v != nil {
-		m.Pos = MapToParent(v, m.Pos)
+		m.Pos = MapToParent(m.Pos, v)
 		v = Parent(v)
 		if v, ok := v.(Mouser); ok {
 			v.Mouse(m)
@@ -222,7 +222,7 @@ func (v *ViewBase) paint() {
 	}
 	gl.PushMatrix()
 	defer gl.PopMatrix()
-	d := MapToParent(v, ZP)
+	d := MapToParent(ZP, v)
 	gl.Translated(gl.Double(d.X), gl.Double(d.Y), 0)
 	v.Self.Paint()
 	for _, child := range v.children {
@@ -254,7 +254,7 @@ func viewAtFunc(v View, p Point, f func(View) View) View {
 	}
 	for i := NumChildren(v) - 1; i >= 0; i-- {
 		child := Child(v, i)
-		view := viewAtFunc(child, MapFromParent(child, p), f)
+		view := viewAtFunc(child, MapFromParent(p, child), f)
 		if view != nil {
 			return view
 		}
@@ -262,21 +262,37 @@ func viewAtFunc(v View, p Point, f func(View) View) View {
 	return f(v)
 }
 
-func MapFromParent(v View, p Point) Point {
-	return p.Sub(Pos(v)).Add(Rect(v).Min)
-}
-func MapFrom(v View, p Point, parent View) Point {
-	if v == parent || Parent(v) == nil {
-		return p
-	}
-	return MapFromParent(v, MapFrom(Parent(v), p, parent))
-}
-func MapToParent(v View, p Point) Point {
+func MapToParent(p Point, v View) Point {
 	return p.Sub(Rect(v).Min).Add(Pos(v))
 }
-func MapTo(v View, p Point, parent View) Point {
-	if v == parent || Parent(v) == nil {
-		return p
+
+func MapFromParent(p Point, v View) Point {
+	return p.Sub(Pos(v)).Add(Rect(v).Min)
+}
+
+func Map(p Point, from, to View) Point {
+	v := commonParent(from, to)
+	if v == nil {
+		panic("no common parent")
 	}
-	return MapTo(Parent(v), MapToParent(v, p), parent)
+	for from != v {
+		p = MapToParent(p, from)
+		from = Parent(from)
+	}
+	for to != v {
+		p = MapFromParent(p, to)
+		to = Parent(to)
+	}
+	return p
+}
+
+func commonParent(v1, v2 View) (p View) {
+	for ; v1 != nil; v1 = Parent(v1) {
+		for v2 := v2; v2 != nil; v2 = Parent(v2) {
+			if v1 == v2 {
+				return v1
+			}
+		}
+	}
+	return nil
 }

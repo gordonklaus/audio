@@ -321,7 +321,7 @@ func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) 
 	dir := map[int]Point{KeyLeft: {-1, 0}, KeyRight: {1, 0}, KeyUp: {0, 1}, KeyDown: {0, -1}}[dirKey]
 	best := 0.0
 	for _, v := range views {
-		d := MapTo(v, ZP, parent).Sub(p)
+		d := Map(ZP, v, parent).Sub(p)
 		score := (dir.X*d.X + dir.Y*d.Y) / (d.X*d.X + d.Y*d.Y)
 		if score > best {
 			best = score
@@ -338,11 +338,11 @@ type focuserFrom interface {
 func (b *block) focusNearestView(viewOrPoint interface{}, dirKey int) {
 	p, _ := viewOrPoint.(Point)
 	if v, ok := viewOrPoint.(View); ok {
-		p = MapTo(v, ZP, b)
+		p = Map(ZP, v, b)
 	}
 
 	b2 := b.outermost()
-	p = MapTo(b, p, b2)
+	p = Map(p, b, b2)
 	b = b2
 
 	views := []View{}
@@ -440,30 +440,24 @@ func (b *block) KeyPress(event KeyEvent) {
 			}
 		}
 	default:
-		openBrowser := func() {
-			browser := newBrowser(browserOptions{enterTypes: true, canFuncAsVal: true}, b)
-			b.Add(browser)
-			browser.Move(Center(b))
-			browser.accepted = func(obj types.Object) {
-				browser.Close()
-				b.newNode(obj, browser.funcAsVal, "")
-			}
-			oldFocus := KeyFocus(b)
-			browser.canceled = func() {
-				browser.Close()
-				SetKeyFocus(oldFocus)
-			}
-			browser.KeyPress(event)
-			SetKeyFocus(browser)
-		}
-		if event.Command && event.Text == "0" {
-			openBrowser()
-			return
-		}
 		if !(event.Ctrl || event.Alt || event.Super) {
 			switch event.Text {
 			default:
-				openBrowser()
+				browser := newBrowser(browserOptions{enterTypes: true, canFuncAsVal: true}, b)
+				b.Add(browser)
+				w := window(b)
+				browser.Move(Map(Center(w), w, b))
+				browser.accepted = func(obj types.Object) {
+					browser.Close()
+					b.newNode(obj, browser.funcAsVal, "")
+				}
+				oldFocus := KeyFocus(b)
+				browser.canceled = func() {
+					browser.Close()
+					SetKeyFocus(oldFocus)
+				}
+				browser.KeyPress(event)
+				SetKeyFocus(browser)
 			case "\"", "'", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
 				text := event.Text
 				kind := token.INT

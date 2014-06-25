@@ -53,7 +53,7 @@ func closeWindow(w *Window) {
 			break
 		}
 	}
-	w.Do(func() { w.close = true } )
+	w.Do(func() { w.close = true })
 	w.w.Destroy()
 	if len(windows) > 0 {
 		windows[0].w.Show()

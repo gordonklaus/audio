@@ -1,6 +1,5 @@
 TODO
 
-- fix placement of browser in func editor
 - document instability of package APIs
 - handle unknown IDs in reader:
   - type in signature

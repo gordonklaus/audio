@@ -277,10 +277,10 @@ func (c *connection) reform() {
 		unconnectedOffset.Y = 96
 	}
 	if c.src != nil {
-		c.srcPt = MapTo(c.src, Center(c.src), c.blk)
+		c.srcPt = Map(Center(c.src), c.src, c.blk)
 	}
 	if c.dst != nil {
-		c.dstPt = MapTo(c.dst, Center(c.dst), c.blk)
+		c.dstPt = Map(Center(c.dst), c.dst, c.blk)
 	} else {
 		c.dstPt = c.srcPt.Add(unconnectedOffset)
 	}
@@ -474,7 +474,7 @@ func (c *connection) KeyPress(event KeyEvent) {
 			if c.focusSrc {
 				pt = c.srcPt
 			}
-			v := nearestView(b, ports, MapTo(c, pt, b), event.Key)
+			v := nearestView(b, ports, Map(pt, c, b), event.Key)
 			if p, ok := v.(*port); ok {
 				if c.focusSrc {
 					c.setSrc(p)
@@ -584,7 +584,7 @@ func (c *connection) Mouse(m MouseEvent) {
 	}
 	var p *port
 	b := c.blk.outermost()
-	if p2, ok := ViewAt(b, MapTo(c, m.Pos, b)).(*port); ok {
+	if p2, ok := ViewAt(b, Map(m.Pos, c, b)).(*port); ok {
 		src, dst := p1, p2
 		if c.focusSrc {
 			src, dst = dst, src

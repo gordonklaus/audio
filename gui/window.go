@@ -120,7 +120,7 @@ func NewWindow(self View, title string, init func(w *Window)) {
 					return v
 				}).(ScrollerView)
 				if v != nil {
-					s.Pos = MapFrom(v, s.Pos, w.Self)
+					s.Pos = Map(s.Pos, w.Self, v)
 					v.Scroll(s)
 				}
 			})
@@ -197,7 +197,7 @@ func (w *Window) mouse(m MouseEvent) {
 			}).(MouserView)
 			if v != nil {
 				w.mouser[m.Button] = v
-				m.Pos = MapFrom(v, m.Pos, w.Self)
+				m.Pos = Map(m.Pos, w.Self, v)
 				v.Mouse(m)
 			}
 		case m.Move:
@@ -212,7 +212,7 @@ func (w *Window) mouse(m MouseEvent) {
 				for v := View(w.mouseIn); v != p && v != nil; v = Parent(v) {
 					if v, ok := v.(MouserView); ok {
 						m := m
-						m.Pos = MapFrom(v, m.Pos, w.Self)
+						m.Pos = Map(m.Pos, w.Self, v)
 						m.Leave = true
 						v.Mouse(m)
 					}
@@ -220,7 +220,7 @@ func (w *Window) mouse(m MouseEvent) {
 				for v := View(v); v != p && v != nil; v = Parent(v) {
 					if v, ok := v.(MouserView); ok {
 						m := m
-						m.Pos = MapFrom(v, m.Pos, w.Self)
+						m.Pos = Map(m.Pos, w.Self, v)
 						m.Enter = true
 						v.Mouse(m)
 					}
@@ -229,7 +229,7 @@ func (w *Window) mouse(m MouseEvent) {
 			}
 			for button, v := range w.mouser {
 				m := m
-				m.Pos = MapFrom(v, m.Pos, w.Self)
+				m.Pos = Map(m.Pos, w.Self, v)
 				m.Drag = true
 				m.Button = button
 				v.Mouse(m)
@@ -237,7 +237,7 @@ func (w *Window) mouse(m MouseEvent) {
 		case m.Release:
 			m.Pos = w.mapToWindow(m.Pos)
 			if v, ok := w.mouser[m.Button]; ok {
-				m.Pos = MapFrom(v, m.Pos, w.Self)
+				m.Pos = Map(m.Pos, w.Self, v)
 				v.Mouse(m)
 				delete(w.mouser, m.Button)
 			}
@@ -261,17 +261,6 @@ func (w *Window) SetCentralView(v View) {
 		Resize(v, Size(w))
 		SetKeyFocus(v)
 	}
-}
-
-func commonParent(v1, v2 View) (p View) {
-	for ; v1 != nil; v1 = Parent(v1) {
-		for v2 := v2; v2 != nil; v2 = Parent(v2) {
-			if v1 == v2 {
-				return v1
-			}
-		}
-	}
-	return nil
 }
 
 func (w *Window) setKeyFocus(view View) {
