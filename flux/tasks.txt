@@ -1,6 +1,5 @@
 TODO
 
-- document instability of package APIs
 - handle unknown IDs in reader:
   - type in signature
   - local var type (including loop var).  can safely ignore?
@@ -8,7 +7,6 @@ TODO
 - prompt to Save, Don't Save, or Cancel when closing a func
 - each connection to an input must originate from a different block.  only one connection to an input may originate from the input's block or an outer block.  (too restrictive?:  if node A precedes node B then an input may not have connections originating from both A and B)
 - type switch
-- builtins panic and recover should have valid signatures in go/types
 - len and capacity inputs for make, max input for slice, ok output for type assert (also mapget and chanrecv?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable
 - shortcuts:
   - on a port, press Space to open a browser with funcs suitable for connection
@@ -20,7 +18,6 @@ TODO
   - cut, copy, paste
   - drag and drop nodes between blocks
   - undo, redo
-- rework package gui, especially considering data races
 - rework typeView appearance
 - display package name for top-level (imported) objects in browser
 - browser text is not focused, so blinking cursor is not drawn.  focus text or show cursor in some other way.
@@ -61,12 +58,6 @@ before releasing:
 - handle all errors
   - including reader.go parsing errors?
 - documentation
-
-
-Some advantages over text:
-- no need to name local variables
-- same syntax for operators and function calls
-- no problem closing over range loop value (index is still trouble, but that can be fixed by automatically inserting i := i)
 
 
 LINKS

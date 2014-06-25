@@ -279,6 +279,26 @@ func (n *newNode) setType(t types.Type) {
 	}
 }
 
+type panicRecoverNode struct {
+	*nodeBase
+	name string
+}
+
+func newPanicRecoverNode(name string, godefer string) *panicRecoverNode {
+	n := &panicRecoverNode{name: name}
+	n.nodeBase = newGoDeferNodeBase(n, godefer)
+	n.text.SetText(name)
+	n.text.SetTextColor(color(&types.Func{}, true, false))
+	t := &types.Interface{}
+	if name == "panic" {
+		n.newInput(newVar("", t))
+	} else {
+		n.newOutput(newVar("", t))
+	}
+	n.addSeqPorts()
+	return n
+}
+
 type realImagNode struct {
 	*nodeBase
 	name string

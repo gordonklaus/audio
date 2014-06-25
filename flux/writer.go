@@ -401,6 +401,13 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				} else {
 					existing = nil
 				}
+			case *panicRecoverNode:
+				w.indent("")
+				if len(results) > 0 {
+					w.write("%s := ", results[0])
+				}
+				w.write("%s%s(%s)", n.godefer, n.name, strings.Join(args, ""))
+				w.seq(n)
 			case *portsNode:
 				// only inputsNodes are in the order (1st)
 				// portsNode is included here so that assignExisting is called for it, to handle assignments of func args and loop vars

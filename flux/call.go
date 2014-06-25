@@ -73,6 +73,8 @@ func newCallNode(obj types.Object, currentPkg *types.Package, godefer string) no
 		return newMakeNode(currentPkg)
 	case "new":
 		return newNewNode(currentPkg)
+	case "panic", "recover":
+		return newPanicRecoverNode(name, godefer)
 	case "real", "imag":
 		return newRealImagNode(name)
 	default:
