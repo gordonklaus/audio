@@ -413,7 +413,6 @@ func (n *basicLiteralNode) KeyPress(k KeyEvent) {
 
 type compositeLiteralNode struct {
 	*nodeBase
-	typ *typeView
 }
 
 func newCompositeLiteralNode(currentPkg *types.Package) *compositeLiteralNode {
