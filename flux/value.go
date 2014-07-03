@@ -99,7 +99,7 @@ func (n *valueNode) connsChanged() {
 			n.text.SetText("*")
 		}
 	}
-	if !n.set && n.addressable {
+	if !n.set && n.addressable && yt != nil { // yt may be nil if this node represents an unknown object
 		yt = &types.Pointer{Elem: yt}
 	}
 	if n.x != nil {
