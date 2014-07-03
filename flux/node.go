@@ -342,6 +342,7 @@ func newBasicLiteralNode(kind token.Token) *basicLiteralNode {
 	n := &basicLiteralNode{kind: kind}
 	n.nodeBase = newNodeBase(n)
 	out := n.newOutput(nil)
+	n.addSeqPorts()
 	switch kind {
 	case token.INT, token.FLOAT:
 		if kind == token.INT {
@@ -419,6 +420,7 @@ func newCompositeLiteralNode(currentPkg *types.Package) *compositeLiteralNode {
 	n := &compositeLiteralNode{}
 	n.nodeBase = newNodeBase(n)
 	out := n.newOutput(nil)
+	n.addSeqPorts()
 	n.typ = newTypeView(&out.obj.Type, currentPkg)
 	n.typ.mode = compositeOrPtrType
 	n.Add(n.typ)

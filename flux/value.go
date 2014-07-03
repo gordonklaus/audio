@@ -44,10 +44,7 @@ func newValueNode(obj types.Object, currentPkg *types.Package, set bool) *valueN
 	} else {
 		n.y = n.newOutput(nil)
 	}
-	switch obj.(type) {
-	case *types.Var, field, nil:
-		n.addSeqPorts()
-	}
+	n.addSeqPorts()
 	n.connsChanged()
 	return n
 }
