@@ -131,8 +131,8 @@ func (w *fluxWindow) animate() {
 			r = Rect(w)
 		})
 		d := target.Sub(r.Center())
-		d.X = math.Copysign(math.Max(0, math.Abs(d.X)-r.Dx()/4), d.X)
-		d.Y = math.Copysign(math.Max(0, math.Abs(d.Y)-r.Dy()/4), d.Y)
+		d.X = math.Copysign(math.Max(0, math.Abs(d.X)-r.Dx()/3), d.X)
+		d.Y = math.Copysign(math.Max(0, math.Abs(d.Y)-r.Dy()/3), d.Y)
 		vel = vel.Add(d).Mul(.8)
 		if vel.Len() < .1 {
 			next = nil
