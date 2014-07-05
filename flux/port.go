@@ -95,7 +95,9 @@ func (p *port) focusMiddle() {
 	var conn *connection
 	dist := 0.0
 	for _, c := range p.conns {
-		d := math.Abs(c.dstPt.Sub(c.srcPt).Angle())
+		dir := c.srcPt.Sub(c.dstPt)
+		dir.Y, dir.X = dir.XY()
+		d := math.Abs(dir.Angle())
 		if conn == nil || d < dist {
 			conn, dist = c, d
 		}
