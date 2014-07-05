@@ -273,7 +273,9 @@ func MapFromParent(p Point, v View) Point {
 func Map(p Point, from, to View) Point {
 	v := commonParent(from, to)
 	if v == nil {
-		panic("no common parent")
+		// It is impossible to map between views without a common parent.
+		// Typically (always?), this happens because one of the views has been removed from the tree, probably to be deleted, in which case it is fine to return an incorrect Point.
+		return ZP
 	}
 	for from != v {
 		p = MapToParent(p, from)
