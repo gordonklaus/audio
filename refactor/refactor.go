@@ -35,8 +35,8 @@ func Rename(importPath, recv, name, newName string) error {
 		return err
 	}
 	pkg := prog.Imported[importPath]
-	if pkg.Errors != nil {
-		return fmt.Errorf("%s", pkg.Errors)
+	for _, err := range pkg.Errors {
+		fmt.Println(err)
 	}
 	obj := pkg.Pkg.Scope().Lookup(name)
 	if recv != "" {

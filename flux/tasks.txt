@@ -8,6 +8,7 @@ TODO
 - allow empty parameter/result names in func editor; ignore uniqueness, write uniquely, interpret as empty
 - in selectionBrowser, indirect pointer-to-interface and pointer-to-pointer
 - fix focusing/connection weirdness when connecting to loopNode input, probably related to ports being created/deleted
+- show port.typ when editing a connection
 - handle unknown IDs in reader:
   - type in signature
   - local var type (including loop var).  can safely ignore?
