@@ -115,20 +115,6 @@ func (n *loopNode) Move(p Point) {
 	nodeMoved(n)
 }
 
-func (n *loopNode) focusFrom(v View, pass bool) {
-	if !pass {
-		SetKeyFocus(n)
-		return
-	}
-
-	switch v {
-	case n.input:
-		n.inputsNode.outs[0].focusMiddle()
-	case n.inputsNode:
-		n.input.focusMiddle()
-	}
-}
-
 func (n *loopNode) TookKeyFocus() {
 	n.focused = true
 	Repaint(n)
@@ -144,15 +130,15 @@ func (n *loopNode) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyUp:
 		if event.Alt && event.Shift {
-			n.seqIn.focusMiddle()
+			SetKeyFocus(n.seqIn)
 		} else {
-			n.input.focusMiddle()
+			SetKeyFocus(n.input)
 		}
 	case KeyDown:
 		if event.Alt && event.Shift {
-			n.seqOut.focusMiddle()
+			SetKeyFocus(n.seqOut)
 		} else {
-			n.inputsNode.outs[0].focusMiddle()
+			SetKeyFocus(n.inputsNode)
 		}
 	default:
 		n.ViewBase.KeyPress(event)

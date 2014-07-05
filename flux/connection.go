@@ -507,15 +507,7 @@ func (c *connection) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyUp:
 		if c.focusSrc {
-			ins := ins(c.src.node)
-			n := len(ins)
-			if f, ok := c.src.node.(focuserFrom); ok {
-				f.focusFrom(c.src, true)
-			} else if p := seqIn(c.src.node); p != nil && len(p.conns) > 0 && n == 0 {
-				p.focusMiddle()
-			} else if n > 0 {
-				ins[(len(ins)-1)/2].focusMiddle()
-			}
+			SetKeyFocus(c.src)
 		} else {
 			c.focus(true)
 		}
@@ -523,15 +515,7 @@ func (c *connection) KeyPress(event KeyEvent) {
 		if c.focusSrc {
 			c.focus(false)
 		} else {
-			outs := outs(c.dst.node)
-			n := len(outs)
-			if f, ok := c.dst.node.(focuserFrom); ok {
-				f.focusFrom(c.dst, true)
-			} else if p := seqOut(c.dst.node); p != nil && len(p.conns) > 0 && n == 0 {
-				p.focusMiddle()
-			} else if n > 0 {
-				outs[(len(outs)-1)/2].focusMiddle()
-			}
+			SetKeyFocus(c.dst)
 		}
 	case KeyRight, KeyLeft:
 		p := c.dst

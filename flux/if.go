@@ -87,21 +87,11 @@ func (n *ifNode) focus(i int) {
 	panTo(n, Pt(CenterInParent(n.blocks[i]).X, 0))
 }
 
-func (n *ifNode) focusFrom(v View, pass bool) {
+func (n *ifNode) focusFrom(v View) {
 	for i, c := range n.cond {
-		if !pass {
-			switch v {
-			case c, n.blocks[i]:
-				n.focus(i)
-				return
-			}
-		}
-
-		switch v {
-		case c:
-			n.blocks[i].focus()
-		case n.blocks[i]:
-			c.focusMiddle()
+		if v == c || v == n.blocks[i] {
+			n.focus(i)
+			break
 		}
 	}
 }
@@ -128,13 +118,13 @@ func (n *ifNode) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyUp:
 		if event.Alt && event.Shift {
-			n.seqIn.focusMiddle()
+			SetKeyFocus(n.seqIn)
 		} else {
 			SetKeyFocus(n.cond[n.focused])
 		}
 	case KeyDown:
 		if event.Alt && event.Shift {
-			n.seqOut.focusMiddle()
+			SetKeyFocus(n.seqOut)
 		} else {
 			n.blocks[n.focused].focus()
 		}

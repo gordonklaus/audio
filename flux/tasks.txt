@@ -1,5 +1,13 @@
 TODO
 
+- write Control instead of Command in docs; mention Command for OS X.  use Alt-Period instead of Control-Period to toggle ellipsis input.
+- for hidden connections, separate ports vertically so that the src conntxt is not below the dst conntxt
+- place seqIn above node focus in ifNode, loopNode, and selectNode
+- in browser, don't allow entering interface types
+- allow use of pointer-to-non-comparable-struct as map key type in typeView
+- allow empty parameter/result names in func editor; ignore uniqueness, write uniquely, interpret as empty
+- in selectionBrowser, indirect pointer-to-interface and pointer-to-pointer
+- fix focusing/connection weirdness when connecting to loopNode input, probably related to ports being created/deleted
 - handle unknown IDs in reader:
   - type in signature
   - local var type (including loop var).  can safely ignore?
@@ -29,6 +37,8 @@ TODO
 - consider not lumping sequencing ports and connections in with the normal ones.  they can be annoying.  don't forget to consider them in the topological sorting order.
 - one-off local functions
 - reposition port.valView after creating new param/result
+- remove sequencing ports from basic and composite literal nodes and readonly value nodes (const, func); they only have them so they can be sequenced with branchNodes (specifically, breaking from a loop).  Branch nodes should always be sequenced last; maybe they shouldn't be normal nodes, but attributes of a block.
+- pass Command-W, Command-Q, etc in connection.KeyPress, Text.KeyPress, elsewhere?
 - case-insensitive sorting in browser?  currently, all lowercase names follow all upper case.  also, don't sort operators?
 - represent generic builtin operations consistently:  color convertNode and typeAssertNode the same as makeNode, newNode, et al.  Are they funcs (red) or specials (yellow)?  I think they are specials; they are generic and have well-defined effect and cost, unlike normal functions.  In which case operators should be colored as specials, too.
 - use go/parser and go/ast to validate basic literals

@@ -198,7 +198,7 @@ func (p *port) KeyPress(event KeyEvent) {
 			p.focusMiddle()
 		} else {
 			if f, ok := p.node.(focuserFrom); ok {
-				f.focusFrom(p, true)
+				f.focusFrom(p)
 			} else {
 				SetKeyFocus(p.node)
 			}
@@ -257,7 +257,7 @@ func (p *port) KeyPress(event KeyEvent) {
 		}
 	case KeyEscape:
 		if f, ok := p.node.(focuserFrom); ok {
-			f.focusFrom(p, false)
+			f.focusFrom(p)
 		} else {
 			SetKeyFocus(p.node)
 		}

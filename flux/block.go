@@ -332,7 +332,7 @@ func nearestView(parent View, views []View, p Point, dirKey int) (nearest View) 
 }
 
 type focuserFrom interface {
-	focusFrom(v View, pass bool)
+	focusFrom(v View)
 }
 
 func (b *block) focusNearestView(viewOrPoint interface{}, dirKey int) {
@@ -388,22 +388,22 @@ func (b *block) KeyPress(event KeyEvent) {
 			if k == KeyUp {
 				seq := seqIn(n)
 				if num := len(ins(n)); seq != nil && (focseq || num == 0 && len(seq.conns) > 0) {
-					seq.focusMiddle()
+					SetKeyFocus(seq)
 				} else if num > 0 {
-					ins(n)[(num-1)/2].focusMiddle()
+					SetKeyFocus(ins(n)[(num-1)/2])
 				}
 			}
 			if k == KeyDown {
 				seq := seqOut(n)
 				if num := len(outs(n)); seq != nil && (focseq || num == 0 && len(seq.conns) > 0) {
-					seq.focusMiddle()
+					SetKeyFocus(seq)
 				} else if num > 0 {
-					outs(n)[(num-1)/2].focusMiddle()
+					SetKeyFocus(outs(n)[(num-1)/2])
 				}
 			}
 		} else if f, ok := b.node.(focuserFrom); ok {
 			if event.Key == KeyUp {
-				f.focusFrom(b, true)
+				f.focusFrom(b)
 			}
 		} else {
 			b.ViewBase.KeyPress(event)
@@ -426,18 +426,12 @@ func (b *block) KeyPress(event KeyEvent) {
 			SetKeyFocus(foc)
 		}
 	case KeyEscape:
-		if n, ok := KeyFocus(b).(node); ok {
-			if f, ok := n.block().node.(focuserFrom); ok {
-				f.focusFrom(b, false)
-			} else {
-				SetKeyFocus(n.block().node)
-			}
+		if f, ok := b.node.(*funcNode); ok && !f.literal {
+			f.Close()
+		} else if f, ok := b.node.(focuserFrom); ok {
+			f.focusFrom(b)
 		} else {
-			if f, ok := b.node.(focuserFrom); ok {
-				f.focusFrom(b, false)
-			} else {
-				SetKeyFocus(b.node)
-			}
+			SetKeyFocus(b.node)
 		}
 	default:
 		if !(event.Ctrl || event.Alt || event.Super) {
@@ -638,19 +632,13 @@ func (n *portsNode) removePort(p *port) {
 	}
 }
 
-func (n *portsNode) focusFrom(v View, pass bool) {
-	if f, ok := n.blk.node.(focuserFrom); ok {
-		f.focusFrom(n, pass)
-	}
-}
-
 func (n *portsNode) KeyPress(event KeyEvent) {
-	if l, ok := n.blk.node.(*loopNode); ok && event.Key == KeyUp {
-		l.focusFrom(n, true)
+	if f, ok := n.blk.node.(*funcNode); ok && f.literal && event.Key == KeyDown && n.out {
+		SetKeyFocus(f)
+	} else if l, ok := n.blk.node.(*loopNode); ok && event.Key == KeyUp {
+		SetKeyFocus(l)
 	} else if s, ok := n.blk.node.(*selectNode); ok && event.Key == KeyUp {
-		s.focusFrom(n, true)
-	} else if f, ok := n.blk.node.(*funcNode); ok && f.literal && event.Key == KeyDown && n.out {
-		f.focusFrom(n, true)
+		s.focusFrom(n)
 	} else if n.editable && event.Text == "," {
 		f := n.blk.node.(*funcNode)
 		sig := f.sig()

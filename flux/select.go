@@ -133,25 +133,12 @@ func (n *selectNode) focus(i int) {
 	Repaint(n)
 }
 
-func (n *selectNode) focusFrom(v View, pass bool) {
+func (n *selectNode) focusFrom(v View) {
 	for i, c := range n.cases {
-		if !pass {
-			switch v {
-			case c.ch, c.elem, c.elemOk, c.blk:
-				n.focus(i)
-				return
-			}
-		}
-
 		switch v {
-		case c.ch, c.elem:
-			if c.elemOk != nil {
-				c.elemOk.outs[0].focusMiddle()
-			} else {
-				c.blk.focus()
-			}
-		case c.elemOk, c.blk:
-			c.ch.focusMiddle()
+		case c.ch, c.elem, c.elemOk, c.blk:
+			n.focus(i)
+			return
 		}
 	}
 }
@@ -214,12 +201,12 @@ func (n *selectNode) KeyPress(event KeyEvent) {
 	switch event.Key {
 	case KeyUp:
 		if i >= 0 && c.ch != nil {
-			c.ch.focusMiddle()
+			SetKeyFocus(c.ch)
 		}
 	case KeyDown:
 		if i >= 0 {
 			if c.elemOk != nil {
-				c.elemOk.outs[0].focusMiddle()
+				SetKeyFocus(c.elemOk)
 			} else {
 				c.blk.focus()
 			}
