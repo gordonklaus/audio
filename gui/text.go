@@ -24,7 +24,7 @@ type Text struct {
 	Reject              func()
 
 	cursor     bool
-	stopCursor chan struct{}
+	stopCursor chan chan bool
 }
 
 func NewText(text string) *Text {
@@ -33,6 +33,7 @@ func NewText(text string) *Text {
 	t.font = getFont()
 	t.textColor = Color{1, 1, 1, 1}
 	t.backgroundColor = Color{0, 0, 0, 1}
+	t.stopCursor = make(chan chan bool)
 	t.SetText(text)
 	return t
 }
@@ -101,19 +102,23 @@ func (t *Text) SetFrameSize(size float64) {
 func (t *Text) TookKeyFocus() {
 	t.cursor = true
 	Repaint(t)
-	t.stopCursor = make(chan struct{})
 	go func() {
 		tick := time.NewTicker(time.Second / 2)
 		defer tick.Stop()
 		for {
 			select {
 			case <-tick.C:
-				Do(t, func() {
+				select {
+				case DoChan(t) <- func() {
 					t.cursor = !t.cursor
 					Repaint(t)
-				})
-			case <-t.stopCursor:
-				t.stopCursor <- struct{}{}
+				}:
+				case ch := <-t.stopCursor:
+					ch <- true
+					return
+				}
+			case ch := <-t.stopCursor:
+				ch <- true
 				return
 			}
 		}
@@ -121,8 +126,9 @@ func (t *Text) TookKeyFocus() {
 }
 
 func (t *Text) LostKeyFocus() {
-	t.stopCursor <- struct{}{}
-	<-t.stopCursor
+	ch := make(chan bool)
+	t.stopCursor <- ch
+	<-ch
 	t.cursor = false
 	Repaint(t)
 }
