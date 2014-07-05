@@ -490,7 +490,7 @@ func (b *block) newNode(obj types.Object, funcAsVal bool, godefer string) node {
 	switch obj := obj.(type) {
 	case special:
 		switch obj.Name {
-		case "break", "continue":
+		case "break", "continue", "return":
 			n = newBranchNode(obj.Name)
 		case "call":
 			n = newCallNode(nil, currentPkg, godefer)

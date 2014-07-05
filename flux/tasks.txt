@@ -9,6 +9,7 @@ TODO
 - in selectionBrowser, indirect pointer-to-interface and pointer-to-pointer
 - fix focusing/connection weirdness when connecting to loopNode input, probably related to ports being created/deleted
 - show port.typ when editing a connection
+- bug: when editing a connection src, moving it between two outputs that have named connections corrupts the second name with the first
 - handle unknown IDs in reader:
   - type in signature
   - local var type (including loop var).  can safely ignore?
@@ -38,7 +39,7 @@ TODO
 - consider not lumping sequencing ports and connections in with the normal ones.  they can be annoying.  don't forget to consider them in the topological sorting order.
 - one-off local functions
 - reposition port.valView after creating new param/result
-- remove sequencing ports from basic and composite literal nodes and readonly value nodes (const, func); they only have them so they can be sequenced with branchNodes (specifically, breaking from a loop).  Branch nodes should always be sequenced last; maybe they shouldn't be normal nodes, but attributes of a block.
+- remove sequencing ports from basic and composite literal nodes and readonly value nodes (const, func); they only have them so they can be sequenced with branchNodes (specifically, breaking from a loop or returning a value from a block).  Branch nodes should always be sequenced last; maybe they shouldn't be normal nodes, but attributes of a block.
 - pass Command-W, Command-Q, etc in connection.KeyPress, Text.KeyPress, elsewhere?
 - case-insensitive sorting in browser?  currently, all lowercase names follow all upper case.  also, don't sort operators?
 - represent generic builtin operations consistently:  color convertNode and typeAssertNode the same as makeNode, newNode, et al.  Are they funcs (red) or specials (yellow)?  I think they are specials; they are generic and have well-defined effect and cost, unlike normal functions.  In which case operators should be colored as specials, too.
