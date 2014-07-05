@@ -90,7 +90,7 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 		r.conns[name] = []*connection{}
 		f.addPkgRef(t)
 	}
-	r.block(n.funcblk, body.List)
+	r.block(n.funcblk, body.List[:len(body.List)-1]) // exclude final ReturnStmt
 	for i, p := range results {
 		r.in(p.Names[0], n.outputsNode.newInput(sig.Results[i]))
 	}
@@ -288,6 +288,10 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 				r.out(s.Value, n.inputsNode.outs[1])
 			}
 			r.block(n.loopblk, s.Body.List)
+			r.seq(n, s)
+		case *ast.ReturnStmt:
+			n := newBranchNode("return")
+			b.addNode(n)
 			r.seq(n, s)
 		case *ast.SelectStmt:
 			n := newSelectNode(b.childArranged)
