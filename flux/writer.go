@@ -214,9 +214,7 @@ func (w *writer) fun(f *funcNode, vars map[*port]string) {
 	w.assignExisting(existing)
 	w.nindent--
 	w.block(f.funcblk, vars)
-	if len(f.outputsNode.ins) > 0 {
-		w.indent("\treturn\n")
-	}
+	w.indent("\treturn\n")
 	w.indent("}\n")
 }
 

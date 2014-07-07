@@ -90,7 +90,13 @@ func (r *reader) fun(n *funcNode, typ *ast.FuncType, body *ast.BlockStmt) {
 		r.conns[name] = []*connection{}
 		f.addPkgRef(t)
 	}
-	r.block(n.funcblk, body.List[:len(body.List)-1]) // exclude final ReturnStmt
+	stmts := body.List
+	if n := len(stmts); n > 0 {
+		if _, ok := stmts[n-1].(*ast.ReturnStmt); ok {
+			stmts = stmts[:n-1]
+		}
+	}
+	r.block(n.funcblk, stmts)
 	for i, p := range results {
 		r.in(p.Names[0], n.outputsNode.newInput(sig.Results[i]))
 	}
