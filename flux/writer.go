@@ -289,7 +289,8 @@ func (w *writer) block(b *block, vars map[*port]string) {
 					case token.CHAR:
 						val = strconv.QuoteRune([]rune(val)[0])
 					}
-					w.indent("const %s = %s\n", results[0], val)
+					w.indent("const %s = %s", results[0], val)
+					w.seq(n)
 				}
 			case *callNode:
 				if !(n.obj == nil && len(args) == 0) {
@@ -474,7 +475,7 @@ func (w *writer) block(b *block, vars map[*port]string) {
 				}
 				w.write("%s{", w.typ(t))
 				first := true
-				for _, in := range n.inputs() {
+				for _, in := range ins(n) {
 					if len(in.conns) > 0 {
 						if !first {
 							w.write(", ")
@@ -483,7 +484,8 @@ func (w *writer) block(b *block, vars map[*port]string) {
 						w.write("%s: %s", in.obj.Name, vars[in])
 					}
 				}
-				w.write("}\n")
+				w.write("}")
+				w.seq(n)
 				w.assignExisting(existing)
 			}
 		case *ifNode:

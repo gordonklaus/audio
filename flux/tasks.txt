@@ -15,7 +15,7 @@ TODO
   - local var type (including loop var).  can safely ignore?
   - package name.  avoidable by always using named imports
 - prompt to Save, Don't Save, or Cancel when closing a func
-- consider replacing outputsNode with a return node with inputs.  this will make early returns much easier to read
+- replace outputsNode with a return node, give return node inputs.  this will make early returns much more readable
 - each connection to an input must originate from a different block.  only one connection to an input may originate from the input's block or an outer block.  (too restrictive?:  if node A precedes node B then an input may not have connections originating from both A and B)
 - type switch
 - len and capacity inputs for make, max input for slice, ok output for type assert (also mapget and chanrecv?), 1st input for XOR (^) (also plus, minus?) are optional, creatable by Comma key, deletable

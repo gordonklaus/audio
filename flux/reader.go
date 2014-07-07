@@ -243,6 +243,7 @@ func (r *reader) block(b *block, s []ast.Stmt) {
 						n.text.SetText(text)
 					}
 					r.out(v.Names[0], n.outs[0])
+					r.seq(n, s)
 				case *ast.Ident, *ast.SelectorExpr:
 					r.value(b, x, v.Names[0], false, s)
 				}
@@ -467,6 +468,7 @@ func (r *reader) compositeLit(b *block, x *ast.CompositeLit, ptr bool, s *ast.As
 		r.in(elt.Value, in)
 	}
 	r.out(s.Lhs[0], n.outs[0])
+	r.seq(n, s)
 }
 
 func (r *reader) index(b *block, x *ast.IndexExpr, y ast.Expr, set bool, s *ast.AssignStmt) {
