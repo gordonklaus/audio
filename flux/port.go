@@ -65,6 +65,11 @@ func (p *port) setType(t types.Type) {
 		p.valView.Move(Pt(-Width(p.valView)/2, 12))
 	}
 
+	if *p.valView.typ == t {
+		// avoid infinite recursion when feedback connections are present
+		return
+	}
+
 	for i := 0; i < len(p.conns); {
 		c := p.conns[i]
 		if c.src != nil && c.dst != nil && !c.connectable(c.src, c.dst) {
