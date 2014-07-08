@@ -82,7 +82,7 @@ func Rename(importPath, recv, name, newName string) error {
 			if !modified {
 				continue
 			}
-			file, err := os.Create(prog.FilePath(f))
+			file, err := os.Create(prog.Fset.File(f.Package).Name())
 			if err != nil {
 				return err
 			}
