@@ -10,16 +10,12 @@ type MultiVoice struct {
 	Out    Audio
 }
 
-func (m *MultiVoice) StartVoice(v Voice) {
+func (m *MultiVoice) Add(v Voice) {
 	Init(v, m.Params)
 	if m.voices == nil {
 		m.voices = map[Voice]struct{}{}
 	}
 	m.voices[v] = struct{}{}
-}
-
-func (m *MultiVoice) StopVoice(v Voice) {
-	delete(m.voices, v)
 }
 
 func (m *MultiVoice) Sing() (Audio, bool) {
