@@ -73,7 +73,7 @@ func pkgDir() string {
 func (t Text) Text() string { return t.text }
 func (t *Text) SetText(text string) {
 	t.text = text
-	Resize(t, Pt(2*t.frameSize+t.font.Advance(t.text), 2*t.frameSize-t.font.Descender()+t.font.Ascender()))
+	t.Resize(2*t.frameSize+t.font.Advance(t.text), 2*t.frameSize-t.font.Descender()+t.font.Ascender())
 	if t.TextChanged != nil {
 		t.TextChanged(text)
 	}
@@ -96,7 +96,7 @@ func (t *Text) SetFrameColor(c Color) {
 
 func (t *Text) SetFrameSize(size float64) {
 	t.frameSize = size
-	Resize(t, Pt(2*t.frameSize+t.font.Advance(t.text), 2*t.frameSize-t.font.Descender()+t.font.Ascender()))
+	t.Resize(2*t.frameSize+t.font.Advance(t.text), 2*t.frameSize-t.font.Descender()+t.font.Ascender())
 }
 
 func (t *Text) TookKeyFocus() {
@@ -161,11 +161,11 @@ func (t *Text) KeyPress(event KeyEvent) {
 
 func (t *Text) Paint() {
 	SetColor(t.backgroundColor)
-	FillRect(Rect(t).Inset(t.frameSize))
+	FillRect(InnerRect(t).Inset(t.frameSize))
 	if t.frameSize > 0 {
 		SetColor(t.frameColor)
 		SetLineWidth(t.frameSize)
-		DrawRect(Rect(t))
+		DrawRect(InnerRect(t))
 	}
 
 	if t.cursor {

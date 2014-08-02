@@ -141,6 +141,7 @@ func MovePackage(old, new string) error {
 				if err != nil {
 					return nil
 				}
+				// TODO: correctly rewrite multiple imports.  should read the file once outside the loop
 				for _, imp := range astFile.Imports {
 					importPath := imp.Path.Value[1 : len(imp.Path.Value)-1]
 					if importPath == old || strings.HasPrefix(importPath, old+"/") {

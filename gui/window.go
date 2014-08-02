@@ -16,6 +16,8 @@ type Window struct {
 	close       bool
 	paint       chan bool
 	do          chan func()
+
+	bufWidth, bufHeight gl.Sizei
 }
 
 func NewWindow(self View, title string, init func(w *Window)) {
@@ -31,25 +33,22 @@ func NewWindow(self View, title string, init func(w *Window)) {
 	w.mouser = make(map[int]MouserView)
 	w.paint = make(chan bool, 1)
 	w.do = make(chan func())
-	go w.run()
-	w.Do(func() { init(w) })
+	go w.run(init)
 	go doMain(w.registerCallbacks)
 }
 
-func (w *Window) run() {
+func (w *Window) run(init func(w *Window)) {
 	runtime.LockOSThread()
 	glfw.MakeContextCurrent(w.w)
 	defer glfw.MakeContextCurrent(nil)
 
-	// glfw should fire initial resize events to avoid this duplication (https://github.com/glfw/glfw/issues/62)
-	width, height := w.w.Size()
-	gl.MatrixMode(gl.PROJECTION)
-	gl.LoadIdentity()
-	gl.Ortho(0, gl.Double(width), 0, gl.Double(height), -1, 1)
-	Resize(w, Pt(float64(width), float64(height)))
-	width, height = w.w.FramebufferSize()
-	gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
+	init(w)
 
+	// glfw should fire initial resize events to avoid this duplication (https://github.com/glfw/glfw/issues/62)
+	w.resized(w.w.Size())
+	w.framebufferResized(w.w.FramebufferSize())
+
+	gl.Enable(gl.SCISSOR_TEST)
 	gl.Enable(gl.BLEND)
 	gl.Enable(gl.POINT_SMOOTH)
 	gl.Enable(gl.LINE_SMOOTH)
@@ -63,6 +62,7 @@ func (w *Window) run() {
 			gl.MatrixMode(gl.MODELVIEW)
 			gl.LoadIdentity()
 
+			gl.Scissor(0, 0, w.bufWidth, w.bufHeight)
 			gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 			w.base().paint()
 			w.w.SwapBuffers()
@@ -84,23 +84,8 @@ func (w *Window) registerCallbacks() {
 		}
 	})
 	w.w.OnClose(w.Close)
-	w.w.OnResize(func(width, height int) {
-		w.Do(func() {
-			s := Pt(float64(width), float64(height))
-			gl.MatrixMode(gl.PROJECTION)
-			gl.LoadIdentity()
-			gl.Ortho(0, gl.Double(s.X), 0, gl.Double(s.Y), -1, 1)
-			Resize(w.Self, s)
-			if w.centralView != nil {
-				Resize(w.centralView, s)
-			}
-		})
-	})
-	w.w.OnFramebufferResize(func(width, height int) {
-		w.Do(func() {
-			gl.Viewport(0, 0, gl.Sizei(width), gl.Sizei(height))
-		})
-	})
+	w.w.OnResize(func(width, height int) { w.Do(func() { w.resized(width, height) }) })
+	w.w.OnFramebufferResize(func(width, height int) { w.Do(func() { w.framebufferResized(width, height) }) })
 
 	k := KeyEvent{}
 	w.w.OnKey(func(key, scancode, action, mods int) {
@@ -153,7 +138,7 @@ func (w *Window) registerCallbacks() {
 	})
 	w.w.OnScroll(func(dx, dy float64) {
 		w.Do(func() {
-			s := ScrollEvent{m.Pos, Pt(dx, -dy)}
+			s := ScrollEvent{m.Pos, Pt(dx, -dy), k.Shift, k.Ctrl, k.Alt, k.Super, k.Command}
 			s.Pos = w.mapToWindow(s.Pos)
 			v, _ := viewAtFunc(w.Self, s.Pos, func(v View) View {
 				v, _ = v.(ScrollerView)
@@ -165,6 +150,22 @@ func (w *Window) registerCallbacks() {
 			}
 		})
 	})
+}
+
+func (w *Window) resized(width, height int) {
+	wid, hei := float64(width), float64(height)
+	gl.MatrixMode(gl.PROJECTION)
+	gl.LoadIdentity()
+	gl.Ortho(0, gl.Double(wid), 0, gl.Double(hei), -1, 1)
+	w.Self.Resize(wid, hei)
+	if w.centralView != nil {
+		w.centralView.Resize(wid, hei)
+	}
+}
+
+func (w *Window) framebufferResized(width, height int) {
+	w.bufWidth, w.bufHeight = gl.Sizei(width), gl.Sizei(height)
+	gl.Viewport(0, 0, w.bufWidth, w.bufHeight)
 }
 
 func (w *Window) mouse(m MouseEvent) {
@@ -228,7 +229,7 @@ func (w *Window) mouse(m MouseEvent) {
 
 func (w *Window) mapToWindow(p Point) Point {
 	p.Y = Height(w) - p.Y
-	return p.Add(Rect(w).Min)
+	return InnerRect(w).Min.Add(p)
 }
 
 func (w *Window) Do(f func()) {
@@ -259,7 +260,7 @@ func (w *Window) SetCentralView(v View) {
 		if Parent(v) != w {
 			w.Add(v)
 		}
-		Resize(v, Size(w))
+		v.Resize(Size(w))
 		SetKeyFocus(v)
 	}
 }

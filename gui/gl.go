@@ -15,7 +15,10 @@ func DrawPoint(p Point) {
 }
 
 func DrawLine(p1, p2 Point) {
-	DrawBezier(p1, p2)
+	Begin(LINES)
+	defer End()
+	Vertex2d(Double(p1.X), Double(p1.Y))
+	Vertex2d(Double(p2.X), Double(p2.Y))
 }
 
 func DrawRect(r Rectangle) {

@@ -1,0 +1,7 @@
+- convert/delete flux code, commit
+
+- experiment with Doppler effect with many (esp ambient) sound sources
+- approach and exceed the speed of sound in Doppler experiments
+- wandering windchimes:  randomly walking pitches (tending towards harmony).  evolving chime spectrum; harmony based on spectrum (à la Sethares)
+- perfect circling fifths/fourths/thirds/whathaveyou
+- water/air cycle: start with low/mid harmonies (ground air), slowly increase distortion (sun's heat) to add higher spectral components (rising air), reverberate highest components into a smooth noise (clouds), resonate oscillators with falling pitch (rain), repeat
