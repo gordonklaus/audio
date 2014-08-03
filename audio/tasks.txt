@@ -1,6 +1,5 @@
-- deletable notes and control points
-- saving
 - no need for special NoteType pseudo-interface:  instead of NoteType struct fields, look at Instrument.Play parameters, store in Note.attributes map[string][]*ControlPoint
+- saving
 
 - experiment with Doppler effect with many (esp ambient) sound sources
 - approach and exceed the speed of sound in Doppler experiments

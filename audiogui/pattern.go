@@ -327,14 +327,27 @@ func (n *noteView) KeyPress(k KeyEvent) {
 		SetKeyFocus(n.attr)
 	case KeyTab:
 		SetKeyFocus(n.attr.next(k.Shift).notes[n.note])
-	case KeyComma:
-		n.newPoint(0)
-	case KeyPeriod:
-		n.newPoint(len(n.points))
 	case KeyEnter:
 		SetKeyFocus(n.points[0])
 	case KeyEscape:
 		SetKeyFocus(n.attr)
+	case KeyComma:
+		n.newPoint(0)
+	case KeyPeriod:
+		n.newPoint(len(n.points))
+	case KeyBackspace, KeyDelete:
+		pattern := n.attr.pattern.pattern
+		for i, n2 := range pattern.Notes {
+			if n2 == n.note {
+				pattern.Notes = append(pattern.Notes[:i], pattern.Notes[i+1:]...)
+				break
+			}
+		}
+		SetKeyFocus(n.attr)
+		for _, a := range n.attr.pattern.attrs {
+			a.Remove(a.notes[n.note])
+			delete(a.notes, n.note)
+		}
 	}
 }
 
@@ -394,8 +407,12 @@ func (n *noteView) reform() {
 func (n *noteView) duration() float64 {
 	t := 0.0
 	for _, a := range n.attr.pattern.attrs {
-		points := a.notes[n.note].points
-		t = math.Max(t, points[len(points)-1].point.Time)
+		n := a.notes[n.note]
+		if n == nil {
+			// may be nil during newNoteView
+			continue
+		}
+		t = math.Max(t, n.points[len(n.points)-1].point.Time)
 	}
 	return t
 }
@@ -453,7 +470,7 @@ func (p *controlPointView) updateCursor() {
 }
 
 func (p *controlPointView) KeyPress(k KeyEvent) {
-	if k.Shift {
+	if k.Shift && k.Key != KeyTab {
 		switch k.Key {
 		case KeyLeft, KeyRight:
 			p.setTime(p.note.attr.pattern.timeGrid.next(p.point.Time+p.note.note.Time(), k.Key == KeyRight) - p.note.note.Time())
@@ -467,13 +484,26 @@ func (p *controlPointView) KeyPress(k KeyEvent) {
 
 	switch k.Key {
 	case KeyLeft, KeyRight:
-		p.focusNext(k.Key)
+		p.focusNext(k.Key == KeyRight)
+	case KeyTab:
+		SetKeyFocus(p.note.attr.next(k.Shift).notes[p.note.note].points[0])
+	case KeyEscape:
+		SetKeyFocus(p.note)
 	case KeyComma:
 		p.note.newPoint(p.index())
 	case KeyPeriod:
 		p.note.newPoint(p.index() + 1)
-	case KeyEscape:
-		SetKeyFocus(p.note)
+	case KeyBackspace, KeyDelete:
+		if len(p.note.points) == 1 {
+			break
+		}
+		i := p.index()
+		p.focusNext((i == 0 || k.Key == KeyDelete) && i < len(p.note.points)-1)
+		points := p.note.getPoints()
+		p.note.setPoints(append(points[:i], points[i+1:]...))
+		p.note.points = append(p.note.points[:i], p.note.points[i+1:]...)
+		p.note.Remove(p)
+		p.note.normalizePoints()
 	}
 }
 
@@ -503,12 +533,12 @@ func (p *controlPointView) reform() {
 	p.note.reform()
 }
 
-func (p *controlPointView) focusNext(dir int) {
+func (p *controlPointView) focusNext(next bool) {
 	i := p.index()
-	if dir == KeyLeft {
-		i--
-	} else {
+	if next {
 		i++
+	} else {
+		i--
 	}
 	if i >= 0 && i < len(p.note.points) {
 		SetKeyFocus(p.note.points[i])
