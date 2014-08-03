@@ -10,13 +10,13 @@ import (
 
 type PatternView struct {
 	*ViewBase
-	pattern   *audio.Pattern
-	noteType  reflect.Type
-	attrs     []*attributeView
-	transTime float64
-	scaleTime float64
-	timeGrid  *uniformGrid
-	focusTime float64
+	pattern    *audio.Pattern
+	noteType   reflect.Type
+	attrs      []*attributeView
+	transTime  float64
+	scaleTime  float64
+	timeGrid   *uniformGrid
+	cursorTime float64
 }
 
 func NewPatternView(pattern *audio.Pattern) *PatternView {
@@ -51,9 +51,9 @@ func (p *PatternView) reform() {
 
 func (p *PatternView) newNote() audio.Note {
 	n := reflect.New(p.noteType)
-	n.Elem().FieldByName("Note").Set(reflect.ValueOf(audio.NewNote(p.focusTime)))
+	n.Elem().FieldByName("Note").Set(reflect.ValueOf(audio.NewNote(p.cursorTime)))
 	for _, a := range p.attrs {
-		n.Elem().FieldByName(a.name).Set(reflect.ValueOf([]*audio.ControlPoint{{0, a.focusVal}}))
+		n.Elem().FieldByName(a.name).Set(reflect.ValueOf([]*audio.ControlPoint{{0, a.cursorVal}}))
 	}
 	note := n.Interface().(audio.Note)
 	p.pattern.Notes = append(p.pattern.Notes, note)
@@ -73,12 +73,12 @@ type attributeView struct {
 	pattern   *PatternView
 	name      string
 	nameText  *Text
-	notes     []*noteView
+	notes     map[audio.Note]*noteView
 	transVal  float64
 	scaleVal  float64
 	valueGrid *uniformGrid
 	focused   bool
-	focusVal  float64
+	cursorVal float64
 }
 
 func newAttributeView(p *PatternView, name string) *attributeView {
@@ -87,9 +87,10 @@ func newAttributeView(p *PatternView, name string) *attributeView {
 	a.nameText = NewText(name)
 	a.nameText.SetBackgroundColor(Color{})
 	a.Add(a.nameText)
+	a.notes = map[audio.Note]*noteView{}
 	for _, note := range p.pattern.Notes {
 		n := newNoteView(a, note)
-		a.notes = append(a.notes, n)
+		a.notes[note] = n
 		a.Add(n)
 	}
 	a.valueGrid = &uniformGrid{0, .2}
@@ -103,36 +104,25 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 	if k.Alt {
 		switch k.Key {
 		case KeyLeft, KeyRight, KeyDown, KeyUp:
-			a.focusNearest(a.to(Pt(a.pattern.focusTime, a.focusVal)), k.Key)
+			a.focusNearest(a.to(Pt(a.pattern.cursorTime, a.cursorVal)), k.Key)
 		}
 		return
 	}
 
 	switch k.Key {
 	case KeyLeft, KeyRight:
-		a.pattern.focusTime = math.Max(0, a.pattern.timeGrid.next(a.pattern.focusTime, k.Key == KeyRight))
-		Repaint(a)
+		a.pattern.cursorTime = math.Max(0, a.pattern.timeGrid.next(a.pattern.cursorTime, k.Key == KeyRight))
+		Repaint(a.pattern)
 	case KeyDown, KeyUp:
-		a.focusVal = a.valueGrid.next(a.focusVal, k.Key == KeyUp)
+		a.cursorVal = a.valueGrid.next(a.cursorVal, k.Key == KeyUp)
 		Repaint(a)
 	case KeyTab:
-		for i, a2 := range a.pattern.attrs {
-			if a2 == a {
-				if k.Shift {
-					i--
-					i += len(a.pattern.attrs)
-				} else {
-					i++
-				}
-				SetKeyFocus(a.pattern.attrs[i%len(a.pattern.attrs)])
-				break
-			}
-		}
+		SetKeyFocus(a.next(k.Shift))
 	case KeyEnter:
 		note := a.pattern.newNote()
 		for _, a2 := range a.pattern.attrs {
 			n := newNoteView(a2, note)
-			a2.notes = append(a2.notes, n)
+			a2.notes[note] = n
 			a2.Add(n)
 			if a2 == a {
 				SetKeyFocus(n)
@@ -144,6 +134,21 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 			a.pattern.pattern.Reset()
 		}()
 	}
+}
+
+func (a *attributeView) next(prev bool) *attributeView {
+	attrs := a.pattern.attrs
+	for i, a2 := range attrs {
+		if a2 == a {
+			if prev {
+				i--
+			} else {
+				i++
+			}
+			return attrs[(i+len(attrs))%len(attrs)]
+		}
+	}
+	panic("unreachable")
 }
 
 func (a *attributeView) to(p Point) Point {
@@ -219,12 +224,14 @@ func (a *attributeView) Paint() {
 	}
 
 	SetLineWidth(3)
-	SetColor(Color{1, 1, 1, .2})
-	DrawLine(a.to(Pt(a.pattern.focusTime, min.Y)), a.to(Pt(a.pattern.focusTime, max.Y)))
-	if !a.focused {
-		SetColor(Color{1, 1, 1, .1})
+	SetColor(Color{.4, .4, .4, 1})
+	DrawLine(a.to(Pt(a.pattern.cursorTime, min.Y)), a.to(Pt(a.pattern.cursorTime, max.Y)))
+	if p, ok := KeyFocus(a).(*controlPointView); !ok || p.note.attr == a {
+		if !a.focused && Parent(KeyFocus(a)) != a {
+			SetColor(Color{.3, .3, .3, 1})
+		}
+		DrawLine(a.to(Pt(math.Max(0, min.X), a.cursorVal)), a.to(Pt(max.X, a.cursorVal)))
 	}
-	DrawLine(a.to(Pt(math.Max(0, min.X), a.focusVal)), a.to(Pt(max.X, a.focusVal)))
 
 	SetLineWidth(1)
 	SetColor(Color{1, 1, 1, 1})
@@ -260,8 +267,26 @@ func (n *noteView) setPoints(value []*audio.ControlPoint) {
 	reflect.Indirect(reflect.ValueOf(n.note)).FieldByName(n.attr.name).Set(reflect.ValueOf(value))
 }
 
-func (n *noteView) TookKeyFocus() { n.focused = true; Repaint(n) }
-func (n *noteView) LostKeyFocus() { n.focused = false; Repaint(n) }
+func (n *noteView) TookKeyFocus() {
+	for _, a := range n.attr.pattern.attrs {
+		n := a.notes[n.note]
+		n.focused = true
+		n.updateCursor()
+	}
+}
+func (n *noteView) LostKeyFocus() {
+	for _, a := range n.attr.pattern.attrs {
+		n := a.notes[n.note]
+		n.focused = false
+		Repaint(n)
+	}
+}
+
+func (n *noteView) updateCursor() {
+	n.attr.pattern.cursorTime = n.note.Time()
+	n.attr.cursorVal = n.points[0].point.Value
+	Repaint(n.attr.pattern)
+}
 
 func (n *noteView) KeyPress(k KeyEvent) {
 	if k.Alt {
@@ -276,23 +301,27 @@ func (n *noteView) KeyPress(k KeyEvent) {
 		switch k.Key {
 		case KeyLeft, KeyRight:
 			n.setTime(n.attr.pattern.timeGrid.next(n.note.Time(), k.Key == KeyRight))
+			n.updateCursor()
 		case KeyDown, KeyUp:
 			p0 := n.points[0].point
 			d := n.attr.valueGrid.next(p0.Value, k.Key == KeyUp) - p0.Value
 			for _, p := range n.points {
 				p.setValue(p.point.Value + d)
 			}
+			n.updateCursor()
 		}
 		return
 	}
 
 	switch k.Key {
-	case KeyLeft:
-		n.attr.pattern.focusTime = n.note.Time()
+	case KeyLeft, KeyRight:
+		n.attr.pattern.cursorTime = n.attr.pattern.timeGrid.next(n.attr.pattern.cursorTime, k.Key == KeyRight)
 		SetKeyFocus(n.attr)
-	case KeyRight:
-		n.attr.pattern.focusTime = n.attr.pattern.timeGrid.next(n.note.Time(), true)
+	case KeyDown, KeyUp:
+		n.attr.cursorVal = n.attr.valueGrid.next(n.attr.cursorVal, k.Key == KeyUp)
 		SetKeyFocus(n.attr)
+	case KeyTab:
+		SetKeyFocus(n.attr.next(k.Shift).notes[n.note])
 	case KeyComma:
 		n.newPoint(0)
 	case KeyPeriod:
@@ -335,8 +364,10 @@ func (n *noteView) setTime(t float64) {
 	t = math.Max(0, t)
 	n.note.SetTime(t)
 	n.attr.pattern.pattern.Sort()
-	for _, p := range n.points {
-		p.reform()
+	for _, a := range n.attr.pattern.attrs {
+		for _, p := range a.notes[n.note].points {
+			p.reform()
+		}
 	}
 }
 
@@ -381,16 +412,24 @@ func newControlPointView(note *noteView, point *audio.ControlPoint) *controlPoin
 	return p
 }
 
-func (p *controlPointView) TookKeyFocus() { p.focused = true; Repaint(p) }
+func (p *controlPointView) TookKeyFocus() { p.focused = true; p.updateCursor() }
 func (p *controlPointView) LostKeyFocus() { p.focused = false; Repaint(p) }
+
+func (p *controlPointView) updateCursor() {
+	p.note.attr.pattern.cursorTime = p.note.note.Time() + p.point.Time
+	p.note.attr.cursorVal = p.point.Value
+	Repaint(p.note.attr.pattern)
+}
 
 func (p *controlPointView) KeyPress(k KeyEvent) {
 	if k.Shift {
 		switch k.Key {
 		case KeyLeft, KeyRight:
 			p.setTime(p.note.attr.pattern.timeGrid.next(p.point.Time+p.note.note.Time(), k.Key == KeyRight) - p.note.note.Time())
+			p.updateCursor()
 		case KeyDown, KeyUp:
 			p.setValue(p.note.attr.valueGrid.next(p.point.Value, k.Key == KeyUp))
+			p.updateCursor()
 		}
 		return
 	}
