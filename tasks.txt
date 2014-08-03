@@ -1,4 +1,3 @@
-- color cursor, focused note, and focused control point
 - deletable notes and control points
 - saving
 - no need for special NoteType pseudo-interface:  instead of NoteType struct fields, look at Instrument.Play parameters, store in Note.attributes map[string][]*ControlPoint
