@@ -381,6 +381,23 @@ func (n *noteView) setTime(t float64) {
 func (n *noteView) reform() {
 	ResizeToFit(n, 0)
 	n.Move(InnerRect(n).Min)
+
+	// make space for a tail after the final control point
+	dx := n.attr.to(Pt(n.note.Time()+n.duration(), 0)).X - InnerRect(n).Max.X
+	if dx > 0 {
+		width, height := Size(n)
+		width += dx
+		n.Resize(width, height)
+	}
+}
+
+func (n *noteView) duration() float64 {
+	t := 0.0
+	for _, a := range n.attr.pattern.attrs {
+		points := a.notes[n.note].points
+		t = math.Max(t, points[len(points)-1].point.Time)
+	}
+	return t
 }
 
 func (n *noteView) normalizePoints() {
@@ -405,6 +422,10 @@ func (n *noteView) Paint() {
 	for i, p := range n.points[1:] {
 		DrawLine(Center(n.points[i]), Center(p))
 	}
+
+	// draw a tail after the final control point
+	p := n.points[len(n.points)-1]
+	DrawLine(Center(p), n.attr.to(Pt(n.note.Time()+n.duration(), p.point.Value)))
 }
 
 type controlPointView struct {
