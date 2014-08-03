@@ -1,4 +1,6 @@
-- tweak AttributeView:  Option-arrow to move between Notes or ControlPoints, arrow (no Shift) to move Notes or ControlPoints.  or something!
+- color cursor, focused note, and focused control point
+- deletable notes and control points
+- saving
 - no need for special NoteType pseudo-interface:  instead of NoteType struct fields, look at Instrument.Play parameters, store in Note.attributes map[string][]*ControlPoint
 
 - experiment with Doppler effect with many (esp ambient) sound sources
