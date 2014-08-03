@@ -1,4 +1,5 @@
-- convert/delete flux code, commit
+- tweak AttributeView:  Option-arrow to move between Notes or ControlPoints, arrow (no Shift) to move Notes or ControlPoints.  or something!
+- no need for special NoteType pseudo-interface:  instead of NoteType struct fields, look at Instrument.Play parameters, store in Note.attributes map[string][]*ControlPoint
 
 - experiment with Doppler effect with many (esp ambient) sound sources
 - approach and exceed the speed of sound in Doppler experiments
