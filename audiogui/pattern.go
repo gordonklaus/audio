@@ -120,14 +120,16 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 		SetKeyFocus(a.next(k.Shift))
 	case KeyEnter:
 		note := a.pattern.newNote()
+		var n *noteView
 		for _, a2 := range a.pattern.attrs {
-			n := newNoteView(a2, note)
-			a2.notes[note] = n
-			a2.Add(n)
+			n2 := newNoteView(a2, note)
+			a2.notes[note] = n2
+			a2.Add(n2)
 			if a2 == a {
-				SetKeyFocus(n)
+				n = n2
 			}
 		}
+		SetKeyFocus(n)
 	case KeySpace:
 		go func() {
 			Play(a.pattern.pattern)
@@ -223,14 +225,16 @@ func (a *attributeView) Paint() {
 		DrawLine(a.to(Pt(math.Max(0, min.X), v)), a.to(Pt(max.X, v)))
 	}
 
-	SetLineWidth(3)
-	SetColor(Color{.4, .4, .4, 1})
-	DrawLine(a.to(Pt(a.pattern.cursorTime, min.Y)), a.to(Pt(a.pattern.cursorTime, max.Y)))
 	if p, ok := KeyFocus(a).(*controlPointView); !ok || p.note.attr == a {
-		if !a.focused && Parent(KeyFocus(a)) != a {
-			SetColor(Color{.3, .3, .3, 1})
+		SetLineWidth(3)
+		SetColor(Color{.2, .2, .35, 1})
+		if a.focused {
+			SetColor(Color{.3, .3, .5, 1})
 		}
-		DrawLine(a.to(Pt(math.Max(0, min.X), a.cursorVal)), a.to(Pt(max.X, a.cursorVal)))
+		DrawLine(a.to(Pt(a.pattern.cursorTime, min.Y)), a.to(Pt(a.pattern.cursorTime, max.Y)))
+		if n, ok := KeyFocus(a).(*noteView); !ok || n.attr == a {
+			DrawLine(a.to(Pt(math.Max(0, min.X), a.cursorVal)), a.to(Pt(max.X, a.cursorVal)))
+		}
 	}
 
 	SetLineWidth(1)
@@ -271,6 +275,7 @@ func (n *noteView) TookKeyFocus() {
 	for _, a := range n.attr.pattern.attrs {
 		n := a.notes[n.note]
 		n.focused = true
+		Raise(n)
 		n.updateCursor()
 	}
 }
@@ -278,7 +283,7 @@ func (n *noteView) LostKeyFocus() {
 	for _, a := range n.attr.pattern.attrs {
 		n := a.notes[n.note]
 		n.focused = false
-		Repaint(n)
+		Raise(n)
 	}
 }
 
@@ -297,7 +302,7 @@ func (n *noteView) KeyPress(k KeyEvent) {
 		return
 	}
 
-	if k.Shift {
+	if k.Shift && k.Key != KeyTab {
 		switch k.Key {
 		case KeyLeft, KeyRight:
 			n.setTime(n.attr.pattern.timeGrid.next(n.note.Time(), k.Key == KeyRight))
@@ -328,6 +333,8 @@ func (n *noteView) KeyPress(k KeyEvent) {
 		n.newPoint(len(n.points))
 	case KeyEnter:
 		SetKeyFocus(n.points[0])
+	case KeyEscape:
+		SetKeyFocus(n.attr)
 	}
 }
 
@@ -387,10 +394,13 @@ func (n *noteView) normalizePoints() {
 
 func (n *noteView) Paint() {
 	SetLineWidth(2)
-	SetColor(Color{.75, .75, .75, 1})
+	SetColor(Color{1, 1, 1, 1})
 	if n.focused {
 		SetLineWidth(3)
-		SetColor(Color{1, 1, 1, 1})
+		SetColor(Color{.6, .6, .9, 1})
+		if KeyFocus(n) == n {
+			SetColor(Color{.4, .4, .9, 1})
+		}
 	}
 	for i, p := range n.points[1:] {
 		DrawLine(Center(n.points[i]), Center(p))
@@ -412,8 +422,8 @@ func newControlPointView(note *noteView, point *audio.ControlPoint) *controlPoin
 	return p
 }
 
-func (p *controlPointView) TookKeyFocus() { p.focused = true; p.updateCursor() }
-func (p *controlPointView) LostKeyFocus() { p.focused = false; Repaint(p) }
+func (p *controlPointView) TookKeyFocus() { p.focused = true; Raise(p); p.updateCursor() }
+func (p *controlPointView) LostKeyFocus() { p.focused = false; Raise(p) }
 
 func (p *controlPointView) updateCursor() {
 	p.note.attr.pattern.cursorTime = p.note.note.Time() + p.point.Time
@@ -495,11 +505,17 @@ func (p *controlPointView) index() int {
 
 func (p *controlPointView) Paint() {
 	SetPointSize(5)
+	SetColor(Color{1, 1, 1, 1})
 	if p.note.focused {
-		SetPointSize(7)
+		SetColor(Color{.6, .6, .9, 1})
+		if KeyFocus(p) == p.note {
+			SetPointSize(7)
+			SetColor(Color{.4, .4, .9, 1})
+		}
 	}
 	if p.focused {
 		SetPointSize(10)
+		SetColor(Color{.4, .4, .9, 1})
 	}
 	DrawPoint(ZP)
 }
