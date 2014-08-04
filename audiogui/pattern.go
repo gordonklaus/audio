@@ -1,7 +1,11 @@
 package audiogui
 
 import (
+	"fmt"
+	"go/build"
 	"math"
+	"os"
+	"path/filepath"
 
 	"code.google.com/p/gordon-go/audio"
 	. "code.google.com/p/gordon-go/gui"
@@ -60,6 +64,40 @@ func (p *PatternView) Resize(width, height float64) {
 	p.reform()
 }
 
+func (p *PatternView) save() {
+	var f *os.File
+	for _, dir := range build.Default.SrcDirs() {
+		var err error
+		f, err = os.Create(filepath.Join(dir, "code.google.com/p/gordon-go/songs", os.Args[0], p.pattern.Name+".go"))
+		if err == nil {
+			break
+		}
+		if !os.IsNotExist(err) {
+			fmt.Println("error saving pattern '%s':  ", err)
+			return
+		}
+	}
+	if f == nil {
+		fmt.Printf("error saving pattern '%s':  unable to open file\n", p.pattern.Name)
+		return
+	}
+	defer f.Close()
+
+	f.WriteString("package main\n\nimport \"code.google.com/p/gordon-go/audio\"\n\nvar " + p.pattern.Name + " = []*audio.Note{\n")
+	for _, n := range p.pattern.Notes {
+		fmt.Fprintf(f, "\t{%#v, map[string][]*audio.ControlPoint{\n", n.Time)
+		for name, attr := range n.Attributes {
+			fmt.Fprintf(f, "\t\t%#v: {\n", name)
+			for _, p := range attr {
+				fmt.Fprintf(f, "\t\t\t{%#v, %#v},\n", p.Time, p.Value)
+			}
+			fmt.Fprint(f, "\t\t},\n")
+		}
+		fmt.Fprint(f, "\t}},\n")
+	}
+	fmt.Fprint(f, "}\n")
+}
+
 type attributeView struct {
 	*ViewBase
 	pattern   *PatternView
@@ -93,6 +131,11 @@ func (a *attributeView) TookKeyFocus() { a.focused = true; Repaint(a) }
 func (a *attributeView) LostKeyFocus() { a.focused = false; Repaint(a) }
 
 func (a *attributeView) KeyPress(k KeyEvent) {
+	if k.Command && k.Key == KeyS {
+		a.pattern.save()
+		return
+	}
+
 	if k.Alt {
 		switch k.Key {
 		case KeyLeft, KeyRight, KeyDown, KeyUp:
@@ -281,6 +324,11 @@ func (n *noteView) updateCursor() {
 }
 
 func (n *noteView) KeyPress(k KeyEvent) {
+	if k.Command && k.Key == KeyS {
+		n.attr.pattern.save()
+		return
+	}
+
 	if k.Alt {
 		switch k.Key {
 		case KeyLeft, KeyRight, KeyDown, KeyUp:
@@ -452,6 +500,11 @@ func (p *controlPointView) updateCursor() {
 }
 
 func (p *controlPointView) KeyPress(k KeyEvent) {
+	if k.Command && k.Key == KeyS {
+		p.note.attr.pattern.save()
+		return
+	}
+
 	if k.Shift && k.Key != KeyTab {
 		switch k.Key {
 		case KeyLeft, KeyRight:

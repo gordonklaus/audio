@@ -9,24 +9,13 @@ import (
 )
 
 func main() {
-	n1 := &audio.Note{0, map[string][]*audio.ControlPoint{
-		"Pitch": {
-			{0, 1},
-			{1, 0},
-		},
-		"Amplitude": {
-			{0, 0},
-			{.25, 1},
-			{1, 0},
-		},
-	}}
-	p := audio.NewPattern([]*audio.Note{n1}, inst)
+	p := audio.NewPattern("melody", melody, inst)
 	if len(os.Args) > 1 && os.Args[1] == "edit" {
 		gui.Run(func() {
 			gui.NewWindow(nil, "song1", func(w *gui.Window) {
-				pv := audiogui.NewPatternView(p)
-				w.SetCentralView(pv)
-				gui.SetKeyFocus(pv)
+				v := audiogui.NewPatternView(p)
+				w.SetCentralView(v)
+				gui.SetKeyFocus(v)
 			})
 		})
 	} else {
@@ -46,11 +35,11 @@ type voice struct {
 	Out audio.Audio
 }
 
-func (v *voice) Sing() (a audio.Audio, done bool) {
+func (v *voice) Sing() (audio.Audio, bool) {
 	for i := range v.Out {
 		v.Out[i] = rand.Float64()
 	}
-	a, done = v.Amp.Sing()
-	a = a.Mul(a, v.Out)
-	return
+	a, done := v.Amp.Sing()
+	a.Mul(a, v.Out)
+	return a, done
 }

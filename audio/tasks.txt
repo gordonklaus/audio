@@ -1,4 +1,3 @@
-- saving
 
 - experiment with Doppler effect with many (esp ambient) sound sources
 - approach and exceed the speed of sound in Doppler experiments
