@@ -8,6 +8,7 @@ import (
 
 type Pattern struct {
 	Params     Params
+	Name       string
 	Notes      []*Note
 	i          int
 	t          float64
@@ -15,8 +16,8 @@ type Pattern struct {
 	play       reflect.Value
 }
 
-func NewPattern(notes []*Note, i Instrument) *Pattern {
-	return &Pattern{Notes: notes, Instrument: i, play: InstrumentPlayMethod(i)}
+func NewPattern(name string, notes []*Note, i Instrument) *Pattern {
+	return &Pattern{Name: name, Notes: notes, Instrument: i, play: InstrumentPlayMethod(i)}
 }
 
 func (p *Pattern) Sort() { sort.Sort(byTime(p.Notes)) }
@@ -50,7 +51,7 @@ func (p *Pattern) newNote(note *Note) reflect.Value {
 	for name, val := range note.Attributes {
 		f := n.FieldByName(name)
 		if !f.IsValid() {
-			fmt.Printf("audio.Pattern: invalid note attribute '%s'\n", name)
+			fmt.Printf("audio.Pattern: invalid note attribute '%s' in pattern '%s'\n", name, p.Name)
 			continue
 		}
 		f.Set(reflect.ValueOf(val))
