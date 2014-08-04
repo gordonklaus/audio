@@ -8,23 +8,23 @@ import (
 
 type Pattern struct {
 	Params     Params
-	Notes      []Note
+	Notes      []*Note
 	i          int
 	t          float64
 	Instrument Instrument
 	play       reflect.Value
 }
 
-func NewPattern(notes []Note, i Instrument) *Pattern {
+func NewPattern(notes []*Note, i Instrument) *Pattern {
 	return &Pattern{Notes: notes, Instrument: i, play: InstrumentPlayMethod(i)}
 }
 
 func (p *Pattern) Sort() { sort.Sort(byTime(p.Notes)) }
 
-type byTime []Note
+type byTime []*Note
 
 func (n byTime) Len() int           { return len(n) }
-func (n byTime) Less(i, j int) bool { return n[i].Time() < n[j].Time() }
+func (n byTime) Less(i, j int) bool { return n[i].Time < n[j].Time }
 func (n byTime) Swap(i, j int)      { n[i], n[j] = n[j], n[i] }
 
 func (p *Pattern) Sing() (a Audio, done bool) {
@@ -35,35 +35,39 @@ func (p *Pattern) Sing() (a Audio, done bool) {
 			break
 		}
 		n := p.Notes[p.i]
-		if n.Time() > p.t {
+		if n.Time > p.t {
 			break
 		}
-		p.play.Call([]reflect.Value{reflect.ValueOf(n)})
+		p.play.Call([]reflect.Value{p.newNote(n)})
 		p.i++
 	}
 	a, done2 := p.Instrument.Sing()
 	return a, done && done2
 }
 
+func (p *Pattern) newNote(note *Note) reflect.Value {
+	n := reflect.New(p.play.Type().In(0)).Elem()
+	for name, val := range note.Attributes {
+		f := n.FieldByName(name)
+		if !f.IsValid() {
+			fmt.Printf("audio.Pattern: invalid note attribute '%s'\n", name)
+			continue
+		}
+		f.Set(reflect.ValueOf(val))
+	}
+	return n
+}
+
 func (p *Pattern) Reset() {
 	p.i, p.t = 0, 0
 }
 
-type Note interface {
-	Time() float64
-	SetTime(float64)
+type Note struct {
+	Time       float64
+	Attributes map[string][]*ControlPoint
 }
 
-type note struct{ time float64 }
-
-func (n *note) Time() float64     { return n.time }
-func (n *note) SetTime(t float64) { n.time = t }
-
-func NewNote(time float64) Note {
-	return &note{time}
-}
-
-// An Instrument must also have a method Play(NoteType) where NoteType implements the Note interface.
+// An Instrument must also have a method Play(noteType) where noteType is a struct with exported fields of type []*ControlPoint.
 type Instrument interface {
 	Voice
 }
@@ -76,10 +80,16 @@ func InstrumentPlayMethod(i Instrument) reflect.Value {
 	if m.Type().NumIn() != 1 {
 		panic(fmt.Sprintf("Method (%T).Play must have a single parameter.", i))
 	}
-	noteInterface := reflect.TypeOf(new(Note)).Elem()
-	noteType := m.Type().In(0)
-	if !noteType.Implements(noteInterface) {
-		panic(fmt.Sprintf("Parameter type %s to method (%T).Play does not implement %s.", noteType, i, noteInterface))
+	n := m.Type().In(0)
+	if n.Kind() != reflect.Struct {
+		panic(fmt.Sprintf("The parameter to method (%T).Play must be a struct.", i))
+	}
+	t := reflect.TypeOf([]*ControlPoint(nil))
+	for j := 0; j < n.NumField(); j++ {
+		f := n.Field(j)
+		if f.Type != t || f.PkgPath != "" {
+			panic(fmt.Sprintf("The parameter to method (%T).Play must only have exported fields of type %s.", i, t))
+		}
 	}
 	return m
 }

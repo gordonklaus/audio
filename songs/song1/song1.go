@@ -9,25 +9,18 @@ import (
 )
 
 func main() {
-	p1 := []*audio.ControlPoint{
-		{0, 1},
-		{1, 0},
-	}
-	amp1 := []*audio.ControlPoint{
-		{0, 0},
-		{.25, 1},
-		{1, 0},
-	}
-	p2 := []*audio.ControlPoint{
-		{0, 3},
-		{2, 4},
-	}
-	amp2 := []*audio.ControlPoint{
-		{0, 0},
-		{.25, 1},
-		{1, 0},
-	}
-	p := audio.NewPattern([]audio.Note{&note{audio.NewNote(.25), p1, amp1}, &note{audio.NewNote(4), p2, amp2}}, inst)
+	n1 := &audio.Note{0, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 1},
+			{1, 0},
+		},
+		"Amplitude": {
+			{0, 0},
+			{.25, 1},
+			{1, 0},
+		},
+	}}
+	p := audio.NewPattern([]*audio.Note{n1}, inst)
 	if len(os.Args) > 1 && os.Args[1] == "edit" {
 		gui.Run(func() {
 			gui.NewWindow(nil, "song1", func(w *gui.Window) {
@@ -44,14 +37,8 @@ func main() {
 var inst = &instrument{}
 
 type instrument struct { audio.MultiVoice }
-func (i *instrument) Play(n *note) {
+func (i *instrument) Play(n struct{ Pitch, Amplitude []*audio.ControlPoint }) {
 	i.Add(&voice{Amp: audio.NewControl(n.Amplitude)})
-}
-
-type note struct {
-	audio.Note
-	Pitch     []*audio.ControlPoint
-	Amplitude []*audio.ControlPoint
 }
 
 type voice struct {

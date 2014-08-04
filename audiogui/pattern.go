@@ -2,7 +2,6 @@ package audiogui
 
 import (
 	"math"
-	"reflect"
 
 	"code.google.com/p/gordon-go/audio"
 	. "code.google.com/p/gordon-go/gui"
@@ -11,7 +10,6 @@ import (
 type PatternView struct {
 	*ViewBase
 	pattern    *audio.Pattern
-	noteType   reflect.Type
 	attrs      []*attributeView
 	transTime  float64
 	scaleTime  float64
@@ -22,13 +20,9 @@ type PatternView struct {
 func NewPatternView(pattern *audio.Pattern) *PatternView {
 	p := &PatternView{pattern: pattern, scaleTime: 32}
 	p.ViewBase = NewView(p)
-	p.noteType = audio.InstrumentPlayMethod(pattern.Instrument).Type().In(0).Elem()
-	for i := 0; i < p.noteType.NumField(); i++ {
-		f := p.noteType.Field(i)
-		if f.Name == "Note" {
-			continue
-		}
-		a := newAttributeView(p, f.Name)
+	noteType := audio.InstrumentPlayMethod(pattern.Instrument).Type().In(0)
+	for i := 0; i < noteType.NumField(); i++ {
+		a := newAttributeView(p, noteType.Field(i).Name)
 		p.attrs = append(p.attrs, a)
 		p.Add(a)
 	}
@@ -49,16 +43,14 @@ func (p *PatternView) reform() {
 	}
 }
 
-func (p *PatternView) newNote() audio.Note {
-	n := reflect.New(p.noteType)
-	n.Elem().FieldByName("Note").Set(reflect.ValueOf(audio.NewNote(p.cursorTime)))
+func (p *PatternView) newNote() *audio.Note {
+	n := &audio.Note{p.cursorTime, map[string][]*audio.ControlPoint{}}
 	for _, a := range p.attrs {
-		n.Elem().FieldByName(a.name).Set(reflect.ValueOf([]*audio.ControlPoint{{0, a.cursorVal}}))
+		n.Attributes[a.name] = []*audio.ControlPoint{{0, a.cursorVal}}
 	}
-	note := n.Interface().(audio.Note)
-	p.pattern.Notes = append(p.pattern.Notes, note)
+	p.pattern.Notes = append(p.pattern.Notes, n)
 	p.pattern.Sort()
-	return note
+	return n
 }
 
 func (p *PatternView) TookKeyFocus() { SetKeyFocus(p.attrs[0]) }
@@ -73,7 +65,7 @@ type attributeView struct {
 	pattern   *PatternView
 	name      string
 	nameText  *Text
-	notes     map[audio.Note]*noteView
+	notes     map[*audio.Note]*noteView
 	transVal  float64
 	scaleVal  float64
 	valueGrid *uniformGrid
@@ -87,7 +79,7 @@ func newAttributeView(p *PatternView, name string) *attributeView {
 	a.nameText = NewText(name)
 	a.nameText.SetBackgroundColor(Color{})
 	a.Add(a.nameText)
-	a.notes = map[audio.Note]*noteView{}
+	a.notes = map[*audio.Note]*noteView{}
 	for _, note := range p.pattern.Notes {
 		n := newNoteView(a, note)
 		a.notes[note] = n
@@ -245,15 +237,15 @@ func (a *attributeView) Paint() {
 type noteView struct {
 	*ViewBase
 	attr    *attributeView
-	note    audio.Note
+	note    *audio.Note
 	points  []*controlPointView
 	focused bool
 }
 
-func newNoteView(attr *attributeView, note audio.Note) *noteView {
+func newNoteView(attr *attributeView, note *audio.Note) *noteView {
 	n := &noteView{attr: attr, note: note}
 	n.ViewBase = NewView(n)
-	for _, point := range n.getPoints() {
+	for _, point := range note.Attributes[attr.name] {
 		p := newControlPointView(n, point)
 		n.points = append(n.points, p)
 		n.Add(p)
@@ -263,13 +255,8 @@ func newNoteView(attr *attributeView, note audio.Note) *noteView {
 	return n
 }
 
-func (n *noteView) getPoints() []*audio.ControlPoint {
-	return reflect.Indirect(reflect.ValueOf(n.note)).FieldByName(n.attr.name).Interface().([]*audio.ControlPoint)
-}
-
-func (n *noteView) setPoints(value []*audio.ControlPoint) {
-	reflect.Indirect(reflect.ValueOf(n.note)).FieldByName(n.attr.name).Set(reflect.ValueOf(value))
-}
+func (n *noteView) getpts() []*audio.ControlPoint    { return n.note.Attributes[n.attr.name] }
+func (n *noteView) setpts(pts []*audio.ControlPoint) { n.note.Attributes[n.attr.name] = pts }
 
 func (n *noteView) TookKeyFocus() {
 	for _, a := range n.attr.pattern.attrs {
@@ -288,7 +275,7 @@ func (n *noteView) LostKeyFocus() {
 }
 
 func (n *noteView) updateCursor() {
-	n.attr.pattern.cursorTime = n.note.Time()
+	n.attr.pattern.cursorTime = n.note.Time
 	n.attr.cursorVal = n.points[0].point.Value
 	Repaint(n.attr.pattern)
 }
@@ -305,7 +292,7 @@ func (n *noteView) KeyPress(k KeyEvent) {
 	if k.Shift && k.Key != KeyTab {
 		switch k.Key {
 		case KeyLeft, KeyRight:
-			n.setTime(n.attr.pattern.timeGrid.next(n.note.Time(), k.Key == KeyRight))
+			n.setTime(n.attr.pattern.timeGrid.next(n.note.Time, k.Key == KeyRight))
 			n.updateCursor()
 		case KeyDown, KeyUp:
 			p0 := n.points[0].point
@@ -355,7 +342,7 @@ func (n *noteView) newPoint(i int) {
 	t, v := 0.0, 0.0
 	switch {
 	case i == 0:
-		t = n.attr.pattern.timeGrid.next(n.note.Time(), false) - n.note.Time()
+		t = n.attr.pattern.timeGrid.next(n.note.Time, false) - n.note.Time
 		v = n.points[0].point.Value
 	default:
 		p, q := n.points[i-1].point, n.points[i].point
@@ -363,26 +350,21 @@ func (n *noteView) newPoint(i int) {
 		v = (p.Value + q.Value) / 2
 	case i == len(n.points):
 		p := n.points[len(n.points)-1].point
-		t = n.attr.pattern.timeGrid.next(p.Time+n.note.Time(), true) - n.note.Time()
+		t = n.attr.pattern.timeGrid.next(p.Time+n.note.Time, true) - n.note.Time
 		v = p.Value
 	}
-	p := n.insertPoint(&audio.ControlPoint{t, v}, i)
+	point := &audio.ControlPoint{t, v}
+	n.setpts(append(n.getpts()[:i], append([]*audio.ControlPoint{point}, n.getpts()[i:]...)...))
+	p := newControlPointView(n, point)
+	n.points = append(n.points[:i], append([]*controlPointView{p}, n.points[i:]...)...)
+	n.Add(p)
 	n.normalizePoints()
 	SetKeyFocus(p)
 }
 
-func (n *noteView) insertPoint(point *audio.ControlPoint, i int) *controlPointView {
-	points := n.getPoints()
-	n.setPoints(append(points[:i], append([]*audio.ControlPoint{point}, points[i:]...)...))
-	p := newControlPointView(n, point)
-	n.points = append(n.points[:i], append([]*controlPointView{p}, n.points[i:]...)...)
-	n.Add(p)
-	return p
-}
-
 func (n *noteView) setTime(t float64) {
 	t = math.Max(0, t)
-	n.note.SetTime(t)
+	n.note.Time = t
 	n.attr.pattern.pattern.Sort()
 	for _, a := range n.attr.pattern.attrs {
 		for _, p := range a.notes[n.note].points {
@@ -396,7 +378,7 @@ func (n *noteView) reform() {
 	n.Move(InnerRect(n).Min)
 
 	// make space for a tail after the final control point
-	dx := n.attr.to(Pt(n.note.Time()+n.duration(), 0)).X - InnerRect(n).Max.X
+	dx := n.attr.to(Pt(n.note.Time+n.duration(), 0)).X - InnerRect(n).Max.X
 	if dx > 0 {
 		width, height := Size(n)
 		width += dx
@@ -423,7 +405,7 @@ func (n *noteView) normalizePoints() {
 		p.point.Time -= t
 		p.reform()
 	}
-	n.setTime(n.note.Time() + t)
+	n.setTime(n.note.Time + t)
 }
 
 func (n *noteView) Paint() {
@@ -442,7 +424,7 @@ func (n *noteView) Paint() {
 
 	// draw a tail after the final control point
 	p := n.points[len(n.points)-1]
-	DrawLine(Center(p), n.attr.to(Pt(n.note.Time()+n.duration(), p.point.Value)))
+	DrawLine(Center(p), n.attr.to(Pt(n.note.Time+n.duration(), p.point.Value)))
 }
 
 type controlPointView struct {
@@ -464,7 +446,7 @@ func (p *controlPointView) TookKeyFocus() { p.focused = true; Raise(p); p.update
 func (p *controlPointView) LostKeyFocus() { p.focused = false; Raise(p) }
 
 func (p *controlPointView) updateCursor() {
-	p.note.attr.pattern.cursorTime = p.note.note.Time() + p.point.Time
+	p.note.attr.pattern.cursorTime = p.note.note.Time + p.point.Time
 	p.note.attr.cursorVal = p.point.Value
 	Repaint(p.note.attr.pattern)
 }
@@ -473,7 +455,7 @@ func (p *controlPointView) KeyPress(k KeyEvent) {
 	if k.Shift && k.Key != KeyTab {
 		switch k.Key {
 		case KeyLeft, KeyRight:
-			p.setTime(p.note.attr.pattern.timeGrid.next(p.point.Time+p.note.note.Time(), k.Key == KeyRight) - p.note.note.Time())
+			p.setTime(p.note.attr.pattern.timeGrid.next(p.point.Time+p.note.note.Time, k.Key == KeyRight) - p.note.note.Time)
 			p.updateCursor()
 		case KeyDown, KeyUp:
 			p.setValue(p.note.attr.valueGrid.next(p.point.Value, k.Key == KeyUp))
@@ -499,8 +481,7 @@ func (p *controlPointView) KeyPress(k KeyEvent) {
 		}
 		i := p.index()
 		p.focusNext((i == 0 || k.Key == KeyDelete) && i < len(p.note.points)-1)
-		points := p.note.getPoints()
-		p.note.setPoints(append(points[:i], points[i+1:]...))
+		p.note.setpts(append(p.note.getpts()[:i], p.note.getpts()[i+1:]...))
 		p.note.points = append(p.note.points[:i], p.note.points[i+1:]...)
 		p.note.Remove(p)
 		p.note.normalizePoints()
@@ -511,7 +492,7 @@ func (p *controlPointView) setTime(t float64) {
 	i := p.index()
 	points := p.note.points
 	if i == 0 {
-		t = math.Max(-p.note.note.Time(), t)
+		t = math.Max(-p.note.note.Time, t)
 	} else {
 		t = math.Max(points[i-1].point.Time, t)
 	}
@@ -529,7 +510,7 @@ func (p *controlPointView) setValue(v float64) {
 }
 
 func (p *controlPointView) reform() {
-	MoveOrigin(p, p.note.attr.to(Pt(p.note.note.Time()+p.point.Time, p.point.Value)))
+	MoveOrigin(p, p.note.attr.to(Pt(p.note.note.Time+p.point.Time, p.point.Value)))
 	p.note.reform()
 }
 
