@@ -37,9 +37,9 @@ func main() {
 	}
 }
 
-type window struct{
+type window struct {
 	*gui.Window
-	Multi audio.MultiVoice
+	Multi  audio.MultiVoice
 	voices map[int]*sineVoice
 }
 
@@ -69,7 +69,10 @@ func (w *window) processAudio(in [][]float32, out [][]float32) {
 	}
 }
 
-type sineVoice struct{Sine audio.SineOsc; Env audio.AttackReleaseEnv}
+type sineVoice struct {
+	Sine audio.FixedFreqSineOsc
+	Env  audio.AttackReleaseEnv
+}
 
 func (v *sineVoice) Sing() (audio.Audio, bool) {
 	a, done := v.Env.Sing()

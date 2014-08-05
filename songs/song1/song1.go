@@ -4,7 +4,6 @@ import (
 	"code.google.com/p/gordon-go/audio"
 	"code.google.com/p/gordon-go/audiogui"
 	"code.google.com/p/gordon-go/gui"
-	"math/rand"
 	"os"
 )
 
@@ -24,21 +23,20 @@ func main() {
 
 var inst = &instrument{}
 
-type instrument struct { audio.MultiVoice }
+type instrument struct{ audio.MultiVoice }
+
 func (i *instrument) Play(n struct{ Pitch, Amplitude []*audio.ControlPoint }) {
-	i.Add(&voice{Amp: audio.NewControl(n.Amplitude)})
+	i.Add(&voice{Pitch: audio.NewControl(n.Pitch), Amp: audio.NewControl(n.Amplitude)})
 }
 
 type voice struct {
-	Amp *audio.Control
-	Out audio.Audio
+	Sine       audio.SineOsc
+	Pitch, Amp *audio.Control
 }
 
 func (v *voice) Sing() (audio.Audio, bool) {
-	for i := range v.Out {
-		v.Out[i] = rand.Float64()
-	}
-	a, done := v.Amp.Sing()
-	a.Mul(a, v.Out)
-	return a, done
+	p, done1 := v.Pitch.Sing()
+	a, done2 := v.Amp.Sing()
+	a.Mul(a, v.Sine.Sine(p.Pow2(p.AddX(p, 8))))
+	return a, done1 && done2
 }

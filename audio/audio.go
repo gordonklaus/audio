@@ -43,9 +43,23 @@ func (z Audio) Div(x Audio, y Audio) Audio {
 	return z
 }
 
+func (z Audio) AddX(x Audio, f float64) Audio {
+	for i := range z {
+		z[i] = x[i] + f
+	}
+	return z
+}
+
 func (z Audio) MulX(x Audio, f float64) Audio {
 	for i := range z {
 		z[i] = x[i] * f
+	}
+	return z
+}
+
+func (z Audio) Pow2(x Audio) Audio {
+	for i := range z {
+		z[i] = math.Pow(2, x[i])
 	}
 	return z
 }

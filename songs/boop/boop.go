@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	seed = flag.Int64("seed", math.MinInt64, "seed for random phases")
+	seed   = flag.Int64("seed", math.MinInt64, "seed for random phases")
 	random = flag.Bool("random", false, "randomly choose seed for random phases")
 )
 
@@ -28,7 +28,7 @@ func main() {
 
 	portaudio.Initialize()
 	defer portaudio.Terminate()
-	
+
 	p := audio.Params{SampleRate: 48000, BufferSize: 512}
 
 	m := audio.MultiVoice{}
@@ -36,19 +36,19 @@ func main() {
 	// for _, x := range [][2]float64{{1, 1}, {2, 1}, {3, 1}, {4, 1}, {5, 1}, {3, 2}, {4, 3}, {5, 4}, {7, 4}, {6, 5}, {7, 5}, {8, 5}, {9, 5}} {
 	for xy := 1; xy <= 60; xy++ {
 		for x := 2; x <= int(math.Sqrt(float64(xy))); x++ {
-			if y := xy / x; x * y == xy && relPrime(x, y) {
+			if y := xy / x; x*y == xy && relPrime(x, y) {
 				x, y, xy := float64(x), float64(y), float64(xy)
-				c := math.Exp(-xy * math.Log2(y / x) / 12)
+				c := math.Exp(-xy * math.Log2(y/x) / 12)
 				f := y / x
 				phase := 0.0
 				if *random {
 					phase = rand.Float64()
 				}
-				m.Add(newSineBeat(.5 * c, 128 * f, 1 / xy, phase, .1 / f))
+				m.Add(newSineBeat(.5*c, 128*f, 1/xy, phase, .1/f))
 			}
 		}
 	}
-	
+
 	s, err := portaudio.OpenDefaultStream(0, 1, p.SampleRate, p.BufferSize, func(out []float32) {
 		x, _ := m.Sing()
 		x = x.Tanh(x)
@@ -75,10 +75,10 @@ func relPrime(x, y int) bool {
 }
 
 type sineBeat struct {
-	amp       float64
-	Sine      audio.SineOsc
-	Env       normalOsc
-	Out       audio.Audio
+	amp  float64
+	Sine audio.FixedFreqSineOsc
+	Env  normalOsc
+	Out  audio.Audio
 }
 
 func newSineBeat(amp, sineFreq, beatFreq, beatPhase, beatWidth float64) *sineBeat {
@@ -95,7 +95,7 @@ func (b *sineBeat) Sing() (audio.Audio, bool) {
 }
 
 type normalOsc struct {
-	Sine  audio.SineOsc
+	Sine  audio.FixedFreqSineOsc
 	width float64
 }
 
@@ -104,7 +104,7 @@ func (o *normalOsc) osc() audio.Audio {
 	w := math.Log(o.width)
 	for i, x := range a {
 		x = x * w
-		a[i] = math.Exp(-x*x)
+		a[i] = math.Exp(-x * x)
 	}
 	return a
 }
