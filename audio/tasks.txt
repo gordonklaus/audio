@@ -1,3 +1,6 @@
+- grids:  pitch, nogrid
+- Score
+- Get rid of Params.visited.  It will break re-initialization.  Cyclic structures can break Init cycles by implementing InitAudio.
 
 - experiment with Doppler effect with many (esp ambient) sound sources
 - approach and exceed the speed of sound in Doppler experiments

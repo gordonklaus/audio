@@ -9,17 +9,16 @@ import (
 )
 
 func main() {
-	p := audio.NewPattern("melody", melody, inst)
 	if len(os.Args) > 1 && os.Args[1] == "edit" {
 		gui.Run(func() {
 			gui.NewWindow(nil, "song1", func(w *gui.Window) {
-				v := audiogui.NewPatternView(p)
+				v := audiogui.NewPatternView(melody, inst)
 				w.SetCentralView(v)
 				gui.SetKeyFocus(v)
 			})
 		})
 	} else {
-		audiogui.Play(p)
+		audiogui.Play(audio.NewPatternPlayer(melody, inst))
 	}
 }
 

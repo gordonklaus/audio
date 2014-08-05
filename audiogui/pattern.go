@@ -14,6 +14,7 @@ import (
 type PatternView struct {
 	*ViewBase
 	pattern    *audio.Pattern
+	inst       audio.Instrument
 	attrs      []*attributeView
 	transTime  float64
 	scaleTime  float64
@@ -21,10 +22,10 @@ type PatternView struct {
 	cursorTime float64
 }
 
-func NewPatternView(pattern *audio.Pattern) *PatternView {
-	p := &PatternView{pattern: pattern, scaleTime: 32}
+func NewPatternView(pattern *audio.Pattern, inst audio.Instrument) *PatternView {
+	p := &PatternView{pattern: pattern, inst: inst, scaleTime: 32}
 	p.ViewBase = NewView(p)
-	noteType := audio.InstrumentPlayMethod(pattern.Instrument).Type().In(0)
+	noteType := audio.InstrumentPlayMethod(inst).Type().In(0)
 	for i := 0; i < noteType.NumField(); i++ {
 		a := newAttributeView(p, noteType.Field(i).Name)
 		p.attrs = append(p.attrs, a)
@@ -53,7 +54,6 @@ func (p *PatternView) newNote() *audio.Note {
 		n.Attributes[a.name] = []*audio.ControlPoint{{0, a.cursorVal}}
 	}
 	p.pattern.Notes = append(p.pattern.Notes, n)
-	p.pattern.Sort()
 	return n
 }
 
@@ -83,7 +83,7 @@ func (p *PatternView) save() {
 	}
 	defer f.Close()
 
-	f.WriteString("package main\n\nimport \"code.google.com/p/gordon-go/audio\"\n\nvar " + p.pattern.Name + " = []*audio.Note{\n")
+	fmt.Fprintf(f, "package main\n\nimport \"code.google.com/p/gordon-go/audio\"\n\nvar %s = &audio.Pattern{%#v, []*audio.Note{\n", p.pattern.Name, p.pattern.Name)
 	for _, n := range p.pattern.Notes {
 		fmt.Fprintf(f, "\t{%#v, map[string][]*audio.ControlPoint{\n", n.Time)
 		for name, attr := range n.Attributes {
@@ -95,7 +95,7 @@ func (p *PatternView) save() {
 		}
 		fmt.Fprint(f, "\t}},\n")
 	}
-	fmt.Fprint(f, "}\n")
+	fmt.Fprint(f, "}}\n")
 }
 
 type attributeView struct {
@@ -167,8 +167,7 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 		SetKeyFocus(n)
 	case KeySpace:
 		go func() {
-			Play(a.pattern.pattern)
-			a.pattern.pattern.Reset()
+			Play(audio.NewPatternPlayer(a.pattern.pattern, a.pattern.inst))
 		}()
 	}
 }
@@ -413,7 +412,6 @@ func (n *noteView) newPoint(i int) {
 func (n *noteView) setTime(t float64) {
 	t = math.Max(0, t)
 	n.note.Time = t
-	n.attr.pattern.pattern.Sort()
 	for _, a := range n.attr.pattern.attrs {
 		for _, p := range a.notes[n.note].points {
 			p.reform()
