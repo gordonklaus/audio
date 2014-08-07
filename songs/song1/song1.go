@@ -37,6 +37,6 @@ type voice struct {
 func (v *voice) Sing() (audio.Audio, bool) {
 	p, done1 := v.Pitch.Sing()
 	a, done2 := v.Amp.Sing()
-	a.Mul(a, v.Sine.Sine(p.Pow2(p.AddX(p, 8))))
-	return a, done1 && done2
+	s := v.Sine.Sine(p.Pow2(p))
+	return s.Amplify(s, a), done1 && done2
 }

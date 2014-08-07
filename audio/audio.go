@@ -71,6 +71,13 @@ func (z Audio) Tanh(x Audio) Audio {
 	return z
 }
 
+func (z Audio) Amplify(x Audio, a Audio) Audio {
+	for i := range z {
+		z[i] = x[i] * math.Exp2(a[i])
+	}
+	return z
+}
+
 func Add(x Audio, y Audio) Audio { return make(Audio, len(x)).Add(x, y) }
 func Sub(x Audio, y Audio) Audio { return make(Audio, len(x)).Sub(x, y) }
 func Mul(x Audio, y Audio) Audio { return make(Audio, len(x)).Mul(x, y) }

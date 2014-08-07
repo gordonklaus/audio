@@ -31,7 +31,7 @@ func NewPatternView(pattern *audio.Pattern, inst audio.Instrument) *PatternView 
 		p.attrs = append(p.attrs, a)
 		p.Add(a)
 	}
-	p.timeGrid = &uniformGrid{0, 1}
+	p.timeGrid = &uniformGrid{1}
 	return p
 }
 
@@ -60,6 +60,14 @@ func (p *PatternView) newNote() *audio.Note {
 func (p *PatternView) TookKeyFocus() { SetKeyFocus(p.attrs[0]) }
 
 func (p *PatternView) Resize(width, height float64) {
+	p.transTime += (width - Width(p)) / 2
+	for _, a := range p.attrs {
+		for _, n := range a.notes {
+			for _, p := range n.points {
+				p.reform()
+			}
+		}
+	}
 	p.ViewBase.Resize(width, height)
 	p.reform()
 }
@@ -106,7 +114,7 @@ type attributeView struct {
 	notes     map[*audio.Note]*noteView
 	transVal  float64
 	scaleVal  float64
-	valueGrid *uniformGrid
+	valueGrid grid
 	focused   bool
 	cursorVal float64
 }
@@ -123,7 +131,9 @@ func newAttributeView(p *PatternView, name string) *attributeView {
 		a.notes[note] = n
 		a.Add(n)
 	}
-	a.valueGrid = &uniformGrid{0, .2}
+	a.valueGrid = defaultGrid(name)
+	a.cursorVal = a.valueGrid.defaultValue()
+	a.transVal = -a.cursorVal * a.scaleVal
 	return a
 }
 
@@ -215,6 +225,13 @@ func (a *attributeView) nearest(pt Point, dirKey int) (nearest *noteView) {
 }
 
 func (a *attributeView) Resize(width, height float64) {
+	a.transVal += (height - Height(a)) / 2
+	for _, n := range a.notes {
+		for _, p := range n.points {
+			p.reform()
+		}
+	}
+	Repaint(a)
 	a.ViewBase.Resize(width, height)
 	a.nameText.Move(InnerRect(a).Max.Sub(Pt(Size(a.nameText))))
 }
@@ -244,19 +261,37 @@ func (a *attributeView) Scroll(s ScrollEvent) {
 			}
 		}
 	}
+	Repaint(a)
 }
 
 func (a *attributeView) Paint() {
 	r := InnerRect(a)
-	SetLineWidth(2)
-	SetColor(Color{.2, .2, .2, 1})
 	min := a.from(r.Min)
 	max := a.from(r.Max)
 	for t := a.pattern.timeGrid.next(math.Nextafter(math.Max(0, min.X), -math.MaxFloat64), true); t < max.X; t = a.pattern.timeGrid.next(t, true) {
+		SetColor(Color{.2, .2, .2, 1})
+		SetLineWidth(2)
+		if t == 0 {
+			SetColor(Color{.3, .3, .3, 1})
+			SetLineWidth(5)
+		}
 		DrawLine(a.to(Pt(t, min.Y)), a.to(Pt(t, max.Y)))
 	}
-	for v := a.valueGrid.next(math.Nextafter(min.Y, -math.MaxFloat64), true); v < max.Y; v = a.valueGrid.next(v, true) {
+	i := 0
+	prev := -math.MaxFloat64
+	for v := a.valueGrid.next(math.Nextafter(min.Y, -math.MaxFloat64), true); i < 1000 && v < max.Y && v != prev; v = a.valueGrid.next(v, true) {
+		SetColor(Color{.2, .2, .2, 1})
+		SetLineWidth(2)
+		if v == a.valueGrid.defaultValue() {
+			SetColor(Color{.3, .3, .3, 1})
+			SetLineWidth(5)
+		}
 		DrawLine(a.to(Pt(math.Max(0, min.X), v)), a.to(Pt(max.X, v)))
+		prev = v
+		i++
+	}
+	if i == 1000 {
+		println("too much")
 	}
 
 	if p, ok := KeyFocus(a).(*controlPointView); !ok || p.note.attr == a {
