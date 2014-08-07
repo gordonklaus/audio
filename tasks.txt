@@ -1,4 +1,4 @@
-- grids:  pitch, nogrid
+- don't limit note and control point times to >0.  let pattern and note be "anchored" at t=0:  placement in score and pattern and movement on grid is based on this anchor while the actual start can be t<0.
 - Score
 - Get rid of Params.visited.  It will break re-initialization.  Cyclic structures can break Init cycles by implementing InitAudio.
 
