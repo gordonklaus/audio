@@ -57,9 +57,9 @@ func (z Audio) MulX(x Audio, f float64) Audio {
 	return z
 }
 
-func (z Audio) Pow2(x Audio) Audio {
+func (z Audio) Exp2(x Audio) Audio {
 	for i := range z {
-		z[i] = math.Pow(2, x[i])
+		z[i] = math.Exp2(x[i])
 	}
 	return z
 }
