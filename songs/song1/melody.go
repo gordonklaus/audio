@@ -5,83 +5,57 @@ import "code.google.com/p/gordon-go/audio"
 var melody = &audio.Pattern{"melody", []*audio.Note{
 	{0, map[string][]*audio.ControlPoint{
 		"Pitch": {
-			{0, 8},
-			{1, 8},
+			{0, 7.2630344058337934},
+			{2, 8},
+			{9, 8},
 		},
 		"Amplitude": {
-			{0, 0},
-		},
-	}},
-	{1, map[string][]*audio.ControlPoint{
-		"Pitch": {
-			{0, 8},
-		},
-		"Amplitude": {
-			{0, -1},
-			{1, -1},
+			{0, -10},
+			{1, 0},
+			{9, -12},
 		},
 	}},
 	{2, map[string][]*audio.ControlPoint{
 		"Pitch": {
-			{0, 8},
+			{0, 8.584962500721156},
+			{7, 8.584962500721156},
 		},
 		"Amplitude": {
-			{0, -2},
-			{1, -2},
+			{0, 0},
+			{7, -12},
+		},
+	}},
+	{2, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -10},
+			{2, -2},
+			{7, -12},
+		},
+		"Pitch": {
+			{0, 9.169925001442312},
+			{7, 9.169925001442312},
 		},
 	}},
 	{3, map[string][]*audio.ControlPoint{
-		"Pitch": {
-			{0, 8},
-		},
 		"Amplitude": {
-			{0, -3},
-			{1, -3},
+			{0, 0},
+			{1, -10},
+			{6, -12},
+		},
+		"Pitch": {
+			{0, 9.584962500721156},
+			{6, 9.584962500721156},
 		},
 	}},
 	{4, map[string][]*audio.ControlPoint{
 		"Pitch": {
-			{0, 8},
+			{0, 10.169925001442312},
+			{5, 10.169925001442312},
 		},
 		"Amplitude": {
-			{0, -4},
+			{0, -10},
 			{1, -4},
-		},
-	}},
-	{5, map[string][]*audio.ControlPoint{
-		"Amplitude": {
-			{0, -5},
-			{1, -5},
-		},
-		"Pitch": {
-			{0, 8},
-		},
-	}},
-	{6, map[string][]*audio.ControlPoint{
-		"Pitch": {
-			{0, 8},
-		},
-		"Amplitude": {
-			{0, -6},
-			{1, -6},
-		},
-	}},
-	{7, map[string][]*audio.ControlPoint{
-		"Pitch": {
-			{0, 8},
-		},
-		"Amplitude": {
-			{0, -7},
-			{1, -7},
-		},
-	}},
-	{8, map[string][]*audio.ControlPoint{
-		"Pitch": {
-			{0, 8},
-		},
-		"Amplitude": {
-			{0, -8},
-			{1, -8},
+			{5, -12},
 		},
 	}},
 }}
