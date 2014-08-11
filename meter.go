@@ -20,9 +20,9 @@ func (a *AmpMeter) InitAudio(p Params) {
 func (a *AmpMeter) Amplitude(x Audio) float64 {
 	for _, x := range x {
 		a.sum -= a.buf[a.i]
-		a.buf[a.i] = math.Abs(x)
+		a.buf[a.i] = x * x
 		a.sum += a.buf[a.i]
 		a.i = (a.i + 1) % len(a.buf)
 	}
-	return a.sum / float64(len(a.buf))
+	return math.Sqrt(a.sum / float64(len(a.buf)))
 }
