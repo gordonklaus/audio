@@ -17,11 +17,10 @@ type Note struct {
 }
 
 type PatternPlayer struct {
-	Params  Params
 	pattern *Pattern
 	inst    Instrument
 	i       int
-	t       float64
+	t, dt   float64
 	play    reflect.Value
 }
 
@@ -37,26 +36,24 @@ func (n byTime) Less(i, j int) bool { return n[i].Time < n[j].Time }
 func (n byTime) Swap(i, j int)      { n[i], n[j] = n[j], n[i] }
 
 func (p *PatternPlayer) InitAudio(params Params) {
-	p.Params = params
 	Init(p.inst, params)
+	p.dt = 1 / params.SampleRate
 }
 
-func (p *PatternPlayer) Sing() (a Audio, done bool) {
-	p.t += float64(p.Params.BufferSize) / p.Params.SampleRate
-	for {
-		if p.i >= len(p.pattern.Notes) {
-			done = true
-			break
-		}
+func (p *PatternPlayer) Sing() float64 {
+	for ; p.i < len(p.pattern.Notes); p.i++ {
 		n := p.pattern.Notes[p.i]
 		if n.Time > p.t {
 			break
 		}
 		p.play.Call([]reflect.Value{p.newNote(n)})
-		p.i++
 	}
-	a, done2 := p.inst.Sing()
-	return a, done && done2
+	p.t += p.dt
+	return p.inst.Sing()
+}
+
+func (p *PatternPlayer) Done() bool {
+	return p.i == len(p.pattern.Notes) && p.inst.Done()
 }
 
 func (p *PatternPlayer) newNote(note *Note) reflect.Value {

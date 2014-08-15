@@ -8,21 +8,11 @@ type AudioIniter interface {
 
 type Params struct {
 	SampleRate float64
-	BufferSize int
-	visited    map[interface{}]struct{}
 }
 
 func (p *Params) InitAudio(q Params) { *p = q }
 
 func Init(x interface{}, p Params) {
-	if p.visited == nil {
-		p.visited = map[interface{}]struct{}{}
-	}
-	if _, ok := p.visited[x]; ok {
-		return
-	}
-	p.visited[x] = struct{}{}
-
 	if x, ok := x.(AudioIniter); ok {
 		x.InitAudio(p)
 		return

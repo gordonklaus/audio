@@ -3,11 +3,13 @@ package audio
 import "fmt"
 
 type Control struct {
-	Params  Params
 	points  []*ControlPoint
 	periods []controlPeriod
 	x       float64
-	Out     Audio
+}
+
+type ControlPoint struct {
+	Time, Value float64
 }
 
 func NewControl(points []*ControlPoint) *Control {
@@ -21,7 +23,6 @@ func NewControl(points []*ControlPoint) *Control {
 }
 
 func (c *Control) InitAudio(params Params) {
-	c.Params = params
 	c.periods = make([]controlPeriod, len(c.points))
 	prev := &ControlPoint{}
 	for i, p := range c.points {
@@ -30,33 +31,24 @@ func (c *Control) InitAudio(params Params) {
 		c.periods[i] = controlPeriod{int(dn), dx, p.Value}
 		prev = p
 	}
-	c.Out.InitAudio(params)
 }
 
-func (c *Control) Sing() (_ Audio, done bool) {
-	i := 0
-	n := len(c.Out)
-	for len(c.periods) > 0 && i < n {
+func (c *Control) Sing() float64 {
+	for len(c.periods) > 0 {
 		p := &c.periods[0]
-		for i < n && p.n > 0 {
-			c.Out[i] = c.x
-			c.x += p.dx
-			i++
+		if p.n > 0 {
 			p.n--
+			c.x += p.dx
+			break
 		}
-		if p.n == 0 {
-			c.x = p.value // this is necessary for zero-length controlPeriods that mark discontinuities (and may also help correct for rounding errors)
-			c.periods = c.periods[1:]
-		}
+		c.x = p.value // this is necessary for zero-length controlPeriods that mark discontinuities
+		c.periods = c.periods[1:]
 	}
-	for ; i < n; i++ {
-		c.Out[i] = c.x
-	}
-	return c.Out, len(c.periods) == 0
+	return c.x
 }
 
-type ControlPoint struct {
-	Time, Value float64
+func (c *Control) Done() bool {
+	return len(c.periods) == 0
 }
 
 type controlPeriod struct {

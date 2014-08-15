@@ -15,17 +15,16 @@ func Play(v audio.Voice) {
 	portaudio.Initialize()
 	defer portaudio.Terminate()
 	stop := make(chan bool, 1)
-	params := audio.Params{SampleRate: 96000, BufferSize: 64}
+	params := audio.Params{SampleRate: 96000}
 	audio.Init(v, params)
-	s, err := portaudio.OpenDefaultStream(0, 1, params.SampleRate, params.BufferSize, func(in [][]float32, out [][]float32) {
-		a, done := v.Sing()
-		for i := range out[0] {
-			out[0][i] = float32(a[i])
-		}
-		if done {
-			select {
-			case stop <- true:
-			default:
+	s, err := portaudio.OpenDefaultStream(0, 1, params.SampleRate, 64, func(out []float32) {
+		for i := range out {
+			out[i] = float32(v.Sing())
+			if v.Done() {
+				select {
+				case stop <- true:
+				default:
+				}
 			}
 		}
 	})

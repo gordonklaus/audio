@@ -11,12 +11,12 @@ import (
 
 func main() {
 	w := &window{voices: map[int]*sineVoice{}}
-	p := audio.Params{SampleRate: 96000, BufferSize: 64}
+	p := audio.Params{SampleRate: 96000}
 	audio.Init(w, p)
 
 	portaudio.Initialize()
 	defer portaudio.Terminate()
-	s, err := portaudio.OpenDefaultStream(0, 1, p.SampleRate, p.BufferSize, w.processAudio)
+	s, err := portaudio.OpenDefaultStream(0, 1, p.SampleRate, 64, w.processAudio)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -62,10 +62,9 @@ func (w *window) KeyRelease(k gui.KeyEvent) {
 	}
 }
 
-func (w *window) processAudio(in [][]float32, out [][]float32) {
-	a, _ := w.Multi.Sing()
-	for i, x := range a {
-		out[0][i] = float32(x)
+func (w *window) processAudio(out []float32) {
+	for i := range out {
+		out[i] = float32(w.Multi.Sing())
 	}
 }
 
@@ -74,18 +73,17 @@ type sineVoice struct {
 	Env  audio.AttackReleaseEnv
 }
 
-func (v *sineVoice) Sing() (audio.Audio, bool) {
-	a, done := v.Env.Sing()
-	return distort(a.Mul(a, v.Sine.Sine())), done
+func (v *sineVoice) Sing() float64 {
+	return distort(v.Env.Sing() * v.Sine.Sine())
 }
 
-func distort(a audio.Audio) audio.Audio {
-	for i, x := range a {
-		y := math.Abs(x) + 1
-		y *= y
-		a[i] = math.Copysign((y-1)/y, x)
-	}
-	return a
+func (v *sineVoice) Done() bool {
+	return v.Env.Done()
+}
+
+func distort(x float64) float64 {
+	y := math.Abs(x) + 1
+	return math.Copysign(1-1/(y*y), x)
 }
 
 func pitchToFreq(pitch float64) float64 { return 512 * math.Pow(2, pitch/12) }

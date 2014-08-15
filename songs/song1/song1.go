@@ -6,7 +6,9 @@ import (
 	"code.google.com/p/gordon-go/gui"
 
 	"math"
+	"math/rand"
 	"os"
+	"time"
 )
 
 func main() {
@@ -32,7 +34,7 @@ func (i *instrument) Play(n struct{ Pitch, Amplitude []*audio.ControlPoint }) {
 	i.Add(&voice{
 		Pitch:    audio.NewControl(n.Pitch),
 		Amp:      audio.NewControl(n.Amplitude),
-		Rand:     audio.NewRand(),
+		rand:     rand.New(rand.NewSource(time.Now().UnixNano())),
 		b:        -math.Log(.001) / 2 / releaseTime,
 		AmpMeter: audio.NewAmpMeter(.05),
 	})
@@ -40,7 +42,7 @@ func (i *instrument) Play(n struct{ Pitch, Amplitude []*audio.ControlPoint }) {
 
 type voice struct {
 	Pitch, Amp        *audio.Control
-	Rand              *audio.Rand
+	rand              *rand.Rand
 	u, v, b, dt, sqdt float64
 	AmpMeter          *audio.AmpMeter
 }
@@ -48,27 +50,24 @@ type voice struct {
 func (v *voice) InitAudio(p audio.Params) {
 	audio.Init(v.Pitch, p)
 	audio.Init(v.Amp, p)
-	audio.Init(v.Rand, p)
 	v.dt = 1 / p.SampleRate
 	v.sqdt = math.Sqrt(v.dt)
 	audio.Init(v.AmpMeter, p)
 }
 
-func (v *voice) Sing() (audio.Audio, bool) {
-	p, done1 := v.Pitch.Sing()
-	a, done2 := v.Amp.Sing()
-	r := v.Rand.NormRand()
-	r.Amplify(r, a)
-	if done1 && done2 {
-		r.Zero()
+func (v *voice) Sing() float64 {
+	p := math.Exp2(v.Pitch.Sing())
+	r := math.Exp2(v.Amp.Sing()) * v.rand.NormFloat64()
+	if v.Pitch.Done() && v.Amp.Done() {
+		r = 0
 	}
-	p.Exp2(p)
-	for i := range a {
-		c := v.b*v.b/4 + 4*math.Pi*math.Pi*p[i]*p[i]
-		v.u += v.dt*v.v + v.sqdt*r[i]
-		v.v -= v.dt * (v.b*v.v + c*v.u)
-		a[i] = v.u
-	}
-	amp := v.AmpMeter.Amplitude(a)
-	return a, done1 && done2 && amp < .00001
+	c := v.b*v.b/4 + 4*math.Pi*math.Pi*p*p
+	v.u += v.dt*v.v + v.sqdt*r
+	v.v -= v.dt * (v.b*v.v + c*v.u)
+	v.AmpMeter.Add(v.u)
+	return v.u
+}
+
+func (v *voice) Done() bool {
+	return v.Pitch.Done() && v.Amp.Done() && v.AmpMeter.Amplitude() < .00001
 }

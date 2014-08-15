@@ -29,7 +29,7 @@ func main() {
 	portaudio.Initialize()
 	defer portaudio.Terminate()
 
-	p := audio.Params{SampleRate: 48000, BufferSize: 512}
+	p := audio.Params{SampleRate: 48000}
 
 	m := audio.MultiVoice{}
 	audio.Init(&m, p)
@@ -49,11 +49,9 @@ func main() {
 		}
 	}
 
-	s, err := portaudio.OpenDefaultStream(0, 1, p.SampleRate, p.BufferSize, func(out []float32) {
-		x, _ := m.Sing()
-		x = x.Tanh(x)
-		for i, a := range x {
-			out[i] = float32(a)
+	s, err := portaudio.OpenDefaultStream(0, 1, p.SampleRate, 512, func(out []float32) {
+		for i := range out {
+			out[i] = float32(math.Tanh(m.Sing()))
 		}
 	})
 	if err != nil {
@@ -78,7 +76,6 @@ type sineBeat struct {
 	amp  float64
 	Sine audio.FixedFreqSineOsc
 	Env  normalOsc
-	Out  audio.Audio
 }
 
 func newSineBeat(amp, sineFreq, beatFreq, beatPhase, beatWidth float64) *sineBeat {
@@ -86,25 +83,22 @@ func newSineBeat(amp, sineFreq, beatFreq, beatPhase, beatWidth float64) *sineBea
 	b.Sine.SetFreq(sineFreq)
 	b.Env.Sine.SetFreq(beatFreq / 2)
 	b.Env.Sine.SetPhase(beatPhase)
-	b.Env.width = beatWidth
+	b.Env.width = math.Log(beatWidth)
 	return b
 }
 
-func (b *sineBeat) Sing() (audio.Audio, bool) {
-	return b.Out.Mul(b.Sine.Sine(), b.Env.osc()).MulX(b.Out, b.amp), false
+func (b *sineBeat) Sing() float64 {
+	return b.amp * b.Sine.Sine() * b.Env.osc()
 }
+
+func (b *sineBeat) Done() bool { return false }
 
 type normalOsc struct {
 	Sine  audio.FixedFreqSineOsc
 	width float64
 }
 
-func (o *normalOsc) osc() audio.Audio {
-	a := o.Sine.Sine()
-	w := math.Log(o.width)
-	for i, x := range a {
-		x = x * w
-		a[i] = math.Exp(-x * x)
-	}
-	return a
+func (o *normalOsc) osc() float64 {
+	x := o.Sine.Sine() * o.width
+	return math.Exp(-x * x)
 }
