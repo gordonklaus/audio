@@ -1,13 +1,13 @@
 package audio
 
 type Voice interface {
-	Sing() (_ Audio, done bool)
+	Sing() float64
+	Done() bool
 }
 
 type MultiVoice struct {
 	Params Params
 	voices map[Voice]struct{}
-	Out    Audio
 }
 
 func (m *MultiVoice) Add(v Voice) {
@@ -18,14 +18,17 @@ func (m *MultiVoice) Add(v Voice) {
 	m.voices[v] = struct{}{}
 }
 
-func (m *MultiVoice) Sing() (Audio, bool) {
-	m.Out.Zero()
+func (m *MultiVoice) Sing() float64 {
+	x := 0.0
 	for v := range m.voices {
-		a, done := v.Sing()
-		m.Out.Add(m.Out, a)
-		if done {
+		x += v.Sing()
+		if v.Done() {
 			delete(m.voices, v)
 		}
 	}
-	return m.Out, len(m.voices) == 0
+	return x
+}
+
+func (m *MultiVoice) Done() bool {
+	return len(m.voices) == 0
 }
