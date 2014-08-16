@@ -17,7 +17,7 @@ func main() {
 			gui.NewWindow(nil, "song1", func(w *gui.Window) {
 				v := audiogui.NewPatternView(melody, inst)
 				w.SetCentralView(v)
-				gui.SetKeyFocus(v)
+				v.InitFocus()
 			})
 		})
 	} else {

@@ -35,6 +35,13 @@ func (n byTime) Len() int           { return len(n) }
 func (n byTime) Less(i, j int) bool { return n[i].Time < n[j].Time }
 func (n byTime) Swap(i, j int)      { n[i], n[j] = n[j], n[i] }
 
+func (p *PatternPlayer) GetTime() float64 { return p.t }
+func (p *PatternPlayer) SetTime(t float64) {
+	p.t = t
+	for p.i = 0; p.i < len(p.pattern.Notes) && p.pattern.Notes[p.i].Time < t; p.i++ {
+	}
+}
+
 func (p *PatternPlayer) InitAudio(params Params) {
 	Init(p.inst, params)
 	p.dt = 1 / params.SampleRate
@@ -72,6 +79,7 @@ func (p *PatternPlayer) newNote(note *Note) reflect.Value {
 // An Instrument must also have a method Play(noteType) where noteType is a struct with exported fields of type []*ControlPoint.
 type Instrument interface {
 	Voice
+	Reset()
 }
 
 func InstrumentPlayMethod(inst Instrument) reflect.Value {

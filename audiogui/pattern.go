@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"time"
 
 	"code.google.com/p/gordon-go/audio"
 	. "code.google.com/p/gordon-go/gui"
@@ -20,6 +21,10 @@ type PatternView struct {
 	scaleTime  float64
 	timeGrid   *uniformGrid
 	cursorTime float64
+
+	player      *audio.PatternPlayer
+	play, close chan bool
+	oldFocus    View
 }
 
 func NewPatternView(pattern *audio.Pattern, inst audio.Instrument) *PatternView {
@@ -32,7 +37,49 @@ func NewPatternView(pattern *audio.Pattern, inst audio.Instrument) *PatternView 
 		p.Add(a)
 	}
 	p.timeGrid = &uniformGrid{1}
+
+	p.player = audio.NewPatternPlayer(pattern, inst)
+	p.play = make(chan bool)
+	p.close = make(chan bool)
+	go p.animate()
+
 	return p
+}
+
+func (p *PatternView) Close() {
+	p.ViewBase.Close()
+	p.close <- true
+}
+
+func (p *PatternView) animate() {
+	var next <-chan time.Time
+	ctrl := &PlayControl{}
+	for {
+		select {
+		case <-p.play:
+			if next != nil {
+				next = nil
+				ctrl.Stop()
+				break
+			}
+			p.inst.Reset()
+			ctrl = PlayAsync(p.player)
+			next = time.After(time.Second / 60)
+		case <-next:
+			next = time.After(time.Second / 60)
+			Do(p, func() {
+				p.cursorTime = p.player.GetTime()
+				Repaint(p)
+			})
+		case <-ctrl.Done:
+			next = nil
+			Do(p, func() {
+				SetKeyFocus(p.oldFocus)
+			})
+		case <-p.close:
+			return
+		}
+	}
 }
 
 func (p *PatternView) reform() {
@@ -57,7 +104,15 @@ func (p *PatternView) newNote() *audio.Note {
 	return n
 }
 
-func (p *PatternView) TookKeyFocus() { SetKeyFocus(p.attrs[0]) }
+func (p *PatternView) InitFocus() { SetKeyFocus(p.attrs[0]) }
+
+func (p *PatternView) KeyPress(k KeyEvent) {
+	switch k.Key {
+	case KeySpace:
+		p.play <- false
+		SetKeyFocus(p.oldFocus)
+	}
+}
 
 func (p *PatternView) Resize(width, height float64) {
 	p.transTime += (width - Width(p)) / 2
@@ -176,9 +231,10 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 		}
 		SetKeyFocus(n)
 	case KeySpace:
-		go func() {
-			Play(audio.NewPatternPlayer(a.pattern.pattern, a.pattern.inst))
-		}()
+		a.pattern.oldFocus = a
+		SetKeyFocus(a.pattern)
+		a.pattern.player.SetTime(a.pattern.cursorTime)
+		a.pattern.play <- true
 	}
 }
 
