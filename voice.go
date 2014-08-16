@@ -32,3 +32,7 @@ func (m *MultiVoice) Sing() float64 {
 func (m *MultiVoice) Done() bool {
 	return len(m.voices) == 0
 }
+
+func (m *MultiVoice) Reset() {
+	m.voices = nil
+}
