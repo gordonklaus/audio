@@ -19,43 +19,66 @@ type Note struct {
 type PatternPlayer struct {
 	pattern *Pattern
 	inst    Instrument
+	play    reflect.Value
 	i       int
 	t, dt   float64
-	play    reflect.Value
 }
 
 func NewPatternPlayer(pattern *Pattern, inst Instrument) *PatternPlayer {
-	sort.Sort(byTime(pattern.Notes))
 	return &PatternPlayer{pattern: pattern, inst: inst, play: InstrumentPlayMethod(inst)}
-}
-
-type byTime []*Note
-
-func (n byTime) Len() int           { return len(n) }
-func (n byTime) Less(i, j int) bool { return n[i].Time < n[j].Time }
-func (n byTime) Swap(i, j int)      { n[i], n[j] = n[j], n[i] }
-
-func (p *PatternPlayer) GetTime() float64 { return p.t }
-func (p *PatternPlayer) SetTime(t float64) {
-	p.t = t
-	for p.i = 0; p.i < len(p.pattern.Notes) && p.pattern.Notes[p.i].Time < t; p.i++ {
-	}
 }
 
 func (p *PatternPlayer) InitAudio(params Params) {
 	Init(p.inst, params)
 	p.dt = 1 / params.SampleRate
+	p.SetTime(p.t)
 }
 
-func (p *PatternPlayer) Sing() float64 {
+func (p *PatternPlayer) GetTime() float64 { return p.t }
+func (p *PatternPlayer) SetTime(t float64) {
+	noteType := p.play.Type().In(0)
+	for _, n := range p.pattern.Notes {
+		for name := range n.Attributes {
+			if _, ok := noteType.FieldByName(name); !ok {
+				panic(fmt.Sprintf("Pattern %s: Instrument %T has no attribute %s.", p.pattern.Name, p.inst, name))
+			}
+		}
+		for i := 0; i < noteType.NumField(); i++ {
+			name := noteType.Field(i).Name
+			if _, ok := n.Attributes[name]; !ok {
+				panic(fmt.Sprintf("Pattern %s: Note has no attribute %s for instrument %T.", p.pattern.Name, name, p.inst))
+			}
+		}
+	}
+	sort.Sort(notesByTime(p.pattern.Notes))
+	for p.i = 0; p.i < len(p.pattern.Notes) && p.pattern.Notes[p.i].Time < t; p.i++ {
+	}
+	p.t = t
+}
+
+type notesByTime []*Note
+
+func (n notesByTime) Len() int           { return len(n) }
+func (n notesByTime) Less(i, j int) bool { return n[i].Time < n[j].Time }
+func (n notesByTime) Swap(i, j int)      { n[i], n[j] = n[j], n[i] }
+
+func (p *PatternPlayer) Play() {
 	for ; p.i < len(p.pattern.Notes); p.i++ {
 		n := p.pattern.Notes[p.i]
 		if n.Time > p.t {
 			break
 		}
-		p.play.Call([]reflect.Value{p.newNote(n)})
+		note := reflect.New(p.play.Type().In(0)).Elem()
+		for name, val := range n.Attributes {
+			note.FieldByName(name).Set(reflect.ValueOf(val))
+		}
+		p.play.Call([]reflect.Value{note})
 	}
 	p.t += p.dt
+}
+
+func (p *PatternPlayer) Sing() float64 {
+	p.Play()
 	return p.inst.Sing()
 }
 
@@ -63,20 +86,7 @@ func (p *PatternPlayer) Done() bool {
 	return p.i == len(p.pattern.Notes) && p.inst.Done()
 }
 
-func (p *PatternPlayer) newNote(note *Note) reflect.Value {
-	n := reflect.New(p.play.Type().In(0)).Elem()
-	for name, val := range note.Attributes {
-		f := n.FieldByName(name)
-		if !f.IsValid() {
-			fmt.Printf("audio.PatternPlayer: invalid note attribute '%s' in pattern '%s'\n", name, p.pattern.Name)
-			continue
-		}
-		f.Set(reflect.ValueOf(val))
-	}
-	return n
-}
-
-// An Instrument must also have a method Play(noteType) where noteType is a struct with exported fields of type []*ControlPoint.
+// An Instrument must have a method Play(noteType) where noteType is a struct with exported fields of type []*ControlPoint.
 type Instrument interface {
 	Voice
 	Reset()
@@ -102,4 +112,10 @@ func InstrumentPlayMethod(inst Instrument) reflect.Value {
 		}
 	}
 	return m
+}
+
+func IsInstrument(i Instrument) (ok bool) {
+	defer func() { ok = recover() == nil }()
+	InstrumentPlayMethod(i)
+	return
 }
