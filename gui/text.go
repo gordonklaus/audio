@@ -4,7 +4,9 @@ import (
 	"code.google.com/p/gordon-go/ftgl"
 	"code.google.com/p/gordon-go/glfw"
 	gl "github.com/chsc/gogl/gl21"
+
 	"go/build"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -23,8 +25,9 @@ type Text struct {
 	Accept, TextChanged func(string)
 	Reject              func()
 
-	cursor     bool
-	stopCursor chan chan bool
+	blinkCursor bool
+	cursor      bool
+	stopCursor  chan chan bool
 }
 
 func NewText(text string) *Text {
@@ -73,7 +76,7 @@ func pkgDir() string {
 func (t Text) Text() string { return t.text }
 func (t *Text) SetText(text string) {
 	t.text = text
-	t.Resize(2*t.frameSize+t.font.Advance(t.text), 2*t.frameSize-t.font.Descender()+t.font.Ascender())
+	t.Resize(math.Max(1, 2*t.frameSize+t.font.Advance(t.text)), 2*t.frameSize-t.font.Descender()+t.font.Ascender())
 	if t.TextChanged != nil {
 		t.TextChanged(text)
 	}
@@ -99,7 +102,14 @@ func (t *Text) SetFrameSize(size float64) {
 	t.Resize(2*t.frameSize+t.font.Advance(t.text), 2*t.frameSize-t.font.Descender()+t.font.Ascender())
 }
 
-func (t *Text) TookKeyFocus() {
+func (t *Text) TookKeyFocus() { t.ShowCursor() }
+func (t *Text) LostKeyFocus() { t.HideCursor() }
+
+func (t *Text) ShowCursor() {
+	if t.blinkCursor {
+		return
+	}
+	t.blinkCursor = true
 	t.cursor = true
 	Repaint(t)
 	go func() {
@@ -125,7 +135,11 @@ func (t *Text) TookKeyFocus() {
 	}()
 }
 
-func (t *Text) LostKeyFocus() {
+func (t *Text) HideCursor() {
+	if !t.blinkCursor {
+		return
+	}
+	t.blinkCursor = false
 	ch := make(chan bool)
 	t.stopCursor <- ch
 	<-ch

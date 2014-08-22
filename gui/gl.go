@@ -21,6 +21,14 @@ func DrawLine(p1, p2 Point) {
 	Vertex2d(Double(p2.X), Double(p2.Y))
 }
 
+func DrawLineStrip(p ...Point) {
+	Begin(LINE_STRIP)
+	defer End()
+	for _, p := range p {
+		Vertex2d(Double(p.X), Double(p.Y))
+	}
+}
+
 func DrawRect(r Rectangle) {
 	p1, p2, p3, p4 := r.Min, Pt(r.Max.X, r.Min.Y), r.Max, Pt(r.Min.X, r.Max.Y)
 	DrawLine(p1, p2)

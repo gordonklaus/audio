@@ -65,6 +65,7 @@ type ViewBase struct {
 	size     Point
 	pan      Point
 	scale    Point
+	NoClip   bool
 }
 
 func NewView(self View) *ViewBase {
@@ -226,18 +227,23 @@ func (v *ViewBase) paint() {
 		return
 	}
 
-	r := OuterRect(v)
-	for v := Parent(v); v != nil; v = Parent(v) {
+	w := v.Self.win()
+	r := OuterRect(w)
+	r = Rectangle{Map(r.Min, w, v.Self), Map(r.Max, w, v.Self)}
+	noclip := false
+	for v := View(v); v != nil; v = Parent(v) {
 		r = Rectangle{MapToParent(r.Min, v), MapToParent(r.Max, v)}
-		r = r.Intersect(OuterRect(v))
-		if r.Empty() {
-			return
+		noclip = noclip || v.base().NoClip
+		if !noclip {
+			r = r.Intersect(OuterRect(v))
+			if r.Empty() {
+				return
+			}
 		}
 	}
-	w := v.Self.win()
 	ax := float64(w.bufWidth) / w.size.X
 	ay := float64(w.bufHeight) / w.size.Y
-	gl.Scissor(gl.Int(ax*r.Min.X), gl.Int(ay*r.Min.Y), gl.Sizei(ax*r.Dx()), gl.Sizei(ay*r.Dy()))
+	gl.Scissor(gl.Int(ax*r.Min.X), gl.Int(ay*r.Min.Y), gl.Sizei(ax*(r.Dx()+1)), gl.Sizei(ay*(r.Dy()+1)))
 
 	gl.PushMatrix()
 	defer gl.PopMatrix()

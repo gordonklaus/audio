@@ -15,23 +15,39 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "edit" {
 		gui.Run(func() {
 			gui.NewWindow(nil, "song1", func(w *gui.Window) {
-				v := audiogui.NewPatternView(melody, inst)
+				v := audiogui.NewScoreView(score, newBand())
 				w.SetCentralView(v)
 				v.InitFocus()
 			})
 		})
 	} else {
-		audiogui.Play(audio.NewPatternPlayer(melody, inst))
+		audiogui.Play(audio.NewScorePlayer(score, newBand()))
 	}
 }
 
-var inst = &instrument{}
+type band struct {
+	Sines  *noiseForcedSines
+	Sines2 *noiseForcedSines
+}
 
-type instrument struct{ audio.MultiVoice }
+func newBand() *band {
+	s := &noiseForcedSines{}
+	return &band{s, s}
+}
 
-func (i *instrument) Play(n struct{ Pitch, Amplitude []*audio.ControlPoint }) {
+func (b *band) Sing() float64 {
+	return b.Sines.Sing()
+}
+
+func (b *band) Done() bool {
+	return b.Sines.Done()
+}
+
+type noiseForcedSines struct{ audio.MultiVoice }
+
+func (s *noiseForcedSines) Play(n struct{ Pitch, Amplitude []*audio.ControlPoint }) {
 	releaseTime := 1.0
-	i.Add(&voice{
+	s.Add(&voice{
 		Pitch:    audio.NewControl(n.Pitch),
 		Amp:      audio.NewControl(n.Amplitude),
 		rand:     rand.New(rand.NewSource(time.Now().UnixNano())),

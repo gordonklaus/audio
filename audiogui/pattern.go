@@ -2,10 +2,9 @@ package audiogui
 
 import (
 	"fmt"
-	"go/build"
 	"math"
 	"os"
-	"path/filepath"
+	"reflect"
 	"time"
 
 	"code.google.com/p/gordon-go/audio"
@@ -30,6 +29,7 @@ type PatternView struct {
 func NewPatternView(pattern *audio.Pattern, inst audio.Instrument) *PatternView {
 	p := &PatternView{pattern: pattern, inst: inst, scaleTime: 32}
 	p.ViewBase = NewView(p)
+	// TODO: add new attributes to notes
 	noteType := audio.InstrumentPlayMethod(inst).Type().In(0)
 	for i := 0; i < noteType.NumField(); i++ {
 		a := newAttributeView(p, noteType.Field(i).Name)
@@ -45,6 +45,8 @@ func NewPatternView(pattern *audio.Pattern, inst audio.Instrument) *PatternView 
 
 	return p
 }
+
+func (p *PatternView) InitFocus() { SetKeyFocus(p.attrs[0]) }
 
 func (p *PatternView) Close() {
 	p.ViewBase.Close()
@@ -87,11 +89,10 @@ func (p *PatternView) reform() {
 	x1, y1 := r.Min.XY()
 	x2, y2 := r.Max.XY()
 	dy := (y2 - y1) / float64(len(p.attrs))
-	y2 -= dy
 	for _, a := range p.attrs {
+		y2 -= dy
 		a.Resize(x2-x1, dy)
 		a.Move(Pt(x1, y2))
-		y2 -= dy
 	}
 }
 
@@ -103,8 +104,6 @@ func (p *PatternView) newNote() *audio.Note {
 	p.pattern.Notes = append(p.pattern.Notes, n)
 	return n
 }
-
-func (p *PatternView) InitFocus() { SetKeyFocus(p.attrs[0]) }
 
 func (p *PatternView) KeyPress(k KeyEvent) {
 	switch k.Key {
@@ -128,26 +127,22 @@ func (p *PatternView) Resize(width, height float64) {
 }
 
 func (p *PatternView) save() {
-	var f *os.File
-	for _, dir := range build.Default.SrcDirs() {
-		var err error
-		f, err = os.Create(filepath.Join(dir, "code.google.com/p/gordon-go/songs", os.Args[0], p.pattern.Name+".go"))
-		if err == nil {
-			break
-		}
-		if !os.IsNotExist(err) {
-			fmt.Println("error saving pattern '%s':  ", err)
-			return
-		}
-	}
-	if f == nil {
-		fmt.Printf("error saving pattern '%s':  unable to open file\n", p.pattern.Name)
+	savePattern(p.pattern)
+}
+
+var audioPkgPath = reflect.TypeOf(audio.Note{}).PkgPath()
+var audioguiPkgPath = reflect.TypeOf(noteView{}).PkgPath()
+
+func savePattern(p *audio.Pattern) {
+	f, err := os.Create(registeredPatterns[p.Name].path)
+	if err != nil {
+		fmt.Printf("error saving pattern '%s':  %s\n", p.Name, err)
 		return
 	}
 	defer f.Close()
 
-	fmt.Fprintf(f, "package main\n\nimport \"code.google.com/p/gordon-go/audio\"\n\nvar %s = &audio.Pattern{%#v, []*audio.Note{\n", p.pattern.Name, p.pattern.Name)
-	for _, n := range p.pattern.Notes {
+	fmt.Fprintf(f, "package main\n\nimport (\n\t%q\n\t%q\n)\n\nvar %s = audiogui.RegisterPattern(&audio.Pattern{%#v, []*audio.Note{\n", audioPkgPath, audioguiPkgPath, p.Name, p.Name)
+	for _, n := range p.Notes {
 		fmt.Fprintf(f, "\t{%#v, map[string][]*audio.ControlPoint{\n", n.Time)
 		for name, attr := range n.Attributes {
 			fmt.Fprintf(f, "\t\t%#v: {\n", name)
@@ -158,7 +153,7 @@ func (p *PatternView) save() {
 		}
 		fmt.Fprint(f, "\t}},\n")
 	}
-	fmt.Fprint(f, "}}\n")
+	fmt.Fprint(f, "}})\n")
 }
 
 type attributeView struct {
@@ -294,18 +289,12 @@ func (a *attributeView) Resize(width, height float64) {
 
 func (a *attributeView) Scroll(s ScrollEvent) {
 	if s.Shift {
-		dt := math.Pow(1.05, -s.Delta.X)
-		dv := math.Pow(1.05, -s.Delta.Y)
-		a.pattern.scaleTime = math.Max(10, math.Min(1000, a.pattern.scaleTime*dt))
-		if a.pattern.scaleTime == 10 || a.pattern.scaleTime == 1000 {
-			dt = 1
-		}
-		a.scaleVal = math.Max(10, math.Min(1000, a.scaleVal*dv))
-		if a.scaleVal == 10 || a.scaleVal == 1000 {
-			dv = 1
-		}
-		a.pattern.transTime = s.Pos.X + (a.pattern.transTime-s.Pos.X)*dt
-		a.transVal = s.Pos.Y + (a.transVal-s.Pos.Y)*dv
+		oldScaleTime := a.pattern.scaleTime
+		a.pattern.scaleTime = math.Max(10, math.Min(1000, a.pattern.scaleTime*math.Pow(1.05, -s.Delta.X)))
+		a.pattern.transTime = s.Pos.X + (a.pattern.transTime-s.Pos.X)*a.pattern.scaleTime/oldScaleTime
+		oldScaleVal := a.scaleVal
+		a.scaleVal = math.Max(10, math.Min(1000, a.scaleVal*math.Pow(1.05, -s.Delta.Y)))
+		a.transVal = s.Pos.Y + (a.transVal-s.Pos.Y)*a.scaleVal/oldScaleVal
 	} else {
 		a.pattern.transTime += 8 * s.Delta.X
 		a.transVal += 8 * s.Delta.Y
@@ -333,9 +322,8 @@ func (a *attributeView) Paint() {
 		}
 		DrawLine(a.to(Pt(t, min.Y)), a.to(Pt(t, max.Y)))
 	}
-	i := 0
 	prev := -math.MaxFloat64
-	for v := a.valueGrid.next(math.Nextafter(min.Y, -math.MaxFloat64), true); i < 1000 && v < max.Y && v != prev; v = a.valueGrid.next(v, true) {
+	for v := a.valueGrid.next(math.Nextafter(min.Y, -math.MaxFloat64), true); v < max.Y && v != prev; v = a.valueGrid.next(v, true) {
 		SetColor(Color{.2, .2, .2, 1})
 		SetLineWidth(2)
 		if v == a.valueGrid.defaultValue() {
@@ -344,10 +332,6 @@ func (a *attributeView) Paint() {
 		}
 		DrawLine(a.to(Pt(math.Max(0, min.X), v)), a.to(Pt(max.X, v)))
 		prev = v
-		i++
-	}
-	if i == 1000 {
-		println("too much")
 	}
 
 	if p, ok := KeyFocus(a).(*controlPointView); !ok || p.note.attr == a {
