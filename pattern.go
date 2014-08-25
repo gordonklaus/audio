@@ -89,7 +89,7 @@ func (p *PatternPlayer) Done() bool {
 // An Instrument must have a method Play(noteType) where noteType is a struct with exported fields of type []*ControlPoint.
 type Instrument interface {
 	Voice
-	Reset()
+	Stop()
 }
 
 func InstrumentPlayMethod(inst Instrument) reflect.Value {
