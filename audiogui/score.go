@@ -28,6 +28,8 @@ type ScoreView struct {
 	player      *audio.ScorePlayer
 	play, close chan bool
 	oldFocus    View
+	
+	pattern *PatternView
 }
 
 func NewScoreView(score *audio.Score, band audio.Band) *ScoreView {
@@ -101,6 +103,23 @@ func (s *ScoreView) animate() {
 	}
 }
 
+func (s *ScoreView) reform() {
+	w, h := Size(s)
+	for _, p := range s.parts {
+		ph := Height(p)
+		h -= ph
+		p.Resize(w, ph)
+		p.Move(Pt(0, h))
+		p.name.Move(Pt(w-Width(p.name), ph-Height(p.name)))
+		for _, e := range p.events {
+			e.reform()
+		}
+	}
+	if s.pattern != nil {
+		s.pattern.Resize(w, h)
+	}
+}
+
 func (s *ScoreView) save() {
 	f, err := os.Create(s.path)
 	if err != nil {
@@ -120,28 +139,31 @@ func (s *ScoreView) save() {
 	fmt.Fprint(f, "}}\n")
 }
 
+func (s *ScoreView) editPattern(e *patternEventView) {
+	p := NewPatternView(e.event.Pattern, audio.BandInstruments(s.band)[e.part.part.Name])
+	p.closed = func() {
+		s.pattern = nil
+		s.reform()
+		SetKeyFocus(e)
+	}
+	s.pattern = p
+	s.Add(p)
+	s.reform()
+	p.InitFocus()
+}
+
+func (s *ScoreView) Resize(width, height float64) {
+	s.transTime += (width - Width(s)) / 2
+	s.ViewBase.Resize(width, height)
+	s.reform()
+}
+
 func (s *ScoreView) KeyPress(k KeyEvent) {
 	switch k.Key {
 	case KeySpace:
 		s.play <- false
 		SetKeyFocus(s.oldFocus)
 	}
-}
-
-func (s *ScoreView) Resize(width, height float64) {
-	s.transTime += (width - Width(s)) / 2
-	y := height
-	const partHeight = 32
-	for _, p := range s.parts {
-		y -= partHeight
-		p.Resize(width, partHeight)
-		p.Move(Pt(0, y))
-		p.name.Move(Pt(width-Width(p.name), partHeight-Height(p.name)))
-		for _, e := range p.events {
-			e.reform()
-		}
-	}
-	s.ViewBase.Resize(width, height)
 }
 
 func (s *ScoreView) Scroll(e ScrollEvent) {
@@ -180,6 +202,7 @@ func newPartView(score *ScoreView, part *audio.Part) *partView {
 		p.events = append(p.events, e)
 		p.Add(e)
 	}
+	p.Resize(0, 32)
 	return p
 }
 
@@ -375,6 +398,8 @@ func (e *patternEventView) KeyPress(k KeyEvent) {
 		SetKeyFocus(e.part)
 	case KeyDown, KeyUp:
 		SetKeyFocus(e.part.next(k.Key == KeyUp))
+	case KeyEnter:
+		e.part.score.editPattern(e)
 	case KeyEscape:
 		SetKeyFocus(e.part)
 	case KeyBackspace, KeyDelete:

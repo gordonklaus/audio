@@ -7,15 +7,15 @@ import (
 
 var melody_pattern = audiogui.NewPattern([]*audio.Note{
 	{0, map[string][]*audio.ControlPoint{
-		"Amplitude": {
-			{0, -10},
-			{1, 0},
-			{9, -12},
-		},
 		"Pitch": {
 			{0, 7.2630344058337934},
 			{2, 8},
 			{9, 8},
+		},
+		"Amplitude": {
+			{0, -10},
+			{1, 0},
+			{9, -12},
 		},
 	}},
 	{2, map[string][]*audio.ControlPoint{

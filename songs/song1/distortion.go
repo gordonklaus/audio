@@ -8,8 +8,10 @@ import (
 var distortion_pattern = audiogui.NewPattern([]*audio.Note{
 	{0, map[string][]*audio.ControlPoint{
 		"Gain": {
-			{0, 1},
-			{8, 8},
+			{0, 8},
+			{3, 1},
+			{5, 8},
+			{8, 1},
 		},
 	}},
 })

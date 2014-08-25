@@ -24,6 +24,8 @@ type PatternView struct {
 	player      *audio.PatternPlayer
 	play, close chan bool
 	oldFocus    View
+	
+	closed func()
 }
 
 func NewPatternView(pattern *audio.Pattern, inst audio.Instrument) *PatternView {
@@ -51,6 +53,9 @@ func (p *PatternView) InitFocus() { SetKeyFocus(p.attrs[0]) }
 func (p *PatternView) Close() {
 	p.ViewBase.Close()
 	p.close <- true
+	if p.closed != nil {
+		p.closed()
+	}
 }
 
 func (p *PatternView) animate() {
@@ -230,6 +235,9 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 		SetKeyFocus(a.pattern)
 		a.pattern.player.SetTime(a.pattern.cursorTime)
 		a.pattern.play <- true
+	case KeyEscape:
+		a.pattern.save()
+		a.pattern.Close()
 	}
 }
 
