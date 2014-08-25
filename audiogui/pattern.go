@@ -64,7 +64,7 @@ func (p *PatternView) animate() {
 				ctrl.Stop()
 				break
 			}
-			p.inst.Reset()
+			p.inst.Stop()
 			ctrl = PlayAsync(p.player)
 			next = time.After(time.Second / 60)
 		case <-next:
@@ -134,14 +134,14 @@ var audioPkgPath = reflect.TypeOf(audio.Note{}).PkgPath()
 var audioguiPkgPath = reflect.TypeOf(noteView{}).PkgPath()
 
 func savePattern(p *audio.Pattern) {
-	f, err := os.Create(registeredPatterns[p.Name].path)
+	f, err := os.Create(Patterns[p.Name].path)
 	if err != nil {
 		fmt.Printf("error saving pattern '%s':  %s\n", p.Name, err)
 		return
 	}
 	defer f.Close()
 
-	fmt.Fprintf(f, "package main\n\nimport (\n\t%q\n\t%q\n)\n\nvar %s = audiogui.RegisterPattern(&audio.Pattern{%#v, []*audio.Note{\n", audioPkgPath, audioguiPkgPath, p.Name, p.Name)
+	fmt.Fprintf(f, "package main\n\nimport (\n\t%q\n\t%q\n)\n\nvar %s_pattern = audiogui.NewPattern([]*audio.Note{\n", audioPkgPath, audioguiPkgPath, p.Name)
 	for _, n := range p.Notes {
 		fmt.Fprintf(f, "\t{%#v, map[string][]*audio.ControlPoint{\n", n.Time)
 		for name, attr := range n.Attributes {
@@ -153,7 +153,7 @@ func savePattern(p *audio.Pattern) {
 		}
 		fmt.Fprint(f, "\t}},\n")
 	}
-	fmt.Fprint(f, "}})\n")
+	fmt.Fprint(f, "})\n")
 }
 
 type attributeView struct {

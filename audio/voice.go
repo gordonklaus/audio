@@ -33,6 +33,6 @@ func (m *MultiVoice) Done() bool {
 	return len(m.voices) == 0
 }
 
-func (m *MultiVoice) Reset() {
+func (m *MultiVoice) Stop() {
 	m.voices = nil
 }

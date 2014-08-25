@@ -3,6 +3,7 @@ package audio
 import "fmt"
 
 type Control struct {
+	params  Params
 	points  []*ControlPoint
 	periods []controlPeriod
 	x       float64
@@ -13,20 +14,26 @@ type ControlPoint struct {
 }
 
 func NewControl(points []*ControlPoint) *Control {
+	return &Control{points: points}
+}
+
+func (c *Control) InitAudio(params Params) {
+	c.params = params
+	c.SetPoints(c.points)
+}
+
+func (c *Control) SetPoints(points []*ControlPoint) {
 	for i := range points {
 		if i > 0 && points[i].Time < points[i-1].Time {
 			fmt.Printf("control points out of order:  %#s\n", points)
 			break
 		}
 	}
-	return &Control{points: points}
-}
-
-func (c *Control) InitAudio(params Params) {
+	c.points = points
 	c.periods = make([]controlPeriod, len(c.points))
 	prev := &ControlPoint{}
 	for i, p := range c.points {
-		dn := (p.Time - prev.Time) * params.SampleRate
+		dn := (p.Time - prev.Time) * c.params.SampleRate
 		dx := (p.Value - prev.Value) / dn
 		c.periods[i] = controlPeriod{int(dn), dx, p.Value}
 		prev = p

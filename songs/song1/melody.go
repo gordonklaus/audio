@@ -5,7 +5,7 @@ import (
 	"code.google.com/p/gordon-go/audiogui"
 )
 
-var melody = audiogui.RegisterPattern(&audio.Pattern{"melody", []*audio.Note{
+var melody_pattern = audiogui.NewPattern([]*audio.Note{
 	{0, map[string][]*audio.ControlPoint{
 		"Amplitude": {
 			{0, -10},
@@ -61,4 +61,4 @@ var melody = audiogui.RegisterPattern(&audio.Pattern{"melody", []*audio.Note{
 			{5, -12},
 		},
 	}},
-}})
+})

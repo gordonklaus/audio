@@ -80,7 +80,7 @@ func (s *ScoreView) animate() {
 				break
 			}
 			for _, inst := range audio.BandInstruments(s.band) {
-				inst.Reset()
+				inst.Stop()
 			}
 			ctrl = PlayAsync(s.player)
 			next = time.After(time.Second / 60)
@@ -113,7 +113,7 @@ func (s *ScoreView) save() {
 	for _, p := range s.score.Parts {
 		fmt.Fprintf(f, "\t{%q, []*audio.PatternEvent{\n", p.Name)
 		for _, e := range p.Events {
-			fmt.Fprintf(f, "\t\t{%v, %v},\n", e.Time, e.Pattern.Name)
+			fmt.Fprintf(f, "\t\t{%v, %s_pattern},\n", e.Time, e.Pattern.Name)
 		}
 		fmt.Fprint(f, "\t}},\n")
 	}
@@ -220,11 +220,11 @@ func (p *partView) KeyPress(k KeyEvent) {
 		e.name.accepted = func(name string) {
 			p.events = append(p.events, e)
 			p.part.Events = append(p.part.Events, event)
-			if info, ok := registeredPatterns[name]; ok {
+			if info, ok := Patterns[name]; ok {
 				event.Pattern = info.p
 			} else {
 				event.Pattern.Name = name
-				registeredPatterns[name] = patternInfo{event.Pattern, filepath.Join(filepath.Dir(p.score.path), name) + ".go"}
+				Patterns[name] = patternInfo{event.Pattern, filepath.Join(filepath.Dir(p.score.path), name) + ".go"}
 				savePattern(event.Pattern)
 			}
 			e.reform()
@@ -448,7 +448,7 @@ func (n *patternName) LostKeyFocus() {
 
 func (n *patternName) addNames() {
 	names := []string{}
-	for name := range registeredPatterns {
+	for name := range Patterns {
 		if strings.HasPrefix(strings.ToLower(name), strings.ToLower(n.text.Text())) {
 			names = append(names, name)
 		}
@@ -523,15 +523,18 @@ func (n *patternName) Paint() {
 	}
 }
 
-var registeredPatterns = map[string]patternInfo{}
+var Patterns = map[string]patternInfo{}
 
 type patternInfo struct {
 	p    *audio.Pattern
 	path string
 }
 
-func RegisterPattern(p *audio.Pattern) *audio.Pattern {
+func NewPattern(notes []*audio.Note) *audio.Pattern {
 	_, path, _, _ := runtime.Caller(1)
-	registeredPatterns[p.Name] = patternInfo{p, path}
+	name := filepath.Base(path)
+	name = name[:len(name)-3]
+	p := &audio.Pattern{name, notes}
+	Patterns[name] = patternInfo{p, path}
 	return p
 }

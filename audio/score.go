@@ -131,9 +131,12 @@ func BandInstruments(b Band) map[string]Instrument {
 		if !f.CanInterface() || sf.Tag.Get("audio") == "noscore" {
 			continue
 		}
-		if i, ok := f.Interface().(Instrument); ok && IsInstrument(i) {
-			insts[sf.Name] = i
+		i, ok := f.Interface().(Instrument)
+		if !ok || !IsInstrument(i) {
+			panic(fmt.Sprintf("(%T).%s is not an Instrument nor is it tagged with `audio:\"noscore\"`.", b, sf.Name))
+			continue
 		}
+		insts[sf.Name] = i
 	}
 	return insts
 }
