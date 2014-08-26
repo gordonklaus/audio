@@ -28,7 +28,7 @@ type ScoreView struct {
 	player      *audio.ScorePlayer
 	play, close chan bool
 	oldFocus    View
-	
+
 	pattern *PatternView
 }
 
@@ -53,7 +53,7 @@ loop:
 		s.parts = append(s.parts, p)
 		s.Add(p)
 	}
-	s.timeGrid = &uniformGrid{1}
+	s.timeGrid = &uniformGrid{0, 1}
 
 	s.player = audio.NewScorePlayer(score, band)
 	s.play = make(chan bool)

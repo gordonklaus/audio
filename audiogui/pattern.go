@@ -21,10 +21,10 @@ type PatternView struct {
 	timeGrid   *uniformGrid
 	cursorTime float64
 
-	player      *audio.PatternPlayer
-	play, close chan bool
-	oldFocus    View
-	
+	player     *audio.PatternPlayer
+	play, stop chan bool
+	oldFocus   View
+
 	closed func()
 }
 
@@ -38,11 +38,11 @@ func NewPatternView(pattern *audio.Pattern, inst audio.Instrument) *PatternView 
 		p.attrs = append(p.attrs, a)
 		p.Add(a)
 	}
-	p.timeGrid = &uniformGrid{1}
+	p.timeGrid = &uniformGrid{0, 1}
 
 	p.player = audio.NewPatternPlayer(pattern, inst)
 	p.play = make(chan bool)
-	p.close = make(chan bool)
+	p.stop = make(chan bool)
 	go p.animate()
 
 	return p
@@ -52,11 +52,16 @@ func (p *PatternView) InitFocus() { SetKeyFocus(p.attrs[0]) }
 
 func (p *PatternView) Close() {
 	p.ViewBase.Close()
-	p.close <- true
+	p.stop <- true
+	for _, a := range p.attrs {
+		a.stop <- true
+	}
 	if p.closed != nil {
 		p.closed()
 	}
 }
+
+const fps = 60
 
 func (p *PatternView) animate() {
 	var next <-chan time.Time
@@ -71,9 +76,9 @@ func (p *PatternView) animate() {
 			}
 			p.inst.Stop()
 			ctrl = PlayAsync(p.player)
-			next = time.After(time.Second / 60)
+			next = time.After(time.Second / fps)
 		case <-next:
-			next = time.After(time.Second / 60)
+			next = time.After(time.Second / fps)
 			Do(p, func() {
 				p.cursorTime = p.player.GetTime()
 				Repaint(p)
@@ -83,7 +88,7 @@ func (p *PatternView) animate() {
 			Do(p, func() {
 				SetKeyFocus(p.oldFocus)
 			})
-		case <-p.close:
+		case <-p.stop:
 			return
 		}
 	}
@@ -171,7 +176,15 @@ type attributeView struct {
 	scaleVal  float64
 	valueGrid grid
 	focused   bool
-	cursorVal float64
+
+	cursorVal    float64
+	cursorAction chan *cursorAction
+	stop         chan bool
+}
+
+type cursorAction struct {
+	accel float64
+	f     func(float64)
 }
 
 func newAttributeView(p *PatternView, name string) *attributeView {
@@ -189,7 +202,54 @@ func newAttributeView(p *PatternView, name string) *attributeView {
 	a.valueGrid = defaultGrid(name)
 	a.cursorVal = a.valueGrid.defaultValue()
 	a.transVal = -a.cursorVal * a.scaleVal
+	a.stop = make(chan bool)
+	a.cursorAction = make(chan *cursorAction)
+	go a.animateCursor()
 	return a
+}
+
+func (a *attributeView) animateCursor() {
+	var next <-chan time.Time
+	var action *cursorAction
+	vel := 0.0
+	for {
+		select {
+		case action = <-a.cursorAction:
+			if action == nil {
+				next = nil
+				vel = 0
+				break
+			}
+			next = time.After(time.Second / fps)
+		case <-next:
+			next = time.After(time.Second / fps)
+			Do(a, func() {
+				vel += action.accel / fps
+				d := vel / fps
+				a.cursorVal += d
+				if action.f != nil {
+					action.f(d)
+				}
+				Repaint(a)
+			})
+		case <-a.stop:
+			return
+		}
+	}
+}
+
+func (a *attributeView) slideCursor(k KeyEvent, f func(float64)) bool {
+	if a.valueGrid != nil {
+		return false
+	}
+	if !k.Repeat {
+		accel := 100 / a.scaleVal
+		if k.Key == KeyDown {
+			accel = -accel
+		}
+		go func() { a.cursorAction <- &cursorAction{accel, f} }()
+	}
+	return true
 }
 
 func (a *attributeView) TookKeyFocus() { a.focused = true; Repaint(a) }
@@ -214,8 +274,10 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 		a.pattern.cursorTime = math.Max(0, a.pattern.timeGrid.next(a.pattern.cursorTime, k.Key == KeyRight))
 		Repaint(a.pattern)
 	case KeyDown, KeyUp:
-		a.cursorVal = a.valueGrid.next(a.cursorVal, k.Key == KeyUp)
-		Repaint(a)
+		if !a.slideCursor(k, nil) {
+			a.cursorVal = a.valueGrid.next(a.cursorVal, k.Key == KeyUp)
+			Repaint(a)
+		}
 	case KeyTab:
 		SetKeyFocus(a.next(k.Shift))
 	case KeyEnter:
@@ -235,9 +297,29 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 		SetKeyFocus(a.pattern)
 		a.pattern.player.SetTime(a.pattern.cursorTime)
 		a.pattern.play <- true
+	case KeyG:
+		if k.Shift {
+			a.valueGrid = nil
+			Repaint(a)
+			return
+		}
+		if a.valueGrid == nil {
+			a.valueGrid = defaultGrid(a.name)
+		}
+		a.valueGrid.setCenter(a.cursorVal)
+		Repaint(a)
 	case KeyEscape:
 		a.pattern.save()
 		a.pattern.Close()
+	}
+}
+
+func (a *attributeView) KeyRelease(k KeyEvent) {
+	switch k.Key {
+	case KeyDown, KeyUp:
+		if a.valueGrid == nil {
+			go func() { a.cursorAction <- nil }()
+		}
 	}
 }
 
@@ -330,16 +412,18 @@ func (a *attributeView) Paint() {
 		}
 		DrawLine(a.to(Pt(t, min.Y)), a.to(Pt(t, max.Y)))
 	}
-	prev := -math.MaxFloat64
-	for v := a.valueGrid.next(math.Nextafter(min.Y, -math.MaxFloat64), true); v < max.Y && v != prev; v = a.valueGrid.next(v, true) {
-		SetColor(Color{.2, .2, .2, 1})
-		SetLineWidth(2)
-		if v == a.valueGrid.defaultValue() {
-			SetColor(Color{.3, .3, .3, 1})
-			SetLineWidth(5)
+	if a.valueGrid != nil {
+		prev := -math.MaxFloat64
+		for v := a.valueGrid.next(math.Nextafter(min.Y, -math.MaxFloat64), true); v < max.Y && v != prev; v = a.valueGrid.next(v, true) {
+			SetColor(Color{.2, .2, .2, 1})
+			SetLineWidth(2)
+			if v == a.valueGrid.defaultValue() {
+				SetColor(Color{.3, .3, .3, 1})
+				SetLineWidth(5)
+			}
+			DrawLine(a.to(Pt(math.Max(0, min.X), v)), a.to(Pt(max.X, v)))
+			prev = v
 		}
-		DrawLine(a.to(Pt(math.Max(0, min.X), v)), a.to(Pt(max.X, v)))
-		prev = v
 	}
 
 	if p, ok := KeyFocus(a).(*controlPointView); !ok || p.note.attr == a {
@@ -425,12 +509,16 @@ func (n *noteView) KeyPress(k KeyEvent) {
 			n.setTime(n.attr.pattern.timeGrid.next(n.note.Time, k.Key == KeyRight))
 			n.updateCursor()
 		case KeyDown, KeyUp:
-			p0 := n.points[0].point
-			d := n.attr.valueGrid.next(p0.Value, k.Key == KeyUp) - p0.Value
-			for _, p := range n.points {
-				p.setValue(p.point.Value + d)
+			f := func(d float64) {
+				for _, p := range n.points {
+					p.setValue(p.point.Value + d)
+				}
+				n.updateCursor()
 			}
-			n.updateCursor()
+			if !n.attr.slideCursor(k, f) {
+				p0 := n.points[0].point
+				f(n.attr.valueGrid.next(p0.Value, k.Key == KeyUp) - p0.Value)
+			}
 		}
 		return
 	}
@@ -440,7 +528,9 @@ func (n *noteView) KeyPress(k KeyEvent) {
 		n.attr.pattern.cursorTime = n.attr.pattern.timeGrid.next(n.attr.pattern.cursorTime, k.Key == KeyRight)
 		SetKeyFocus(n.attr)
 	case KeyDown, KeyUp:
-		n.attr.cursorVal = n.attr.valueGrid.next(n.attr.cursorVal, k.Key == KeyUp)
+		if !n.attr.slideCursor(k, nil) {
+			n.attr.cursorVal = n.attr.valueGrid.next(n.attr.cursorVal, k.Key == KeyUp)
+		}
 		SetKeyFocus(n.attr)
 	case KeyTab:
 		SetKeyFocus(n.attr.next(k.Shift).notes[n.note])
@@ -592,8 +682,13 @@ func (p *controlPointView) KeyPress(k KeyEvent) {
 			p.setTime(p.note.attr.pattern.timeGrid.next(p.point.Time+p.note.note.Time, k.Key == KeyRight) - p.note.note.Time)
 			p.updateCursor()
 		case KeyDown, KeyUp:
-			p.setValue(p.note.attr.valueGrid.next(p.point.Value, k.Key == KeyUp))
-			p.updateCursor()
+			f := func(d float64) {
+				p.setValue(p.point.Value + d)
+				p.updateCursor()
+			}
+			if !p.note.attr.slideCursor(k, f) {
+				f(p.note.attr.valueGrid.next(p.point.Value, k.Key == KeyUp) - p.point.Value)
+			}
 		}
 		return
 	}

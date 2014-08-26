@@ -8,6 +8,7 @@ import (
 type grid interface {
 	defaultValue() float64
 	next(float64, bool) float64
+	setCenter(float64)
 }
 
 func defaultGrid(name string) grid {
@@ -15,21 +16,21 @@ func defaultGrid(name string) grid {
 	case "Pitch":
 		return newPitchGrid(8, 7)
 	case "Amplitude":
-		return uniformGrid{1}
+		return &uniformGrid{0, 1}
 	}
-	return &uniformGrid{1}
+	return &uniformGrid{0, 1}
 }
 
 type uniformGrid struct {
-	interval float64
+	center, interval float64
 }
 
-func (g uniformGrid) defaultValue() float64 { return 0 }
+func (g uniformGrid) defaultValue() float64 { return g.center }
 
 func (g uniformGrid) next(t float64, next bool) float64 {
-	x := t / g.interval
+	x := (t - g.center) / g.interval
 	i := math.Floor(x + .5)
-	if i*g.interval == t {
+	if i*g.interval+g.center == t {
 		if next {
 			i++
 		} else {
@@ -42,13 +43,17 @@ func (g uniformGrid) next(t float64, next bool) float64 {
 			i = math.Floor(x)
 		}
 	}
-	return i * g.interval
+	return i*g.interval + g.center
+}
+
+func (g *uniformGrid) setCenter(c float64) {
+	g.center = c
 }
 
 func (g uniformGrid) snap(t float64) float64 {
-	x := t / g.interval
+	x := (t - g.center) / g.interval
 	i := math.Floor(x + .5)
-	return i * g.interval
+	return i*g.interval + g.center
 }
 
 type valueGrid struct {
@@ -83,10 +88,11 @@ func (g valueGrid) next(x float64, next bool) float64 {
 
 type pitchGrid struct {
 	valueGrid
-	center float64
+	center        float64
+	maxComplexity int
 }
 
-func newPitchGrid(center float64, maxComplexity int) pitchGrid {
+func newPitchGrid(center float64, maxComplexity int) *pitchGrid {
 	vals := []float64{center}
 	more := true
 	for a := 2; more; a++ {
@@ -101,10 +107,14 @@ func newPitchGrid(center float64, maxComplexity int) pitchGrid {
 		}
 	}
 	sort.Float64s(vals)
-	return pitchGrid{valueGrid{vals}, center}
+	return &pitchGrid{valueGrid{vals}, center, maxComplexity}
 }
 
 func (g pitchGrid) defaultValue() float64 { return g.center }
+
+func (g *pitchGrid) setCenter(c float64) {
+	*g = *newPitchGrid(c, g.maxComplexity)
+}
 
 func complexity(a, b int) int {
 	lcm := a * b / gcd(a, b)
