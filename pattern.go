@@ -55,8 +55,8 @@ func (p *PatternPlayer) SetTime(t float64) {
 	for p.i = 0; p.i < len(p.pattern.Notes) && p.pattern.Notes[p.i].Time < t; p.i++ {
 	}
 
-	for name, c := range InstrumentControls(p.inst) {
-		c.SetPoints(p.pattern.Attributes[name])
+	for _, c := range InstrumentControls(p.inst) {
+		c.SetPoints(p.pattern.Attributes[c.Name])
 		c.SetTime(t)
 	}
 
@@ -123,17 +123,22 @@ func InstrumentPlayMethod(inst Instrument) reflect.Value {
 	return m
 }
 
-func InstrumentControls(inst Instrument) map[string]*Control {
-	cs := map[string]*Control{}
+func InstrumentControls(inst Instrument) []NamedControl {
+	c := []NamedControl{}
 	v := reflect.Indirect(reflect.ValueOf(inst))
 	t := v.Type()
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		if f.Type == reflect.TypeOf(Control{}) && f.PkgPath == "" {
-			cs[f.Name] = v.Field(i).Addr().Interface().(*Control)
+			c = append(c, NamedControl{f.Name, v.Field(i).Addr().Interface().(*Control)})
 		}
 	}
-	return cs
+	return c
+}
+
+type NamedControl struct {
+	Name string
+	*Control
 }
 
 // TODO: remove me?  no longer relevant as Play method is optional

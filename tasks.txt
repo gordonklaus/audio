@@ -1,4 +1,3 @@
-- to stabilize order, make Attributes a list of named entities instead of map
 - don't limit note and control point times to >0.  let pattern and note be "anchored" at t=0:  placement in score and pattern and movement on grid is based on this anchor while the actual start can be t<0.
 
 - experiment with Doppler effect with many (esp ambient) sound sources
