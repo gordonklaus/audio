@@ -31,10 +31,18 @@ type PatternView struct {
 func NewPatternView(pattern *audio.Pattern, inst audio.Instrument) *PatternView {
 	p := &PatternView{pattern: pattern, inst: inst, scaleTime: 32}
 	p.ViewBase = NewView(p)
-	// TODO: add new attributes to notes
+	// TODO: add new attributes to all notes in pattern.notes
 	noteType := audio.InstrumentPlayMethod(inst).Type().In(0)
 	for i := 0; i < noteType.NumField(); i++ {
-		a := newAttributeView(p, noteType.Field(i).Name)
+		a := newNoteAttributeView(p, noteType.Field(i).Name)
+		p.attrs = append(p.attrs, a)
+		p.Add(a)
+	}
+	for name := range audio.InstrumentControls(inst) {
+		if _, ok := pattern.Attributes[name]; !ok {
+			pattern.Attributes[name] = []*audio.ControlPoint{{}}
+		}
+		a := newPatternAttributeView(p, name)
 		p.attrs = append(p.attrs, a)
 		p.Add(a)
 	}
@@ -109,7 +117,9 @@ func (p *PatternView) reform() {
 func (p *PatternView) newNote() *audio.Note {
 	n := &audio.Note{p.cursorTime, map[string][]*audio.ControlPoint{}}
 	for _, a := range p.attrs {
-		n.Attributes[a.name] = []*audio.ControlPoint{{0, a.cursorVal}}
+		if !a.isPatternAttribute {
+			n.Attributes[a.name] = []*audio.ControlPoint{{0, a.cursorVal}}
+		}
 	}
 	p.pattern.Notes = append(p.pattern.Notes, n)
 	return n
@@ -153,21 +163,31 @@ func savePattern(p *audio.Pattern) {
 
 	fmt.Fprintf(f, "package main\n\nimport (\n\t%q\n\t%q\n)\n\nvar %s_pattern = audiogui.NewPattern([]*audio.Note{\n", audioPkgPath, audioguiPkgPath, p.Name)
 	for _, n := range p.Notes {
-		fmt.Fprintf(f, "\t{%#v, map[string][]*audio.ControlPoint{\n", n.Time)
+		fmt.Fprintf(f, "\t{%v, map[string][]*audio.ControlPoint{\n", n.Time)
 		for name, attr := range n.Attributes {
-			fmt.Fprintf(f, "\t\t%#v: {\n", name)
+			fmt.Fprintf(f, "\t\t%q: {\n", name)
 			for _, p := range attr {
-				fmt.Fprintf(f, "\t\t\t{%#v, %#v},\n", p.Time, p.Value)
+				fmt.Fprintf(f, "\t\t\t{%v, %v},\n", p.Time, p.Value)
 			}
 			fmt.Fprint(f, "\t\t},\n")
 		}
 		fmt.Fprint(f, "\t}},\n")
+	}
+	fmt.Fprintf(f, "}, map[string][]*audio.ControlPoint{\n")
+	for name, attr := range p.Attributes {
+		fmt.Fprintf(f, "\t%q: {\n", name)
+		for _, p := range attr {
+			fmt.Fprintf(f, "\t\t{%v, %v},\n", p.Time, p.Value)
+		}
+		fmt.Fprint(f, "\t},\n")
 	}
 	fmt.Fprint(f, "})\n")
 }
 
 type attributeView struct {
 	*ViewBase
+	isPatternAttribute bool
+
 	pattern   *PatternView
 	name      string
 	nameText  *Text
@@ -187,6 +207,26 @@ type cursorAction struct {
 	f     func(float64)
 }
 
+func newNoteAttributeView(p *PatternView, name string) *attributeView {
+	a := newAttributeView(p, name)
+	for _, note := range p.pattern.Notes {
+		n := newNoteView(a, note)
+		a.notes[note] = n
+		a.Add(n)
+	}
+	return a
+}
+
+func newPatternAttributeView(p *PatternView, name string) *attributeView {
+	a := newAttributeView(p, name)
+	a.isPatternAttribute = true
+	note := &audio.Note{0, p.pattern.Attributes}
+	n := newNoteView(a, note)
+	a.notes[note] = n
+	a.Add(n)
+	return a
+}
+
 func newAttributeView(p *PatternView, name string) *attributeView {
 	a := &attributeView{pattern: p, name: name, scaleVal: 32}
 	a.ViewBase = NewView(a)
@@ -194,11 +234,6 @@ func newAttributeView(p *PatternView, name string) *attributeView {
 	a.nameText.SetBackgroundColor(Color{})
 	a.Add(a.nameText)
 	a.notes = map[*audio.Note]*noteView{}
-	for _, note := range p.pattern.Notes {
-		n := newNoteView(a, note)
-		a.notes[note] = n
-		a.Add(n)
-	}
 	a.valueGrid = defaultGrid(name)
 	a.cursorVal = a.valueGrid.defaultValue()
 	a.transVal = -a.cursorVal * a.scaleVal
@@ -281,14 +316,19 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 	case KeyTab:
 		SetKeyFocus(a.next(k.Shift))
 	case KeyEnter:
+		if a.isPatternAttribute {
+			break
+		}
 		note := a.pattern.newNote()
 		var n *noteView
 		for _, a2 := range a.pattern.attrs {
-			n2 := newNoteView(a2, note)
-			a2.notes[note] = n2
-			a2.Add(n2)
-			if a2 == a {
-				n = n2
+			if !a2.isPatternAttribute {
+				n2 := newNoteView(a2, note)
+				a2.notes[note] = n2
+				a2.Add(n2)
+				if a2 == a {
+					n = n2
+				}
 			}
 		}
 		SetKeyFocus(n)
@@ -469,17 +509,19 @@ func (n *noteView) setpts(pts []*audio.ControlPoint) { n.note.Attributes[n.attr.
 
 func (n *noteView) TookKeyFocus() {
 	for _, a := range n.attr.pattern.attrs {
-		n := a.notes[n.note]
-		n.focused = true
-		Raise(n)
-		n.updateCursor()
+		if n, ok := a.notes[n.note]; ok {
+			n.focused = true
+			Raise(n)
+			n.updateCursor()
+		}
 	}
 }
 func (n *noteView) LostKeyFocus() {
 	for _, a := range n.attr.pattern.attrs {
-		n := a.notes[n.note]
-		n.focused = false
-		Raise(n)
+		if n, ok := a.notes[n.note]; ok {
+			n.focused = false
+			Raise(n)
+		}
 	}
 }
 
@@ -533,7 +575,12 @@ func (n *noteView) KeyPress(k KeyEvent) {
 		}
 		SetKeyFocus(n.attr)
 	case KeyTab:
-		SetKeyFocus(n.attr.next(k.Shift).notes[n.note])
+		a := n.attr.next(k.Shift)
+		if n, ok := a.notes[n.note]; ok {
+			SetKeyFocus(n)
+		} else {
+			SetKeyFocus(a)
+		}
 	case KeyEnter:
 		SetKeyFocus(n.points[0])
 	case KeyEscape:
@@ -543,6 +590,9 @@ func (n *noteView) KeyPress(k KeyEvent) {
 	case KeyPeriod:
 		n.newPoint(len(n.points))
 	case KeyBackspace, KeyDelete:
+		if n.attr.isPatternAttribute {
+			break
+		}
 		pattern := n.attr.pattern.pattern
 		for i, n2 := range pattern.Notes {
 			if n2 == n.note {
@@ -586,8 +636,10 @@ func (n *noteView) setTime(t float64) {
 	t = math.Max(0, t)
 	n.note.Time = t
 	for _, a := range n.attr.pattern.attrs {
-		for _, p := range a.notes[n.note].points {
-			p.reform()
+		if n, ok := a.notes[n.note]; ok {
+			for _, p := range n.points {
+				p.reform()
+			}
 		}
 	}
 }
@@ -608,12 +660,9 @@ func (n *noteView) reform() {
 func (n *noteView) duration() float64 {
 	t := 0.0
 	for _, a := range n.attr.pattern.attrs {
-		n := a.notes[n.note]
-		if n == nil {
-			// may be nil during newNoteView
-			continue
+		if n, ok := a.notes[n.note]; ok {
+			t = math.Max(t, n.points[len(n.points)-1].point.Time)
 		}
-		t = math.Max(t, n.points[len(n.points)-1].point.Time)
 	}
 	return t
 }
@@ -697,7 +746,12 @@ func (p *controlPointView) KeyPress(k KeyEvent) {
 	case KeyLeft, KeyRight:
 		p.focusNext(k.Key == KeyRight)
 	case KeyTab:
-		SetKeyFocus(p.note.attr.next(k.Shift).notes[p.note.note].points[0])
+		a := p.note.attr.next(k.Shift)
+		if n, ok := a.notes[p.note.note]; ok {
+			SetKeyFocus(n.points[0])
+		} else {
+			SetKeyFocus(a)
+		}
 	case KeyEscape:
 		SetKeyFocus(p.note)
 	case KeyComma:

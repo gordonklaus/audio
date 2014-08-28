@@ -7,8 +7,9 @@ import (
 )
 
 type Pattern struct {
-	Name  string
-	Notes []*Note
+	Name       string
+	Notes      []*Note
+	Attributes map[string][]*ControlPoint
 }
 
 type Note struct {
@@ -53,6 +54,12 @@ func (p *PatternPlayer) SetTime(t float64) {
 	sort.Sort(notesByTime(p.pattern.Notes))
 	for p.i = 0; p.i < len(p.pattern.Notes) && p.pattern.Notes[p.i].Time < t; p.i++ {
 	}
+
+	for name, c := range InstrumentControls(p.inst) {
+		c.SetPoints(p.pattern.Attributes[name])
+		c.SetTime(t)
+	}
+
 	p.t = t
 }
 
@@ -86,13 +93,15 @@ func (p *PatternPlayer) Done() bool {
 	return p.i == len(p.pattern.Notes) && p.inst.Done()
 }
 
-// An Instrument must have a method Play(noteType) where noteType is a struct with exported fields of type []*ControlPoint.
+// For an Instrument to play notes, it must have a method Play(noteType) where noteType is a struct with exported fields of type []*ControlPoint.
+// For an Instrument to be controlled, it must export fields of type audio.Control.
 type Instrument interface {
 	Voice
 	Stop()
 }
 
 func InstrumentPlayMethod(inst Instrument) reflect.Value {
+	// TODO: Play method is optional.
 	m := reflect.ValueOf(inst).MethodByName("Play")
 	if !m.IsValid() {
 		panic(fmt.Sprintf("Type %T must have a method named Play.", inst))
@@ -114,6 +123,20 @@ func InstrumentPlayMethod(inst Instrument) reflect.Value {
 	return m
 }
 
+func InstrumentControls(inst Instrument) map[string]*Control {
+	cs := map[string]*Control{}
+	v := reflect.Indirect(reflect.ValueOf(inst))
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		if f.Type == reflect.TypeOf(Control{}) && f.PkgPath == "" {
+			cs[f.Name] = v.Field(i).Addr().Interface().(*Control)
+		}
+	}
+	return cs
+}
+
+// TODO: remove me?  no longer relevant as Play method is optional
 func IsInstrument(i Instrument) (ok bool) {
 	defer func() { ok = recover() == nil }()
 	InstrumentPlayMethod(i)

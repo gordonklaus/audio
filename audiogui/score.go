@@ -555,11 +555,11 @@ type patternInfo struct {
 	path string
 }
 
-func NewPattern(notes []*audio.Note) *audio.Pattern {
+func NewPattern(notes []*audio.Note, attributes map[string][]*audio.ControlPoint) *audio.Pattern {
 	_, path, _, _ := runtime.Caller(1)
 	name := filepath.Base(path)
 	name = name[:len(name)-3]
-	p := &audio.Pattern{name, notes}
+	p := &audio.Pattern{name, notes, attributes}
 	Patterns[name] = patternInfo{p, path}
 	return p
 }
