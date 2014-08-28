@@ -38,11 +38,11 @@ func NewPatternView(pattern *audio.Pattern, inst audio.Instrument) *PatternView 
 		p.attrs = append(p.attrs, a)
 		p.Add(a)
 	}
-	for name := range audio.InstrumentControls(inst) {
-		if _, ok := pattern.Attributes[name]; !ok {
-			pattern.Attributes[name] = []*audio.ControlPoint{{}}
+	for _, c := range audio.InstrumentControls(inst) {
+		if _, ok := pattern.Attributes[c.Name]; !ok {
+			pattern.Attributes[c.Name] = []*audio.ControlPoint{{}}
 		}
-		a := newPatternAttributeView(p, name)
+		a := newPatternAttributeView(p, c.Name)
 		p.attrs = append(p.attrs, a)
 		p.Add(a)
 	}
@@ -299,6 +299,12 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 	if k.Alt {
 		switch k.Key {
 		case KeyLeft, KeyRight, KeyDown, KeyUp:
+			if a.isPatternAttribute {
+				for _, n := range a.notes {
+					SetKeyFocus(n)
+					return
+				}
+			}
 			a.focusNearest(a.to(Pt(a.pattern.cursorTime, a.cursorVal)), k.Key)
 		}
 		return
