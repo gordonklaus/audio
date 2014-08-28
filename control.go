@@ -5,7 +5,7 @@ import "fmt"
 type Control struct {
 	params  Params
 	points  []*ControlPoint
-	periods []controlPeriod
+	periods []*controlPeriod
 	x       float64
 }
 
@@ -30,19 +30,35 @@ func (c *Control) SetPoints(points []*ControlPoint) {
 		}
 	}
 	c.points = points
-	c.periods = make([]controlPeriod, len(c.points))
+	c.SetTime(0)
+}
+
+func (c *Control) SetTime(t float64) {
+	c.periods = make([]*controlPeriod, len(c.points))
 	prev := &ControlPoint{}
 	for i, p := range c.points {
 		dn := (p.Time - prev.Time) * c.params.SampleRate
 		dx := (p.Value - prev.Value) / dn
-		c.periods[i] = controlPeriod{int(dn), dx, p.Value}
+		c.periods[i] = &controlPeriod{int(dn), dx, p.Value}
 		prev = p
+	}
+
+	c.x = 0
+	n := int(t * c.params.SampleRate)
+	for _, p := range c.periods {
+		if p.n > n {
+			p.n -= n
+			c.x += float64(n) * p.dx
+			break
+		}
+		n -= p.n
+		c.x = p.value
+		c.periods = c.periods[1:]
 	}
 }
 
 func (c *Control) Sing() float64 {
-	for len(c.periods) > 0 {
-		p := &c.periods[0]
+	for _, p := range c.periods {
 		if p.n > 0 {
 			p.n--
 			c.x += p.dx
