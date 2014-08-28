@@ -608,8 +608,10 @@ func (n *noteView) KeyPress(k KeyEvent) {
 		}
 		SetKeyFocus(n.attr)
 		for _, a := range n.attr.pattern.attrs {
-			a.Remove(a.notes[n.note])
-			delete(a.notes, n.note)
+			if n, ok := a.notes[n.note]; ok {
+				a.Remove(n)
+				delete(a.notes, n.note)
+			}
 		}
 	}
 }
