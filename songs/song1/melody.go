@@ -9,39 +9,38 @@ var melody_pattern = audiogui.NewPattern([]*audio.Note{
 	{0, map[string][]*audio.ControlPoint{
 		"Pitch": {
 			{0, 6},
-			{8, 6},
 		},
 		"Amplitude": {
-			{0, 0},
+			{0, -8},
+			{1, 0},
+			{3, -8},
 		},
 	}},
 	{0, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -8},
+			{2, 0},
+			{3, -8},
+		},
 		"Pitch": {
 			{0, 7},
 		},
-		"Amplitude": {
-			{0, -8},
-			{8, 0},
-		},
 	}},
-	{4, map[string][]*audio.ControlPoint{
-		"Pitch": {
-			{0, 6.584962500721156},
-			{4, 6.584962500721156},
-		},
+	{21, map[string][]*audio.ControlPoint{
 		"Amplitude": {
-			{0, -8},
-			{4, 0},
+			{0, 0},
+		},
+		"Pitch": {
+			{0, 8},
 		},
 	}},
 }, map[string][]*audio.ControlPoint{
 	"Distortion": {
-		{0, 4},
-		{1, 0},
-		{8, 4},
+		{0, 3},
+		{12, 3},
 	},
 	"Amplitude": {
 		{0, 0},
-		{8, -1},
+		{8, 0},
 	},
 })
