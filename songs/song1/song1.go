@@ -45,7 +45,7 @@ type sines struct {
 	audio.MultiVoice
 	Distortion audio.Control
 	Amplitude  audio.Control
-	Reverb     audio.Reverb
+	Reverb     reverb
 }
 
 func (s *sines) Play(n struct{ Pitch, Amplitude []*audio.ControlPoint }) {
@@ -56,7 +56,11 @@ func (s *sines) Play(n struct{ Pitch, Amplitude []*audio.ControlPoint }) {
 }
 
 func (s *sines) Sing() float64 {
-	return s.Reverb.Reverb(math.Exp2(s.Amplitude.Sing()) * math.Tanh(s.MultiVoice.Sing()*math.Exp2(s.Distortion.Sing())))
+	return s.Reverb.reverb(math.Exp2(s.Amplitude.Sing()) * math.Tanh(s.MultiVoice.Sing()*math.Exp2(s.Distortion.Sing())))
+}
+
+func (s *sines) Done() bool {
+	return s.MultiVoice.Done() && s.Reverb.Done()
 }
 
 type sineVoice struct {
