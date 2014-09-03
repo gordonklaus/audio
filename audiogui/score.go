@@ -33,8 +33,7 @@ type ScoreView struct {
 }
 
 func NewScoreView(score *audio.Score, band audio.Band) *ScoreView {
-	_, path, _, _ := runtime.Caller(1)
-	s := &ScoreView{score: score, band: band, path: filepath.Join(filepath.Dir(path), "score.go"), scaleTime: 32}
+	s := &ScoreView{score: score, band: band, scaleTime: 32}
 	s.ViewBase = NewView(s)
 	instruments := audio.BandInstruments(band)
 loop:
@@ -237,7 +236,7 @@ func (p *partView) KeyPress(k KeyEvent) {
 	case KeyDown, KeyUp:
 		SetKeyFocus(p.next(k.Key == KeyUp))
 	case KeyEnter:
-		event := &audio.PatternEvent{p.score.cursorTime, &audio.Pattern{}}
+		event := &audio.PatternEvent{p.score.cursorTime, &audio.Pattern{Attributes: map[string][]*audio.ControlPoint{}}}
 		e := newPatternEventView(p, event)
 		p.Add(e)
 		e.name.accepted = func(name string) {

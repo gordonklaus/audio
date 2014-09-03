@@ -7,7 +7,7 @@ type DCFilter struct {
 }
 
 func (f *DCFilter) InitAudio(p Params) {
-	rc := 1 / (2*math.Pi*10)
+	rc := 1 / (2 * math.Pi * 10)
 	f.a = rc / (rc + 1/p.SampleRate)
 }
 

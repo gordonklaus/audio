@@ -3,49 +3,33 @@ package main
 import (
 	"code.google.com/p/gordon-go/audio"
 	"code.google.com/p/gordon-go/audiogui"
-	"code.google.com/p/gordon-go/gui"
 
 	"math"
 	"math/rand"
-	"os"
 	"time"
 )
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "edit" {
-		gui.Run(func() {
-			gui.NewWindow(nil, "song1", func(w *gui.Window) {
-				v := audiogui.NewScoreView(score, newBand())
-				w.SetCentralView(v)
-				v.InitFocus()
-			})
-		})
-	} else {
-		audiogui.Play(audio.NewScorePlayer(score, newBand()))
-	}
+	audiogui.Main(score, &band{})
 }
 
 type band struct {
-	Sines sines
-}
-
-func newBand() *band {
-	return &band{}
+	Sines  sines
+	Reverb reverb
 }
 
 func (b *band) Sing() float64 {
-	return b.Sines.Sing()
+	return b.Reverb.reverb(b.Sines.Sing())
 }
 
 func (b *band) Done() bool {
-	return b.Sines.Done()
+	return b.Sines.Done() && b.Reverb.Done()
 }
 
 type sines struct {
 	audio.MultiVoice
 	Distortion audio.Control
 	Amplitude  audio.Control
-	Reverb     reverb
 }
 
 func (s *sines) Play(n struct{ Pitch, Amplitude []*audio.ControlPoint }) {
@@ -56,11 +40,11 @@ func (s *sines) Play(n struct{ Pitch, Amplitude []*audio.ControlPoint }) {
 }
 
 func (s *sines) Sing() float64 {
-	return s.Reverb.reverb(math.Exp2(s.Amplitude.Sing()) * math.Tanh(s.MultiVoice.Sing()*math.Exp2(s.Distortion.Sing())))
+	return math.Exp2(s.Amplitude.Sing()) * math.Tanh(s.MultiVoice.Sing()*math.Exp2(s.Distortion.Sing()))
 }
 
 func (s *sines) Done() bool {
-	return s.MultiVoice.Done() && s.Reverb.Done()
+	return s.MultiVoice.Done()
 }
 
 type sineVoice struct {
@@ -81,11 +65,11 @@ type noiseForcedSines struct{ audio.MultiVoice }
 func (s *noiseForcedSines) Play(n struct{ Pitch, Amplitude []*audio.ControlPoint }) {
 	releaseTime := 1.0
 	s.Add(&voice{
-		Pitch:    audio.NewControl(n.Pitch),
-		Amp:      audio.NewControl(n.Amplitude),
-		rand:     rand.New(rand.NewSource(time.Now().UnixNano())),
-		b:        -math.Log(.001) / 2 / releaseTime,
-		AmpMeter: audio.NewAmpMeter(.05),
+		Pitch: audio.NewControl(n.Pitch),
+		Amp:   audio.NewControl(n.Amplitude),
+		rand:  rand.New(rand.NewSource(time.Now().UnixNano())),
+		b:     -math.Log(.001) / 2 / releaseTime,
+		RMS:   audio.NewRMS(.05),
 	})
 }
 
@@ -93,7 +77,7 @@ type voice struct {
 	Pitch, Amp        *audio.Control
 	rand              *rand.Rand
 	u, v, b, dt, sqdt float64
-	AmpMeter          *audio.AmpMeter
+	RMS               *audio.RMS
 }
 
 func (v *voice) InitAudio(p audio.Params) {
@@ -101,7 +85,7 @@ func (v *voice) InitAudio(p audio.Params) {
 	audio.Init(v.Amp, p)
 	v.dt = 1 / p.SampleRate
 	v.sqdt = math.Sqrt(v.dt)
-	audio.Init(v.AmpMeter, p)
+	audio.Init(v.RMS, p)
 }
 
 func (v *voice) Sing() float64 {
@@ -113,10 +97,10 @@ func (v *voice) Sing() float64 {
 	c := v.b*v.b/4 + 4*math.Pi*math.Pi*p*p
 	v.u += v.dt*v.v + v.sqdt*r
 	v.v -= v.dt * (v.b*v.v + c*v.u)
-	v.AmpMeter.Add(v.u)
+	v.RMS.Add(v.u)
 	return v.u
 }
 
 func (v *voice) Done() bool {
-	return v.Pitch.Done() && v.Amp.Done() && v.AmpMeter.Amplitude() < .00001
+	return v.Pitch.Done() && v.Amp.Done() && v.RMS.Amplitude() < .00001
 }

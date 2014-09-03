@@ -15,7 +15,9 @@ type reverb struct {
 	i        int
 	rand     *rand.Rand
 	dcFilter audio.DCFilter
-	ampMeter *audio.AmpMeter
+	fbRMS    *audio.RMS
+	outRMS   *audio.RMS
+	Dry, Wet audio.Control
 }
 
 func (r *reverb) InitAudio(p audio.Params) {
@@ -28,18 +30,33 @@ func (r *reverb) InitAudio(p audio.Params) {
 	r.buf = make([]float64, int(p.SampleRate))
 	r.rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 	r.dcFilter.InitAudio(p)
-	r.ampMeter = audio.NewAmpMeter(.5)
-	r.ampMeter.InitAudio(p)
+	r.fbRMS = audio.NewRMS(.5)
+	r.fbRMS.InitAudio(p)
+	r.outRMS = audio.NewRMS(.5)
+	r.outRMS.InitAudio(p)
+	r.Dry.InitAudio(p)
+	r.Wet.InitAudio(p)
+}
+
+func (r *reverb) Play(_ struct{}) {}
+func (r *reverb) Sing() float64   { return 0 }
+
+func (r *reverb) Done() bool {
+	return r.Dry.Done() && r.Wet.Done() && r.outRMS.Amplitude() < .001
+}
+
+func (r *reverb) Stop() {
+	r.InitAudio(r.params)
 }
 
 func (r *reverb) reverb(dry float64) float64 {
-	f := func(x float64) float64 { return x*math.Sqrt(x*(6*x*x-15*x+10)) }
+	f := func(x float64) float64 { return x * math.Sqrt(x*(6*x*x-15*x+10)) }
 
 	size := .05
 	// decayTime := 4.0
 
 	a := 1.0
-	switch amp := r.ampMeter.Amplitude(); {
+	switch amp := r.fbRMS.Amplitude(); {
 	case amp < .05:
 		a = 1.1
 	case .8 < amp:
@@ -51,10 +68,10 @@ func (r *reverb) reverb(dry float64) float64 {
 		if s.t >= 1 {
 			s.t -= 1
 			s.a1, s.i1 = s.a2, s.i2
-			delay := math.Exp2(r.rand.Float64()-2.5)
-			s.dt = 1 / (math.Exp2(r.rand.Float64()*4)*size*r.params.SampleRate)
-			s.a2 = a//math.Pow(.01, delay / decayTime)
-			s.i2 = (r.i-int(delay*r.params.SampleRate)+len(r.buf)) % len(r.buf)
+			delay := math.Exp2(r.rand.Float64() - 2.5)
+			s.dt = 1 / (math.Exp2(r.rand.Float64()*4) * size * r.params.SampleRate)
+			s.a2 = a //math.Pow(.01, delay / decayTime)
+			s.i2 = (r.i - int(delay*r.params.SampleRate) + len(r.buf)) % len(r.buf)
 		}
 		wet += s.a1*f(1-s.t)*r.buf[s.i1] + s.a2*f(s.t)*r.buf[s.i2]
 		s.i1 = (s.i1 + 1) % len(r.buf)
@@ -62,15 +79,13 @@ func (r *reverb) reverb(dry float64) float64 {
 		s.t += s.dt
 	}
 	wet /= math.Sqrt(float64(len(r.streams)))
+	r.fbRMS.Add(dry + wet)
 	r.buf[r.i] = r.dcFilter.Filter(dry + wet)
 	r.i = (r.i + 1) % len(r.buf)
 
-	r.ampMeter.Add(dry + wet)
-	return dry + wet
-}
-
-func (r *reverb) Done() bool {
-	return r.ampMeter.Amplitude() < .00001
+	out := math.Exp2(r.Dry.Sing())*dry + math.Exp2(r.Wet.Sing())*wet
+	r.outRMS.Add(out)
+	return out
 }
 
 type grainStream struct {
