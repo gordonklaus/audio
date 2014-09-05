@@ -356,6 +356,9 @@ func (e *patternEventView) reform() {
 			t = math.Max(t, a[len(a)-1].Time)
 		}
 	}
+	for _, a := range e.event.Pattern.Attributes {
+		t = math.Max(t, a[len(a)-1].Time)
+	}
 	max := OuterRect(e.name).Max
 	e.Resize(math.Max(max.X+3, t*e.part.score.scaleTime), max.Y)
 	e.Move(Pt(e.part.to(e.event.Time), 4))

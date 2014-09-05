@@ -16,8 +16,9 @@ type reverb struct {
 	rand     *rand.Rand
 	dcFilter audio.DCFilter
 	fbRMS    *audio.RMS
-	outRMS   *audio.RMS
 	Dry, Wet audio.Control
+	limiter  *audio.Limiter
+	outRMS   *audio.RMS
 }
 
 func (r *reverb) InitAudio(p audio.Params) {
@@ -36,6 +37,8 @@ func (r *reverb) InitAudio(p audio.Params) {
 	r.outRMS.InitAudio(p)
 	r.Dry.InitAudio(p)
 	r.Wet.InitAudio(p)
+	r.limiter = audio.NewLimiter(.5, .1, 1)
+	r.limiter.InitAudio(p)
 }
 
 func (r *reverb) Play(_ struct{}) {}
@@ -56,11 +59,8 @@ func (r *reverb) reverb(dry float64) float64 {
 	// decayTime := 4.0
 
 	a := 1.0
-	switch amp := r.fbRMS.Amplitude(); {
-	case amp < .05:
+	if r.fbRMS.Amplitude() < .05 {
 		a = 1.1
-	case .8 < amp:
-		a = .8 / amp
 	}
 
 	wet := 0.0
@@ -79,11 +79,12 @@ func (r *reverb) reverb(dry float64) float64 {
 		s.t += s.dt
 	}
 	wet /= math.Sqrt(float64(len(r.streams)))
-	r.fbRMS.Add(dry + wet)
-	r.buf[r.i] = r.dcFilter.Filter(dry + wet)
+	fb := r.dcFilter.Filter(dry + wet)
+	r.fbRMS.Add(fb)
+	r.buf[r.i] = fb
 	r.i = (r.i + 1) % len(r.buf)
 
-	out := math.Exp2(r.Dry.Sing())*dry + math.Exp2(r.Wet.Sing())*wet
+	out := r.limiter.Limit(math.Exp2(r.Dry.Sing())*dry + math.Exp2(r.Wet.Sing())*wet)
 	r.outRMS.Add(out)
 	return out
 }
