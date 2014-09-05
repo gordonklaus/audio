@@ -246,7 +246,7 @@ func (p *partView) KeyPress(k KeyEvent) {
 				event.Pattern = info.p
 			} else {
 				event.Pattern.Name = name
-				Patterns[name] = patternInfo{event.Pattern, filepath.Join(filepath.Dir(p.score.path), name) + ".go"}
+				Patterns[name] = patternInfo{event.Pattern, filepath.Join(filepath.Dir(p.score.path), name) + "_pattern.go"}
 				savePattern(event.Pattern)
 			}
 			e.reform()
@@ -559,8 +559,7 @@ type patternInfo struct {
 
 func NewPattern(notes []*audio.Note, attributes map[string][]*audio.ControlPoint) *audio.Pattern {
 	_, path, _, _ := runtime.Caller(1)
-	name := filepath.Base(path)
-	name = name[:len(name)-3]
+	name := strings.TrimSuffix(filepath.Base(path), "_pattern.go")
 	p := &audio.Pattern{name, notes, attributes}
 	Patterns[name] = patternInfo{p, path}
 	return p

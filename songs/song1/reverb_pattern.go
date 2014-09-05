@@ -5,7 +5,7 @@ import (
 	"code.google.com/p/gordon-go/audiogui"
 )
 
-var reverbControl_pattern = audiogui.NewPattern([]*audio.Note{
+var reverb_pattern = audiogui.NewPattern([]*audio.Note{
 }, map[string][]*audio.ControlPoint{
 	"Dry": {
 		{0, -12},

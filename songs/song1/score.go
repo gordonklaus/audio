@@ -7,6 +7,6 @@ var score = &audio.Score{[]*audio.Part{
 		{0, melody_pattern},
 	}},
 	{"Reverb", []*audio.PatternEvent{
-		{0, reverbControl_pattern},
+		{0, reverb_pattern},
 	}},
 }}
