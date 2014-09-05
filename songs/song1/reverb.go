@@ -16,9 +16,10 @@ type reverb struct {
 	rand     *rand.Rand
 	dcFilter audio.DCFilter
 	fbRMS    *audio.RMS
-	Dry, Wet audio.Control
 	limiter  *audio.Limiter
 	outRMS   *audio.RMS
+
+	Decay, Sustain, Dry, Wet audio.Control
 }
 
 func (r *reverb) InitAudio(p audio.Params) {
@@ -35,10 +36,13 @@ func (r *reverb) InitAudio(p audio.Params) {
 	r.fbRMS.InitAudio(p)
 	r.outRMS = audio.NewRMS(.5)
 	r.outRMS.InitAudio(p)
-	r.Dry.InitAudio(p)
-	r.Wet.InitAudio(p)
 	r.limiter = audio.NewLimiter(.5, .1, 1)
 	r.limiter.InitAudio(p)
+
+	r.Decay.InitAudio(p)
+	r.Sustain.InitAudio(p)
+	r.Dry.InitAudio(p)
+	r.Wet.InitAudio(p)
 }
 
 func (r *reverb) Play(_ struct{}) {}
@@ -56,12 +60,9 @@ func (r *reverb) reverb(dry float64) float64 {
 	f := func(x float64) float64 { return x * math.Sqrt(x*(6*x*x-15*x+10)) }
 
 	size := .05
-	// decayTime := 4.0
 
-	a := 1.0
-	if r.fbRMS.Amplitude() < .05 {
-		a = 1.1
-	}
+	decayTime := r.Decay.Sing()
+	sustain := r.Sustain.Sing()
 
 	wet := 0.0
 	for _, s := range r.streams {
@@ -70,7 +71,12 @@ func (r *reverb) reverb(dry float64) float64 {
 			s.a1, s.i1 = s.a2, s.i2
 			delay := math.Exp2(r.rand.Float64() - 2.5)
 			s.dt = 1 / (math.Exp2(r.rand.Float64()*4) * size * r.params.SampleRate)
-			s.a2 = a //math.Pow(.01, delay / decayTime)
+			s.a2 = math.Pow(.01, delay / decayTime)
+			if amp, sustain := r.fbRMS.Amplitude(), math.Exp2(sustain); amp < sustain {
+				s.a2 = math.Min(sustain / amp, 1.1)
+			} else if amp > 1 {
+				s.a2 = math.Max(1 / amp, .9)
+			}
 			s.i2 = (r.i - int(delay*r.params.SampleRate) + len(r.buf)) % len(r.buf)
 		}
 		wet += s.a1*f(1-s.t)*r.buf[s.i1] + s.a2*f(s.t)*r.buf[s.i2]
