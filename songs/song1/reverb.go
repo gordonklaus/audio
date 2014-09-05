@@ -36,7 +36,7 @@ func (r *reverb) InitAudio(p audio.Params) {
 	r.fbRMS.InitAudio(p)
 	r.outRMS = audio.NewRMS(.5)
 	r.outRMS.InitAudio(p)
-	r.limiter = audio.NewLimiter(.5, .1, 1)
+	r.limiter = audio.NewLimiter(.25, 1, 1)
 	r.limiter.InitAudio(p)
 
 	r.Decay.InitAudio(p)
@@ -71,11 +71,11 @@ func (r *reverb) reverb(dry float64) float64 {
 			s.a1, s.i1 = s.a2, s.i2
 			delay := math.Exp2(r.rand.Float64() - 2.5)
 			s.dt = 1 / (math.Exp2(r.rand.Float64()*4) * size * r.params.SampleRate)
-			s.a2 = math.Pow(.01, delay / decayTime)
+			s.a2 = math.Pow(.01, delay/decayTime)
 			if amp, sustain := r.fbRMS.Amplitude(), math.Exp2(sustain); amp < sustain {
-				s.a2 = math.Min(sustain / amp, 1.1)
+				s.a2 = math.Min(sustain/amp, 1.1)
 			} else if amp > 1 {
-				s.a2 = math.Max(1 / amp, .9)
+				s.a2 = math.Max(1/amp, .9)
 			}
 			s.i2 = (r.i - int(delay*r.params.SampleRate) + len(r.buf)) % len(r.buf)
 		}
