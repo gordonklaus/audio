@@ -161,7 +161,10 @@ func savePattern(p *audio.Pattern) {
 	}
 	defer f.Close()
 
-	fmt.Fprintf(f, "package main\n\nimport (\n\t%q\n\t%q\n)\n\nvar %s_pattern = audiogui.NewPattern([]*audio.Note{\n", audioPkgPath, audioguiPkgPath, p.Name)
+	fmt.Fprintf(f, "package main\n\nimport (\n\t%q\n\t%q\n)\n\nvar %s_pattern = audiogui.NewPattern([]*audio.Note{", audioPkgPath, audioguiPkgPath, p.Name)
+	if len(p.Notes) > 0 {
+		fmt.Fprintln(f)
+	}
 	for _, n := range p.Notes {
 		fmt.Fprintf(f, "\t{%v, map[string][]*audio.ControlPoint{\n", n.Time)
 		for name, attr := range n.Attributes {
@@ -173,7 +176,10 @@ func savePattern(p *audio.Pattern) {
 		}
 		fmt.Fprint(f, "\t}},\n")
 	}
-	fmt.Fprintf(f, "}, map[string][]*audio.ControlPoint{\n")
+	fmt.Fprintf(f, "}, map[string][]*audio.ControlPoint{")
+	if len(p.Attributes) > 0 {
+		fmt.Fprintln(f)
+	}
 	for name, attr := range p.Attributes {
 		fmt.Fprintf(f, "\t%q: {\n", name)
 		for _, p := range attr {
