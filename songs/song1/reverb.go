@@ -36,8 +36,8 @@ func (r *reverb) InitAudio(p audio.Params) {
 	r.fbRMS.InitAudio(p)
 	r.outRMS = audio.NewRMS(.5)
 	r.outRMS.InitAudio(p)
-	r.limiter = audio.NewLimiter(.25, 1, 1)
-	r.limiter.InitAudio(p)
+	r.limiter = audio.NewLimiter(.25, 1)
+	audio.Init(r.limiter, p)
 
 	r.Decay.InitAudio(p)
 	r.Sustain.InitAudio(p)
