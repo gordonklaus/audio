@@ -20,6 +20,7 @@ type PatternView struct {
 	scaleTime  float64
 	timeGrid   *uniformGrid
 	cursorTime float64
+	tPressed   bool
 
 	player     *audio.PatternPlayer
 	play, stop chan bool
@@ -349,6 +350,8 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 		SetKeyFocus(a.pattern)
 		a.pattern.player.SetTime(a.pattern.cursorTime)
 		a.pattern.play <- true
+	case KeyT:
+		a.pattern.tPressed = true
 	case KeyG:
 		if k.Shift {
 			a.valueGrid = nil
@@ -363,6 +366,11 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 	case KeyEscape:
 		a.pattern.save()
 		a.pattern.Close()
+	default:
+		if a.pattern.tPressed && k.Key > Key0 && k.Key <= Key9 {
+			a.pattern.timeGrid.interval = 1 / float64(k.Key - Key0)
+			Repaint(a.pattern)
+		}
 	}
 }
 
@@ -372,6 +380,8 @@ func (a *attributeView) KeyRelease(k KeyEvent) {
 		if a.valueGrid == nil {
 			go func() { a.cursorAction <- nil }()
 		}
+	case KeyT:
+		a.pattern.tPressed = false
 	}
 }
 
