@@ -367,9 +367,14 @@ func (a *attributeView) KeyPress(k KeyEvent) {
 		a.pattern.save()
 		a.pattern.Close()
 	default:
-		if a.pattern.tPressed && k.Key > Key0 && k.Key <= Key9 {
-			a.pattern.timeGrid.interval = 1 / float64(k.Key - Key0)
-			Repaint(a.pattern)
+		if p := a.pattern; p.tPressed && k.Key > Key0 && k.Key <= Key9 {
+			x := float64(k.Key - Key0)
+			if k.Shift {
+				x = 1 / x
+			}
+			p.timeGrid.center = p.cursorTime
+			p.timeGrid.interval = x
+			Repaint(p)
 		}
 	}
 }

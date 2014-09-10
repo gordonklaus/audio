@@ -1,3 +1,4 @@
+- link time translation and scaling between score and pattern.
 - don't limit note and control point times to >0.  let pattern and note be "anchored" at t=0:  placement in score and pattern and movement on grid is based on this anchor while the actual start can be t<0.
 
 - experiment with Doppler effect with many (esp ambient) sound sources
@@ -6,3 +7,4 @@
 - perfect circling fifths/fourths/thirds/whathaveyou
 - water/air cycle: start with low/mid harmonies (ground air), slowly increase distortion (sun's heat) to add higher spectral components (rising air), reverberate highest components into a smooth noise (clouds), resonate oscillators with falling pitch (rain), repeat
 - feedback FM:  modulate sine frequency using delayed signal of self
+- do some long recordings, e.g., of the forest at night, of the city, of a trip, etc., and play them back time compressed (variable rates, scanning for effect) using granular synthesis
