@@ -43,5 +43,5 @@ func (e *AttackReleaseEnv) Sing() float64 {
 }
 
 func (e *AttackReleaseEnv) Done() bool {
-	return e.x < .0001
+	return e.release && e.x < .0001
 }
