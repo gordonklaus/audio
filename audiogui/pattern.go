@@ -74,7 +74,7 @@ const fps = 60
 
 func (p *PatternView) animate() {
 	var next <-chan time.Time
-	ctrl := &PlayControl{}
+	ctrl := PlayControl{}
 	for {
 		select {
 		case <-p.play:
@@ -92,7 +92,7 @@ func (p *PatternView) animate() {
 				p.cursorTime = p.player.GetTime()
 				Repaint(p)
 			})
-		case <-ctrl.Done:
+		case <-ctrl.WaitChan():
 			next = nil
 			Do(p, func() {
 				SetKeyFocus(p.oldFocus)

@@ -2,20 +2,37 @@ package audiogui
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"sync"
 
 	"code.google.com/p/gordon-go/audio"
 	"code.google.com/p/portaudio-go/portaudio"
 )
 
+var playControls []PlayControl
+
 func init() {
 	portaudio.Initialize()
+	go func() {
+		defer os.Exit(0)
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig)
+		<-sig
+		for _, c := range playControls {
+			c.Stop()
+			c.Wait()
+		}
+		portaudio.Terminate()
+	}()
 }
 
 func Play(v audio.Voice) {
 	PlayAsync(v).Wait()
 }
 
-func PlayAsync(v audio.Voice) *PlayControl {
+func PlayAsync(v audio.Voice) PlayControl {
+	c := PlayControl{}
 	done := make(chan struct{}, 1)
 	params := audio.Params{SampleRate: 96000}
 	audio.Init(v, params)
@@ -44,31 +61,51 @@ func PlayAsync(v audio.Voice) *PlayControl {
 	})
 	if err != nil {
 		fmt.Println(err)
-		return nil
+		return c
 	}
 	if err := s.Start(); err != nil {
 		fmt.Println(err)
-		return nil
+		return c
 	}
 
-	Done := make(chan struct{})
-	stop := make(chan struct{}, 1)
+	c.stop = make(chan struct{}, 1)
+	c.wg = new(sync.WaitGroup)
+	c.wg.Add(1)
 	go func() {
 		select {
 		case <-done:
-		case <-stop:
+		case <-c.stop:
 		}
 		if err := s.Close(); err != nil {
 			fmt.Println(err)
 		}
-		Done <- struct{}{}
+		c.wg.Done()
 	}()
-	return &PlayControl{Done, stop}
+	playControls = append(playControls, c)
+	return c
 }
 
 type PlayControl struct {
-	Done, stop chan struct{}
+	stop chan struct{}
+	wg   *sync.WaitGroup
 }
 
-func (s PlayControl) Stop() { s.stop <- struct{}{} }
-func (s PlayControl) Wait() { <-s.Done }
+func (c PlayControl) Stop() {
+	select {
+	case c.stop <- struct{}{}:
+	default:
+	}
+}
+
+func (c PlayControl) Wait() {
+	c.wg.Wait()
+}
+
+func (c PlayControl) WaitChan() <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		c.wg.Wait()
+		ch <- struct{}{}
+	}()
+	return ch
+}

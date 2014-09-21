@@ -71,7 +71,7 @@ func (s *ScoreView) Close() {
 
 func (s *ScoreView) animate() {
 	var next <-chan time.Time
-	ctrl := &PlayControl{}
+	ctrl := PlayControl{}
 	for {
 		select {
 		case <-s.play:
@@ -91,7 +91,7 @@ func (s *ScoreView) animate() {
 				s.cursorTime = s.player.GetTime()
 				Repaint(s)
 			})
-		case <-ctrl.Done:
+		case <-ctrl.WaitChan():
 			next = nil
 			Do(s, func() {
 				SetKeyFocus(s.oldFocus)
