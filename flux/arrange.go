@@ -5,7 +5,7 @@
 package main
 
 import (
-	. "code.google.com/p/gordon-go/gui"
+	. "code.google.com/p/gordon-go/flux/gui"
 	"math"
 	"math/rand"
 	"time"

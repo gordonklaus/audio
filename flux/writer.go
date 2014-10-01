@@ -6,7 +6,7 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/gordon-go/go/types"
+	"code.google.com/p/gordon-go/flux/go/types"
 	"fmt"
 	"go/build"
 	"go/parser"

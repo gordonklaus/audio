@@ -5,7 +5,7 @@
 package main
 
 import (
-	"code.google.com/p/gordon-go/go/types"
+	"code.google.com/p/gordon-go/flux/go/types"
 	"unicode"
 )
 
