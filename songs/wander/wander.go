@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"time"
@@ -9,32 +10,52 @@ import (
 	"code.google.com/p/gordon-go/audiogui"
 )
 
+var (
+	print   = fmt.Print
+	printf  = fmt.Printf
+	println = fmt.Println
+)
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	audiogui.Play(&song{freq: 256})
+	audiogui.Play(&song{repPeriod: newMelody(ratio{1, 4}), beatFreq: newMelody(ratio{6, 1}), sineFreq: newMelody(ratio{256, 1})})
 }
 
 type song struct {
-	Params     audio.Params
-	next       int
-	hist       []ratio
-	freq       float64
+	EventDelay audio.EventDelay
+	repPeriod  melody
+	beatCount  int
+	beatFreq   melody
+	sineFreq   melody
 	MultiVoice audio.MultiVoice
 }
 
-func (s *song) Sing() float64 {
-	s.next--
-	if s.next <= 0 {
-		s.next = int(s.Params.SampleRate)
-		n := len(s.hist) - 2
-		if n < 0 {
-			n = 0
+func (s *song) InitAudio(p audio.Params) {
+	audio.Init(&s.EventDelay, p)
+	s.EventDelay.Delay(0, s.beat)
+	audio.Init(&s.MultiVoice, p)
+}
+
+func (s *song) beat() {
+	s.beatCount--
+	if s.beatCount <= 0 {
+		f := s.beatFreq.new(rats())
+		rats := make([]ratio, 6)
+		for i := range rats {
+			rats[i] = ratio{i + 1, 1}.div(f).div(s.repPeriod.last())
 		}
-		r := rat(s.freq, s.hist[n:])
-		s.hist = append(s.hist, r)
-		s.freq = s.freq*r.float() + rand.Float64()/64
-		s.MultiVoice.Add(newSineVoice(s.freq))
+		c := s.repPeriod.new(rats).mul(f)
+		if c.b != 1 {
+			panic(c.b)
+		}
+		s.beatCount = c.a
 	}
+	s.MultiVoice.Add(newSineVoice(s.sineFreq.new(rats()).float()))
+	s.EventDelay.Delay(1/s.beatFreq.float(), s.beat)
+}
+
+func (s *song) Sing() float64 {
+	s.EventDelay.Step()
 	return math.Tanh(s.MultiVoice.Sing() / 8)
 }
 
@@ -51,14 +72,14 @@ type sineVoice struct {
 func newSineVoice(freq float64) *sineVoice {
 	v := &sineVoice{}
 	v.Osc.SetFreq(freq)
-	v.Env = audio.NewAttackReleaseEnv(8, 8)
+	v.Env = audio.NewAttackReleaseEnv(.1, 4)
 	return v
 }
 
 func (v *sineVoice) InitAudio(p audio.Params) {
 	v.Osc.InitAudio(p)
 	v.Env.InitAudio(p)
-	v.n = int(p.SampleRate * 8)
+	v.n = int(p.SampleRate * .1)
 }
 
 func (v *sineVoice) Sing() float64 {
@@ -77,40 +98,63 @@ type ratio struct {
 	a, b int
 }
 
-func (r ratio) float() float64 { return float64(r.a) / float64(r.b) }
+func (r ratio) mul(s ratio) ratio { return ratio{r.a * s.a, r.b * s.b}.reduced() }
+func (r ratio) div(s ratio) ratio { return ratio{r.a * s.b, r.b * s.a}.reduced() }
+func (r ratio) reduced() ratio    { gcd := gcd(r.a, r.b); return ratio{r.a / gcd, r.b / gcd} }
+func (r ratio) float() float64    { return float64(r.a) / float64(r.b) }
 
-func rat(freq float64, hist []ratio) ratio {
+type melody struct {
+	center  float64
+	history []ratio
+}
+
+func newMelody(center ratio) melody {
+	return melody{center: center.float(), history: []ratio{center}}
+}
+
+func (m *melody) last() ratio    { return m.history[len(m.history)-1] }
+func (m *melody) float() float64 { return m.last().float() }
+
+func (m *melody) new(rats []ratio) ratio {
+	n := len(m.history) - 5
+	if n < 0 {
+		n = 0
+	}
+	hist := m.history[n:]
+	normHist := make([]ratio, len(hist))
+	r := hist[0]
+	for i := range hist {
+		normHist[i] = hist[i].div(r)
+	}
+	hist = normHist
+	last := hist[len(hist)-1]
+
 	sum := 0.0
-	sums := []float64{}
+	sums := make([]float64, len(rats))
+	for i, r := range rats {
+		p := math.Log2(m.float() * r.float() / m.center)
+		sum += math.Exp2(-p*p/2) * math.Exp2(-float64(complexity(append(hist, r.mul(last)))))
+		sums[i] = sum
+	}
+	x := sum * rand.Float64()
+	for i := range sums {
+		if x < sums[i] {
+			m.history = append(m.history, m.last().mul(rats[i]))
+			return m.last()
+		}
+	}
+	panic("unreachable")
+}
+
+func rats() []ratio {
 	rats := []ratio{}
 	for a := 1; a < 16; a++ {
 		for b := 1; b < 16; b++ {
 			if gcd(a, b) != 1 {
 				continue
 			}
-			r := ratio{a, b}
-			p := math.Log2(freq*r.float()) - 8
-			sum += math.Exp2(-p*p/2) * math.Exp2(-float64(complexity(cumrat(append(hist, r)))))
-			sums = append(sums, sum)
-			rats = append(rats, r)
+			rats = append(rats, ratio{a, b})
 		}
-	}
-	x := sum * rand.Float64()
-	for i := range sums {
-		if x < sums[i] {
-			return rats[i]
-		}
-	}
-	panic("unreachable")
-}
-
-func cumrat(rats []ratio) []ratio {
-	rats = append([]ratio{{1, 1}}, rats...)
-	r := ratio{1, 1}
-	for i, s := range rats {
-		r.a *= s.a
-		r.b *= s.b
-		rats[i] = r
 	}
 	return rats
 }
