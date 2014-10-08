@@ -136,14 +136,15 @@ func (m *melody) new(rats []ratio) ratio {
 		sum += math.Exp2(-p*p/2) * math.Exp2(-float64(complexity(append(hist, r.mul(last)))))
 		sums[i] = sum
 	}
+	i := 0
 	x := sum * rand.Float64()
-	for i := range sums {
+	for i = range sums {
 		if x < sums[i] {
-			m.history = append(m.history, m.last().mul(rats[i]))
-			return m.last()
+			break
 		}
 	}
-	panic("unreachable")
+	m.history = append(m.history, m.last().mul(rats[i]))
+	return m.last()
 }
 
 func rats() []ratio {
