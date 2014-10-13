@@ -55,7 +55,7 @@ loop:
 	s.timeGrid = &uniformGrid{0, 1}
 
 	s.player = audio.NewScorePlayer(score, band)
-	s.play = make(chan bool)
+	s.play = make(chan bool, 1)
 	s.close = make(chan bool)
 	go s.animate()
 
@@ -71,7 +71,7 @@ func (s *ScoreView) Close() {
 
 func (s *ScoreView) animate() {
 	var next <-chan time.Time
-	ctrl := PlayControl{}
+	var ctrl PlayControl
 	for {
 		select {
 		case <-s.play:
@@ -91,7 +91,7 @@ func (s *ScoreView) animate() {
 				s.cursorTime = s.player.GetTime()
 				Repaint(s)
 			})
-		case <-ctrl.WaitChan():
+		case <-ctrl.Done:
 			next = nil
 			Do(s, func() {
 				SetKeyFocus(s.oldFocus)

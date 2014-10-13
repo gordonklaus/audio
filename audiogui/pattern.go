@@ -50,7 +50,7 @@ func NewPatternView(pattern *audio.Pattern, inst audio.Instrument) *PatternView 
 	p.timeGrid = &uniformGrid{0, 1}
 
 	p.player = audio.NewPatternPlayer(pattern, inst)
-	p.play = make(chan bool)
+	p.play = make(chan bool, 1)
 	p.stop = make(chan bool)
 	go p.animate()
 
@@ -74,7 +74,7 @@ const fps = 60
 
 func (p *PatternView) animate() {
 	var next <-chan time.Time
-	ctrl := PlayControl{}
+	var ctrl PlayControl
 	for {
 		select {
 		case <-p.play:
@@ -92,7 +92,7 @@ func (p *PatternView) animate() {
 				p.cursorTime = p.player.GetTime()
 				Repaint(p)
 			})
-		case <-ctrl.WaitChan():
+		case <-ctrl.Done:
 			next = nil
 			Do(p, func() {
 				SetKeyFocus(p.oldFocus)

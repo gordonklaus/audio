@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"sync"
 
 	"code.google.com/p/gordon-go/audio"
 	"code.google.com/p/portaudio-go/portaudio"
@@ -21,14 +20,14 @@ func init() {
 		<-sig
 		for _, c := range playControls {
 			c.Stop()
-			c.Wait()
+			<-c.Done
 		}
 		portaudio.Terminate()
 	}()
 }
 
 func Play(v audio.Voice) {
-	PlayAsync(v).Wait()
+	<-PlayAsync(v).Done
 }
 
 func PlayAsync(v audio.Voice) PlayControl {
@@ -69,8 +68,7 @@ func PlayAsync(v audio.Voice) PlayControl {
 	}
 
 	c.stop = make(chan struct{}, 1)
-	c.wg = new(sync.WaitGroup)
-	c.wg.Add(1)
+	c.Done = make(chan struct{}, 1)
 	go func() {
 		select {
 		case <-done:
@@ -79,15 +77,14 @@ func PlayAsync(v audio.Voice) PlayControl {
 		if err := s.Close(); err != nil {
 			fmt.Println(err)
 		}
-		c.wg.Done()
+		c.Done <- struct{}{}
 	}()
 	playControls = append(playControls, c)
 	return c
 }
 
 type PlayControl struct {
-	stop chan struct{}
-	wg   *sync.WaitGroup
+	stop, Done chan struct{}
 }
 
 func (c PlayControl) Stop() {
@@ -95,17 +92,4 @@ func (c PlayControl) Stop() {
 	case c.stop <- struct{}{}:
 	default:
 	}
-}
-
-func (c PlayControl) Wait() {
-	c.wg.Wait()
-}
-
-func (c PlayControl) WaitChan() <-chan struct{} {
-	ch := make(chan struct{})
-	go func() {
-		c.wg.Wait()
-		ch <- struct{}{}
-	}()
-	return ch
 }
