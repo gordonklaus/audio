@@ -40,7 +40,7 @@ func (s *song) beat() {
 	s.beatCount--
 	if s.beatCount <= 0 {
 		f := s.beatFreq.new(rats())
-		rats := make([]ratio, 6)
+		rats := make([]ratio, 12)
 		for i := range rats {
 			rats[i] = ratio{i + 1, 1}.div(f).div(s.repPeriod.last())
 		}
@@ -203,11 +203,11 @@ divisors:
 }
 
 func gcd(a, b int) int {
-	switch {
-	case a > b:
-		return gcd(b, a)
-	case a == 0:
-		return b
+	for a > 0 {
+		if a > b {
+			a, b = b, a
+		}
+		b -= a
 	}
-	return gcd(b-a, a)
+	return b
 }
