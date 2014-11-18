@@ -18,13 +18,11 @@ var (
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	audiogui.Play(&song{repPeriod: newMelody(ratio{1, 4}), beatFreq: newMelody(ratio{6, 1}), sineFreq: newMelody(ratio{256, 1})})
+	audiogui.Play(&song{beatFreq: newMelody(6, 5), sineFreq: newMelody(256, 5)})
 }
 
 type song struct {
 	EventDelay audio.EventDelay
-	repPeriod  melody
-	beatCount  int
 	beatFreq   melody
 	sineFreq   melody
 	MultiVoice audio.MultiVoice
@@ -37,21 +35,8 @@ func (s *song) InitAudio(p audio.Params) {
 }
 
 func (s *song) beat() {
-	s.beatCount--
-	if s.beatCount <= 0 {
-		f := s.beatFreq.new(rats())
-		rats := make([]ratio, 12)
-		for i := range rats {
-			rats[i] = ratio{i + 1, 1}.div(f).div(s.repPeriod.last())
-		}
-		c := s.repPeriod.new(rats).mul(f)
-		if c.b != 1 {
-			panic(c.b)
-		}
-		s.beatCount = c.a
-	}
-	s.MultiVoice.Add(newSineVoice(s.sineFreq.new(rats()).float()))
-	s.EventDelay.Delay(1/s.beatFreq.float(), s.beat)
+	s.MultiVoice.Add(newSineVoice(s.sineFreq.next(rats())))
+	s.EventDelay.Delay(1/s.beatFreq.next(rats()), s.beat)
 }
 
 func (s *song) Sing() float64 {
@@ -98,42 +83,25 @@ type ratio struct {
 	a, b int
 }
 
-func (r ratio) mul(s ratio) ratio { return ratio{r.a * s.a, r.b * s.b}.reduced() }
-func (r ratio) div(s ratio) ratio { return ratio{r.a * s.b, r.b * s.a}.reduced() }
-func (r ratio) reduced() ratio    { gcd := gcd(r.a, r.b); return ratio{r.a / gcd, r.b / gcd} }
-func (r ratio) float() float64    { return float64(r.a) / float64(r.b) }
+func (r ratio) float() float64 { return float64(r.a) / float64(r.b) }
 
 type melody struct {
+	current float64
 	center  float64
-	history []ratio
+	history []int
+	histlen int
 }
 
-func newMelody(center ratio) melody {
-	return melody{center: center.float(), history: []ratio{center}}
+func newMelody(center float64, histlen int) melody {
+	return melody{center, center, []int{1}, histlen}
 }
 
-func (m *melody) last() ratio    { return m.history[len(m.history)-1] }
-func (m *melody) float() float64 { return m.last().float() }
-
-func (m *melody) new(rats []ratio) ratio {
-	n := len(m.history) - 5
-	if n < 0 {
-		n = 0
-	}
-	hist := m.history[n:]
-	normHist := make([]ratio, len(hist))
-	r := hist[0]
-	for i := range hist {
-		normHist[i] = hist[i].div(r)
-	}
-	hist = normHist
-	last := hist[len(hist)-1]
-
+func (m *melody) next(rats []ratio) float64 {
 	sum := 0.0
 	sums := make([]float64, len(rats))
 	for i, r := range rats {
-		p := math.Log2(m.float() * r.float() / m.center)
-		sum += math.Exp2(-p*p/2) * math.Exp2(-float64(complexity(append(hist, r.mul(last)))))
+		p := math.Log2(m.current * r.float() / m.center)
+		sum += math.Exp2(-p*p/2) * math.Exp2(-float64(complexity(appendRatio(m.history, r))))
 		sums[i] = sum
 	}
 	i := 0
@@ -143,34 +111,46 @@ func (m *melody) new(rats []ratio) ratio {
 			break
 		}
 	}
-	m.history = append(m.history, m.last().mul(rats[i]))
-	return m.last()
+	m.current *= rats[i].float()
+	m.history = appendRatio(m.history, rats[i])
+	if len(m.history) > m.histlen {
+		m.history = m.history[1:]
+	}
+
+	d := m.history[0]
+	for _, x := range m.history[1:] {
+		d = gcd(d, x)
+	}
+	for i := range m.history {
+		m.history[i] /= d
+	}
+
+	return m.current
+}
+
+func appendRatio(history []int, r ratio) []int {
+	r.a *= history[len(history)-1]
+	hist := make([]int, len(history))
+	for i, x := range history {
+		hist[i] = x * r.b
+	}
+	return append(hist, r.a)
 }
 
 func rats() []ratio {
 	rats := []ratio{}
 	for a := 1; a < 16; a++ {
 		for b := 1; b < 16; b++ {
-			if gcd(a, b) != 1 {
-				continue
+			if gcd(a, b) == 1 {
+				rats = append(rats, ratio{a, b})
 			}
-			rats = append(rats, ratio{a, b})
 		}
 	}
 	return rats
 }
 
-func complexity(rats []ratio) int {
-	n := make([]int, len(rats))
-	for j := range n {
-		n[j] = rats[j].a
-		for i, r := range rats {
-			if i != j {
-				n[j] *= r.b
-			}
-		}
-	}
-
+func complexity(n []int) int {
+	n = append([]int{}, n...)
 	c := 1
 divisors:
 	for d := 2; ; d++ {
