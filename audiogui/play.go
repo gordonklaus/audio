@@ -31,31 +31,15 @@ func Play(v audio.Voice) {
 }
 
 func PlayAsync(v audio.Voice) PlayControl {
-	c := PlayControl{}
-	done := make(chan struct{}, 1)
+	c := PlayControl{make(chan struct{}, 1), make(chan struct{}, 1)}
 	params := audio.Params{SampleRate: 96000}
 	audio.Init(v, params)
 	s, err := portaudio.OpenDefaultStream(0, 1, params.SampleRate, 1024, func(out []float32) {
-		defer func() {
-			if x := recover(); x != nil {
-				for i := range out {
-					out[i] = 0
-				}
-				select {
-				case done <- struct{}{}:
-					fmt.Println("panic in stream callback:", x)
-				default:
-				}
-			}
-		}()
 		for i := range out {
 			out[i] = float32(v.Sing())
 		}
 		if v.Done() {
-			select {
-			case done <- struct{}{}:
-			default:
-			}
+			c.Stop()
 		}
 	})
 	if err != nil {
@@ -67,13 +51,8 @@ func PlayAsync(v audio.Voice) PlayControl {
 		return c
 	}
 
-	c.stop = make(chan struct{}, 1)
-	c.Done = make(chan struct{}, 1)
 	go func() {
-		select {
-		case <-done:
-		case <-c.stop:
-		}
+		<-c.stop
 		if err := s.Close(); err != nil {
 			fmt.Println(err)
 		}
