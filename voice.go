@@ -7,23 +7,26 @@ type Voice interface {
 
 type MultiVoice struct {
 	Params Params
-	voices map[Voice]struct{}
+	voices []Voice
 }
 
 func (m *MultiVoice) Add(v Voice) {
 	Init(v, m.Params)
-	if m.voices == nil {
-		m.voices = map[Voice]struct{}{}
-	}
-	m.voices[v] = struct{}{}
+	m.voices = append(m.voices, v)
 }
 
 func (m *MultiVoice) Sing() float64 {
 	x := 0.0
-	for v := range m.voices {
+	for i, n := 0, len(m.voices); i < n; {
+		v := m.voices[i]
 		x += v.Sing()
 		if v.Done() {
-			delete(m.voices, v)
+			n--
+			m.voices[i] = m.voices[n]
+			m.voices[n] = nil
+			m.voices = m.voices[:n]
+		} else {
+			i++
 		}
 	}
 	return x
