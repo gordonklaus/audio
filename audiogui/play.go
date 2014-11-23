@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
+	"syscall"
 
 	"code.google.com/p/gordon-go/audio"
 	"code.google.com/p/portaudio-go/portaudio"
@@ -17,7 +19,13 @@ func init() {
 		defer os.Exit(0)
 		sig := make(chan os.Signal, 1)
 		signal.Notify(sig)
-		<-sig
+		if <-sig == syscall.SIGQUIT {
+			buf := make([]byte, 1<<10)
+			for runtime.Stack(buf, true) == len(buf) {
+				buf = make([]byte, 2*len(buf))
+			}
+			fmt.Fprintln(os.Stderr, string(buf))
+		}
 		for _, c := range playControls {
 			c.Stop()
 			<-c.Done
