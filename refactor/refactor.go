@@ -1,9 +1,9 @@
 package refactor
 
 import (
-	_ "code.google.com/p/go.tools/go/gcimporter"
-	"code.google.com/p/go.tools/go/loader"
-	"code.google.com/p/go.tools/go/types"
+	_ "golang.org/x/tools/go/gcimporter"
+	"golang.org/x/tools/go/loader"
+	"golang.org/x/tools/go/types"
 	"fmt"
 	"go/ast"
 	"go/build"

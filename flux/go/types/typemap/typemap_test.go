@@ -8,7 +8,7 @@ package typemap_test
 import (
 	"testing"
 
-	"code.google.com/p/go.tools/go/types/typemap"
+	"golang.org/x/tools/go/types/typemap"
 	"code.google.com/p/gordon-go/flux/go/types"
 )
 

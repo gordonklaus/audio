@@ -139,7 +139,7 @@ func (check *checker) resolveFiles(files []*ast.File) {
 	importer := check.conf.Import
 	if importer == nil {
 		if DefaultImport == nil {
-			panic(`no Config.Import or DefaultImport (missing import _ "code.google.com/p/go.tools/go/gcimporter"?)`)
+			panic(`no Config.Import or DefaultImport (missing import _ "golang.org/x/tools/go/gcimporter"?)`)
 		}
 		importer = DefaultImport
 	}

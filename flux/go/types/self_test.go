@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	_ "code.google.com/p/go.tools/go/gcimporter"
+	_ "golang.org/x/tools/go/gcimporter"
 	. "code.google.com/p/gordon-go/flux/go/types"
 )
 
