@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<!-- without a single key (regardless of its name and value) or without this file, the app crashes on my phone with an InflateException -->
+    <string name=""></string>
+</resources>
