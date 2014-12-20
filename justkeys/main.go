@@ -26,15 +26,15 @@ var (
 )
 
 func main() {
-	startAudio()
 	app.Run(app.Callbacks{
+		Start: start,
+		Stop:  stop,
 		Touch: touch,
 		Draw:  draw,
-		Pause: stopAudio,
 	})
 }
 
-func initGL() {
+func start() {
 	var err error
 	program, err = glutil.CreateProgram(vertexShader, fragmentShader)
 	if err != nil {
@@ -53,6 +53,16 @@ func initGL() {
 	projmat.Translate(&projmat, -pitchOffset, 0, 0)
 
 	initKeys()
+
+	startAudio()
+}
+
+func stop() {
+	stopAudio()
+
+	gl.DeleteProgram(program)
+	gl.DeleteBuffer(positionbuf)
+	gl.DeleteBuffer(pointsizebuf)
 }
 
 func touch(t event.Touch) {
@@ -90,10 +100,6 @@ func touch(t event.Touch) {
 }
 
 func draw() {
-	if program.Value == 0 {
-		initGL()
-	}
-
 	gl.ClearColor(0, 0, 0, 1)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
 	gl.UseProgram(program)
