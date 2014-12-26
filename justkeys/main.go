@@ -14,6 +14,12 @@ import (
 )
 
 var (
+	print   = log.Print
+	printf  = log.Printf
+	println = log.Println
+)
+
+var (
 	program    gl.Program
 	projection gl.Uniform
 
@@ -22,7 +28,10 @@ var (
 	pitchOffset float32 = 7
 
 	mel  = newMelody(big.NewRat(512, 1), 5)
-	keys []*key
+	keys []key
+
+	pressed = map[*event.Touch]key{}
+	// fingers Fingers
 )
 
 func main() {
@@ -65,7 +74,9 @@ func stop() {
 	gl.DeleteBuffer(pointsizebuf)
 }
 
-func touch(t event.Touch) {
+func touch(t *event.Touch) {
+	// finger := fingers.touch(t)
+
 	// TODO: Don't manually invert or multiply projection matrix; use improved package f32.
 	m := new(f32.Mat4)
 	m.Identity()
@@ -80,22 +91,27 @@ func touch(t event.Touch) {
 
 	pitch := float64(v[0][0])
 	y := float64(v[1][0])
-	var key *key
+	var key key
 	mind := math.MaxFloat64
 	for _, k := range keys {
-		dx := k.pitch - pitch
-		dy := k.y - y
+		kb := k.base()
+		dx := kb.pitch - pitch
+		dy := kb.y - y
 		d := dx*dx + dy*dy
 		if d < mind {
 			mind = d
 			key = k
 		}
 	}
-	if t.Type == event.TouchStart {
-		mel.add(key.ratio)
-		updateKeys(key.ratio)
-		freq, _ := mel.current.Float64()
-		multivoice.Add(newSineVoice(freq))
+	switch t.Type {
+	case event.TouchStart:
+		pressed[t] = key
+		pressed[t].press(t.Loc)
+	case event.TouchMove:
+		pressed[t].move(t.Loc)
+	case event.TouchEnd:
+		pressed[t].release(t.Loc)
+		delete(pressed, t)
 	}
 }
 
@@ -127,3 +143,38 @@ void main(void)
     gl_FragColor = a * color;
 }
 `
+
+// type Fingers struct {
+// 	fingers []*finger
+// }
+//
+// func (f *Fingers) touch(t event.Touch) *finger {
+// 	if t.Type == event.TouchStart {
+// 		finger := &finger{t.Loc}
+// 		f.fingers = append(f.fingers, finger)
+// 		return finger
+// 	}
+// 	index := 0
+// 	dist := geom.Pt(math.MaxFloat32)
+// 	for i, finger := range f.fingers {
+// 		dx := finger.loc.X - t.Loc.X
+// 		dy := finger.loc.Y - t.Loc.Y
+// 		d := dx*dx + dy*dy
+// 		if d < dist {
+// 			index = i
+// 			dist = d
+// 		}
+// 	}
+// 	finger := f.fingers[index]
+// 	finger.loc = t.Loc
+// 	if t.Type == event.TouchEnd {
+// 		n := len(f.fingers)
+// 		f.fingers[index] = f.fingers[n-1]
+// 		f.fingers = f.fingers[:n-1]
+// 	}
+// 	return finger
+// }
+//
+// type finger struct {
+// 	loc geom.Point
+// }

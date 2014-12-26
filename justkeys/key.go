@@ -5,19 +5,88 @@ import (
 	"math"
 	"math/big"
 	"sort"
+	"time"
 
 	"golang.org/x/mobile/f32"
 	"golang.org/x/mobile/geom"
 	"golang.org/x/mobile/gl"
 )
 
-type key struct {
+type key interface {
+	base() *keyBase
+	press(loc geom.Point)
+	move(loc geom.Point)
+	release(loc geom.Point)
+}
+
+type keyBase struct {
 	ratio      *big.Rat
 	pitch      float64
 	complexity int
 	y, yTarget float64
 	sizeTarget float64
 	size       float64
+}
+
+func (k *keyBase) base() *keyBase { return k }
+
+type pluckedKey struct {
+	*keyBase
+	pressLoc geom.Point
+}
+
+func (k *pluckedKey) press(loc geom.Point) {
+	k.pressLoc = loc
+}
+
+func (k *pluckedKey) move(loc geom.Point) {}
+
+func (k *pluckedKey) release(loc geom.Point) {
+	amp := math.Max(-6, math.Log2(math.Tanh(dist(loc, k.pressLoc)/64)))
+
+	mel.add(k.ratio)
+	updateKeys(k.ratio)
+	multivoice.Add(newPluckedSine(amp, math.Exp2(k.pitch)))
+}
+
+type bowedKey struct {
+	*keyBase
+	moveLoc  geom.Point
+	moveTime time.Time
+
+	amp   float64
+	voice *bowedSine
+}
+
+func (k *bowedKey) press(loc geom.Point) {
+	k.moveLoc = loc
+	k.moveTime = time.Now()
+
+	if k.voice == nil || k.voice.Done() {
+		k.voice = newBowedSine(math.Exp2(k.pitch))
+		multivoice.Add(k.voice)
+	}
+
+	mel.add(k.ratio)
+	updateKeys(k.ratio)
+}
+
+func (k *bowedKey) move(loc geom.Point) {
+	dx := dist(loc, k.moveLoc)
+	dt := time.Now().Sub(k.moveTime).Seconds()
+	amp := math.Max(-12, math.Log2(math.Tanh(dx/dt/128)))
+	a := math.Pow(.999, 1/dt)
+	k.amp = a*amp + (1-a)*k.amp
+	k.voice.attack(k.amp)
+
+	k.moveLoc = loc
+	k.moveTime = time.Now()
+}
+
+func (k *bowedKey) release(loc geom.Point) {}
+
+func dist(a, b geom.Point) float64 {
+	return math.Hypot(float64(a.X-b.X), float64(a.Y-b.Y)) / float64(geom.PixelsPerPt)
 }
 
 var (
@@ -54,27 +123,37 @@ func updateKeys(last *big.Rat) {
 	}
 	for i, r := range rats {
 		f, _ := r.Float64()
-		k := &key{
+		pitch := math.Log2(cur * f)
+		yTarget := 1 - math.Exp2(-float64(complexities[i]-minComplexity)/4)
+		sizeTarget := math.Exp2(-float64(complexities[i]) / 4)
+		if k := findKey(oldkeys, pitch); k != nil {
+			kb := k.base()
+			kb.ratio = r
+			kb.yTarget = yTarget
+			kb.sizeTarget = sizeTarget
+			keys = append(keys, k)
+			continue
+		}
+		kb := &keyBase{
 			ratio:      r,
-			pitch:      math.Log2(cur * f),
-			yTarget:    1 - math.Exp2(-float64(complexities[i]-minComplexity)/4),
-			sizeTarget: math.Exp2(-float64(complexities[i]) / 4),
+			pitch:      pitch,
+			yTarget:    yTarget,
+			y:          yTarget,
+			sizeTarget: sizeTarget,
+			size:       sizeTarget,
 		}
-		k.y = k.yTarget
-		k.size = k.sizeTarget
-		if k2 := findKey(oldkeys, new(big.Rat).Mul(r, last)); k2 != nil {
-			k.y = k2.y
-			k.size = k2.size
-		}
+		// k := &bowedKey{keyBase: kb, amp: -12}
+		k := &pluckedKey{keyBase: kb}
 		keys = append(keys, k)
 	}
-	sort.Sort(byRatio(keys))
+	sort.Sort(byPitch(keys))
 }
 
 func drawKeys() {
 	data := []float32{}
 	pointsizedata := []float32{}
 	for _, k := range keys {
+		k := k.base()
 		k.y = k.yTarget + (k.y-k.yTarget)*.95
 		k.size = k.sizeTarget + (k.size-k.sizeTarget)*.95
 		data = append(data, float32(k.pitch), float32(k.y))
@@ -97,21 +176,21 @@ func drawKeys() {
 	gl.DisableVertexAttribArray(pointsize)
 }
 
-func findKey(keys []*key, r *big.Rat) *key {
+func findKey(keys []key, pitch float64) key {
 	i := sort.Search(
 		len(keys),
 		func(i int) bool {
-			return keys[i].ratio.Cmp(r) >= 0
+			return keys[i].base().pitch >= pitch-1e-9
 		},
 	)
-	if i < len(keys) && keys[i].ratio.Cmp(r) == 0 {
+	if i < len(keys) && math.Abs(keys[i].base().pitch-pitch) < 1e-9 {
 		return keys[i]
 	}
 	return nil
 }
 
-type byRatio []*key
+type byPitch []key
 
-func (s byRatio) Len() int           { return len(s) }
-func (s byRatio) Less(i, j int) bool { return s[i].ratio.Cmp(s[j].ratio) < 0 }
-func (s byRatio) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s byPitch) Len() int           { return len(s) }
+func (s byPitch) Less(i, j int) bool { return s[i].base().pitch < s[j].base().pitch }
+func (s byPitch) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
