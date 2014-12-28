@@ -24,13 +24,14 @@ var (
 	projection gl.Uniform
 
 	projmat     f32.Mat4
-	pitchRange  float32 = 4
-	pitchOffset float32 = 7
+	pitchRange  float64 = 4
+	pitchOffset float64 = 7
 
 	mel  = newMelody(big.NewRat(512, 1), 5)
 	keys []key
 
-	pressed = map[*event.Touch]key{}
+	pressed   = map[*event.Touch]key{}
+	scrollLoc = map[*event.Touch]geom.Pt{}
 	// fingers Fingers
 )
 
@@ -56,14 +57,18 @@ func start() {
 	gl.BlendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR)
 
 	projection = gl.GetUniformLocation(program, "projection")
-	projmat.Identity()
-	projmat.Translate(&projmat, -1, -1, 0)
-	projmat.Scale(&projmat, 2/pitchRange, 2, 1)
-	projmat.Translate(&projmat, -pitchOffset, 0, 0)
+	updateProjectionMatrix()
 
 	initKeys()
 
 	startAudio()
+}
+
+func updateProjectionMatrix() {
+	projmat.Identity()
+	projmat.Translate(&projmat, -1, -1, 0)
+	projmat.Scale(&projmat, 2/float32(pitchRange), 2, 1)
+	projmat.Translate(&projmat, -float32(pitchOffset), 0, 0)
 }
 
 func stop() {
@@ -77,35 +82,29 @@ func stop() {
 func touch(t *event.Touch) {
 	// finger := fingers.touch(t)
 
-	// TODO: Don't manually invert or multiply projection matrix; use improved package f32.
-	m := new(f32.Mat4)
-	m.Identity()
-	m.Translate(m, pitchOffset, 0, 0)
-	m.Scale(m, pitchRange/2, .5, 1)
-	m.Translate(m, 1, 1, 0)
-	v := new(f32.Mat4)
-	v[0][0] = float32(2*t.Loc.X/geom.Width - 1)
-	v[1][0] = float32(1 - 2*t.Loc.Y/geom.Height)
-	v[3][0] = 1
-	v.Mul(m, v)
-
-	pitch := float64(v[0][0])
-	y := float64(v[1][0])
-	var key key
-	mind := math.MaxFloat64
-	for _, k := range keys {
-		kb := k.base()
-		dx := kb.pitch - pitch
-		dy := kb.y - y
-		d := dx*dx + dy*dy
-		if d < mind {
-			mind = d
-			key = k
-		}
+	if t.Type == event.TouchStart && t.Loc.Y < 36 {
+		scrollLoc[t] = t.Loc.X
 	}
+	if _, ok := scrollLoc[t]; ok {
+		avg0, stddev0 := scrollStats()
+		scrollLoc[t] = t.Loc.X
+		avg1, stddev1 := scrollStats()
+		scale := 1.0
+		if stddev0 > 0 && stddev1 > 0 {
+			scale = float64(stddev1 / stddev0)
+		}
+		pitchOffset -= pitchRange * float64((avg1/geom.Pt(scale)-avg0)/geom.Width)
+		pitchRange /= scale
+		updateProjectionMatrix()
+		if t.Type == event.TouchEnd {
+			delete(scrollLoc, t)
+		}
+		return
+	}
+
 	switch t.Type {
 	case event.TouchStart:
-		pressed[t] = key
+		pressed[t] = nearestKey(t.Loc)
 		pressed[t].press(t.Loc)
 	case event.TouchMove:
 		pressed[t].move(t.Loc)
@@ -113,6 +112,36 @@ func touch(t *event.Touch) {
 		pressed[t].release(t.Loc)
 		delete(pressed, t)
 	}
+}
+
+func scrollStats() (avg, stddev geom.Pt) {
+	n := geom.Pt(len(scrollLoc))
+	for _, x := range scrollLoc {
+		avg += x
+	}
+	avg /= n
+	for _, x := range scrollLoc {
+		stddev += (x - avg) * (x - avg)
+	}
+	return avg, geom.Pt(math.Sqrt(float64(stddev / n)))
+}
+
+func nearestKey(loc geom.Point) key {
+	p := pitchOffset + pitchRange*float64(loc.X/geom.Width)
+	y := 1 - float64(loc.Y/geom.Height)
+	var key key
+	min := math.MaxFloat64
+	for _, k := range keys {
+		kb := k.base()
+		dx := kb.pitch - p
+		dy := kb.y - y
+		d := dx*dx + dy*dy
+		if d < min {
+			min = d
+			key = k
+		}
+	}
+	return key
 }
 
 func draw() {
