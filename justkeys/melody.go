@@ -1,27 +1,27 @@
 package main
 
-import (
-	"math/big"
-)
+type ratio struct {
+	a, b int
+}
+
+func (r ratio) float() float64 { return float64(r.a) / float64(r.b) }
 
 type melody struct {
-	current *big.Rat
-	center  *big.Rat
+	current float64
 	history []int
 	histlen int
 }
 
-func newMelody(center *big.Rat, histlen int) melody {
-	return melody{new(big.Rat).Set(center), center, []int{1}, histlen}
+func newMelody(start float64, histlen int) melody {
+	return melody{start, []int{1}, histlen}
 }
 
-func (m *melody) add(r *big.Rat) {
-	m.current.Mul(m.current, r)
+func (m *melody) add(r ratio) {
+	m.current *= r.float()
 	m.history = appendRatio(m.history, r)
 	if len(m.history) > m.histlen {
 		m.history = m.history[1:]
 	}
-
 	d := m.history[0]
 	for _, x := range m.history[1:] {
 		d = gcd(d, x)
@@ -31,17 +31,17 @@ func (m *melody) add(r *big.Rat) {
 	}
 }
 
-func appendRatio(history []int, r *big.Rat) []int {
-	a := int(r.Num().Int64()) * history[len(history)-1]
+func appendRatio(history []int, r ratio) []int {
+	a := r.a * history[len(history)-1]
 	hist := make([]int, len(history))
 	for i, x := range history {
-		hist[i] = x * int(r.Denom().Int64())
+		hist[i] = x * r.b
 	}
 	return append(hist, a)
 }
 
-func rats() []*big.Rat {
-	rats := []*big.Rat{}
+func rats() []ratio {
+	rats := []ratio{}
 	pow := func(a, x int) int {
 		y := 1
 		for x > 0 {
@@ -66,7 +66,7 @@ func rats() []*big.Rat {
 				n, d = mul(n, d, 3, three)
 				n, d = mul(n, d, 5, five)
 				// n, d = mul(n, d, 7, seven)
-				rats = append(rats, big.NewRat(int64(n), int64(d)))
+				rats = append(rats, ratio{n, d})
 				// }
 			}
 		}

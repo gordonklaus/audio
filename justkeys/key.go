@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"log"
 	"math"
-	"math/big"
 	"sort"
 	"time"
 
@@ -24,7 +23,7 @@ type key interface {
 }
 
 type keyBase struct {
-	ratio      *big.Rat
+	ratio      ratio
 	pitch      float64
 	complexity int
 	y, yTarget float64
@@ -94,7 +93,7 @@ func dist(a, b geom.Point) float64 {
 }
 
 var (
-	mel  = newMelody(big.NewRat(512, 1), 5)
+	mel  = newMelody(512, 5)
 	keys []key
 
 	program      gl.Program
@@ -148,7 +147,7 @@ func initKeys() {
 	color = gl.GetUniformLocation(program, "color")
 	positionbuf = gl.GenBuffer()
 	pointsizebuf = gl.GenBuffer()
-	updateKeys(big.NewRat(1, 1))
+	updateKeys(ratio{1, 1})
 }
 
 func updateProjectionMatrix() {
@@ -158,12 +157,11 @@ func updateProjectionMatrix() {
 	projmat.Translate(&projmat, -float32(pitchOffset), 0, 0)
 }
 
-func updateKeys(last *big.Rat) {
+func updateKeys(last ratio) {
 	oldkeys := keys
 	keys = nil
 
 	rats := rats()
-	cur, _ := mel.current.Float64()
 	complexities := make([]int, len(rats))
 	minComplexity := math.MaxInt32
 	for i, r := range rats {
@@ -174,8 +172,7 @@ func updateKeys(last *big.Rat) {
 		}
 	}
 	for i, r := range rats {
-		f, _ := r.Float64()
-		pitch := math.Log2(cur * f)
+		pitch := math.Log2(mel.current * r.float())
 		yTarget := 1 - math.Exp2(-float64(complexities[i]-minComplexity)/4)
 		sizeTarget := math.Exp2(-float64(complexities[i])/4) * float64(geom.Width) * float64(geom.PixelsPerPt) / 4
 		if k := findKey(oldkeys, pitch); k != nil {
