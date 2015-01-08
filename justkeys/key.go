@@ -50,7 +50,7 @@ func (k *pluckedKey) release(loc geom.Point) {
 
 	mel.add(k.ratio)
 	updateKeys(k.ratio)
-	multivoice.Add(newPluckedSine(amp, math.Exp2(k.pitch)))
+	multivoice.Add(newPluckedTone(amp, math.Exp2(k.pitch)))
 }
 
 type bowedKey struct {
@@ -59,7 +59,7 @@ type bowedKey struct {
 	moveTime time.Time
 
 	amp   float64
-	voice *bowedSine
+	voice *bowedTone
 }
 
 func (k *bowedKey) press(loc geom.Point) {
@@ -67,7 +67,7 @@ func (k *bowedKey) press(loc geom.Point) {
 	k.moveTime = time.Now()
 
 	if k.voice == nil || k.voice.Done() {
-		k.voice = newBowedSine(math.Exp2(k.pitch))
+		k.voice = newBowedTone(math.Exp2(k.pitch))
 		multivoice.Add(k.voice)
 	}
 
