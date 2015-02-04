@@ -7,6 +7,8 @@ import (
 	"sort"
 	"time"
 
+	"code.google.com/p/gordon-go/audio"
+
 	"golang.org/x/mobile/f32"
 	"golang.org/x/mobile/geom"
 	"golang.org/x/mobile/gl"
@@ -26,12 +28,41 @@ type keyBase struct {
 	ratio      ratio
 	pitch      float64
 	complexity int
-	y, yTarget float64
-	sizeTarget float64
+	y          float64
 	size       float64
+	voice      ampVoice
 }
 
 func (k *keyBase) base() *keyBase { return k }
+
+type ampVoice interface {
+	audio.Voice
+	amp() float64
+}
+
+type pressedKey struct {
+	*keyBase
+}
+
+func (k *pressedKey) press(loc geom.Point) {
+	if k.voice == nil || k.voice.Done() {
+		k.voice = newPressedTone(math.Exp2(k.pitch))
+		multivoice.Add(k.voice)
+	}
+	updateKeys(k.ratio)
+}
+
+func (k *pressedKey) move(loc geom.Point) {
+	k.voice.(*pressedTone).attack(-3 * float64(loc.Y/geom.Height))
+}
+
+func (k *pressedKey) release(loc geom.Point) {
+	if loc.Y < geom.Height-8 {
+		k.move(loc)
+	} else {
+		k.voice.(*pressedTone).release()
+	}
+}
 
 type pluckedKey struct {
 	*keyBase
@@ -47,9 +78,10 @@ func (k *pluckedKey) move(loc geom.Point) {}
 func (k *pluckedKey) release(loc geom.Point) {
 	amp := math.Max(-6, math.Log2(math.Tanh(dist(loc, k.pressLoc)/64)))
 
-	mel.add(k.ratio)
 	updateKeys(k.ratio)
-	multivoice.Add(newPluckedTone(amp, math.Exp2(k.pitch)))
+	v := newPluckedTone(amp, math.Exp2(k.pitch))
+	multivoice.Add(v)
+	k.keyBase.voice = v
 }
 
 type bowedKey struct {
@@ -68,9 +100,9 @@ func (k *bowedKey) press(loc geom.Point) {
 	if k.voice == nil || k.voice.Done() {
 		k.voice = newBowedTone(math.Exp2(k.pitch))
 		multivoice.Add(k.voice)
+		k.keyBase.voice = k.voice
 	}
 
-	mel.add(k.ratio)
 	updateKeys(k.ratio)
 }
 
@@ -93,8 +125,8 @@ func dist(a, b geom.Point) float64 {
 }
 
 var (
-	mel  = newMelody(512, 5)
-	keys []key
+	keys      []key
+	lastPitch = 512.0
 
 	program      gl.Program
 	projection   gl.Uniform
@@ -105,8 +137,8 @@ var (
 	positionbuf  gl.Buffer
 	pointsizebuf gl.Buffer
 
-	pitchRange  = 4.0
-	pitchOffset = 7.0
+	pitchRange  = 2.0
+	pitchOffset = 6.0
 )
 
 func initKeys() {
@@ -158,42 +190,40 @@ func updateProjectionMatrix() {
 }
 
 func updateKeys(last ratio) {
-	oldkeys := keys
-	keys = nil
-
-	rats := rats()
-	complexities := make([]int, len(rats))
-	minComplexity := math.MaxInt32
-	for i, r := range rats {
-		c := complexity(appendRatio(mel.history, r))
-		complexities[i] = c
-		if c < minComplexity {
-			minComplexity = c
+	lastPitch *= last.float()
+	playing := []ratio{{1, 1}}
+	for _, k := range keys {
+		k := k.base()
+		if k.voice != nil && !k.voice.Done() {
+			playing = append(playing, k.ratio.div(last))
 		}
 	}
-	for i, r := range rats {
-		pitch := math.Log2(mel.current * r.float())
-		yTarget := 1 - math.Exp2(-float64(complexities[i]-minComplexity)/4)
-		sizeTarget := math.Exp2(-float64(complexities[i])/4) * float64(geom.Width) * float64(geom.PixelsPerPt) / 4
-		if k := findKey(oldkeys, pitch); k != nil {
-			kb := k.base()
-			kb.ratio = r
-			kb.yTarget = yTarget
-			kb.sizeTarget = sizeTarget
+
+	oldkeys := keys
+	keys = nil
+	added := map[ratio]bool{}
+	for _, r := range rats() {
+		for _, playing := range playing {
+			r := r.mul(playing)
+			if added[r] {
+				continue
+			}
+			added[r] = true
+			var k key
+			if oldkeys, k = findAndRemoveKey(oldkeys, last.mul(r)); k != nil {
+				k.base().ratio = r
+				keys = append(keys, k)
+				continue
+			}
+			kb := &keyBase{
+				ratio: r,
+				pitch: math.Log2(lastPitch * r.float()),
+			}
+			// k = &bowedKey{keyBase: kb, amp: -12}
+			// k = &pluckedKey{keyBase: kb}
+			k = &pressedKey{keyBase: kb}
 			keys = append(keys, k)
-			continue
 		}
-		kb := &keyBase{
-			ratio:      r,
-			pitch:      pitch,
-			yTarget:    yTarget,
-			y:          yTarget,
-			sizeTarget: sizeTarget,
-			size:       sizeTarget,
-		}
-		// k := &bowedKey{keyBase: kb, amp: -12}
-		k := &pluckedKey{keyBase: kb}
-		keys = append(keys, k)
 	}
 	sort.Sort(byPitch(keys))
 }
@@ -202,12 +232,45 @@ func drawKeys() {
 	gl.UseProgram(program)
 	projection.WriteMat4(&projmat)
 
+	iPlaying := []int{}
+	playing := []ratio{}
+	amps := []float64{}
+	for i, k := range keys {
+		k := k.base()
+		if k.voice != nil && !k.voice.Done() {
+			iPlaying = append(iPlaying, i)
+			playing = append(playing, k.ratio)
+			amps = append(amps, k.voice.amp())
+		}
+	}
+	complexities := make([]float64, len(keys))
+	minComplexity := math.MaxFloat64
+	for i, k := range keys {
+		k := k.base()
+		c := -1.0
+		for j, iPlaying := range iPlaying {
+			if i == iPlaying {
+				a := amps[j]
+				amps[j] = 1
+				c = complexity(playing, amps)
+				amps[j] = a
+				break
+			}
+		}
+		if c == -1 {
+			c = complexity(append(playing, k.ratio), append(amps, 1))
+		}
+		complexities[i] = c
+		if c < minComplexity {
+			minComplexity = c
+		}
+	}
 	data := []float32{}
 	pointsizedata := []float32{}
-	for _, k := range keys {
+	for i, k := range keys {
 		k := k.base()
-		k.y = k.yTarget + (k.y-k.yTarget)*.95
-		k.size = k.sizeTarget + (k.size-k.sizeTarget)*.95
+		k.y = 1 - math.Exp2(-float64(complexities[i]-minComplexity)/4)
+		k.size = math.Exp2(-float64(complexities[i])/4) * float64(geom.Width) * float64(geom.PixelsPerPt) / 4
 		data = append(data, float32(k.pitch), float32(k.y))
 		pointsizedata = append(pointsizedata, float32(k.size))
 	}
@@ -228,21 +291,22 @@ func drawKeys() {
 	gl.DisableVertexAttribArray(pointsize)
 }
 
-func findKey(keys []key, pitch float64) key {
+func findAndRemoveKey(keys []key, r ratio) ([]key, key) {
 	i := sort.Search(
 		len(keys),
 		func(i int) bool {
-			return keys[i].base().pitch >= pitch-1e-9
+			return !keys[i].base().ratio.less(r)
 		},
 	)
-	if i < len(keys) && math.Abs(keys[i].base().pitch-pitch) < 1e-9 {
-		return keys[i]
+	if i < len(keys) && keys[i].base().ratio == r {
+		k := keys[i]
+		return append(keys[:i], keys[i+1:]...), k
 	}
-	return nil
+	return keys, nil
 }
 
 type byPitch []key
 
 func (s byPitch) Len() int           { return len(s) }
-func (s byPitch) Less(i, j int) bool { return s[i].base().pitch < s[j].base().pitch }
+func (s byPitch) Less(i, j int) bool { return s[i].base().ratio.less(s[j].base().ratio) }
 func (s byPitch) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }

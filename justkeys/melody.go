@@ -4,41 +4,19 @@ type ratio struct {
 	a, b int
 }
 
-func (r ratio) float() float64 { return float64(r.a) / float64(r.b) }
-
-type melody struct {
-	current float64
-	history []int
-	histlen int
+func (r ratio) mul(s ratio) ratio {
+	r.a *= s.a
+	r.b *= s.b
+	d := gcd(r.a, r.b)
+	r.a /= d
+	r.b /= d
+	return r
 }
 
-func newMelody(start float64, histlen int) melody {
-	return melody{start, []int{1}, histlen}
-}
+func (r ratio) div(s ratio) ratio { return r.mul(ratio{s.b, s.a}) }
 
-func (m *melody) add(r ratio) {
-	m.current *= r.float()
-	m.history = appendRatio(m.history, r)
-	if len(m.history) > m.histlen {
-		m.history = m.history[1:]
-	}
-	d := m.history[0]
-	for _, x := range m.history[1:] {
-		d = gcd(d, x)
-	}
-	for i := range m.history {
-		m.history[i] /= d
-	}
-}
-
-func appendRatio(history []int, r ratio) []int {
-	a := r.a * history[len(history)-1]
-	hist := make([]int, len(history))
-	for i, x := range history {
-		hist[i] = x * r.b
-	}
-	return append(hist, a)
-}
+func (r ratio) less(s ratio) bool { return r.a*s.b < s.a*r.b }
+func (r ratio) float() float64    { return float64(r.a) / float64(r.b) }
 
 func rats() []ratio {
 	rats := []ratio{}
@@ -56,52 +34,52 @@ func rats() []ratio {
 		}
 		return n, d * pow(a, -x)
 	}
-	x := []int{-2, -1, 0, 1, 2}
 	for _, two := range []int{-3, -2, -1, 0, 1, 2, 3} {
-		for _, three := range x {
-			for _, five := range x {
-				// for _, seven := range x {
-				n, d := 1, 1
-				n, d = mul(n, d, 2, two)
-				n, d = mul(n, d, 3, three)
-				n, d = mul(n, d, 5, five)
-				// n, d = mul(n, d, 7, seven)
-				rats = append(rats, ratio{n, d})
-				// }
+		for _, three := range []int{-2, -1, 0, 1, 2} {
+			for _, five := range []int{-1, 0, 1} {
+				for _, seven := range []int{-1, 0, 1} {
+					n, d := 1, 1
+					n, d = mul(n, d, 2, two)
+					n, d = mul(n, d, 3, three)
+					n, d = mul(n, d, 5, five)
+					n, d = mul(n, d, 7, seven)
+					rats = append(rats, ratio{n, d})
+				}
 			}
 		}
 	}
 	return rats
 }
 
-func complexity(n []int) int {
-	c := 1
-divisors:
-	for d := 2; ; d++ {
-		for {
-			dividesAny := false
-			dividesAll := true
-			for i := range n {
-				if n[i]%d == 0 {
-					n[i] /= d
-					dividesAny = true
-				} else {
-					dividesAll = false
-				}
-			}
-			if !dividesAny {
-				break
-			}
-			if !dividesAll {
-				c += d - 1
-			}
+func complexity(r []ratio, amp []float64) float64 {
+	c := 0.0
+	ampSum := 0.0
+	for i := range r {
+		for j := range r[:i] {
+			c += amp[i] * amp[j] * float64(r[i].div(r[j]).complexity())
 		}
-		for _, n := range n {
-			if n > 1 {
-				continue divisors
-			}
+		ampSum += amp[i]
+	}
+	return c / ampSum
+}
+
+func (r ratio) complexity() int {
+	c := 0
+	for d := 2; r.a != r.b; {
+		d1 := r.a%d == 0
+		d2 := r.b%d == 0
+		if d1 != d2 {
+			c += d - 1
 		}
-		break
+		if d1 {
+			r.a /= d
+		}
+		if d2 {
+			r.b /= d
+		}
+		if !(d1 || d2) {
+			d++
+		}
 	}
 	return c
 }
