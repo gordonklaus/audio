@@ -35,8 +35,8 @@ func (s *song) InitAudio(p audio.Params) {
 }
 
 func (s *song) beat() {
-	s.MultiVoice.Add(newSineVoice(s.melody.next(rats())))
-	s.EventDelay.Delay(s.rhythm.next(rats()), s.beat)
+	s.MultiVoice.Add(newSineVoice(s.melody.next(rats)))
+	s.EventDelay.Delay(s.rhythm.next(rats), s.beat)
 }
 
 func (s *song) Sing() float64 {
@@ -149,16 +149,37 @@ func appendRatio(history []int, r ratio) []int {
 	return append(hist, r.a)
 }
 
-func rats() []ratio {
-	rats := []ratio{}
-	for a := 1; a < 16; a++ {
-		for b := 1; b < 16; b++ {
-			if gcd(a, b) == 1 {
-				rats = append(rats, ratio{a, b})
+var rats []ratio
+
+func init() {
+	pow := func(a, x int) int {
+		y := 1
+		for x > 0 {
+			y *= a
+			x--
+		}
+		return y
+	}
+	mul := func(n, d, a, x int) (int, int) {
+		if x > 0 {
+			return n * pow(a, x), d
+		}
+		return n, d * pow(a, -x)
+	}
+	for _, two := range []int{-3, -2, -1, 0, 1, 2, 3} {
+		for _, three := range []int{-2, -1, 0, 1, 2} {
+			for _, five := range []int{-1, 0, 1} {
+				for _, seven := range []int{-1, 0, 1} {
+					n, d := 1, 1
+					n, d = mul(n, d, 2, two)
+					n, d = mul(n, d, 3, three)
+					n, d = mul(n, d, 5, five)
+					n, d = mul(n, d, 7, seven)
+					rats = append(rats, ratio{n, d})
+				}
 			}
 		}
 	}
-	return rats
 }
 
 func complexity(n []int) int {

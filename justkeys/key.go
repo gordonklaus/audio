@@ -202,7 +202,7 @@ func updateKeys(last ratio) {
 	oldkeys := keys
 	keys = nil
 	added := map[ratio]bool{}
-	for _, r := range rats() {
+	for _, r := range rats {
 		for _, playing := range playing {
 			r := r.mul(playing)
 			if added[r] {

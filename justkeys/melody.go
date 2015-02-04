@@ -18,8 +18,9 @@ func (r ratio) div(s ratio) ratio { return r.mul(ratio{s.b, s.a}) }
 func (r ratio) less(s ratio) bool { return r.a*s.b < s.a*r.b }
 func (r ratio) float() float64    { return float64(r.a) / float64(r.b) }
 
-func rats() []ratio {
-	rats := []ratio{}
+var rats []ratio
+
+func init() {
 	pow := func(a, x int) int {
 		y := 1
 		for x > 0 {
@@ -48,7 +49,6 @@ func rats() []ratio {
 			}
 		}
 	}
-	return rats
 }
 
 func complexity(r []ratio, amp []float64) float64 {
