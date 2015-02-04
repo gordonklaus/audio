@@ -18,13 +18,13 @@ var (
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	audiogui.Play(&song{beatFreq: newMelody(6, 5), sineFreq: newMelody(256, 5)})
+	audiogui.Play(&song{rhythm: newRhythm(1./4, 5), melody: newMelody(256, 5)})
 }
 
 type song struct {
 	EventDelay audio.EventDelay
-	beatFreq   melody
-	sineFreq   melody
+	rhythm     melody
+	melody     melody
 	MultiVoice audio.MultiVoice
 }
 
@@ -35,8 +35,8 @@ func (s *song) InitAudio(p audio.Params) {
 }
 
 func (s *song) beat() {
-	s.MultiVoice.Add(newSineVoice(s.sineFreq.next(rats())))
-	s.EventDelay.Delay(1/s.beatFreq.next(rats()), s.beat)
+	s.MultiVoice.Add(newSineVoice(s.melody.next(rats())))
+	s.EventDelay.Delay(s.rhythm.next(rats()), s.beat)
 }
 
 func (s *song) Sing() float64 {
@@ -86,23 +86,32 @@ type ratio struct {
 func (r ratio) float() float64 { return float64(r.a) / float64(r.b) }
 
 type melody struct {
-	current float64
+	rhythm  bool
+	last    float64
 	center  float64
 	history []int
 	histlen int
 }
 
 func newMelody(center float64, histlen int) melody {
-	return melody{center, center, []int{1}, histlen}
+	return melody{false, center, center, []int{1}, histlen}
+}
+
+func newRhythm(center float64, histlen int) melody {
+	return melody{true, center, center, []int{1}, histlen}
 }
 
 func (m *melody) next(rats []ratio) float64 {
 	sum := 0.0
 	sums := make([]float64, len(rats))
 	for i, r := range rats {
-		p := math.Log2(m.current * r.float() / m.center)
+		p := math.Log2(m.last * r.float() / m.center)
 		sum += math.Exp2(-p*p/2) * math.Exp2(-float64(complexity(appendRatio(m.history, r))))
 		sums[i] = sum
+	}
+	if m.rhythm {
+		sum += math.Exp2(-float64(complexity(m.history)))
+		sums = append(sums, sum)
 	}
 	i := 0
 	x := sum * rand.Float64()
@@ -111,7 +120,10 @@ func (m *melody) next(rats []ratio) float64 {
 			break
 		}
 	}
-	m.current *= rats[i].float()
+	if i == len(rats) {
+		return 0
+	}
+	m.last *= rats[i].float()
 	m.history = appendRatio(m.history, rats[i])
 	if len(m.history) > m.histlen {
 		m.history = m.history[1:]
@@ -125,7 +137,7 @@ func (m *melody) next(rats []ratio) float64 {
 		m.history[i] /= d
 	}
 
-	return m.current
+	return m.last
 }
 
 func appendRatio(history []int, r ratio) []int {
