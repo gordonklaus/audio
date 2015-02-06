@@ -47,7 +47,7 @@ type pressedKey struct {
 func (k *pressedKey) press(loc geom.Point) {
 	if k.voice == nil || k.voice.Done() {
 		k.voice = newPressedTone(math.Exp2(k.pitch))
-		multivoice.Add(k.voice)
+		tones.Add(k.voice)
 	}
 	updateKeys(k.ratio)
 }
@@ -80,7 +80,7 @@ func (k *pluckedKey) release(loc geom.Point) {
 
 	updateKeys(k.ratio)
 	v := newPluckedTone(amp, math.Exp2(k.pitch))
-	multivoice.Add(v)
+	tones.Add(v)
 	k.keyBase.voice = v
 }
 
@@ -99,7 +99,7 @@ func (k *bowedKey) press(loc geom.Point) {
 
 	if k.voice == nil || k.voice.Done() {
 		k.voice = newBowedTone(math.Exp2(k.pitch))
-		multivoice.Add(k.voice)
+		tones.Add(k.voice)
 		k.keyBase.voice = k.voice
 	}
 

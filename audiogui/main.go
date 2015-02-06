@@ -31,6 +31,6 @@ func Main(score *audio.Score, band audio.Band) {
 			println("unknown arg: " + os.Args[1])
 		}
 	} else {
-		Play(audio.NewScorePlayer(score, band))
+		audio.Play(audio.NewScorePlayer(score, band))
 	}
 }

@@ -3,24 +3,26 @@ package main
 import (
 	"math"
 
-	"golang.org/x/mobile/sl"
-
 	"code.google.com/p/gordon-go/audio"
 )
 
-var multivoice audio.MultiVoice
+var tones Tones
+
+type Tones struct {
+	audio.MultiVoice
+}
+
+func (t *Tones) Sing() float64 { return math.Tanh(t.MultiVoice.Sing() / 4) }
+func (t *Tones) Done() bool    { return false }
+
+var playControl audio.PlayControl
 
 func startAudio() {
-	audio.Init(&multivoice, audio.Params{48000})
-	sl.Start(func(out []float32) {
-		for i := range out {
-			out[i] = float32(math.Tanh(multivoice.Sing() / 4))
-		}
-	})
+	playControl = audio.PlayAsync(&tones)
 }
 
 func stopAudio() {
-	sl.Stop()
+	playControl.Stop()
 }
 
 type pressedTone struct {

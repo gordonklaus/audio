@@ -74,7 +74,7 @@ const fps = 60
 
 func (p *PatternView) animate() {
 	var next <-chan time.Time
-	var ctrl PlayControl
+	var ctrl audio.PlayControl
 	for {
 		select {
 		case <-p.play:
@@ -84,7 +84,7 @@ func (p *PatternView) animate() {
 				break
 			}
 			p.inst.Stop()
-			ctrl = PlayAsync(p.player)
+			ctrl = audio.PlayAsync(p.player)
 			next = time.After(time.Second / fps)
 		case <-next:
 			next = time.After(time.Second / fps)

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"code.google.com/p/gordon-go/audio"
-	"code.google.com/p/gordon-go/audiogui"
 )
 
 var (
@@ -18,7 +17,7 @@ var (
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	audiogui.Play(&song{rhythm: newRhythm(1./4, 5), melody: newMelody(256, 5)})
+	audio.Play(&song{rhythm: newRhythm(1./4, 5), melody: newMelody(256, 5)})
 }
 
 type song struct {

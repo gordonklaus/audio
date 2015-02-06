@@ -71,7 +71,7 @@ func (s *ScoreView) Close() {
 
 func (s *ScoreView) animate() {
 	var next <-chan time.Time
-	var ctrl PlayControl
+	var ctrl audio.PlayControl
 	for {
 		select {
 		case <-s.play:
@@ -83,7 +83,7 @@ func (s *ScoreView) animate() {
 			for _, inst := range audio.BandInstruments(s.band) {
 				inst.Stop()
 			}
-			ctrl = PlayAsync(s.player)
+			ctrl = audio.PlayAsync(s.player)
 			next = time.After(time.Second / 60)
 		case <-next:
 			next = time.After(time.Second / 60)
