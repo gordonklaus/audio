@@ -30,7 +30,7 @@ var sines_pattern = audiogui.NewPattern([]*audio.Note{
 			{1, 9},
 		},
 		"Amplitude": {
-			{0, -2},
+			{0, -3},
 		},
 	}},
 	{3, map[string][]*audio.ControlPoint{
@@ -39,16 +39,16 @@ var sines_pattern = audiogui.NewPattern([]*audio.Note{
 			{1, 8.584962500721156},
 		},
 		"Amplitude": {
-			{0, -2},
+			{0, -3},
 		},
 	}},
 	{4, map[string][]*audio.ControlPoint{
-		"Amplitude": {
-			{0, -2},
-		},
 		"Pitch": {
 			{0, 8.169925001442312},
 			{1, 8.169925001442312},
+		},
+		"Amplitude": {
+			{0, -2},
 		},
 	}},
 	{5, map[string][]*audio.ControlPoint{
@@ -61,17 +61,17 @@ var sines_pattern = audiogui.NewPattern([]*audio.Note{
 		},
 	}},
 	{6, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -3},
+		},
 		"Pitch": {
 			{0, 9.169925001442312},
 			{1, 9.169925001442312},
 		},
-		"Amplitude": {
-			{0, -2},
-		},
 	}},
 	{7, map[string][]*audio.ControlPoint{
 		"Amplitude": {
-			{0, -2},
+			{0, -3},
 		},
 		"Pitch": {
 			{0, 8.906890595608518},
@@ -79,12 +79,12 @@ var sines_pattern = audiogui.NewPattern([]*audio.Note{
 		},
 	}},
 	{8, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -2},
+		},
 		"Pitch": {
 			{0, 8.321928094887362},
 			{1, 8.321928094887362},
-		},
-		"Amplitude": {
-			{0, -2},
 		},
 	}},
 	{9, map[string][]*audio.ControlPoint{
@@ -97,12 +97,12 @@ var sines_pattern = audiogui.NewPattern([]*audio.Note{
 		},
 	}},
 	{10, map[string][]*audio.ControlPoint{
-		"Amplitude": {
-			{0, -2},
-		},
 		"Pitch": {
 			{0, 7.906890595608518},
 			{1, 7.906890595608518},
+		},
+		"Amplitude": {
+			{0, -3},
 		},
 	}},
 	{11, map[string][]*audio.ControlPoint{
@@ -111,7 +111,7 @@ var sines_pattern = audiogui.NewPattern([]*audio.Note{
 			{1, 8.584962500721156},
 		},
 		"Amplitude": {
-			{0, -2},
+			{0, -3},
 		},
 	}},
 	{12, map[string][]*audio.ControlPoint{
@@ -142,21 +142,12 @@ var sines_pattern = audiogui.NewPattern([]*audio.Note{
 		},
 	}},
 	{13, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -2},
+		},
 		"Pitch": {
 			{0, 8.584962500721156},
 			{1, 8.584962500721156},
-		},
-		"Amplitude": {
-			{0, -2},
-		},
-	}},
-	{14, map[string][]*audio.ControlPoint{
-		"Pitch": {
-			{0, 9},
-			{1, 9},
-		},
-		"Amplitude": {
-			{0, -2},
 		},
 	}},
 	{14, map[string][]*audio.ControlPoint{
@@ -165,16 +156,16 @@ var sines_pattern = audiogui.NewPattern([]*audio.Note{
 			{1, 9.321928094887362},
 		},
 		"Amplitude": {
-			{0, -2},
+			{0, -3},
 		},
 	}},
-	{15, map[string][]*audio.ControlPoint{
-		"Amplitude": {
-			{0, -2},
-		},
+	{14, map[string][]*audio.ControlPoint{
 		"Pitch": {
-			{0, 9.584962500721156},
-			{1, 9.584962500721156},
+			{0, 9},
+			{1, 9},
+		},
+		"Amplitude": {
+			{0, -3},
 		},
 	}},
 	{15, map[string][]*audio.ControlPoint{
@@ -183,7 +174,16 @@ var sines_pattern = audiogui.NewPattern([]*audio.Note{
 			{1, 8.736965594166206},
 		},
 		"Amplitude": {
-			{0, -2},
+			{0, -3},
+		},
+	}},
+	{15, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -3},
+		},
+		"Pitch": {
+			{0, 9.584962500721156},
+			{1, 9.584962500721156},
 		},
 	}},
 	{16, map[string][]*audio.ControlPoint{
@@ -202,6 +202,385 @@ var sines_pattern = audiogui.NewPattern([]*audio.Note{
 		"Pitch": {
 			{0, 8.491853096329674},
 			{1, 8.491853096329674},
+		},
+	}},
+	{17, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.169925001442312},
+			{1, 8.169925001442312},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{17, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.754887502163468},
+			{1, 8.754887502163468},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{18, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 9.754887502163468},
+			{1, 9.754887502163468},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{18, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -3},
+		},
+		"Pitch": {
+			{0, 8.584962500721156},
+			{1, 8.584962500721156},
+		},
+	}},
+	{19, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -4},
+		},
+		"Pitch": {
+			{0, 9.169925001442312},
+			{1, 9.169925001442312},
+		},
+	}},
+	{19, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 9.906890595608518},
+			{1, 9.906890595608518},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{19, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.491853096329674},
+			{1, 8.491853096329674},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{20, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 9.321928094887362},
+			{1, 9.321928094887362},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{20, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8},
+			{1, 8},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{20, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -3},
+		},
+		"Pitch": {
+			{0, 8.321928094887362},
+			{1, 8.321928094887362},
+		},
+	}},
+	{21, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 7.584962500721156},
+			{1, 7.584962500721156},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{21.018666666252102, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.169925001442312},
+			{0.981333333747898, 8.169925001442312},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{22, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.321928094887362},
+			{1, 8.321928094887362},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{22, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8},
+			{1, 8},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{23, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 6.584962500721156},
+			{1, 6.584962500721156},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{23, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 7.584962500721156},
+			{1, 7.584962500721156},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{23, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.169925001442312},
+			{1, 8.169925001442312},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{24, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -2},
+		},
+		"Pitch": {
+			{0, 7},
+			{1, 7},
+		},
+	}},
+	{24, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.321928094887362},
+			{1, 8.321928094887362},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{25, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.169925001442312},
+			{1, 8.169925001442312},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{25, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -2},
+		},
+		"Pitch": {
+			{0, 7.584962500721156},
+			{1, 7.584962500721156},
+		},
+	}},
+	{26, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -2},
+		},
+		"Pitch": {
+			{0, 8},
+			{1, 8},
+		},
+	}},
+	{26, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.321928094887362},
+			{1, 8.321928094887362},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{27, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 6.584962500721156},
+			{1, 6.584962500721156},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{27, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.169925001442312},
+			{1, 8.169925001442312},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{28, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.321928094887362},
+			{1, 8.321928094887362},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{28, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 6},
+			{1, 6},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{28, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8},
+			{1, 8},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{29, map[string][]*audio.ControlPoint{
+		"Amplitude": {
+			{0, -2},
+		},
+		"Pitch": {
+			{0, 8.321928094887362},
+			{1, 8.321928094887362},
+		},
+	}},
+	{29, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.584962500721156},
+			{1, 8.584962500721156},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{29, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 6.584962500721156},
+			{1, 6.584962500721156},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{30, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 7},
+			{1, 7},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{30, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.584962500721156},
+			{1, 8.584962500721156},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{30, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 9},
+			{1, 9},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{31, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.321928094887362},
+			{1, 8.321928094887362},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{31, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 6.906890595608518},
+			{0.042666667210141895, 6.906890595608518},
+			{1.042666667210142, 6.906890595608518},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{31, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.584962500721156},
+			{1, 8.584962500721156},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{31, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 7.321928094887362},
+			{1, 7.321928094887362},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{32, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.754887502163468},
+			{1, 8.754887502163468},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{32, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 6.7369655941662066},
+			{1, 6.7369655941662066},
+		},
+		"Amplitude": {
+			{0, -3},
+		},
+	}},
+	{32, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.07681559705083},
+			{1, 8.07681559705083},
+		},
+		"Amplitude": {
+			{0, -2},
+		},
+	}},
+	{33, map[string][]*audio.ControlPoint{
+		"Pitch": {
+			{0, 8.491853096329674},
+			{1, 8.491853096329674},
+		},
+		"Amplitude": {
+			{0, -2},
 		},
 	}},
 }, map[string][]*audio.ControlPoint{
