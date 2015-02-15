@@ -353,7 +353,7 @@ func (e *patternEventView) reform() {
 	t := 0.0
 	for _, n := range e.event.Pattern.Notes {
 		for _, a := range n.Attributes {
-			t = math.Max(t, a[len(a)-1].Time)
+			t = math.Max(t, n.Time + a[len(a)-1].Time)
 		}
 	}
 	for _, a := range e.event.Pattern.Attributes {
