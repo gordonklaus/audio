@@ -17,6 +17,12 @@ func Main(score *audio.Score, band audio.Band) {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "edit":
+			procs := runtime.GOMAXPROCS(0)
+			if procs < 2 {
+				procs = 2
+			}
+			runtime.GOMAXPROCS(procs)
+
 			gui.Run(func() {
 				gui.NewWindow(nil, name, func(w *gui.Window) {
 					v := NewScoreView(score, band)
