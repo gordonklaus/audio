@@ -17,7 +17,7 @@ var (
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	audio.Play(&song{rhythm: newRhythm(1./4, 5), melody: newMelody(256, 5)})
+	audio.Play(&song{rhythm: newRhythm(1./4, 8), melody: newMelody(256, 8)})
 }
 
 type song struct {
@@ -35,7 +35,10 @@ func (s *song) InitAudio(p audio.Params) {
 
 func (s *song) beat() {
 	s.MultiVoice.Add(newSineVoice(s.melody.next(rats)))
-	s.EventDelay.Delay(s.rhythm.next(rats), s.beat)
+	t := s.rhythm.next(rats)
+	s.melody.time += t
+	s.rhythm.time += t
+	s.EventDelay.Delay(t, s.beat)
 }
 
 func (s *song) Sing() float64 {
@@ -50,6 +53,7 @@ func (s *song) Done() bool {
 type sineVoice struct {
 	Osc audio.FixedFreqSineOsc
 	Env *audio.AttackReleaseEnv
+	amp float64
 	n   int
 }
 
@@ -57,6 +61,7 @@ func newSineVoice(freq float64) *sineVoice {
 	v := &sineVoice{}
 	v.Osc.SetFreq(freq)
 	v.Env = audio.NewAttackReleaseEnv(.1, 4)
+	v.amp = 4 / math.Log2(freq)
 	return v
 }
 
@@ -71,7 +76,7 @@ func (v *sineVoice) Sing() float64 {
 	if v.n < 0 {
 		v.Env.Release()
 	}
-	return v.Osc.Sine() * v.Env.Sing()
+	return math.Tanh(2*v.Osc.Sine()) * v.Env.Sing() * v.amp
 }
 
 func (v *sineVoice) Done() bool {
@@ -85,31 +90,49 @@ type ratio struct {
 func (r ratio) float() float64 { return float64(r.a) / float64(r.b) }
 
 type melody struct {
-	rhythm  bool
+	rhythm        bool
+	center        float64
+	coherency     float64
+	coherencyTime float64
+
 	last    float64
-	center  float64
-	history []int
-	histlen int
+	time    float64
+	history []note
 }
 
-func newMelody(center float64, histlen int) melody {
-	return melody{false, center, center, []int{1}, histlen}
+type note struct {
+	t float64
+	n int
 }
 
-func newRhythm(center float64, histlen int) melody {
-	return melody{true, center, center, []int{1}, histlen}
+func newMelody(center, coherencyTime float64) melody {
+	return melody{
+		center:        center,
+		coherency:     math.Pow(.01, 1./coherencyTime),
+		coherencyTime: coherencyTime,
+		last:          center,
+		history:       []note{{0, 1}},
+	}
+}
+
+func newRhythm(center, coherencyTime float64) melody {
+	m := newMelody(center, coherencyTime)
+	m.rhythm = true
+	return m
 }
 
 func (m *melody) next(rats []ratio) float64 {
+	cSum, ampSum := m.historyComplexity()
+
 	sum := 0.0
 	sums := make([]float64, len(rats))
 	for i, r := range rats {
 		p := math.Log2(m.last * r.float() / m.center)
-		sum += math.Exp2(-p*p/2) * math.Exp2(-float64(complexity(appendRatio(m.history, r))))
+		sum += math.Exp2(-p*p/2) * math.Exp2(-m.complexity(cSum, ampSum, r))
 		sums[i] = sum
 	}
 	if m.rhythm {
-		sum += math.Exp2(-float64(complexity(m.history)))
+		sum += math.Exp2(-cSum / ampSum)
 		sums = append(sums, sum)
 	}
 	i := 0
@@ -123,29 +146,23 @@ func (m *melody) next(rats []ratio) float64 {
 		return 0
 	}
 	m.last *= rats[i].float()
-	m.history = appendRatio(m.history, rats[i])
-	if len(m.history) > m.histlen {
-		m.history = m.history[1:]
-	}
+	m.history = m.appendHistory(rats[i])
 
-	d := m.history[0]
-	for _, x := range m.history[1:] {
-		d = gcd(d, x)
-	}
-	for i := range m.history {
-		m.history[i] /= d
+	for i, n := range m.history {
+		if m.time-n.t < m.coherencyTime {
+			m.history = m.history[i:]
+			d := m.history[0].n
+			for _, n := range m.history[1:] {
+				d = gcd(d, n.n)
+			}
+			for i := range m.history {
+				m.history[i].n /= d
+			}
+			break
+		}
 	}
 
 	return m.last
-}
-
-func appendRatio(history []int, r ratio) []int {
-	r.a *= history[len(history)-1]
-	hist := make([]int, len(history))
-	for i, x := range history {
-		hist[i] = x * r.b
-	}
-	return append(hist, r.a)
 }
 
 var rats []ratio
@@ -174,44 +191,65 @@ func init() {
 					n, d = mul(n, d, 3, three)
 					n, d = mul(n, d, 5, five)
 					n, d = mul(n, d, 7, seven)
-					rats = append(rats, ratio{n, d})
+					if complexity(n, d) < 12 {
+						rats = append(rats, ratio{n, d})
+					}
 				}
 			}
 		}
 	}
 }
 
-func complexity(n []int) int {
-	n = append([]int{}, n...)
-	c := 1
-divisors:
-	for d := 2; ; d++ {
-		for {
-			dividesAny := false
-			dividesAll := true
-			for i := range n {
-				if n[i]%d == 0 {
-					n[i] /= d
-					dividesAny = true
-				} else {
-					dividesAll = false
-				}
-			}
-			if !dividesAny {
-				break
-			}
-			if !dividesAll {
-				c += d - 1
-			}
+func (m *melody) historyComplexity() (cSum, ampSum float64) {
+	for i, n1 := range m.history {
+		a1 := math.Pow(m.coherency, m.time-n1.t)
+		for _, n2 := range m.history[:i] {
+			a2 := math.Pow(m.coherency, m.time-n2.t)
+			cSum += a1 * a2 * float64(complexity(n1.n, n2.n))
 		}
-		for _, n := range n {
-			if n > 1 {
-				continue divisors
-			}
+		ampSum += a1
+	}
+	return
+}
+
+func (m *melody) complexity(cSum, ampSum float64, r ratio) float64 {
+	const a1 = 1
+	n1n := r.a * m.history[len(m.history)-1].n
+	for _, n2 := range m.history {
+		a2 := math.Pow(m.coherency, m.time-n2.t)
+		cSum += a1 * a2 * float64(complexity(n1n, n2.n*r.b))
+	}
+	return cSum / (ampSum + a1)
+}
+
+func complexity(a, b int) int {
+	c := 0
+	for d := 2; a != b; {
+		d1 := a%d == 0
+		d2 := b%d == 0
+		if d1 != d2 {
+			c += d - 1
 		}
-		break
+		if d1 {
+			a /= d
+		}
+		if d2 {
+			b /= d
+		}
+		if !(d1 || d2) {
+			d++
+		}
 	}
 	return c
+}
+
+func (m *melody) appendHistory(r ratio) []note {
+	r.a *= m.history[len(m.history)-1].n
+	history := make([]note, len(m.history), len(m.history)+1)
+	for i, n := range m.history {
+		history[i] = note{n.t, n.n * r.b}
+	}
+	return append(history, note{m.time, r.a})
 }
 
 func gcd(a, b int) int {
