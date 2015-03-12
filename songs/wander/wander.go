@@ -34,8 +34,8 @@ func (s *song) InitAudio(p audio.Params) {
 }
 
 func (s *song) beat() {
-	s.MultiVoice.Add(newSineVoice(s.melody.next(rats)))
-	t := s.rhythm.next(rats)
+	s.MultiVoice.Add(newSineVoice(s.melody.next()))
+	t := s.rhythm.next()
 	s.melody.time += t
 	s.rhythm.time += t
 	s.EventDelay.Delay(t, s.beat)
@@ -121,7 +121,7 @@ func newRhythm(center, coherencyTime float64) melody {
 	return m
 }
 
-func (m *melody) next(rats []ratio) float64 {
+func (m *melody) next() float64 {
 	cSum, ampSum := m.historyComplexity()
 
 	sum := 0.0
