@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"syscall"
 
-	"code.google.com/p/portaudio-go/portaudio"
+	"github.com/gordonklaus/portaudio"
 )
 
 func init() {
