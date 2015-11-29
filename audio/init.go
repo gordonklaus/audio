@@ -13,6 +13,8 @@ type Params struct {
 func (p *Params) InitAudio(q Params) { *p = q }
 
 func Init(x interface{}, p Params) {
+	// TODO: warn (fail?) if pointer-to-x implements AudioIniter but x does not?
+
 	if x, ok := x.(AudioIniter); ok {
 		x.InitAudio(p)
 		return
