@@ -17,8 +17,8 @@ var (
 )
 
 var (
-	pressed   = map[*event.Touch]key{}
-	scrollLoc = map[*event.Touch]geom.Pt{}
+	pressed   = map[event.TouchSequenceID]key{}
+	scrollLoc = map[event.TouchSequenceID]geom.Pt{}
 	// fingers Fingers
 )
 
@@ -44,15 +44,15 @@ func stop() {
 	gl.DeleteBuffer(pointsizebuf)
 }
 
-func touch(t *event.Touch) {
+func touch(t event.Touch) {
 	// finger := fingers.touch(t)
 
 	if t.Type == event.TouchStart && t.Loc.Y < 8 {
-		scrollLoc[t] = t.Loc.X
+		scrollLoc[t.ID] = t.Loc.X
 	}
-	if _, ok := scrollLoc[t]; ok {
+	if _, ok := scrollLoc[t.ID]; ok {
 		avg0, stddev0 := scrollStats()
-		scrollLoc[t] = t.Loc.X
+		scrollLoc[t.ID] = t.Loc.X
 		avg1, stddev1 := scrollStats()
 		scale := 1.0
 		if stddev0 > 0 && stddev1 > 0 {
@@ -62,17 +62,17 @@ func touch(t *event.Touch) {
 		pitchRange /= scale
 		updateProjectionMatrix()
 		if t.Type == event.TouchEnd {
-			delete(scrollLoc, t)
+			delete(scrollLoc, t.ID)
 		}
 		return
 	}
 
 	if t.Type == event.TouchStart {
 		if k := nearestKey(t.Loc); k != nil {
-			pressed[t] = k
+			pressed[t.ID] = k
 		}
 	}
-	if k := pressed[t]; k != nil {
+	if k := pressed[t.ID]; k != nil {
 		switch t.Type {
 		case event.TouchStart:
 			k.press(t.Loc)
@@ -80,7 +80,7 @@ func touch(t *event.Touch) {
 			k.move(t.Loc)
 		case event.TouchEnd:
 			k.release(t.Loc)
-			delete(pressed, t)
+			delete(pressed, t.ID)
 		}
 	}
 }

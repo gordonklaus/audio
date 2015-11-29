@@ -14,7 +14,8 @@ license that can be found in the LICENSE file.
 	<application android:label="JustKeys" android:hasCode="false">
 	<activity android:name="android.app.NativeActivity"
 		android:label="JustKeys"
-		android:configChanges="orientation|keyboardHidden">
+		android:configChanges="orientation|keyboardHidden"
+		android:theme="@android:style/Theme.NoTitleBar.Fullscreen"> <!-- until David submits the fullscreen code -->
 		<meta-data android:name="android.app.lib_name" android:value="justkeys" />
 		<intent-filter>
 			<action android:name="android.intent.action.MAIN" />

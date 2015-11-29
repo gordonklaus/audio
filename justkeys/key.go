@@ -177,8 +177,8 @@ func initKeys() {
 	position = gl.GetAttribLocation(program, "position")
 	pointsize = gl.GetAttribLocation(program, "pointsize")
 	color = gl.GetUniformLocation(program, "color")
-	positionbuf = gl.GenBuffer()
-	pointsizebuf = gl.GenBuffer()
+	positionbuf = gl.CreateBuffer()
+	pointsizebuf = gl.CreateBuffer()
 	updateKeys(ratio{1, 1})
 }
 
@@ -275,9 +275,9 @@ func drawKeys() {
 		pointsizedata = append(pointsizedata, float32(k.size))
 	}
 	gl.BindBuffer(gl.ARRAY_BUFFER, positionbuf)
-	gl.BufferData(gl.ARRAY_BUFFER, gl.DYNAMIC_DRAW, f32.Bytes(binary.LittleEndian, data...))
+	gl.BufferData(gl.ARRAY_BUFFER, f32.Bytes(binary.LittleEndian, data...), gl.DYNAMIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, pointsizebuf)
-	gl.BufferData(gl.ARRAY_BUFFER, gl.DYNAMIC_DRAW, f32.Bytes(binary.LittleEndian, pointsizedata...))
+	gl.BufferData(gl.ARRAY_BUFFER, f32.Bytes(binary.LittleEndian, pointsizedata...), gl.DYNAMIC_DRAW)
 
 	gl.EnableVertexAttribArray(position)
 	gl.EnableVertexAttribArray(pointsize)
