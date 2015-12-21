@@ -20,6 +20,10 @@ func (e *ExpEnv) Go(x, t float64) *ExpEnv {
 	return e
 }
 
+func (e *ExpEnv) AttackHoldRelease(a, h, r float64) *ExpEnv {
+	return e.Go(1, a).Go(1, h).Go(0, r)
+}
+
 func (e *ExpEnv) Release(t float64) {
 	s := newExpEnv(0, t)
 	Init(s, e.p)
