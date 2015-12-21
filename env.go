@@ -2,90 +2,67 @@ package audio
 
 import "math"
 
-type AttackReleaseEnv struct {
-	Params                  Params
-	attackTime, releaseTime float64
-	up, down                float64
-	release                 bool
-	x                       float64
+type ExpEnv struct {
+	p Params
+	s []*expSeg
+	y float64
 }
 
-func NewAttackReleaseEnv(attackTime, releaseTime float64) *AttackReleaseEnv {
-	return &AttackReleaseEnv{attackTime: attackTime, releaseTime: releaseTime}
+func (e *ExpEnv) InitAudio(p Params) {
+	e.p = p
+	Init(e.s, p)
 }
 
-func (e *AttackReleaseEnv) InitAudio(p Params) {
-	e.Params = p
-	e.SetAttackTime(e.attackTime)
-	e.SetReleaseTime(e.releaseTime)
+func (e *ExpEnv) Go(x, t float64) *ExpEnv {
+	s := newExpEnv(x, t)
+	Init(s, e.p)
+	e.s = append(e.s, s)
+	return e
 }
 
-func (e *AttackReleaseEnv) SetAttackTime(t float64) {
-	e.attackTime = t
-	e.up = math.Pow(.01, 1/(e.Params.SampleRate*t))
+func (e *ExpEnv) Release(t float64) {
+	s := newExpEnv(0, t)
+	Init(s, e.p)
+	e.s = []*expSeg{s}
 }
 
-func (e *AttackReleaseEnv) SetReleaseTime(t float64) {
-	e.releaseTime = t
-	e.down = math.Pow(.01, 1/(e.Params.SampleRate*t))
-}
-
-func (e *AttackReleaseEnv) Attack()  { e.release = false }
-func (e *AttackReleaseEnv) Release() { e.release = true }
-
-func (e *AttackReleaseEnv) Sing() float64 {
-	if e.release {
-		e.x *= e.down
-	} else {
-		e.x = 1 - (1-e.x)*e.up
+func (e *ExpEnv) Sing() float64 {
+	if len(e.s) > 0 {
+		s := e.s[0]
+		e.y = s.do(e.y)
+		if s.done() && len(e.s) > 1 {
+			e.s = e.s[1:]
+		}
 	}
-	return e.x
+	return e.y
 }
 
-func (e *AttackReleaseEnv) Done() bool {
-	return e.release && e.x < .0001
+func (e *ExpEnv) Done() bool {
+	return len(e.s) == 0 || len(e.s) == 1 && math.Abs(e.y-e.s[0].x) < .0001
 }
 
-type LinAttackReleaseEnv struct {
-	Params                  Params
-	attackTime, releaseTime float64
-	up, down                float64
-	release                 bool
-	x                       float64
+type expSeg struct {
+	x float64
+	t float64
+	n int
+	b float64
 }
 
-func NewLinAttackReleaseEnv(attackTime, releaseTime float64) *LinAttackReleaseEnv {
-	return &LinAttackReleaseEnv{attackTime: attackTime, releaseTime: releaseTime}
+func newExpEnv(x, t float64) *expSeg {
+	return &expSeg{x: x, t: t}
 }
 
-func (e *LinAttackReleaseEnv) InitAudio(p Params) {
-	e.Params = p
-	e.SetAttackTime(e.attackTime)
-	e.SetReleaseTime(e.releaseTime)
+func (s *expSeg) InitAudio(p Params) {
+	n := p.SampleRate * s.t
+	s.n = int(n) - 1
+	s.b = math.Pow(.01, 1/n)
 }
 
-func (e *LinAttackReleaseEnv) SetAttackTime(t float64) {
-	e.attackTime = t
-	e.up = 1 / (e.Params.SampleRate * t)
+func (s *expSeg) do(x float64) float64 {
+	s.n--
+	return s.x - (s.x-x)*s.b
 }
 
-func (e *LinAttackReleaseEnv) SetReleaseTime(t float64) {
-	e.releaseTime = t
-	e.down = 1 / (e.Params.SampleRate * t)
-}
-
-func (e *LinAttackReleaseEnv) Attack()  { e.release = false }
-func (e *LinAttackReleaseEnv) Release() { e.release = true }
-
-func (e *LinAttackReleaseEnv) Sing() float64 {
-	if e.release {
-		e.x = math.Max(0, e.x-e.down)
-	} else {
-		e.x = math.Min(1, e.x+e.up)
-	}
-	return e.x
-}
-
-func (e *LinAttackReleaseEnv) Done() bool {
-	return e.release && e.x < .0001
+func (s *expSeg) done() bool {
+	return s.n < 0
 }

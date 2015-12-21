@@ -33,6 +33,13 @@ func (c *Control) SetPoints(points []*ControlPoint) {
 	c.SetTime(0)
 }
 
+func (c *Control) Duration() float64 {
+	if len(c.points) == 0 {
+		return 0
+	}
+	return c.points[len(c.points)-1].Time
+}
+
 func (c *Control) SetTime(t float64) {
 	c.periods = make([]*controlPeriod, len(c.points))
 	prev := &ControlPoint{}
