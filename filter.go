@@ -63,7 +63,7 @@ func (e *LinSmoother) Smooth(x float64) float64 {
 }
 
 func (e *LinSmoother) Done() bool {
-	return math.Abs(e.x - e.y) < .0001
+	return math.Abs(e.x-e.y) < .0001
 }
 
 type ExpSmoother struct {
@@ -104,5 +104,5 @@ func (e *ExpSmoother) Smooth(x float64) float64 {
 }
 
 func (e *ExpSmoother) Done() bool {
-	return math.Abs(e.x - e.y) < .0001
+	return math.Abs(e.x-e.y) < .0001
 }

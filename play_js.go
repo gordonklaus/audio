@@ -17,7 +17,7 @@ func startPlaying(v Voice, callback func(out []float32)) error {
 	}
 	if contextType == js.Undefined {
 		s := "The Web Audio API is apparently not supported in this browser."
-		js.Global.Get("document").Call("write", "<p>" + s + "</p>")
+		js.Global.Get("document").Call("write", "<p>"+s+"</p>")
 		return errors.New(s)
 	}
 	context := contextType.New()
