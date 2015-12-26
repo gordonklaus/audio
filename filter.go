@@ -2,6 +2,29 @@ package audio
 
 import "math"
 
+type LowPass1 struct {
+	p          Params
+	freq       float64
+	a0, b1, y1 float64
+}
+
+func (f *LowPass1) Freq(freq float64) *LowPass1 {
+	f.freq = freq
+	f.b1 = math.Exp(-2 * math.Pi * freq / f.p.SampleRate)
+	f.a0 = 1 - f.b1
+	return f
+}
+
+func (f *LowPass1) InitAudio(p Params) {
+	f.p = p
+	f.Freq(f.freq)
+}
+
+func (f *LowPass1) Filter(x float64) float64 {
+	f.y1 = f.a0*x + f.b1*f.y1
+	return f.y1
+}
+
 type DCFilter struct {
 	a, x, y float64
 }

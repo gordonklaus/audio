@@ -42,3 +42,28 @@ func (o *FixedFreqSineOsc) Sine() float64 {
 	o.x *= o.d
 	return real(o.x)
 }
+
+type SawOsc struct {
+	Params Params
+	freq   float64
+	x, d   float64
+}
+
+func (o *SawOsc) InitAudio(p Params) {
+	o.Params = p
+	o.Freq(o.freq)
+}
+
+func (o *SawOsc) Freq(freq float64) *SawOsc {
+	o.freq = freq
+	o.d = 2 * freq / o.Params.SampleRate
+	return o
+}
+
+func (o *SawOsc) Saw() float64 {
+	o.x += o.d
+	if o.x > 1 {
+		o.x -= 2
+	}
+	return o.x
+}
