@@ -32,11 +32,19 @@ func TestSineOsc_expwdt_approx(t *testing.T) {
 	}
 }
 
-func BenchmarkSineOsc(b *testing.B) {
+func BenchmarkSineOsc_Osc(b *testing.B) {
+	o := new(SineOsc).Freq(1234)
+	Init(o, Params{96000})
+	for i := 0; i < b.N; i++ {
+		o.Osc()
+	}
+}
+
+func BenchmarkSineOsc_OscFreq(b *testing.B) {
 	o := new(SineOsc)
 	Init(o, Params{96000})
 	for i := 0; i < b.N; i++ {
-		o.Sine(1234)
+		o.OscFreq(1234)
 	}
 }
 
@@ -44,6 +52,6 @@ func BenchmarkSawOsc(b *testing.B) {
 	o := new(SawOsc).Freq(1234)
 	Init(o, Params{96000})
 	for i := 0; i < b.N; i++ {
-		o.Saw()
+		o.Osc()
 	}
 }
