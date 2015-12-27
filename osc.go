@@ -6,13 +6,29 @@ import (
 )
 
 type SineOsc struct {
-	Params Params
-	phase  float64
+	pidt float64
+	x    complex128
+}
+
+func (o *SineOsc) InitAudio(p Params) {
+	o.pidt = math.Pi / p.SampleRate
+	o.x = 1
 }
 
 func (o *SineOsc) Sine(freq float64) float64 {
-	_, o.phase = math.Modf(o.phase + freq/o.Params.SampleRate)
-	return math.Sin(2 * math.Pi * o.phase)
+	o.x *= o.expwdt_approx(freq)
+	return imag(o.x)
+}
+
+// expwdt_approx approximates cmplx.Exp(complex(0, w*dt)) as complex(1, w*dt/2) / complex(1, -w*dt/2), where w=2*pi*freq and dt=1/sampleRate.
+// At 96000 samples per second, it results in sine waves with frequencies >99% accurate up to 2048 Hz.  At higher frequences, the errors are typically imperceptible.  See TestSineOsc_expwdt_approx for details.
+func (o *SineOsc) expwdt_approx(freq float64) complex128 {
+	wdt_2 := freq * o.pidt
+
+	// an optimization of complex(1, wdt_2) / complex(1, -wdt_2):
+	wdt_22 := wdt_2 * wdt_2
+	_1wdt_22 := 1 / (1 + wdt_22)
+	return complex((1-wdt_22)*_1wdt_22, 2*wdt_2*_1wdt_22)
 }
 
 type FixedFreqSineOsc struct {
