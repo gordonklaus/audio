@@ -21,23 +21,8 @@ func (o *SineOsc) InitAudio(p Params) {
 
 func (o *SineOsc) Freq(freq float64) *SineOsc {
 	o.freq = freq
-	o.d = cmplx.Exp(complex(0, 2*o.pidt*freq))
+	o.d = o.expwdt_approx(freq)
 	return o
-}
-
-func (o *SineOsc) Phase(phase float64) *SineOsc {
-	o.x = cmplx.Exp(complex(0, 2*math.Pi*phase))
-	return o
-}
-
-func (o *SineOsc) Osc() float64 {
-	o.x *= o.d
-	return imag(o.x)
-}
-
-func (o *SineOsc) OscFreq(freq float64) float64 {
-	o.x *= o.expwdt_approx(freq)
-	return imag(o.x)
 }
 
 // expwdt_approx approximates cmplx.Exp(complex(0, w*dt)) as complex(1, w*dt/2) / complex(1, -w*dt/2), where w=2*pi*freq and dt=1/sampleRate.
@@ -51,24 +36,34 @@ func (o *SineOsc) expwdt_approx(freq float64) complex128 {
 	return complex((1-wdt_22)*_1wdt_22, 2*wdt_2*_1wdt_22)
 }
 
+func (o *SineOsc) Phase(phase float64) *SineOsc {
+	o.x = cmplx.Exp(complex(0, 2*math.Pi*phase))
+	return o
+}
+
+func (o *SineOsc) Sing() float64 {
+	o.x *= o.d
+	return imag(o.x)
+}
+
 type SawOsc struct {
-	Params Params
-	freq   float64
-	x, d   float64
+	dt   float64
+	freq float64
+	x, d float64
 }
 
 func (o *SawOsc) InitAudio(p Params) {
-	o.Params = p
+	o.dt = 1 / p.SampleRate
 	o.Freq(o.freq)
 }
 
 func (o *SawOsc) Freq(freq float64) *SawOsc {
 	o.freq = freq
-	o.d = 2 * freq / o.Params.SampleRate
+	o.d = 2 * freq * o.dt
 	return o
 }
 
-func (o *SawOsc) Osc() float64 {
+func (o *SawOsc) Sing() float64 {
 	o.x += o.d
 	if o.x > 1 {
 		o.x -= 2
