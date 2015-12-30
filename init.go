@@ -1,8 +1,11 @@
 package audio
 
-import "reflect"
+import (
+	"fmt"
+	"reflect"
+)
 
-type AudioIniter interface {
+type Initer interface {
 	InitAudio(Params)
 }
 
@@ -13,30 +16,52 @@ type Params struct {
 func (p *Params) InitAudio(q Params) { *p = q }
 
 func Init(x interface{}, p Params) {
-	// TODO: warn (fail?) if pointer-to-x implements AudioIniter but x does not?
+	if err := initVal(reflect.ValueOf(x), p); err != nil {
+		panic("audio.Init: " + err.Error())
+	}
+}
 
-	if x, ok := x.(AudioIniter); ok {
+var initerType = reflect.TypeOf(new(Initer)).Elem()
+
+func initVal(v reflect.Value, p Params) (err error) {
+	if v.Kind() == reflect.Ptr && v.IsNil() || !v.CanInterface() {
+		return
+	}
+
+	v = reflect.Indirect(v)
+	if v.CanAddr() && v.Type().Name() != "" && v.Kind() != reflect.Interface {
+		v = v.Addr()
+	}
+	if x, ok := v.Interface().(Initer); ok {
 		x.InitAudio(p)
 		return
 	}
 
-	initVal := func(v reflect.Value) {
-		if v.CanAddr() && v.Kind() != reflect.Ptr && v.Kind() != reflect.Interface {
-			v = v.Addr()
+	defer func() {
+		if err != nil {
+			// append v to the Init stack trace
+			err = fmt.Errorf("%s\n\t%#v", err, v)
 		}
-		if v.CanInterface() {
-			Init(v.Interface(), p)
-		}
+	}()
+	if t := v.Type(); reflect.PtrTo(t).Implements(initerType) {
+		return fmt.Errorf("%s does not implement audio.Initer but *%s does.\nInit stack:", t, t)
 	}
-	v := reflect.Indirect(reflect.ValueOf(x))
+
+	v = reflect.Indirect(v)
 	switch v.Kind() {
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
-			initVal(v.Field(i))
+			if err = initVal(v.Field(i), p); err != nil {
+				return
+			}
 		}
 	case reflect.Slice:
 		for i := 0; i < v.Len(); i++ {
-			initVal(v.Index(i))
+			if err = initVal(v.Index(i), p); err != nil {
+				return
+			}
 		}
 	}
+
+	return
 }
