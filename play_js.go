@@ -8,7 +8,7 @@ import (
 	"github.com/gopherjs/gopherjs/js"
 )
 
-var node js.Object
+var node *js.Object
 
 func startPlaying(v Voice, callback func(out []float32)) error {
 	contextType := js.Global.Get("AudioContext")
@@ -23,7 +23,7 @@ func startPlaying(v Voice, callback func(out []float32)) error {
 	context := contextType.New()
 	Init(v, Params{SampleRate: context.Get("sampleRate").Float()})
 	node = context.Call("createScriptProcessor", 1024, 0, 1)
-	node.Set("onaudioprocess", func(e js.Object) {
+	node.Set("onaudioprocess", func(e *js.Object) {
 		callback(e.Get("outputBuffer").Call("getChannelData", 0).Interface().([]float32))
 	})
 	node.Call("connect", context.Get("destination"))
