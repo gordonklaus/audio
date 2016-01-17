@@ -35,11 +35,18 @@ func init() {
 
 var stream *portaudio.Stream
 
-func startPlaying(v Voice, callback func(out []float32)) error {
+func startPlaying(v Voice, c PlayControl) error {
 	const sampleRate = 96000
 	Init(v, Params{SampleRate: sampleRate})
 	var err error
-	stream, err = portaudio.OpenDefaultStream(0, 1, sampleRate, 1024, callback)
+	stream, err = portaudio.OpenDefaultStream(0, 1, sampleRate, 1024, func(out []float32) {
+		for i := range out {
+			out[i] = float32(v.Sing())
+		}
+		if v.Done() {
+			c.Stop()
+		}
+	})
 	if err != nil {
 		return err
 	}
