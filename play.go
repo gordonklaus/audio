@@ -1,8 +1,7 @@
 package audio
 
 import (
-	"fmt"
-	"os"
+	"log"
 )
 
 var playControls []PlayControl
@@ -14,7 +13,7 @@ func Play(v Voice) {
 func PlayAsync(v Voice) PlayControl {
 	c := PlayControl{make(chan struct{}, 1), make(chan struct{}, 1)}
 	if err := startPlaying(v, c); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		log.Println(err)
 		close(c.Done)
 		return c
 	}
@@ -22,7 +21,7 @@ func PlayAsync(v Voice) PlayControl {
 	go func() {
 		<-c.stop
 		if err := stopPlaying(); err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			log.Println(err)
 		}
 		c.Done <- struct{}{}
 	}()
