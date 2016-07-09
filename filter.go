@@ -2,6 +2,119 @@ package audio
 
 import "math"
 
+type Filter struct {
+	a, b []FilterTap
+	buf  []float64
+	i    int
+}
+
+type FilterTap struct {
+	Delay int
+	Coef  float64
+}
+
+func (f *Filter) Taps(a, b []FilterTap) *Filter {
+	n := 0
+	a0 := 0.0
+	for _, a := range a {
+		if a.Delay < 0 {
+			panic(a.Delay)
+		}
+		if n < a.Delay {
+			n = a.Delay
+		}
+		if a.Delay == 0 {
+			a0 = a.Coef
+		}
+	}
+	for _, b := range b {
+		if b.Delay < 0 {
+			panic(b.Delay)
+		}
+		if n < b.Delay {
+			n = b.Delay
+		}
+	}
+	if a0 == 0 {
+		panic(a0)
+	}
+	for i := range a {
+		a[i].Coef /= a0
+	}
+	for i := range b {
+		b[i].Coef /= a0
+	}
+
+	f.a = a
+	f.b = b
+	f.buf = make([]float64, n)
+	f.i = 0
+	return f
+}
+
+func (f *Filter) Filter(x float64) float64 {
+	y := 0.0
+	n := len(f.buf)
+
+	// Direct form II implementation:
+	// First, accumulate feedback into x.
+	for _, a := range f.a {
+		if a.Delay > 0 {
+			x -= a.Coef * f.buf[(f.i-a.Delay+n)%n]
+		}
+	}
+	// Then, accumulate feedforward into y.
+	for _, b := range f.b {
+		if b.Delay > 0 {
+			y += b.Coef * f.buf[(f.i-b.Delay+n)%n]
+		} else {
+			y += b.Coef * x
+		}
+	}
+
+	f.buf[f.i] = x
+	f.i = (f.i + 1) % n
+	return y
+}
+
+func AllPassFilterTaps(a []FilterTap) (_, _ []FilterTap) {
+	a_ := make([]FilterTap, len(a))
+	N := 0
+	for _, a := range a {
+		if N < a.Delay {
+			N = a.Delay
+		}
+	}
+	for i := range a {
+		a_[len(a)-i-1] = FilterTap{N - a[i].Delay, a[i].Coef}
+	}
+	return a, a_
+}
+
+func TapsFromRoots(r []complex128) []FilterTap {
+	p := poly{1}
+	for _, r := range r {
+		p = p.mul(poly{1, -2 * real(r), real(r) * real(r) + imag(r) * imag(r)})
+	}
+	t := make([]FilterTap, len(p))
+	for i := range p {
+		t[i] = FilterTap{i, p[i]}
+	}
+	return t
+}
+
+type poly []float64
+
+func (p poly) mul(q poly) poly {
+	r := make(poly, len(p) + len(q) - 1)
+	for i := range p {
+		for j := range q {
+			r[i+j] += p[i] * q[j]
+		}
+	}
+	return r
+}
+
 type LowPass1 struct {
 	p          Params
 	freq       float64
