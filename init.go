@@ -55,7 +55,7 @@ func initVal(v reflect.Value, p Params) (err error) {
 				return
 			}
 		}
-	case reflect.Slice:
+	case reflect.Array, reflect.Slice:
 		for i := 0; i < v.Len(); i++ {
 			if err = initVal(v.Index(i), p); err != nil {
 				return
