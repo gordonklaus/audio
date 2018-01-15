@@ -28,8 +28,11 @@ func initVal(v reflect.Value, p Params) (err error) {
 		return
 	}
 
+	if v.Kind() == reflect.Interface {
+		v = v.Elem()
+	}
 	v = reflect.Indirect(v)
-	if v.CanAddr() && v.Type().Name() != "" && v.Kind() != reflect.Interface {
+	if v.CanAddr() {
 		v = v.Addr()
 	}
 	if x, ok := v.Interface().(Initer); ok {
