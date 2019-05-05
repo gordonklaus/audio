@@ -11,6 +11,9 @@ type Delay struct {
 func (d *Delay) Read(t float64) float64 {
 	i_, f := math.Modf(t * d.Params.SampleRate)
 	i := int(i_)
+	if i < 1 {
+		return d.ReadSample(0)
+	}
 	return Interp3(f, d.ReadSample(i-1), d.ReadSample(i), d.ReadSample(i+1), d.ReadSample(i+2))
 }
 
@@ -30,6 +33,9 @@ func (d *Delay) ReadSample(i int) float64 {
 }
 
 func (d *Delay) Write(x float64) {
+	if d.x == nil {
+		d.x = make([]float64, 1)
+	}
 	d.x[d.i] = x
 	d.i++
 	if d.i == len(d.x) {
