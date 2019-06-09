@@ -25,7 +25,7 @@ func (c *Control) InitAudio(params Params) {
 func (c *Control) SetPoints(points []*ControlPoint) {
 	for i := range points {
 		if i > 0 && points[i].Time < points[i-1].Time {
-			fmt.Printf("control points out of order:  %#s\n", points)
+			fmt.Printf("control points out of order:  %#v\n", points)
 			break
 		}
 	}

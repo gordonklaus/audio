@@ -5,6 +5,11 @@ type Voice interface {
 	Done() bool
 }
 
+type StereoVoice interface {
+	Sing() (float64, float64)
+	Done() bool
+}
+
 type MultiVoice struct {
 	Params Params
 	Voices []Voice

@@ -9,13 +9,15 @@ type Reverb struct {
 	LowPass                   *LowPass1
 }
 
-func NewReverb() *Reverb {
-	return &Reverb{
-		Delay:    newReverbAllPass([]float64{.15011404}),
-		AllPass1: newReverbAllPass([]float64{.1350392713}),
-		AllPass2: newReverbAllPass([]float64{.14302603, .114801574}),
-		LowPass:  new(LowPass1).Freq(22000),
-	}
+func (r *Reverb) InitAudio(p Params) {
+	r.Delay = newReverbAllPass([]float64{.15011404})
+	r.AllPass1 = newReverbAllPass([]float64{.1350392713})
+	r.AllPass2 = newReverbAllPass([]float64{.14302603, .114801574})
+	r.LowPass = new(LowPass1).Freq(22000)
+	Init(r.Delay, p)
+	Init(r.AllPass1, p)
+	Init(r.AllPass2, p)
+	Init(r.LowPass, p)
 }
 
 func (r *Reverb) Filter(x float64) float64 {
