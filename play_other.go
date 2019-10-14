@@ -42,7 +42,7 @@ func startPlaying(v interface{}, c PlayControl) error {
 	var err error
 	switch v := v.(type) {
 	case Voice:
-		stream, err = portaudio.OpenDefaultStream(0, 1, sampleRate, 1024, func(out []float32) {
+		stream, err = portaudio.OpenDefaultStream(0, 1, sampleRate, 64, func(out []float32) {
 			for i := range out {
 				out[i] = float32(v.Sing())
 			}
@@ -51,7 +51,7 @@ func startPlaying(v interface{}, c PlayControl) error {
 			}
 		})
 	case StereoVoice:
-		stream, err = portaudio.OpenDefaultStream(0, 2, sampleRate, 1024, func(out [][]float32) {
+		stream, err = portaudio.OpenDefaultStream(0, 2, sampleRate, 64, func(out [][]float32) {
 			for i := range out[0] {
 				l, r := v.Sing()
 				out[0][i] = float32(l)
