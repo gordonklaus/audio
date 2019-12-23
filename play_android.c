@@ -4,6 +4,8 @@
 #include <SLES/OpenSLES_Android.h>
 #include "_cgo_export.h"
 
+#include <stdlib.h>
+
 SLObjectItf engineObject;
 SLEngineItf engineEngine;
 SLObjectItf outputMixObject;
@@ -11,14 +13,13 @@ SLObjectItf bqPlayerObject;
 SLPlayItf bqPlayerPlay;
 SLAndroidSimpleBufferQueueItf bqPlayerBufferQueue;
 
-short outBuffer[64];
-
-void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
-	streamCallback(outBuffer);
-	(*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, outBuffer, 64*sizeof(short));
+static void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
+	stream_t *s = context;
+	streamCallback(s);
+	(*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, s->outBuffer, s->outBufferByteLen);
 }
 
-void start() {
+void start(int channels) {
 	SLresult result;
 	result = slCreateEngine(&engineObject, 0, 0, 0, 0, 0);
 	if (result != SL_RESULT_SUCCESS) return;
@@ -34,13 +35,10 @@ void start() {
     result = (*outputMixObject)->Realize(outputMixObject, SL_BOOLEAN_FALSE);
 	if (result != SL_RESULT_SUCCESS) return;
 
-	SLuint32 channels = 1;
-	int speakers;
-	if(channels > 1) 
+	int speakers = SL_SPEAKER_FRONT_CENTER;
+	if (channels > 1) 
 		speakers = SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT;
-	else
-		speakers = SL_SPEAKER_FRONT_CENTER;
-	SLDataFormat_PCM format_pcm = {SL_DATAFORMAT_PCM, channels, SL_SAMPLINGRATE_48, SL_PCMSAMPLEFORMAT_FIXED_16, SL_PCMSAMPLEFORMAT_FIXED_16, speakers, SL_BYTEORDER_LITTLEENDIAN};
+	SLDataFormat_PCM format_pcm = {SL_DATAFORMAT_PCM, (SLuint32)channels, SL_SAMPLINGRATE_48, SL_PCMSAMPLEFORMAT_FIXED_16, SL_PCMSAMPLEFORMAT_FIXED_16, speakers, SL_BYTEORDER_LITTLEENDIAN};
 
 	SLDataLocator_AndroidSimpleBufferQueue loc_bufq = {SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, 2};
 	SLDataSource audioSrc = {&loc_bufq, &format_pcm};
@@ -59,10 +57,18 @@ void start() {
 	if (result != SL_RESULT_SUCCESS) return;
 	result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_ANDROIDSIMPLEBUFFERQUEUE, &bqPlayerBufferQueue);
 	if (result != SL_RESULT_SUCCESS) return;
-	result = (*bqPlayerBufferQueue)->RegisterCallback(bqPlayerBufferQueue, bqPlayerCallback, 0);
+
+	stream_t *s = malloc(sizeof(stream_t));
+	s->outBufferSampleLength = 64;
+	s->outBufferByteLen = s->outBufferSampleLength * channels * sizeof(short);
+	s->outBuffer = malloc(s->outBufferByteLen);
+
+	result = (*bqPlayerBufferQueue)->RegisterCallback(bqPlayerBufferQueue, bqPlayerCallback, s);
 	if (result != SL_RESULT_SUCCESS) return;
 	result = (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
-	(*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, outBuffer, 64*sizeof(short));
+	if (result != SL_RESULT_SUCCESS) return;
+
+	bqPlayerCallback(bqPlayerBufferQueue, s);
 }
 
 void stop() {

@@ -4,49 +4,67 @@ package audio
 
 /*
 #cgo LDFLAGS: -landroid -lOpenSLES
-extern void start();
+
+typedef struct {
+	short *outBuffer;
+	int outBufferSampleLength;
+	int outBufferByteLen;
+} stream_t;
+
+extern void start(int channels);
 extern void stop();
 */
 import "C"
 import (
-	"errors"
 	"unsafe"
 )
 
 var (
-	playing bool
-	voice   Voice
-	ctrl    PlayControl
+	voice interface{}
+	ctrl  PlayControl
 )
 
-func startPlaying(v Voice, c PlayControl) error {
-	if playing {
-		return errors.New("audio.Play doesn't yet support multiple simultaneous voices on Android.")
-	}
-	playing = true
+func startPlaying(v interface{}, c PlayControl) error {
 	voice = v
 	ctrl = c
 	Init(voice, Params{SampleRate: 48000}) // corresponds with SL_SAMPLINGRATE_48 in play_android.c
-	C.start()
+
+	channels := 1
+	if _, ok := voice.(StereoVoice); ok {
+		channels = 2
+	}
+
+	C.start(C.int(channels))
 	return nil
 }
 
 //export streamCallback
-func streamCallback(buf *int16) {
-	p := uintptr(unsafe.Pointer(buf))
-	for i := 64; i > 0; i-- {
-		*(*int16)(unsafe.Pointer(p)) = int16(voice.Sing() * 32767)
-		p += unsafe.Sizeof(int16(0))
-	}
-	if voice.Done() {
-		ctrl.Stop()
+func streamCallback(s *C.stream_t) {
+	p := uintptr(unsafe.Pointer(s.outBuffer))
+	switch voice := voice.(type) {
+	case Voice:
+		for i := s.outBufferSampleLength; i > 0; i-- {
+			*(*int16)(unsafe.Pointer(p)) = int16(voice.Sing() * 32767)
+			p += unsafe.Sizeof(int16(0))
+		}
+		if voice.Done() {
+			ctrl.Stop()
+		}
+	case StereoVoice:
+		for i := s.outBufferSampleLength; i > 0; i-- {
+			left, right := voice.Sing()
+			*(*int16)(unsafe.Pointer(p)) = int16(left * 32767)
+			p += unsafe.Sizeof(int16(0))
+			*(*int16)(unsafe.Pointer(p)) = int16(right * 32767)
+			p += unsafe.Sizeof(int16(0))
+		}
+		if voice.Done() {
+			ctrl.Stop()
+		}
 	}
 }
 
 func stopPlaying() error {
-	if playing {
-		playing = false
-		C.stop()
-	}
+	C.stop()
 	return nil
 }
