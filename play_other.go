@@ -17,7 +17,7 @@ func init() {
 	go func() {
 		defer os.Exit(0)
 		sig := make(chan os.Signal, 1)
-		signal.Notify(sig)
+		signal.Notify(sig, syscall.SIGQUIT, syscall.SIGINT)
 		if <-sig == syscall.SIGQUIT {
 			buf := make([]byte, 1<<10)
 			for runtime.Stack(buf, true) == len(buf) {
