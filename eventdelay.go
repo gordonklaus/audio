@@ -2,7 +2,7 @@ package audio
 
 type EventDelay struct {
 	Params Params
-	events []*delayEvent
+	events []delayEvent
 }
 
 type delayEvent struct {
@@ -16,24 +16,29 @@ func (d *EventDelay) Delay(t float64, f func()) {
 	}
 	n := int(t * d.Params.SampleRate)
 	i := 0
-	e := &delayEvent{}
-	for i, e = range d.events {
+	for ; i < len(d.events); i++ {
+		e := &d.events[i]
 		if n < e.n {
+			e.n -= n
 			break
 		}
 		n -= e.n
 	}
-	d.events = append(append(d.events[:i], &delayEvent{n, f}), d.events[i:]...)
-	e.n -= n
+	d.events = append(d.events, delayEvent{})
+	copy(d.events[i+1:], d.events[i:])
+	d.events[i] = delayEvent{n, f}
 }
 
 func (d *EventDelay) Step() {
-	for _, e := range d.events {
-		e.n--
-		if e.n > 0 {
-			break
+	if len(d.events) > 0 {
+		d.events[0].n--
+		for len(d.events) > 0 {
+			e := &d.events[0]
+			if e.n > 0 {
+				break
+			}
+			e.f()
+			d.events = d.events[1:]
 		}
-		e.f()
-		d.events = d.events[1:]
 	}
 }
