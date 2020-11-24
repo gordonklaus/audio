@@ -7,15 +7,16 @@ import (
 var playControls []PlayControl
 
 func Play(v interface{}) {
+	<-PlayAsync(v).Done
+}
+
+func PlayAsync(v interface{}) PlayControl {
 	switch v.(type) {
 	case Voice, StereoVoice:
 	default:
 		panic("can only play Voice or StereoVoice")
 	}
-	<-PlayAsync(v).Done
-}
 
-func PlayAsync(v interface{}) PlayControl {
 	c := PlayControl{make(chan struct{}, 1), make(chan struct{}, 1)}
 	if err := startPlaying(v, c); err != nil {
 		log.Println(err)
