@@ -20,6 +20,12 @@ func (e *ExpEnv) Go(x, t float64) *ExpEnv {
 	return e
 }
 
+func (e *ExpEnv) GoNow(x, t float64) *ExpEnv {
+	e.s = nil
+	e.Go(x, t)
+	return e
+}
+
 func (e *ExpEnv) AttackHoldRelease(a, h, r float64) *ExpEnv {
 	return e.Go(1, a).Go(1, h).Go(0, r)
 }
