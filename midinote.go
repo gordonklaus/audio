@@ -1,8 +1,18 @@
 package audio
 
+import "math"
+
 func MIDINote(key string) (uint8, bool) {
 	note, ok := midiNote[key]
 	return note, ok
+}
+
+func MIDINotePitch(note uint8) float64 {
+	return math.Log2(MIDINoteFrequency(note))
+}
+
+func MIDINoteFrequency(note uint8) float64 {
+	return 440 * math.Exp2((float64(note)-69)/12)
 }
 
 var midiNote = map[string]uint8{
