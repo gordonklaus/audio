@@ -1,7 +1,8 @@
 package audio
 
-func MIDINote(key string) uint8 {
-	return midiNote[key]
+func MIDINote(key string) (uint8, bool) {
+	note, ok := midiNote[key]
+	return note, ok
 }
 
 var midiNote = map[string]uint8{
